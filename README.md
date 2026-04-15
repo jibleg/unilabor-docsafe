@@ -56,6 +56,13 @@ Backend:
 Copy-Item unilabor-safedoc/.env.example unilabor-safedoc/.env
 ```
 
+La politica de `VIEWER` se controla desde estas variables del backend:
+
+- `VIEWER_ALLOWED_CATEGORY_LABELS`
+- `VIEWER_ALLOWED_CATEGORY_KEYWORDS`
+
+Con ellas puedes limitar explicitamente las categorias visibles para consulta del SGC ISO 15189.
+
 Frontend:
 
 ```powershell

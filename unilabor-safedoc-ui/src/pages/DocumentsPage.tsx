@@ -68,6 +68,7 @@ export const DocumentsPage = () => {
   const userRole = useAuthStore((state) => state.user?.role);
   const { documents, fetchDocuments, loading, error } = useDocumentStore();
   const canManageDocuments = hasAnyRole(userRole, ['ADMIN', 'EDITOR']);
+  const isViewer = hasAnyRole(userRole, ['VIEWER']);
 
   const loadDocuments = useCallback(async () => {
     await fetchDocuments({
@@ -320,9 +321,13 @@ export const DocumentsPage = () => {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Gestor de documentos</h1>
+          <h1 className="text-2xl font-bold text-slate-100">
+            {isViewer ? 'Consulta documental SGC ISO 15189' : 'Gestor de documentos'}
+          </h1>
           <p className="text-sm text-slate-400">
-            Administra documentos vigentes, historial derogado y estados operativos.
+            {isViewer
+              ? 'Acceso de solo lectura a documentos vigentes autorizados del sistema de gestion de calidad.'
+              : 'Administra documentos vigentes, historial derogado y estados operativos.'}
           </p>
           {canManageDocuments && (
             <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
@@ -366,7 +371,7 @@ export const DocumentsPage = () => {
             </button>
           ) : (
             <span className="inline-flex items-center rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
-              Modo lectura
+              Modo lectura SGC ISO 15189
             </span>
           )}
         </div>
@@ -612,7 +617,7 @@ export const DocumentsPage = () => {
                       type="button"
                       onClick={() => handleView(doc.filename)}
                       className="rounded-lg p-2 text-cyan-300 transition hover:bg-cyan-500/10 hover:text-cyan-100"
-                      title="Ver documento"
+                      title={isViewer ? 'Visualizar documento protegido' : 'Ver documento'}
                     >
                       <Eye size={18} />
                     </button>

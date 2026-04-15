@@ -703,6 +703,12 @@ export const viewDocument = async (req: AuthRequest, res: Response): Promise<voi
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+    res.setHeader('Accept-Ranges', 'none');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Permissions-Policy', 'clipboard-read=(), clipboard-write=(), display-capture=(), fullscreen=()');
+    res.setHeader('X-Download-Options', 'noopen');
     res.setHeader('X-Content-Type-Options', 'nosniff');
 
     res.sendFile(filePath);

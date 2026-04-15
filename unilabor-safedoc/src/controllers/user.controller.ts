@@ -6,6 +6,7 @@ import { sendWelcomeEmail } from '../services/email.service';
 import { resetPasswordForUserById } from '../services/password.service';
 import * as categoryService from '../services/category.service';
 import { AuthRequest, UserRole } from '../types';
+import { isViewerProtectedCategoryName } from '../policies/viewer-access.policy';
 
 const allowedRoles: UserRole[] = ['ADMIN', 'EDITOR', 'VIEWER'];
 
@@ -136,7 +137,11 @@ export const createUser = async (req: AuthRequest, res: Response) => {
 
       const hasCategoryStatusColumn = await categoriesStatusColumnExists(client);
       const categoriesValidationQuery = `
-        SELECT COUNT(*)::int AS total
+        SELECT COUNT(*)::int AS total,
+               COALESCE(
+                 json_agg(json_build_object('id', c.id, 'name', c.name)) FILTER (WHERE c.id IS NOT NULL),
+                 '[]'::json
+               ) AS categories
         FROM categories c
         WHERE c.id = ANY($1::int[])
         ${hasCategoryStatusColumn ? 'AND c.is_active = TRUE' : ''};
@@ -148,6 +153,21 @@ export const createUser = async (req: AuthRequest, res: Response) => {
         const invalidCategoryError = new Error('INVALID_CATEGORY_IDS');
         (invalidCategoryError as any).code = 'INVALID_CATEGORY_IDS';
         throw invalidCategoryError;
+      }
+
+      if (normalizedRole === 'VIEWER') {
+        const categoryRows = Array.isArray(categoriesValidation.rows[0]?.categories)
+          ? categoriesValidation.rows[0].categories
+          : [];
+        const invalidViewerCategories = categoryRows.filter(
+          (category: { name?: string }) => !isViewerProtectedCategoryName(category?.name)
+        );
+
+        if (invalidViewerCategories.length > 0) {
+          const invalidViewerCategoryError = new Error('INVALID_VIEWER_CATEGORY_POLICY');
+          (invalidViewerCategoryError as any).code = 'INVALID_VIEWER_CATEGORY_POLICY';
+          throw invalidViewerCategoryError;
+        }
       }
 
       await client.query(
@@ -190,6 +210,12 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     if (error?.code === 'INVALID_CATEGORY_IDS') {
       return res.status(400).json({
         message: 'Una o mas categorias no existen o estan inactivas.',
+      });
+    }
+
+    if (error?.code === 'INVALID_VIEWER_CATEGORY_POLICY') {
+      return res.status(400).json({
+        message: 'Los usuarios VIEWER solo pueden asignarse a categorias del SGC ISO 15189.',
       });
     }
 
@@ -307,6 +333,12 @@ export const replaceUserCategoriesById = async (req: AuthRequest, res: Response)
 
     if (error?.code === 'INVALID_CATEGORY_IDS') {
       return res.status(400).json({ message: 'Una o mas categorias no existen o estan inactivas' });
+    }
+
+    if (error?.code === 'INVALID_VIEWER_CATEGORY_POLICY') {
+      return res.status(400).json({
+        message: 'Los usuarios VIEWER solo pueden asignarse a categorias del SGC ISO 15189.',
+      });
     }
 
     if (error?.code === 'USER_CATEGORIES_TABLE_NOT_AVAILABLE') {
