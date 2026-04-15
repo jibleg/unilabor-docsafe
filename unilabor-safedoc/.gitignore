@@ -1,0 +1,35 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Runtime-generated files
+uploads/*
+!uploads/avatars/
+!uploads/documents/
+uploads/avatars/*
+!uploads/avatars/.gitkeep
+uploads/documents/*
+!uploads/documents/.gitkeep
+
+storage/*
+!storage/pdfs/
+storage/pdfs/*
+!storage/pdfs/.gitkeep
+
+# Local logs
+*.log
+
+# Stale root-level compiled outputs
+/index.js
+/index.js.map
+/index.d.ts
+/index.d.ts.map
+
+# Local helper kept outside version control
+/index.ts

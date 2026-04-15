@@ -1,0 +1,291 @@
+{
+  "id": "8c90d355-c4f4-4fbf-a8d2-8aa0dba72d86",
+  "name": "SafeDoc Backend Local",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@example.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "adminPassword",
+      "value": "Admin123*",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "adminNewPassword",
+      "value": "Admin123*New",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "adminUserId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "adminMustChangePassword",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "editorEmail",
+      "value": "editor@example.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "editorPassword",
+      "value": "Editor123*",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "editorNewPassword",
+      "value": "Editor123*New",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "editorToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "editorUserId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "editorMustChangePassword",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "viewerEmail",
+      "value": "viewer@example.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "viewerPassword",
+      "value": "Viewer123*",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "viewerNewPassword",
+      "value": "Viewer123*New",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "viewerToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "viewerUserId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "viewerMustChangePassword",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "newUserEmail",
+      "value": "nuevo.usuario@example.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "newUserFullName",
+      "value": "Usuario Nuevo",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "newUserRole",
+      "value": "VIEWER",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "managedUserId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "resetTempPassword",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "resetGeneratedPassword",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "categoryName",
+      "value": "Seguridad Industrial",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "editorCategoryName",
+      "value": "Operacion Planta",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "editorCategoryNameUpdated",
+      "value": "Operacion Planta v2",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "editorCategoryId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "page",
+      "value": "1",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "limit",
+      "value": "10",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "categorySearch",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "includeInactive",
+      "value": "false",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentsIncludeInactive",
+      "value": "false",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "pdfFilePath",
+      "value": "C:\\\\Developer\\\\unilabor-safedoc\\\\postman\\\\sample.pdf",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "avatarFilePath",
+      "value": "C:\\\\Developer\\\\unilabor-safedoc\\\\postman\\\\sample-avatar.png",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentTitle",
+      "value": "Procedimiento Estandar",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentTitleUpdated",
+      "value": "Procedimiento Estandar v2",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentDescription",
+      "value": "Documento de prueba para flujo RBAC",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentDescriptionUpdated",
+      "value": "Documento actualizado desde endpoint de metadata",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentPublishDate",
+      "value": "2026-04-07",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentPublishDateUpdated",
+      "value": "2026-04-08",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentExpiryDate",
+      "value": "2027-04-07",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentExpiryDateUpdated",
+      "value": "2027-04-08",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "documentFilename",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-04-07T15:30:00.000Z",
+  "_postman_exported_using": "Codex GPT-5"
+}
