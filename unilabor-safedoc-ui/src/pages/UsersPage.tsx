@@ -127,6 +127,7 @@ const confirmAction = (title: string, description: string, confirmLabel: string)
 
 export const UsersPage = () => {
   const currentUserId = useAuthStore((state) => state.user?.id ?? '');
+  const currentUserEmail = useAuthStore((state) => state.user?.email?.trim().toLowerCase() ?? '');
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -220,7 +221,7 @@ export const UsersPage = () => {
     setCreateForm((currentForm) => ({
       ...currentForm,
       role,
-      categoryIds: role === 'VIEWER' ? currentForm.categoryIds : [],
+      categoryIds: currentForm.categoryIds,
     }));
   };
 
@@ -228,7 +229,7 @@ export const UsersPage = () => {
     setEditForm((currentForm) => ({
       ...currentForm,
       role,
-      categoryIds: role === 'VIEWER' ? currentForm.categoryIds : [],
+      categoryIds: currentForm.categoryIds,
     }));
   };
 
@@ -302,7 +303,7 @@ export const UsersPage = () => {
       email: createForm.email.trim(),
       full_name: createForm.full_name.trim(),
       role: createForm.role,
-      category_ids: createForm.role === 'VIEWER' ? createForm.categoryIds : undefined,
+      category_ids: createForm.categoryIds,
     };
 
     setCreating(true);
@@ -328,10 +329,6 @@ export const UsersPage = () => {
       categoryIds: [],
     });
     setIsEditModalOpen(true);
-
-    if (roleValue !== 'VIEWER') {
-      return;
-    }
 
     setLoadingUserCategories(true);
     try {
@@ -377,9 +374,7 @@ export const UsersPage = () => {
     try {
       await updateUserById(editingUser.id, payload);
 
-      if (editForm.role === 'VIEWER') {
-        await updateUserCategories(editingUser.id, editForm.categoryIds);
-      }
+      await updateUserCategories(editingUser.id, editForm.categoryIds);
 
       closeEditModal();
       await loadUsers();
@@ -391,6 +386,15 @@ export const UsersPage = () => {
   };
 
   const removeUser = async (user: ManagedUser) => {
+    const isCurrentUser =
+      (currentUserId.length > 0 && currentUserId === user.id) ||
+      (currentUserEmail.length > 0 && currentUserEmail === user.email.trim().toLowerCase());
+
+    if (isCurrentUser) {
+      notifyWarning('No puedes eliminar tu propia cuenta desde este modulo');
+      return;
+    }
+
     const confirmed = await confirmAction(
       `Se eliminara al usuario "${user.full_name}".`,
       'La cuenta sera desactivada y no podra iniciar sesion.',
@@ -525,7 +529,10 @@ export const UsersPage = () => {
               </tr>
             ) : (
               visibleUsers.map((user) => {
-                const isCurrentUser = currentUserId.length > 0 && currentUserId === user.id;
+                const isCurrentUser =
+                  (currentUserId.length > 0 && currentUserId === user.id) ||
+                  (currentUserEmail.length > 0 &&
+                    currentUserEmail === user.email.trim().toLowerCase());
                 const isDeleting = deletingId === user.id;
                 const isResetting = resettingId === user.id;
 
@@ -685,39 +692,44 @@ export const UsersPage = () => {
                 </select>
               </div>
 
-              {createForm.role === 'VIEWER' && (
-                <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Categorias asignadas
-                  </p>
+              <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Categorias asignadas
+                </p>
+                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
+                  {createForm.role === 'VIEWER'
+                    ? 'El usuario VIEWER debe tener al menos una categoria para visualizar documentos.'
+                    : 'La asignacion de categorias es opcional para este rol.'}
+                </p>
 
-                  {loadingCategories ? (
-                    <p className="text-xs text-[var(--unilabor-neutral)]">Cargando categorias...</p>
-                  ) : categories.length === 0 ? (
-                    <p className="text-xs text-[var(--unilabor-neutral)]">No hay categorias disponibles.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {categories.map((category) => {
-                        const selected = createForm.categoryIds.includes(category.id);
-                        return (
-                          <label
-                            key={category.id}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleCreateCategory(category.id)}
-                              className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
-                            />
-                            <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>{category.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
+                {loadingCategories ? (
+                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando categorias...</p>
+                ) : categories.length === 0 ? (
+                  <p className="text-xs text-[var(--unilabor-neutral)]">No hay categorias disponibles.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {categories.map((category) => {
+                      const selected = createForm.categoryIds.includes(category.id);
+                      return (
+                        <label
+                          key={category.id}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleCreateCategory(category.id)}
+                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
+                          />
+                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
+                            {category.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               <div className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2 text-xs text-[var(--color-brand-700)]">
                 Al crear el usuario, el sistema envia por correo una contrasena temporal y se fuerza el cambio en el primer inicio de sesion.
@@ -816,39 +828,44 @@ export const UsersPage = () => {
                 </select>
               </div>
 
-              {editForm.role === 'VIEWER' && (
-                <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Categorias asignadas
-                  </p>
+              <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Categorias asignadas
+                </p>
+                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
+                  {editForm.role === 'VIEWER'
+                    ? 'El usuario VIEWER debe tener al menos una categoria para visualizar documentos.'
+                    : 'La asignacion de categorias es opcional para este rol.'}
+                </p>
 
-                  {loadingCategories || loadingUserCategories ? (
-                    <p className="text-xs text-[var(--unilabor-neutral)]">Cargando categorias...</p>
-                  ) : categories.length === 0 ? (
-                    <p className="text-xs text-[var(--unilabor-neutral)]">No hay categorias disponibles.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {categories.map((category) => {
-                        const selected = editForm.categoryIds.includes(category.id);
-                        return (
-                          <label
-                            key={category.id}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() => toggleEditCategory(category.id)}
-                              className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
-                            />
-                            <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>{category.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
+                {loadingCategories || loadingUserCategories ? (
+                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando categorias...</p>
+                ) : categories.length === 0 ? (
+                  <p className="text-xs text-[var(--unilabor-neutral)]">No hay categorias disponibles.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {categories.map((category) => {
+                      const selected = editForm.categoryIds.includes(category.id);
+                      return (
+                        <label
+                          key={category.id}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleEditCategory(category.id)}
+                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
+                          />
+                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
+                            {category.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               <div className="flex justify-end gap-2">
                 <button

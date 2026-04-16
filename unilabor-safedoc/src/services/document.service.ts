@@ -3,7 +3,6 @@ import path from 'path';
 import pool from '../config/db';
 import { UserRole } from '../types';
 import * as categoryService from './category.service';
-import { isViewerProtectedCategoryName } from '../policies/viewer-access.policy';
 
 type DocumentId = string | number;
 
@@ -524,7 +523,7 @@ export const listDocumentsForUser = async (
   `;
 
   const result = await pool.query(query, [userId]);
-  return result.rows.filter((document) => isViewerProtectedCategoryName(document.category_name));
+  return result.rows;
 };
 
 export const searchDocumentsForUser = async (
@@ -655,7 +654,7 @@ export const searchDocumentsForUser = async (
   `;
 
   const result = await pool.query(query, values);
-  return result.rows.filter((document) => isViewerProtectedCategoryName(document.category_name));
+  return result.rows;
 };
 
 export const findDocumentByFilename = async (filename: string): Promise<DocumentLookup | null> => {

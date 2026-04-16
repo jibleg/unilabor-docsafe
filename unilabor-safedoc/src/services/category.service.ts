@@ -1,6 +1,5 @@
 import pool from '../config/db';
 import { UserRole } from '../types';
-import { isViewerProtectedCategoryName } from '../policies/viewer-access.policy';
 
 export interface CategoryRecord {
   id: number;
@@ -317,10 +316,6 @@ export const listCategoriesForUser = async (userId: string, role: UserRole): Pro
   `;
 
   const result = await pool.query(query, [userId]);
-  if (role === 'VIEWER') {
-    return result.rows.filter((category) => isViewerProtectedCategoryName(category.name));
-  }
-
   return result.rows;
 };
 
@@ -363,30 +358,6 @@ export const replaceUserCategories = async (userId: string, categoryIds: number[
   }
 
   if (uniqueCategoryIds.length > 0) {
-    const targetUserResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1 LIMIT 1',
-      [userId]
-    );
-    const targetUserRole = String(targetUserResult.rows[0]?.role ?? '').toUpperCase() as UserRole;
-
-    if (targetUserRole === 'VIEWER') {
-      const viewerCategoryPolicyQuery = `
-        SELECT c.id, c.name
-        FROM categories c
-        WHERE c.id = ANY($1::int[]);
-      `;
-      const viewerCategoryPolicyResult = await pool.query(viewerCategoryPolicyQuery, [uniqueCategoryIds]);
-      const invalidViewerCategories = viewerCategoryPolicyResult.rows.filter(
-        (category) => !isViewerProtectedCategoryName(category.name)
-      );
-
-      if (invalidViewerCategories.length > 0) {
-        const invalidViewerCategoryError = new Error('INVALID_VIEWER_CATEGORY_POLICY');
-        (invalidViewerCategoryError as any).code = 'INVALID_VIEWER_CATEGORY_POLICY';
-        throw invalidViewerCategoryError;
-      }
-    }
-
     const availabilityQuery = `
       SELECT COUNT(*)::int AS total
       FROM categories c
@@ -503,15 +474,6 @@ export const canUserAccessCategory = async (
   }
 
   if (role === 'VIEWER') {
-    const categoryResult = await pool.query(
-      'SELECT name FROM categories WHERE id = $1 LIMIT 1',
-      [categoryId]
-    );
-    const categoryName = String(categoryResult.rows[0]?.name ?? '');
-    if (!isViewerProtectedCategoryName(categoryName)) {
-      return false;
-    }
-
     return hasUserCategoryAssignment(userId, categoryId);
   }
 

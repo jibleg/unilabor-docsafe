@@ -322,11 +322,11 @@ export const DocumentsPage = () => {
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">
-            {isViewer ? 'Consulta documental SGC ISO 15189' : 'Gestor de documentos'}
+            {isViewer ? 'Consulta documental' : 'Gestor de documentos'}
           </h1>
           <p className="text-sm text-[var(--unilabor-neutral)]">
             {isViewer
-              ? 'Acceso de solo lectura a documentos vigentes autorizados del sistema de gestion de calidad.'
+              ? 'Acceso de solo lectura a los documentos vigentes de las categorias asignadas.'
               : 'Administra documentos vigentes, historial derogado y estados operativos.'}
           </p>
           {canManageDocuments && (
@@ -371,7 +371,7 @@ export const DocumentsPage = () => {
             </button>
           ) : (
             <span className="inline-flex items-center rounded-2xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-brand-700)]">
-              Modo lectura SGC ISO 15189
+              Modo lectura
             </span>
           )}
         </div>

@@ -6,7 +6,6 @@ import { sendWelcomeEmail } from '../services/email.service';
 import { resetPasswordForUserById } from '../services/password.service';
 import * as categoryService from '../services/category.service';
 import { AuthRequest, UserRole } from '../types';
-import { isViewerProtectedCategoryName } from '../policies/viewer-access.policy';
 
 const allowedRoles: UserRole[] = ['ADMIN', 'EDITOR', 'VIEWER'];
 
@@ -155,21 +154,6 @@ export const createUser = async (req: AuthRequest, res: Response) => {
         throw invalidCategoryError;
       }
 
-      if (normalizedRole === 'VIEWER') {
-        const categoryRows = Array.isArray(categoriesValidation.rows[0]?.categories)
-          ? categoriesValidation.rows[0].categories
-          : [];
-        const invalidViewerCategories = categoryRows.filter(
-          (category: { name?: string }) => !isViewerProtectedCategoryName(category?.name)
-        );
-
-        if (invalidViewerCategories.length > 0) {
-          const invalidViewerCategoryError = new Error('INVALID_VIEWER_CATEGORY_POLICY');
-          (invalidViewerCategoryError as any).code = 'INVALID_VIEWER_CATEGORY_POLICY';
-          throw invalidViewerCategoryError;
-        }
-      }
-
       await client.query(
         `
           INSERT INTO user_categories (user_id, category_id)
@@ -213,12 +197,6 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    if (error?.code === 'INVALID_VIEWER_CATEGORY_POLICY') {
-      return res.status(400).json({
-        message: 'Los usuarios VIEWER solo pueden asignarse a categorias del SGC ISO 15189.',
-      });
-    }
-
     console.error(error);
     res.status(500).json({ message: 'Error interno al crear usuario' });
   } finally {
@@ -253,10 +231,11 @@ export const getAllUsers = async (_req: Request, res: Response) => {
           FROM users u
           LEFT JOIN user_categories uc ON uc.user_id = u.id
           LEFT JOIN categories c ON c.id = uc.category_id
+          WHERE u.is_active = TRUE
           GROUP BY u.id, u.email, u.full_name, u.role, u.is_active, u.created_at
           ORDER BY u.created_at DESC;
         `
-      : 'SELECT id, email, full_name, role, is_active, created_at FROM users ORDER BY created_at DESC';
+      : 'SELECT id, email, full_name, role, is_active, created_at FROM users WHERE is_active = TRUE ORDER BY created_at DESC';
 
     const result = await pool.query(query);
     res.json(result.rows);
@@ -333,12 +312,6 @@ export const replaceUserCategoriesById = async (req: AuthRequest, res: Response)
 
     if (error?.code === 'INVALID_CATEGORY_IDS') {
       return res.status(400).json({ message: 'Una o mas categorias no existen o estan inactivas' });
-    }
-
-    if (error?.code === 'INVALID_VIEWER_CATEGORY_POLICY') {
-      return res.status(400).json({
-        message: 'Los usuarios VIEWER solo pueden asignarse a categorias del SGC ISO 15189.',
-      });
     }
 
     if (error?.code === 'USER_CATEGORIES_TABLE_NOT_AVAILABLE') {

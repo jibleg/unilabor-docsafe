@@ -517,36 +517,7 @@ export const updateUserCategories = async (
 
 export const resetUserPassword = async (userId: string): Promise<void> => {
   const encodedId = encodeURIComponent(userId);
-
-  const attempts = [
-    () => api.post(`/users/${encodedId}/reset-password`),
-    () => api.patch(`/users/${encodedId}/reset-password`),
-  ];
-
-  let lastError: unknown = null;
-
-  for (const attempt of attempts) {
-    try {
-      await attempt();
-      return;
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status ?? 0;
-        if (status === 404 || status === 405) {
-          lastError = error;
-          continue;
-        }
-      }
-
-      throw error;
-    }
-  }
-
-  if (lastError) {
-    throw lastError;
-  }
-
-  throw new Error('No se pudo restablecer la contrasena del usuario');
+  await api.patch(`/users/${encodedId}/reset-password`);
 };
 
 const createDocumentListParams = (options: ListDocumentsOptions) => {
