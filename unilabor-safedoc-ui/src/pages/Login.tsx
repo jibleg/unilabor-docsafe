@@ -5,6 +5,8 @@ import { getApiErrorMessage, login } from '../api/service';
 import { FormFieldError } from '../components/FormFieldError';
 import { useNativeFormValidation } from '../hooks/useNativeFormValidation';
 import { useAuthStore } from '../store/useAuthStore';
+import unilaborIcon from '../assets/icono-UNILABOR.png';
+import loginPageBackground from '../assets/login-page-v1.png';
 
 const featureCards = [
   {
@@ -81,15 +83,30 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-[linear-gradient(180deg,#f8fbfd_0%,#eef5fa_52%,#dbe8f2_100%)] text-[var(--unilabor-ink)]">
-      <section className="relative hidden overflow-hidden border-r border-[rgba(0,65,106,0.08)] bg-[linear-gradient(135deg,#ffffff_0%,#eef5fa_52%,#dbe8f2_100%)] lg:flex lg:h-dvh lg:w-1/2">
+    <div className="relative isolate flex h-dvh overflow-hidden bg-[linear-gradient(180deg,#f8fbfd_0%,#eef5fa_52%,#dbe8f2_100%)] text-[var(--unilabor-ink)]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <img
+          src={loginPageBackground}
+          alt=""
+          aria-hidden="true"
+          className="h-full w-full object-cover object-center opacity-[0.28] sm:object-[center_22%] sm:opacity-[0.34] lg:object-[center_center] lg:opacity-[0.4] xl:opacity-[0.46]"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(248,251,253,0.36)_0%,rgba(238,245,250,0.44)_52%,rgba(219,232,242,0.52)_100%)]" />
+      </div>
+
+      <section className="relative hidden overflow-hidden border-r border-[rgba(0,65,106,0.08)] bg-[linear-gradient(135deg,rgba(255,255,255,0.48)_0%,rgba(238,245,250,0.56)_52%,rgba(219,232,242,0.66)_100%)] lg:flex lg:h-dvh lg:w-1/2">
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0%,rgba(238,245,250,0.26)_52%,rgba(219,232,242,0.36)_100%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(124,173,211,0.24),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(191,212,230,0.28),transparent_30%)]" />
 
         <div className="relative z-10 flex h-full w-full flex-col justify-between overflow-y-auto p-8 xl:p-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div>
             <div className="inline-flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 px-4 py-2 backdrop-blur-md shadow-xl shadow-[rgba(0,65,106,0.08)] transition-all duration-300 hover:-translate-y-0.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-brand-200)] text-[var(--color-brand-700)] font-black text-lg">
-                U
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-1 shadow-[0_8px_18px_rgba(0,65,106,0.08)] xl:h-11 xl:w-11">
+                <img
+                  src={unilaborIcon}
+                  alt="Icono Unilabor"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">UNILABOR</p>
@@ -134,13 +151,18 @@ export const LoginPage = () => {
         </div>
       </section>
 
-      <section className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#f8fbfd_0%,#eef5fa_52%,#dbe8f2_100%)] px-6 py-6 sm:px-10 lg:w-1/2 lg:py-8">
+      <section className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-[linear-gradient(180deg,rgba(248,251,253,0.34)_0%,rgba(238,245,250,0.44)_52%,rgba(219,232,242,0.52)_100%)] px-6 py-6 sm:px-10 lg:w-1/2 lg:py-8">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(248,251,253,0.12)_0%,rgba(238,245,250,0.22)_52%,rgba(219,232,242,0.32)_100%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(124,173,211,0.2),transparent_30%),linear-gradient(180deg,transparent,rgba(191,212,230,0.2))]" />
         <div className="w-full max-w-md overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="mb-6 lg:hidden">
             <div className="inline-flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 px-4 py-2 shadow-xl shadow-[rgba(0,65,106,0.08)]">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-brand-200)] text-[var(--color-brand-700)] font-black text-lg">
-                U
+              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-1 shadow-[0_8px_18px_rgba(0,65,106,0.08)] sm:h-10 sm:w-10">
+                <img
+                  src={unilaborIcon}
+                  alt="Icono Unilabor"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">UNILABOR</p>
@@ -149,7 +171,7 @@ export const LoginPage = () => {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.1)] bg-white/92 shadow-2xl shadow-[rgba(0,65,106,0.12)] backdrop-blur-xl">
+          <div className="overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.1)] bg-white/88 shadow-2xl shadow-[rgba(0,65,106,0.12)] backdrop-blur-xl">
             <div className="h-2 w-full bg-[linear-gradient(90deg,#00416a_0%,#0069a6_48%,#7cadd3_100%)]" />
             <div className="p-8 sm:p-9">
               <div>
@@ -278,7 +300,7 @@ export const LoginPage = () => {
               </form>
 
               <div className="mt-6 grid grid-cols-3 gap-3">
-                {['ISO', 'Trazabilidad', 'Control'].map((item) => (
+                {['ISO-15189', 'Trazabilidad', 'Control'].map((item) => (
                   <div
                     key={item}
                     className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[linear-gradient(180deg,rgba(191,212,230,0.34),rgba(255,255,255,0.95))] px-3 py-4 text-center transition-all duration-300 hover:border-[rgba(124,173,211,0.35)]"

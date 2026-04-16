@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
 import { useUserAvatar } from '../hooks/useUserAvatar';
+import unilaborIcon from '../assets/icono-UNILABOR.png';
 
 interface SidebarMenuItem {
   icon: typeof LayoutDashboard;
@@ -51,8 +52,12 @@ export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) =
       <div className="border-b border-[rgba(0,65,106,0.08)] p-4">
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[linear-gradient(135deg,#ffffff_0%,#eef5fa_100%)] px-3 py-2 shadow-[0_12px_28px_rgba(0,65,106,0.08)]">
           <div className="inline-flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-brand-200)] text-sm font-black text-[var(--color-brand-700)]">
-              U
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-1 shadow-[0_8px_18px_rgba(0,65,106,0.08)] xl:h-11 xl:w-11">
+              <img
+                src={unilaborIcon}
+                alt="Icono Unilabor"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <h2 className="text-base font-bold tracking-tight text-[var(--color-brand-700)]">SafeDoc</h2>

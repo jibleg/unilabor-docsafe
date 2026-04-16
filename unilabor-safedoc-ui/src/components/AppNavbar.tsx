@@ -14,6 +14,7 @@ import {
 import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
 import { useUserAvatar } from '../hooks/useUserAvatar';
+import unilaborIcon from '../assets/icono-UNILABOR.png';
 
 interface NavbarItem {
   icon: typeof LayoutDashboard;
@@ -58,8 +59,12 @@ export const AppNavbar = () => {
       <div className="navbar px-4">
         <div className="navbar-start">
           <NavLink to="/dashboard" className="btn btn-ghost px-2 normal-case">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-brand-200)] text-sm font-black text-[var(--color-brand-700)]">
-              U
+            <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-1 shadow-[0_8px_18px_rgba(0,65,106,0.08)] sm:h-10 sm:w-10">
+              <img
+                src={unilaborIcon}
+                alt="Icono Unilabor"
+                className="h-full w-full object-contain"
+              />
             </span>
             <span className="ml-2 text-base font-bold tracking-tight text-[var(--color-brand-700)]">SafeDoc</span>
           </NavLink>
