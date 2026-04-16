@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Edit3, KeyRound, Loader2, Plus, RefreshCw, Trash2, UserPlus, X } from 'lucide-react';
+import { Edit3, KeyRound, Loader2, Plus, RefreshCw, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'react-toastify';
 import {
   createUser,
@@ -55,12 +55,12 @@ const getRoleLabel = (role: string): string => {
 const getRoleBadgeClassName = (role: string): string => {
   const normalizedRole = normalizeRole(role);
   if (normalizedRole === 'ADMIN') {
-    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
+    return 'border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] text-[var(--color-brand-700)]';
   }
   if (normalizedRole === 'EDITOR') {
-    return 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200';
+    return 'border-[rgba(124,173,211,0.28)] bg-[rgba(191,212,230,0.34)] text-[var(--color-brand-700)]';
   }
-  return 'border-slate-600 bg-slate-800/70 text-slate-200';
+  return 'border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.16)] text-[var(--color-brand-700)]';
 };
 
 const normalizeRoleValue = (role: string): RoleValue => {
@@ -89,12 +89,12 @@ const confirmAction = (title: string, description: string, confirmLabel: string)
     toast.warning(
       ({ closeToast }) => (
         <div className="space-y-3">
-          <p className="text-sm text-slate-100">{title}</p>
-          <p className="text-xs text-slate-300">{description}</p>
+          <p className="text-sm text-[var(--color-brand-700)]">{title}</p>
+          <p className="text-xs text-[var(--unilabor-neutral)]">{description}</p>
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800"
+              className="rounded-lg border border-[rgba(0,65,106,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
               onClick={() => {
                 settle(false);
                 closeToast();
@@ -104,7 +104,7 @@ const confirmAction = (title: string, description: string, confirmLabel: string)
             </button>
             <button
               type="button"
-              className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
+              className="rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
               onClick={() => {
                 settle(true);
                 closeToast();
@@ -442,8 +442,8 @@ export const UsersPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">Personal del laboratorio</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Personal del laboratorio</h1>
+          <p className="text-sm text-[var(--unilabor-neutral)]">
             Administra usuarios, roles y reseteo de contrasenas temporales.
           </p>
         </div>
@@ -452,7 +452,7 @@ export const UsersPage = () => {
           <button
             type="button"
             onClick={openCreateModal}
-            className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2.5 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
+            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
           >
             <UserPlus size={16} />
             Nuevo usuario
@@ -462,7 +462,7 @@ export const UsersPage = () => {
             type="button"
             onClick={() => void loadUsers()}
             disabled={loadingUsers}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw size={16} className={loadingUsers ? 'animate-spin' : ''} />
             Recargar
@@ -470,22 +470,22 @@ export const UsersPage = () => {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-xl shadow-slate-950/40 backdrop-blur-xl">
+      <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <input
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar por nombre, correo o rol..."
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 lg:max-w-md"
+            className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)] lg:max-w-md"
           />
 
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className="flex items-center gap-2 text-xs text-[var(--unilabor-neutral)]">
             <span>Filas por pagina</span>
             <select
               value={pageSize}
               onChange={(event) => setPageSize(Number(event.target.value))}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+              className="rounded-lg border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-2.5 py-1.5 text-xs text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
             >
               {PAGE_SIZE_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -497,29 +497,29 @@ export const UsersPage = () => {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 shadow-xl shadow-slate-950/40 backdrop-blur-xl">
+      <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
         <table className="w-full text-left">
-          <thead className="border-b border-slate-800 bg-slate-900/80">
+          <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
             <tr>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-slate-400">Nombre</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-slate-400">Email</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-slate-400">Rol</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-slate-400">Estado</th>
-              <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-400">
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Nombre</th>
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Email</th>
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Rol</th>
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Estado</th>
+              <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                 Acciones
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
+          <tbody className="divide-y divide-[rgba(0,65,106,0.08)]">
             {loadingUsers ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-slate-500">
+                <td colSpan={5} className="p-10 text-center text-[var(--unilabor-neutral)]">
                   Cargando usuarios...
                 </td>
               </tr>
             ) : visibleUsers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-slate-500">
+                <td colSpan={5} className="p-10 text-center text-[var(--unilabor-neutral)]">
                   No hay usuarios para mostrar.
                 </td>
               </tr>
@@ -530,9 +530,9 @@ export const UsersPage = () => {
                 const isResetting = resettingId === user.id;
 
                 return (
-                  <tr key={user.id} className="transition-colors hover:bg-slate-800/50">
-                    <td className="px-6 py-4 text-sm font-semibold text-slate-100">{user.full_name}</td>
-                    <td className="px-6 py-4 text-sm text-slate-300">{user.email}</td>
+                  <tr key={user.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
+                    <td className="px-6 py-4 text-sm font-semibold text-[var(--color-brand-700)]">{user.full_name}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--unilabor-ink)]">{user.email}</td>
                     <td className="px-6 py-4">
                       <span
                         className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getRoleBadgeClassName(
@@ -542,13 +542,13 @@ export const UsersPage = () => {
                         {getRoleLabel(user.role)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-slate-300">
+                    <td className="px-6 py-4 text-xs text-[var(--unilabor-ink)]">
                       {user.is_active ? (
-                        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-semibold uppercase tracking-wide text-emerald-200">
+                        <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-2.5 py-1 font-semibold uppercase tracking-wide text-[var(--color-brand-700)]">
                           Activo
                         </span>
                       ) : (
-                        <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 font-semibold uppercase tracking-wide text-rose-200">
+                        <span className="rounded-full border border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.16)] px-2.5 py-1 font-semibold uppercase tracking-wide text-[var(--color-brand-700)]">
                           Inactivo
                         </span>
                       )}
@@ -559,7 +559,7 @@ export const UsersPage = () => {
                           type="button"
                           onClick={() => void openEditModal(user)}
                           disabled={isDeleting || isResetting}
-                          className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <Edit3 size={14} />
                           Editar
@@ -569,7 +569,7 @@ export const UsersPage = () => {
                           type="button"
                           onClick={() => void triggerPasswordReset(user)}
                           disabled={isCurrentUser || isDeleting || isResetting}
-                          className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[rgba(124,173,211,0.28)] bg-[rgba(191,212,230,0.34)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
                           title={isCurrentUser ? 'No puedes resetear tu propia clave desde aqui' : ''}
                         >
                           <KeyRound size={14} />
@@ -580,7 +580,7 @@ export const UsersPage = () => {
                           type="button"
                           onClick={() => void removeUser(user)}
                           disabled={isCurrentUser || isDeleting || isResetting}
-                          className="inline-flex items-center gap-1 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.16)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(151,163,172,0.24)] disabled:cursor-not-allowed disabled:opacity-60"
                           title={isCurrentUser ? 'No puedes eliminar tu propia cuenta' : ''}
                         >
                           <Trash2 size={14} />
@@ -596,7 +596,7 @@ export const UsersPage = () => {
         </table>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 px-4 py-3 text-sm text-[var(--unilabor-neutral)] shadow-xl shadow-[rgba(0,65,106,0.08)] sm:flex-row sm:items-center sm:justify-between">
         <span>
           Mostrando {startRecord} - {endRecord} de {filteredUsers.length}
         </span>
@@ -605,18 +605,18 @@ export const UsersPage = () => {
             type="button"
             onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
             disabled={currentPage <= 1}
-            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-[rgba(0,65,106,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Anterior
           </button>
-          <span className="text-xs font-semibold text-slate-300">
+          <span className="text-xs font-semibold text-[var(--color-brand-700)]">
             Pagina {currentPage} de {totalPages}
           </span>
           <button
             type="button"
             onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
             disabled={currentPage >= totalPages}
-            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-[rgba(0,65,106,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Siguiente
           </button>
@@ -624,24 +624,16 @@ export const UsersPage = () => {
       </div>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-              <h2 className="text-base font-bold text-slate-100">Nuevo usuario</h2>
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                disabled={creating}
-                className="rounded-lg px-2 py-1 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <X size={16} />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
+            <div className="border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
+              <h2 className="text-base font-bold text-[var(--color-brand-700)]">Nuevo usuario</h2>
             </div>
 
             <div className="space-y-4 px-4 py-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Nombre completo
                   </label>
                   <input
@@ -652,13 +644,13 @@ export const UsersPage = () => {
                         full_name: event.target.value,
                       }))
                     }
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     placeholder="Nombre Apellido"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Correo
                   </label>
                   <input
@@ -670,20 +662,20 @@ export const UsersPage = () => {
                         email: event.target.value,
                       }))
                     }
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     placeholder="usuario@unilabor.mx"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                   Rol
                 </label>
                 <select
                   value={createForm.role}
                   onChange={(event) => updateCreateRole(normalizeRoleValue(event.target.value))}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                  className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                 >
                   {ROLE_OPTIONS.map((roleOption) => (
                     <option key={roleOption.value} value={roleOption.value}>
@@ -694,15 +686,15 @@ export const UsersPage = () => {
               </div>
 
               {createForm.role === 'VIEWER' && (
-                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Categorias asignadas
                   </p>
 
                   {loadingCategories ? (
-                    <p className="text-xs text-slate-500">Cargando categorias...</p>
+                    <p className="text-xs text-[var(--unilabor-neutral)]">Cargando categorias...</p>
                   ) : categories.length === 0 ? (
-                    <p className="text-xs text-slate-500">No hay categorias disponibles.</p>
+                    <p className="text-xs text-[var(--unilabor-neutral)]">No hay categorias disponibles.</p>
                   ) : (
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {categories.map((category) => {
@@ -710,15 +702,15 @@ export const UsersPage = () => {
                         return (
                           <label
                             key={category.id}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-xs text-slate-300 transition hover:border-cyan-500/40"
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
                           >
                             <input
                               type="checkbox"
                               checked={selected}
                               onChange={() => toggleCreateCategory(category.id)}
-                              className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-cyan-500"
+                              className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
                             />
-                            <span className={selected ? 'text-cyan-200' : ''}>{category.name}</span>
+                            <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>{category.name}</span>
                           </label>
                         );
                       })}
@@ -727,7 +719,7 @@ export const UsersPage = () => {
                 </div>
               )}
 
-              <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
+              <div className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2 text-xs text-[var(--color-brand-700)]">
                 Al crear el usuario, el sistema envia por correo una contrasena temporal y se fuerza el cambio en el primer inicio de sesion.
               </div>
 
@@ -736,7 +728,7 @@ export const UsersPage = () => {
                   type="button"
                   onClick={closeCreateModal}
                   disabled={creating}
-                  className="rounded-xl border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -744,7 +736,7 @@ export const UsersPage = () => {
                   type="button"
                   onClick={() => void submitCreateUser()}
                   disabled={creating}
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {creating ? (
                     <>
@@ -765,24 +757,16 @@ export const UsersPage = () => {
       )}
 
       {isEditModalOpen && editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-              <h2 className="text-base font-bold text-slate-100">Editar usuario</h2>
-              <button
-                type="button"
-                onClick={closeEditModal}
-                disabled={savingEdit}
-                className="rounded-lg px-2 py-1 text-sm text-slate-400 transition hover:bg-slate-800 hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <X size={16} />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
+            <div className="border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
+              <h2 className="text-base font-bold text-[var(--color-brand-700)]">Editar usuario</h2>
             </div>
 
             <div className="space-y-4 px-4 py-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Nombre completo
                   </label>
                   <input
@@ -793,12 +777,12 @@ export const UsersPage = () => {
                         full_name: event.target.value,
                       }))
                     }
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Correo
                   </label>
                   <input
@@ -810,19 +794,19 @@ export const UsersPage = () => {
                         email: event.target.value,
                       }))
                     }
-                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                   Rol
                 </label>
                 <select
                   value={editForm.role}
                   onChange={(event) => updateEditRole(normalizeRoleValue(event.target.value))}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                  className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                 >
                   {ROLE_OPTIONS.map((roleOption) => (
                     <option key={roleOption.value} value={roleOption.value}>
@@ -833,15 +817,15 @@ export const UsersPage = () => {
               </div>
 
               {editForm.role === 'VIEWER' && (
-                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Categorias asignadas
                   </p>
 
                   {loadingCategories || loadingUserCategories ? (
-                    <p className="text-xs text-slate-500">Cargando categorias...</p>
+                    <p className="text-xs text-[var(--unilabor-neutral)]">Cargando categorias...</p>
                   ) : categories.length === 0 ? (
-                    <p className="text-xs text-slate-500">No hay categorias disponibles.</p>
+                    <p className="text-xs text-[var(--unilabor-neutral)]">No hay categorias disponibles.</p>
                   ) : (
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {categories.map((category) => {
@@ -849,15 +833,15 @@ export const UsersPage = () => {
                         return (
                           <label
                             key={category.id}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2 text-xs text-slate-300 transition hover:border-cyan-500/40"
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
                           >
                             <input
                               type="checkbox"
                               checked={selected}
                               onChange={() => toggleEditCategory(category.id)}
-                              className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-cyan-500"
+                              className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
                             />
-                            <span className={selected ? 'text-cyan-200' : ''}>{category.name}</span>
+                            <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>{category.name}</span>
                           </label>
                         );
                       })}
@@ -871,7 +855,7 @@ export const UsersPage = () => {
                   type="button"
                   onClick={closeEditModal}
                   disabled={savingEdit}
-                  className="rounded-xl border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -879,7 +863,7 @@ export const UsersPage = () => {
                   type="button"
                   onClick={() => void submitEditUser()}
                   disabled={savingEdit}
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {savingEdit ? (
                     <>

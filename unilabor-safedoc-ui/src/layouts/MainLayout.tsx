@@ -47,8 +47,8 @@ export const MainLayout = () => {
   }
 
   return (
-    <div className="relative min-h-screen text-slate-100" data-theme="night">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(14,116,144,0.18),transparent_32%)]" />
+    <div className="relative min-h-screen text-[var(--unilabor-ink)]">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(124,173,211,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(191,212,230,0.42),transparent_32%)]" />
       <AppSidebar
         isVisible={isDesktopSidebarVisible}
         onToggleVisibility={() => setIsDesktopSidebarVisible((visible) => !visible)}
@@ -58,7 +58,7 @@ export const MainLayout = () => {
         <button
           type="button"
           onClick={() => setIsDesktopSidebarVisible(true)}
-          className="fixed left-4 top-4 z-50 hidden items-center gap-1 rounded-xl border border-slate-700 bg-slate-900/90 px-3 py-2 text-xs font-semibold text-cyan-100 shadow-lg shadow-slate-950/40 transition hover:bg-slate-800 lg:inline-flex"
+          className="fixed left-4 top-4 z-50 hidden items-center gap-1 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/92 px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] shadow-lg shadow-[rgba(0,65,106,0.1)] transition hover:bg-white lg:inline-flex"
           title="Mostrar menu lateral"
         >
           <ChevronRight size={14} />

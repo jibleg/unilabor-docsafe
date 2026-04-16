@@ -44,25 +44,25 @@ export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) =
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-slate-800/90 bg-slate-950/90 backdrop-blur-xl transition-transform duration-300 ease-in-out lg:flex ${
+      className={`fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-[rgba(0,65,106,0.08)] bg-[rgba(255,255,255,0.88)] backdrop-blur-xl transition-transform duration-300 ease-in-out lg:flex ${
         isVisible ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
-      <div className="border-b border-slate-800/80 p-4">
-        <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-700/80 bg-slate-900/80 px-3 py-2">
+      <div className="border-b border-[rgba(0,65,106,0.08)] p-4">
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[linear-gradient(135deg,#ffffff_0%,#eef5fa_100%)] px-3 py-2 shadow-[0_12px_28px_rgba(0,65,106,0.08)]">
           <div className="inline-flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500 text-sm font-black text-slate-950">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-brand-200)] text-sm font-black text-[var(--color-brand-700)]">
               U
             </div>
             <div>
-              <h2 className="text-base font-bold tracking-tight text-cyan-100">SafeDoc</h2>
-              <p className="mt-0.5 text-[10px] font-semibold uppercase text-slate-400">Lab IT Management</p>
+              <h2 className="text-base font-bold tracking-tight text-[var(--color-brand-700)]">SafeDoc</h2>
+              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--unilabor-neutral)]">Unilabor</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onToggleVisibility}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 text-slate-300 transition hover:bg-slate-800 hover:text-cyan-100"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.18)]"
             title="Ocultar menu"
             aria-label="Ocultar menu lateral"
           >
@@ -85,8 +85,8 @@ export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) =
                 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all
                 ${
                   isActive
-                    ? 'border-cyan-400/30 bg-cyan-500/15 text-cyan-100 shadow-lg shadow-cyan-900/20'
-                    : 'border-transparent text-slate-300 hover:bg-slate-900/70 hover:text-cyan-100'
+                    ? 'border-[rgba(0,65,106,0.14)] bg-[linear-gradient(135deg,rgba(191,212,230,0.45),rgba(124,173,211,0.2))] text-[var(--color-brand-700)] shadow-lg shadow-[rgba(0,65,106,0.08)]'
+                    : 'border-transparent text-[var(--unilabor-ink)] hover:bg-[rgba(191,212,230,0.34)] hover:text-[var(--color-brand-700)]'
                 }
               `}
             >
@@ -97,10 +97,10 @@ export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) =
         })}
       </nav>
 
-      <div className="border-t border-slate-800/80 p-4">
-        <div className="mb-4 rounded-xl border border-slate-800 bg-slate-900/80 p-3">
+      <div className="border-t border-[rgba(0,65,106,0.08)] p-4">
+        <div className="mb-4 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 overflow-hidden rounded-xl border border-slate-700 bg-slate-800">
+            <div className="h-10 w-10 overflow-hidden rounded-xl border border-[rgba(0,65,106,0.1)] bg-[rgba(124,173,211,0.28)]">
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
@@ -108,20 +108,20 @@ export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) =
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-100">
+                <div className="flex h-full w-full items-center justify-center text-sm font-black text-[var(--color-brand-700)]">
                   {avatarInitial}
                 </div>
               )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-slate-100">{displayName}</p>
-              <p className="text-[10px] uppercase tracking-wide text-cyan-300">{user?.role}</p>
+              <p className="truncate text-xs font-bold text-[var(--unilabor-ink)]">{displayName}</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--color-brand-500)]">{user?.role}</p>
             </div>
           </div>
         </div>
         <button
           onClick={logout}
-          className="flex w-full items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-medium text-rose-300 transition-colors hover:border-rose-400/30 hover:bg-rose-500/10"
+          className="flex w-full items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-medium text-[var(--color-brand-700)] transition-colors hover:border-[rgba(0,65,106,0.1)] hover:bg-[rgba(191,212,230,0.28)]"
         >
           <LogOut size={20} />
           Cerrar sesion

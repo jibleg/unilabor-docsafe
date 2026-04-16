@@ -7,29 +7,42 @@
    ya no necesitas el tailwind.config.js para lo básico 
 */
 @theme {
-  --font-sans: "Inter", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --color-brand-50: #ecfeff;
-  --color-brand-100: #cffafe;
-  --color-brand-400: #22d3ee;
-  --color-brand-500: #06b6d4;
-  --color-brand-600: #0891b2;
-  --color-brand-700: #0e7490;
+  --font-sans: "Aptos", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #eef5fa;
+  --color-brand-100: #dbe8f2;
+  --color-brand-200: #bfd4e6;
+  --color-brand-300: #7cadd3;
+  --color-brand-400: #4d8fbf;
+  --color-brand-500: #0069a6;
+  --color-brand-600: #00588b;
+  --color-brand-700: #00416a;
+  --color-brand-800: #153f5c;
+  --color-brand-900: #0b2235;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --unilabor-primary: #00416a;
+  --unilabor-primary-strong: #0069a6;
+  --unilabor-primary-soft: #7cadd3;
+  --unilabor-primary-pale: #bfd4e6;
+  --unilabor-neutral: #97a3ac;
+  --unilabor-ink: #173047;
+  --unilabor-panel: rgba(255, 255, 255, 0.88);
+  --unilabor-panel-strong: rgba(255, 255, 255, 0.95);
+  --unilabor-border: rgba(0, 65, 106, 0.14);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
   font-family: var(--font-sans);
-  color: #e2e8f0;
-  background-color: #020617;
+  color: #173047;
+  background-color: #eef5fa;
   background-image:
-    radial-gradient(circle at top right, rgba(6, 182, 212, 0.22), transparent 35%),
-    radial-gradient(circle at bottom left, rgba(14, 116, 144, 0.2), transparent 38%),
-    linear-gradient(180deg, #020617 0%, #0f172a 100%);
+    radial-gradient(circle at top right, rgba(124, 173, 211, 0.2), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(191, 212, 230, 0.55), transparent 36%),
+    linear-gradient(180deg, #f8fbfd 0%, #eef5fa 52%, #dbe8f2 100%);
   background-attachment: fixed;
 }
 
@@ -38,18 +51,19 @@ body {
 }
 
 .unilabor-glass {
-  border: 1px solid rgba(51, 65, 85, 0.9);
-  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid var(--unilabor-border);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(12px);
-  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
+  box-shadow: 0 24px 50px rgba(0, 65, 106, 0.1);
 }
 
 .unilabor-button-primary {
-  border: 1px solid transparent;
-  background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
-  color: #082f49;
+  border: 1px solid rgba(191, 212, 230, 0.28);
+  background: linear-gradient(135deg, #0069a6 0%, #7cadd3 100%);
+  color: #f4f9fc;
   font-weight: 700;
   transition: all 0.2s ease;
+  box-shadow: 0 16px 32px rgba(0, 65, 106, 0.24);
 }
 
 .unilabor-button-primary:hover {
@@ -92,14 +106,83 @@ body {
 }
 
 .unilabor-toast {
-  border: 1px solid rgba(51, 65, 85, 0.85);
+  border: 1px solid var(--unilabor-border);
   border-radius: 14px;
-  background: rgba(15, 23, 42, 0.96);
-  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 20px 45px rgba(0, 65, 106, 0.12);
+}
+
+.unilabor-toast.Toastify__toast--success {
+  border-color: rgba(0, 65, 106, 0.14);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 245, 250, 0.98) 100%);
+}
+
+.unilabor-toast.Toastify__toast--error {
+  border-color: rgba(251, 113, 133, 0.2);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 241, 242, 0.98) 100%);
+}
+
+.unilabor-toast.Toastify__toast--warning {
+  border-color: rgba(124, 173, 211, 0.24);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 245, 250, 0.98) 100%);
+}
+
+.unilabor-toast.Toastify__toast--info {
+  border-color: rgba(124, 173, 211, 0.24);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 245, 250, 0.98) 100%);
 }
 
 .unilabor-toast .Toastify__toast-body {
   font-size: 0.92rem;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #173047;
+}
+
+.unilabor-toast .Toastify__close-button {
+  color: var(--color-brand-700);
+  opacity: 0.7;
+}
+
+.unilabor-toast .Toastify__close-button:hover {
+  opacity: 1;
+}
+
+.unilabor-toast-progress {
+  height: 4px;
+  border-radius: 999px;
+  margin: 0 10px 8px;
+}
+
+.Toastify__toast--success .unilabor-toast-progress {
+  background: linear-gradient(90deg, #00416a 0%, #0069a6 58%, #7cadd3 100%);
+}
+
+.Toastify__toast--error .unilabor-toast-progress {
+  background: linear-gradient(90deg, #fb7185 0%, #fda4af 100%);
+}
+
+.Toastify__toast--warning .unilabor-toast-progress,
+.Toastify__toast--info .unilabor-toast-progress {
+  background: linear-gradient(90deg, #7cadd3 0%, #0069a6 100%);
+}
+
+.Toastify__toast-icon svg {
+  fill: currentColor;
+}
+
+.unilabor-toast.Toastify__toast--success .Toastify__toast-icon {
+  color: var(--color-brand-700);
+}
+
+.unilabor-toast.Toastify__toast--error .Toastify__toast-icon {
+  color: #e11d48;
+}
+
+.unilabor-toast.Toastify__toast--warning .Toastify__toast-icon,
+.unilabor-toast.Toastify__toast--info .Toastify__toast-icon {
+  color: var(--color-brand-500);
 }

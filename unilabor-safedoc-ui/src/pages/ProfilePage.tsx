@@ -69,18 +69,18 @@ const getPasswordStrengthLabel = (score: number): string => {
 
 const getPasswordStrengthColor = (score: number): string => {
   if (score <= 1) {
-    return 'bg-rose-500';
+    return 'bg-[linear-gradient(90deg,#fda4af_0%,#fb7185_100%)]';
   }
   if (score === 2) {
-    return 'bg-orange-400';
+    return 'bg-[linear-gradient(90deg,#f9c98b_0%,#f59e0b_100%)]';
   }
   if (score === 3) {
-    return 'bg-amber-400';
+    return 'bg-[linear-gradient(90deg,#c9dff0_0%,#7cadd3_100%)]';
   }
   if (score === 4) {
-    return 'bg-cyan-400';
+    return 'bg-[linear-gradient(90deg,#7cadd3_0%,#0069a6_100%)]';
   }
-  return 'bg-emerald-400';
+  return 'bg-[linear-gradient(90deg,#00416a_0%,#0069a6_58%,#7cadd3_100%)]';
 };
 
 const loadImageFromBlob = (blob: Blob): Promise<HTMLImageElement> =>
@@ -437,14 +437,14 @@ export const ProfilePage = () => {
       />
 
       <div className="space-y-6">
-        <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/75 p-6 shadow-2xl shadow-slate-950/40 backdrop-blur-xl lg:p-8">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-cyan-500/20 blur-3xl" />
-          <div className="pointer-events-none absolute -left-10 -bottom-20 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
+        <section className="relative overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.08)] bg-[linear-gradient(135deg,#ffffff_0%,#eef5fa_56%,#dbe8f2_100%)] p-6 shadow-2xl shadow-[rgba(0,65,106,0.1)] backdrop-blur-xl lg:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-[rgba(124,173,211,0.22)] blur-3xl" />
+          <div className="pointer-events-none absolute -left-10 -bottom-20 h-56 w-56 rounded-full bg-[rgba(191,212,230,0.28)] blur-3xl" />
 
           <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="h-24 w-24 overflow-hidden rounded-3xl border border-cyan-300/30 bg-gradient-to-br from-cyan-400 via-sky-500 to-cyan-700 shadow-xl shadow-cyan-950/30">
+                <div className="h-24 w-24 overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.12)] bg-[linear-gradient(135deg,#bfd4e6_0%,#7cadd3_55%,#00416a_100%)] shadow-xl shadow-[rgba(0,65,106,0.18)]">
                   {avatarUrl ? (
                     <img
                       src={avatarUrl}
@@ -452,33 +452,33 @@ export const ProfilePage = () => {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-2xl font-black text-slate-950">
+                    <div className="flex h-full w-full items-center justify-center text-2xl font-black text-white">
                       {avatarInitials || 'U'}
                     </div>
                   )}
 
                   {avatarLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60">
-                      <Loader2 size={18} className="animate-spin text-cyan-200" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-[rgba(11,34,53,0.42)]">
+                      <Loader2 size={18} className="animate-spin text-white" />
                     </div>
                   )}
                 </div>
-                <span className="absolute -bottom-2 -right-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-900 bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-900/30">
+                <span className="absolute -bottom-2 -right-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/90 bg-white text-[var(--color-brand-700)] shadow-lg shadow-[rgba(0,65,106,0.16)]">
                   <ShieldCheck size={14} />
                 </span>
               </div>
 
               <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/80">Perfil personal</p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-100">
+                <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-brand-500)]">Perfil personal</p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-[var(--color-brand-700)]">
                   {displayName}
                 </h1>
-                <p className="mt-1 text-sm text-slate-300">{displayEmail}</p>
+                <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">{displayEmail}</p>
               </div>
             </div>
 
             <div className="flex flex-col gap-3">
-              <div className="inline-flex items-center gap-2 self-start rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+              <div className="inline-flex items-center gap-2 self-start rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.34)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)]">
                 <ShieldCheck size={14} />
                 Acceso activo: {roleLabel}
               </div>
@@ -488,7 +488,7 @@ export const ProfilePage = () => {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={avatarSubmitting}
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <ImagePlus size={14} />
                   Subir foto
@@ -497,7 +497,7 @@ export const ProfilePage = () => {
                   type="button"
                   onClick={() => void openCameraModal()}
                   disabled={cameraLoading || avatarSubmitting}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/90 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/92 px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {cameraLoading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
                   Camara en vivo
@@ -506,13 +506,13 @@ export const ProfilePage = () => {
                   type="button"
                   onClick={() => void handleRemoveAvatar()}
                   disabled={avatarSubmitting || !user?.avatar_path}
-                  className="inline-flex items-center gap-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.16)] px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(151,163,172,0.24)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Trash2 size={14} />
                   Quitar foto
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-[var(--unilabor-neutral)]">
                 Tu avatar se guarda de forma segura en el servidor y se sincroniza entre dispositivos.
               </p>
             </div>
@@ -520,47 +520,47 @@ export const ProfilePage = () => {
         </section>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-slate-950/40 backdrop-blur-xl xl:col-span-1">
-            <h2 className="text-base font-bold uppercase tracking-wide text-slate-200">
+          <section className="rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-6 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl xl:col-span-1">
+            <h2 className="text-base font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
               Informacion de cuenta
             </h2>
             <div className="mt-5 space-y-4">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Nombre</p>
-                <p className="mt-1 text-sm font-semibold text-slate-100">{displayName}</p>
+              <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.92)] p-4">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--unilabor-neutral)]">Nombre</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--color-brand-700)]">{displayName}</p>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Correo institucional</p>
-                <p className="mt-1 inline-flex items-center gap-2 text-sm font-semibold text-slate-100">
-                  <Mail size={14} className="text-cyan-300" />
+              <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.92)] p-4">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--unilabor-neutral)]">Correo institucional</p>
+                <p className="mt-1 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-brand-700)]">
+                  <Mail size={14} className="text-[var(--color-brand-500)]" />
                   {displayEmail}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Rol</p>
-                <p className="mt-1 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200">
+              <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.92)] p-4">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--unilabor-neutral)]">Rol</p>
+                <p className="mt-1 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-brand-700)]">
                   <UserRound size={14} />
                   {roleLabel}
                 </p>
               </div>
-              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
-                <p className="inline-flex items-center gap-2 text-xs font-semibold text-amber-300">
+              <div className="rounded-2xl border border-[rgba(124,173,211,0.2)] bg-[rgba(191,212,230,0.24)] p-4">
+                <p className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-brand-700)]">
                   <AlertTriangle size={14} />
                   Recomendacion de seguridad
                 </p>
-                <p className="mt-2 text-xs leading-5 text-amber-200/90">
+                <p className="mt-2 text-xs leading-5 text-[var(--unilabor-ink)]">
                   Actualiza tu contrasena periodicamente y evita reutilizar claves de otros sistemas.
                 </p>
               </div>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-slate-950/40 backdrop-blur-xl xl:col-span-2">
+          <section className="rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-6 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl xl:col-span-2">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-base font-bold uppercase tracking-wide text-slate-200">
+              <h2 className="text-base font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
                 Seguridad y contrasena
               </h2>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-[var(--unilabor-neutral)]">
                 La clave debe cumplir politica corporativa de complejidad
               </span>
             </div>
@@ -568,21 +568,21 @@ export const ProfilePage = () => {
             <form onSubmit={handleChangePassword} className="mt-6 space-y-5">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">Nueva contrasena</label>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">Nueva contrasena</label>
                   <div className="relative">
-                    <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                    <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" size={16} />
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       autoComplete="new-password"
                       value={newPassword}
                       onChange={(event) => setNewPassword(event.target.value)}
                       placeholder="NuevaClaveSegura123*"
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 pl-10 pr-11 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                      className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] py-2.5 pl-10 pr-11 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewPassword((value) => !value)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-cyan-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)] transition hover:text-[var(--color-brand-700)]"
                       aria-label={showNewPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
                     >
                       {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -591,21 +591,21 @@ export const ProfilePage = () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-300">Confirmar contrasena</label>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">Confirmar contrasena</label>
                   <div className="relative">
-                    <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                    <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" size={16} />
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
                       autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
                       placeholder="Repite la nueva contrasena"
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 pl-10 pr-11 text-sm text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20"
+                      className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] py-2.5 pl-10 pr-11 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword((value) => !value)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-cyan-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)] transition hover:text-[var(--color-brand-700)]"
                       aria-label={showConfirmPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
                     >
                       {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -614,16 +614,16 @@ export const ProfilePage = () => {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Fortaleza de contrasena
                   </p>
-                  <p className="text-xs font-bold text-slate-200">
+                  <p className="text-xs font-bold text-[var(--color-brand-700)]">
                     {getPasswordStrengthLabel(passwordScore)}
                   </p>
                 </div>
-                <div className="h-2 rounded-full bg-slate-800">
+                <div className="h-2 rounded-full bg-[rgba(191,212,230,0.55)]">
                   <div
                     className={`h-full rounded-full transition-all ${getPasswordStrengthColor(passwordScore)}`}
                     style={{ width: `${(passwordScore / passwordRules.length) * 100}%` }}
@@ -634,7 +634,7 @@ export const ProfilePage = () => {
                     <p
                       key={rule.label}
                       className={`inline-flex items-center gap-2 text-xs ${
-                        rule.valid ? 'text-emerald-300' : 'text-slate-400'
+                        rule.valid ? 'text-[var(--color-brand-700)]' : 'text-[var(--unilabor-neutral)]'
                       }`}
                     >
                       <CheckCircle2 size={14} />
@@ -643,7 +643,7 @@ export const ProfilePage = () => {
                   ))}
                   <p
                     className={`inline-flex items-center gap-2 text-xs ${
-                      passwordsMatch ? 'text-emerald-300' : 'text-slate-400'
+                      passwordsMatch ? 'text-[var(--color-brand-700)]' : 'text-[var(--unilabor-neutral)]'
                     }`}
                   >
                     <CheckCircle2 size={14} />
@@ -656,7 +656,7 @@ export const ProfilePage = () => {
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className="inline-flex min-w-56 items-center justify-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500 px-4 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-900/30 transition hover:-translate-y-0.5 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-w-56 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#00416a_0%,#0069a6_58%,#7cadd3_100%)] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[rgba(0,65,106,0.24)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-[rgba(191,212,230,0.9)] disabled:text-[var(--color-brand-700)] disabled:shadow-none"
                 >
                   {submitting ? (
                     <>
@@ -674,17 +674,17 @@ export const ProfilePage = () => {
       </div>
 
       {isCameraModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
+            <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
               <div>
-                <p className="text-sm font-bold text-slate-100">Captura de avatar</p>
-                <p className="text-xs text-slate-400">Alinea tu rostro al centro y toma la foto</p>
+                <p className="text-sm font-bold text-[var(--color-brand-700)]">Captura de avatar</p>
+                <p className="text-xs text-[var(--unilabor-neutral)]">Alinea tu rostro al centro y toma la foto</p>
               </div>
               <button
                 type="button"
                 onClick={closeCameraModal}
-                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
+                className="rounded-lg p-2 text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)] hover:text-[var(--color-brand-700)]"
                 aria-label="Cerrar camara"
               >
                 <X size={16} />
@@ -692,7 +692,7 @@ export const ProfilePage = () => {
             </div>
 
             <div className="space-y-4 p-4">
-              <div className="overflow-hidden rounded-2xl border border-slate-800 bg-black">
+              <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.92)]">
                 <video
                   ref={videoRef}
                   autoPlay
@@ -706,7 +706,7 @@ export const ProfilePage = () => {
                 <button
                   type="button"
                   onClick={closeCameraModal}
-                  className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+                  className="rounded-xl border border-[rgba(0,65,106,0.12)] px-4 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
                 >
                   Cancelar
                 </button>
@@ -714,7 +714,7 @@ export const ProfilePage = () => {
                   type="button"
                   onClick={() => void captureCameraPhoto()}
                   disabled={capturingFromCamera || avatarSubmitting}
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {capturingFromCamera ? (
                     <Loader2 size={16} className="animate-spin" />

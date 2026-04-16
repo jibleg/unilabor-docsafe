@@ -55,10 +55,11 @@ function App() {
       pauseOnHover
       draggable={false}
       newestOnTop
-      theme="dark"
+      theme="light"
       transition={Zoom}
       className="unilabor-toast-container"
       toastClassName="unilabor-toast"
+      progressClassName="unilabor-toast-progress"
     />
   </BrowserRouter>
   );

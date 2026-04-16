@@ -54,20 +54,20 @@ export const AppNavbar = () => {
   }, [location.pathname]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-base-300/60 bg-base-100/85 backdrop-blur-xl lg:hidden">
+    <header className="sticky top-0 z-40 border-b border-[rgba(0,65,106,0.08)] bg-white/90 backdrop-blur-xl lg:hidden">
       <div className="navbar px-4">
         <div className="navbar-start">
           <NavLink to="/dashboard" className="btn btn-ghost px-2 normal-case">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500 text-sm font-black text-slate-950">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-brand-200)] text-sm font-black text-[var(--color-brand-700)]">
               U
             </span>
-            <span className="ml-2 text-base font-bold tracking-tight text-cyan-100">SafeDoc</span>
+            <span className="ml-2 text-base font-bold tracking-tight text-[var(--color-brand-700)]">SafeDoc</span>
           </NavLink>
         </div>
 
         <div className="navbar-end gap-2">
-          <div className="flex items-center gap-2 rounded-full border border-slate-700/70 bg-slate-900/65 px-2 py-1">
-            <div className="h-7 w-7 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
+          <div className="flex items-center gap-2 rounded-full border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.92)] px-2 py-1">
+            <div className="h-7 w-7 overflow-hidden rounded-full border border-[rgba(0,65,106,0.08)] bg-[rgba(124,173,211,0.24)]">
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
@@ -75,7 +75,7 @@ export const AppNavbar = () => {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-xs font-black text-cyan-100">
+                <div className="flex h-full w-full items-center justify-center text-xs font-black text-[var(--color-brand-700)]">
                   {avatarInitial}
                 </div>
               )}
@@ -95,13 +95,13 @@ export const AppNavbar = () => {
       </div>
 
       <div
-        className={`overflow-hidden border-t border-slate-800/70 transition-all duration-300 ease-in-out ${
+        className={`overflow-hidden border-t border-[rgba(0,65,106,0.08)] transition-all duration-300 ease-in-out ${
           isMobileMenuOpen ? 'max-h-[480px] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         <div className="w-full space-y-3 px-4 py-4">
-          <div className="flex items-center gap-3 rounded-xl border border-slate-700/70 bg-slate-900/70 px-3 py-2">
-            <div className="h-9 w-9 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
+          <div className="flex items-center gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.98)] px-3 py-2">
+            <div className="h-9 w-9 overflow-hidden rounded-full border border-[rgba(0,65,106,0.08)] bg-[rgba(124,173,211,0.24)]">
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
@@ -109,26 +109,26 @@ export const AppNavbar = () => {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-100">
+                <div className="flex h-full w-full items-center justify-center text-sm font-black text-[var(--color-brand-700)]">
                   {avatarInitial}
                 </div>
               )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-100">{displayName}</p>
-              <p className="text-[11px] uppercase tracking-wide text-cyan-300">{user?.role}</p>
+              <p className="truncate text-sm font-semibold text-[var(--unilabor-ink)]">{displayName}</p>
+              <p className="text-[11px] uppercase tracking-wide text-[var(--color-brand-500)]">{user?.role}</p>
             </div>
           </div>
 
-          <ul className="menu rounded-box w-full border border-slate-800 bg-slate-900/70 p-2">
+          <ul className="menu rounded-box w-full border border-[rgba(0,65,106,0.08)] bg-white p-2 shadow-[0_14px_28px_rgba(0,65,106,0.08)]">
             {visibleItems.map((item) => (
               <li key={item.path}>
                 <NavLink
                   to={item.path}
                   className={({ isActive }) =>
                     isActive
-                      ? 'rounded-lg bg-cyan-500/20 text-cyan-100'
-                      : 'rounded-lg text-slate-200 hover:bg-slate-800 hover:text-cyan-100'
+                      ? 'rounded-lg bg-[rgba(191,212,230,0.45)] text-[var(--color-brand-700)]'
+                      : 'rounded-lg text-[var(--unilabor-ink)] hover:bg-[rgba(191,212,230,0.34)] hover:text-[var(--color-brand-700)]'
                   }
                 >
                   <item.icon size={16} />
@@ -141,7 +141,7 @@ export const AppNavbar = () => {
           <button
             type="button"
             onClick={logout}
-            className="btn btn-sm btn-outline btn-error w-full"
+            className="btn btn-sm w-full border-[rgba(0,65,106,0.1)] bg-[rgba(191,212,230,0.32)] text-[var(--color-brand-700)] hover:border-[rgba(0,65,106,0.14)] hover:bg-[rgba(124,173,211,0.34)]"
           >
             <LogOut size={14} />
             Cerrar sesion

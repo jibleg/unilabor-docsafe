@@ -81,28 +81,28 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="h-dvh overflow-hidden bg-slate-950 text-white flex">
-      <section className="relative hidden overflow-hidden bg-gradient-to-br from-cyan-600 via-sky-700 to-slate-900 lg:flex lg:h-dvh lg:w-1/2">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.10),transparent_30%)] animate-pulse" />
+    <div className="flex h-dvh overflow-hidden bg-[linear-gradient(180deg,#f8fbfd_0%,#eef5fa_52%,#dbe8f2_100%)] text-[var(--unilabor-ink)]">
+      <section className="relative hidden overflow-hidden border-r border-[rgba(0,65,106,0.08)] bg-[linear-gradient(135deg,#ffffff_0%,#eef5fa_52%,#dbe8f2_100%)] lg:flex lg:h-dvh lg:w-1/2">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(124,173,211,0.24),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(191,212,230,0.28),transparent_30%)]" />
 
         <div className="relative z-10 flex h-full w-full flex-col justify-between overflow-y-auto p-8 xl:p-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div>
-            <div className="inline-flex items-center gap-3 rounded-2xl border border-white/20 bg-white/10 px-4 py-2 backdrop-blur-md shadow-2xl transition-all duration-300 hover:-translate-y-0.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-sky-700 font-black text-lg">
+            <div className="inline-flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 px-4 py-2 backdrop-blur-md shadow-xl shadow-[rgba(0,65,106,0.08)] transition-all duration-300 hover:-translate-y-0.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-brand-200)] text-[var(--color-brand-700)] font-black text-lg">
                 U
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.30em] text-cyan-100/80">UNILABOR</p>
-                <h1 className="text-xl font-semibold">Gestion Documental</h1>
+                <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">UNILABOR</p>
+                <h1 className="text-xl font-semibold text-[var(--color-brand-700)]">Gestion Documental</h1>
               </div>
             </div>
 
             <div className="mt-8 max-w-xl">
-              <p className="text-sm uppercase tracking-[0.35em] text-cyan-100/70">Plataforma SaaS</p>
-              <h2 className="mt-4 text-4xl xl:text-5xl font-black leading-tight">
+              <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-500)]">Plataforma SaaS</p>
+              <h2 className="mt-4 text-4xl font-black leading-tight text-[var(--color-brand-700)] xl:text-5xl">
                 Control inteligente de documentos clinicos y operativos.
               </h2>
-              <p className="mt-6 text-base xl:text-lg text-cyan-50/85 leading-8">
+              <p className="mt-6 text-base leading-8 text-[var(--unilabor-neutral)] xl:text-lg">
                 Centraliza procedimientos, formatos, evidencias, versiones y aprobaciones en una sola plataforma segura, moderna y trazable.
               </p>
             </div>
@@ -111,10 +111,10 @@ export const LoginPage = () => {
               {featureCards.map((item) => (
                 <div
                   key={item.title}
-                  className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-md shadow-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/15"
+                  className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-5 backdrop-blur-md shadow-lg shadow-[rgba(0,65,106,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[rgba(124,173,211,0.32)]"
                 >
-                  <h3 className="text-lg font-semibold">{item.title}</h3>
-                  <p className="mt-2 text-sm text-cyan-50/80 leading-6">{item.text}</p>
+                  <h3 className="text-lg font-semibold text-[var(--color-brand-700)]">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--unilabor-neutral)]">{item.text}</p>
                 </div>
               ))}
             </div>
@@ -124,169 +124,173 @@ export const LoginPage = () => {
             {quickStats.map(([value, label]) => (
               <div
                 key={label}
-                className="rounded-2xl border border-white/15 bg-black/20 px-4 py-5 backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5"
+                className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[linear-gradient(180deg,rgba(191,212,230,0.34),rgba(255,255,255,0.96))] px-4 py-5 backdrop-blur-md shadow-lg shadow-[rgba(0,65,106,0.05)] transition-all duration-300 hover:-translate-y-0.5"
               >
-                <p className="text-2xl font-black">{value}</p>
-                <p className="mt-1 text-xs text-cyan-100/75 leading-5">{label}</p>
+                <p className="text-2xl font-black text-[var(--color-brand-700)]">{value}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--unilabor-neutral)]">{label}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="flex h-dvh w-full items-center justify-center overflow-hidden bg-slate-950 px-6 py-6 sm:px-10 lg:w-1/2 lg:py-8">
+      <section className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#f8fbfd_0%,#eef5fa_52%,#dbe8f2_100%)] px-6 py-6 sm:px-10 lg:w-1/2 lg:py-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(124,173,211,0.2),transparent_30%),linear-gradient(180deg,transparent,rgba(191,212,230,0.2))]" />
         <div className="w-full max-w-md overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="mb-6 lg:hidden">
-            <div className="inline-flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 shadow-xl">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500 text-slate-950 font-black text-lg">
+            <div className="inline-flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 px-4 py-2 shadow-xl shadow-[rgba(0,65,106,0.08)]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-brand-200)] text-[var(--color-brand-700)] font-black text-lg">
                 U
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.30em] text-slate-400">UNILABOR</p>
-                <h1 className="text-lg font-semibold">Gestion Documental</h1>
+                <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">UNILABOR</p>
+                <h1 className="text-lg font-semibold text-[var(--color-brand-700)]">Gestion Documental</h1>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl sm:p-9">
-            <div>
-              <p className="text-sm uppercase tracking-[0.30em] text-cyan-400">Bienvenido</p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight">Iniciar sesion</h2>
-              <p className="mt-3 text-sm text-slate-400 leading-6">
-                Accede al portal centralizado para administrar documentos, politicas, procedimientos y registros de calidad.
-              </p>
-            </div>
-
-            <form
-              onSubmit={handleSubmit}
-              onInvalidCapture={validation.handleInvalid}
-              onChangeCapture={validation.handleChange}
-              className="mt-6 space-y-4.5"
-            >
-              {infoMessage && (
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-                  {infoMessage}
-                </div>
-              )}
-
-              {error && (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                  {error}
-                </div>
-              )}
-
+          <div className="overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.1)] bg-white/92 shadow-2xl shadow-[rgba(0,65,106,0.12)] backdrop-blur-xl">
+            <div className="h-2 w-full bg-[linear-gradient(90deg,#00416a_0%,#0069a6_48%,#7cadd3_100%)]" />
+            <div className="p-8 sm:p-9">
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Correo institucional <span className="text-rose-300">*</span>
-                </label>
-                <div className="relative">
-                  <Mail
-                    className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${
-                      emailError ? 'text-rose-300' : 'text-slate-500'
-                    }`}
-                    size={18}
-                  />
-                  <input
-                    type="email"
-                    required
-                    autoComplete="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="usuario@unilabor.com"
-                    data-value-missing="Ingresa tu correo institucional."
-                    data-type-mismatch="Ingresa un correo institucional valido."
-                    {...validation.getFieldProps('email')}
-                    className={`w-full rounded-2xl border pl-11 pr-4 py-3.5 text-sm outline-none transition ${
-                      emailError
-                        ? 'border-rose-500/60 bg-rose-950/20 text-slate-50 placeholder:text-rose-200/40 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20'
-                        : 'border-slate-700 bg-slate-950 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20'
-                    }`}
-                  />
-                </div>
-                <FormFieldError id="email-error" message={emailError} />
+                <p className="text-sm uppercase tracking-[0.30em] text-[var(--color-brand-300)]">Bienvenido</p>
+                <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--color-brand-700)]">Iniciar sesion</h2>
+                <p className="mt-3 text-sm leading-6 text-[var(--unilabor-neutral)]">
+                  Accede al portal centralizado para administrar documentos, politicas, procedimientos y registros de calidad.
+                </p>
               </div>
 
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="block text-sm font-medium text-slate-300">
-                    Contrasena <span className="text-rose-300">*</span>
-                  </label>
-                  <Link
-                    to="/forgot-password"
-                    className="text-sm text-cyan-400 transition hover:text-cyan-300"
-                  >
-                    Olvide mi contrasena
-                  </Link>
-                </div>
-                <div className="relative">
-                  <Lock
-                    className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${
-                      passwordError ? 'text-rose-300' : 'text-slate-500'
-                    }`}
-                    size={18}
-                  />
-                  <input
-                    type="password"
-                    required
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="************"
-                    data-value-missing="Ingresa tu contrasena."
-                    {...validation.getFieldProps('password')}
-                    className={`w-full rounded-2xl border pl-11 pr-4 py-3.5 text-sm outline-none transition ${
-                      passwordError
-                        ? 'border-rose-500/60 bg-rose-950/20 text-slate-50 placeholder:text-rose-200/40 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20'
-                        : 'border-slate-700 bg-slate-950 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20'
-                    }`}
-                  />
-                </div>
-                <FormFieldError id="password-error" message={passwordError} />
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-3 text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={rememberSession}
-                    onChange={(event) => setRememberSession(event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-cyan-500"
-                  />
-                  Recordar sesion
-                </label>
-                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300 inline-flex items-center gap-1.5">
-                  <ShieldCheck size={14} /> Acceso seguro
-                </span>
-              </div>
-
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className="w-full rounded-2xl bg-cyan-500 px-4 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:-translate-y-0.5 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-slate-700 disabled:text-slate-400 disabled:shadow-none"
+              <form
+                onSubmit={handleSubmit}
+                onInvalidCapture={validation.handleInvalid}
+                onChangeCapture={validation.handleChange}
+                className="mt-6 space-y-4.5"
               >
-                {loading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 size={18} className="animate-spin" /> Validando acceso...
-                  </span>
-                ) : (
-                  'Entrar al sistema'
+                {infoMessage && (
+                  <div className="rounded-2xl border border-[rgba(124,173,211,0.24)] bg-[rgba(191,212,230,0.24)] px-4 py-3 text-sm text-[var(--color-brand-700)]">
+                    {infoMessage}
+                  </div>
                 )}
-              </button>
-            </form>
 
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              {['ISO', 'Trazabilidad', 'Control'].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-slate-800 bg-slate-950 px-3 py-4 text-center transition-all duration-300 hover:border-cyan-500/40"
-                >
-                  <p className="text-xs font-semibold text-slate-300">{item}</p>
+                {error && (
+                  <div className="rounded-2xl border border-red-500/20 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">
+                    Correo institucional <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail
+                      className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${
+                        emailError ? 'text-rose-500' : 'text-slate-500'
+                      }`}
+                      size={18}
+                    />
+                    <input
+                      type="email"
+                      required
+                      autoComplete="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="usuario@unilabor.com"
+                      data-value-missing="Ingresa tu correo institucional."
+                      data-type-mismatch="Ingresa un correo institucional valido."
+                      {...validation.getFieldProps('email')}
+                      className={`w-full rounded-2xl border py-3.5 pl-11 pr-4 text-sm text-[var(--unilabor-ink)] outline-none transition ${
+                        emailError
+                          ? 'border-rose-300 bg-rose-50 placeholder:text-rose-300 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20'
+                          : 'border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]'
+                      }`}
+                    />
+                  </div>
+                  <FormFieldError id="email-error" message={emailError} />
                 </div>
-              ))}
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label className="block text-sm font-medium text-[var(--color-brand-700)]">
+                      Contrasena <span className="text-rose-500">*</span>
+                    </label>
+                    <Link
+                      to="/forgot-password"
+                      className="text-sm text-[var(--color-brand-500)] transition hover:text-[var(--color-brand-700)]"
+                    >
+                      Olvide mi contrasena
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <Lock
+                      className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${
+                        passwordError ? 'text-rose-500' : 'text-slate-500'
+                      }`}
+                      size={18}
+                    />
+                    <input
+                      type="password"
+                      required
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder="************"
+                      data-value-missing="Ingresa tu contrasena."
+                      {...validation.getFieldProps('password')}
+                      className={`w-full rounded-2xl border py-3.5 pl-11 pr-4 text-sm text-[var(--unilabor-ink)] outline-none transition ${
+                        passwordError
+                          ? 'border-rose-300 bg-rose-50 placeholder:text-rose-300 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20'
+                          : 'border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]'
+                      }`}
+                    />
+                  </div>
+                  <FormFieldError id="password-error" message={passwordError} />
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <label className="flex items-center gap-3 text-[var(--unilabor-neutral)]">
+                    <input
+                      type="checkbox"
+                      checked={rememberSession}
+                      onChange={(event) => setRememberSession(event.target.checked)}
+                      className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
+                    />
+                    Recordar sesion
+                  </label>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(0,65,106,0.1)] bg-[rgba(191,212,230,0.32)] px-3 py-1 text-xs text-[var(--color-brand-700)]">
+                    <ShieldCheck size={14} /> Acceso seguro
+                  </span>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="w-full rounded-2xl bg-[linear-gradient(135deg,#00416a_0%,#0069a6_58%,#7cadd3_100%)] px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[rgba(0,65,106,0.24)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
+                >
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 size={18} className="animate-spin" /> Validando acceso...
+                    </span>
+                  ) : (
+                    'Entrar al sistema'
+                  )}
+                </button>
+              </form>
+
+              <div className="mt-6 grid grid-cols-3 gap-3">
+                {['ISO', 'Trazabilidad', 'Control'].map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[linear-gradient(180deg,rgba(191,212,230,0.34),rgba(255,255,255,0.95))] px-3 py-4 text-center transition-all duration-300 hover:border-[rgba(124,173,211,0.35)]"
+                  >
+                    <p className="text-xs font-semibold text-[var(--color-brand-700)]">{item}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          <p className="mt-4 text-center text-xs text-slate-500 leading-5">
+          <p className="mt-4 text-center text-xs leading-5 text-[var(--unilabor-neutral)]">
             Copyright 2026 UNILABOR. Plataforma de gestion documental para entornos regulados, clinicos y administrativos.
           </p>
         </div>

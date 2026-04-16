@@ -52,31 +52,31 @@ export const ForgotPasswordPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 px-6 py-10 text-white sm:px-10">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbfd_0%,#eef5fa_52%,#dbe8f2_100%)] px-6 py-10 text-[var(--unilabor-ink)] sm:px-10">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-5xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-900/75 shadow-2xl shadow-slate-950/50 backdrop-blur-xl lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="relative hidden overflow-hidden border-r border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.22),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(14,116,144,0.20),transparent_28%),linear-gradient(180deg,#0f172a_0%,#020617_100%)] p-8 lg:block">
+        <div className="grid w-full overflow-hidden rounded-[2rem] border border-[rgba(0,65,106,0.08)] bg-white/90 shadow-2xl shadow-[rgba(0,65,106,0.12)] backdrop-blur-xl lg:grid-cols-[1.1fr_0.9fr]">
+          <section className="relative hidden overflow-hidden border-r border-[rgba(0,65,106,0.08)] bg-[linear-gradient(135deg,#ffffff_0%,#eef5fa_52%,#dbe8f2_100%)] p-8 lg:block">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.04)_50%,transparent_100%)]" />
             <div className="relative z-10 flex h-full flex-col justify-between">
               <div>
-                <div className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 shadow-xl">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400 font-black text-slate-950">
+                <div className="inline-flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 px-4 py-2 shadow-xl shadow-[rgba(0,65,106,0.08)]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-brand-200)] font-black text-[var(--color-brand-700)]">
                     U
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-[0.30em] text-cyan-100/70">UNILABOR</p>
-                    <h1 className="text-lg font-semibold text-slate-100">Recuperacion segura</h1>
+                    <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">UNILABOR</p>
+                    <h1 className="text-lg font-semibold text-[var(--color-brand-700)]">Recuperacion segura</h1>
                   </div>
                 </div>
 
                 <div className="mt-10 max-w-xl">
-                  <p className="text-sm uppercase tracking-[0.35em] text-cyan-300/70">
+                  <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-500)]">
                     Acceso controlado
                   </p>
-                  <h2 className="mt-4 text-4xl font-black leading-tight text-slate-50">
+                  <h2 className="mt-4 text-4xl font-black leading-tight text-[var(--color-brand-700)]">
                     Solicita una contrasena temporal para volver a entrar.
                   </h2>
-                  <p className="mt-5 text-base leading-8 text-slate-300">
+                  <p className="mt-5 text-base leading-8 text-[var(--unilabor-neutral)]">
                     Te enviaremos una clave temporal al correo institucional registrado y el sistema
                     te pedira cambiarla en el siguiente inicio de sesion.
                   </p>
@@ -84,15 +84,15 @@ export const ForgotPasswordPage = () => {
               </div>
 
               <div className="grid gap-4">
-                <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-                  <p className="text-sm font-semibold text-cyan-100">Revisa spam o correo no deseado</p>
-                  <p className="mt-2 text-sm leading-6 text-cyan-50/80">
+                <div className="rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(191,212,230,0.28)] p-4">
+                  <p className="text-sm font-semibold text-[var(--color-brand-700)]">Revisa spam o correo no deseado</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--unilabor-neutral)]">
                     Algunos servidores pueden tardar unos minutos en entregar la contrasena temporal.
                   </p>
                 </div>
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                  <p className="text-sm font-semibold text-emerald-200">Proteccion de cuenta</p>
-                  <p className="mt-2 text-sm leading-6 text-emerald-100/80">
+                <div className="rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/84 p-4">
+                  <p className="text-sm font-semibold text-[var(--color-brand-700)]">Proteccion de cuenta</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--unilabor-neutral)]">
                     La nueva clave temporal invalida la anterior y fuerza un cambio inmediato al entrar.
                   </p>
                 </div>
@@ -103,22 +103,22 @@ export const ForgotPasswordPage = () => {
           <section className="p-8 sm:p-10">
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-500/40 hover:text-cyan-100"
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/92 px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
             >
               <ArrowLeft size={14} />
               Volver al login
             </Link>
 
             <div className="mt-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(0,65,106,0.1)] bg-[rgba(191,212,230,0.32)] px-3 py-1 text-xs font-semibold text-[var(--color-brand-700)]">
                 <ShieldCheck size={14} />
                 Recuperacion por correo
               </div>
 
-              <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-100">
+              <h2 className="mt-4 text-3xl font-bold tracking-tight text-[var(--color-brand-700)]">
                 Olvide mi contrasena
               </h2>
-              <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
+              <p className="mt-3 max-w-md text-sm leading-6 text-[var(--unilabor-neutral)]">
                 Ingresa tu correo institucional para enviar una contrasena temporal al email
                 registrado.
               </p>
@@ -143,14 +143,14 @@ export const ForgotPasswordPage = () => {
               )}
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
+                <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">
                   Correo institucional <span className="text-rose-300">*</span>
                 </label>
                 <div className="relative">
                   <Mail
                     size={18}
                     className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 ${
-                      emailError ? 'text-rose-300' : 'text-slate-500'
+                      emailError ? 'text-rose-500' : 'text-slate-500'
                     }`}
                   />
                   <input
@@ -165,8 +165,8 @@ export const ForgotPasswordPage = () => {
                     {...validation.getFieldProps('email')}
                     className={`w-full rounded-2xl border pl-11 pr-4 py-3.5 text-sm outline-none transition ${
                       emailError
-                        ? 'border-rose-500/60 bg-rose-950/20 text-slate-50 placeholder:text-rose-200/40 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20'
-                        : 'border-slate-700 bg-slate-950 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20'
+                        ? 'border-rose-300 bg-rose-50 text-[var(--unilabor-ink)] placeholder:text-rose-300 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20'
+                        : 'border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] text-[var(--unilabor-ink)] focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]'
                     }`}
                   />
                 </div>
@@ -176,7 +176,7 @@ export const ForgotPasswordPage = () => {
               <button
                 type="submit"
                 disabled={!canSubmit}
-                className="w-full rounded-2xl bg-cyan-500 px-4 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:-translate-y-0.5 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-slate-700 disabled:text-slate-400 disabled:shadow-none"
+                className="w-full rounded-2xl bg-[linear-gradient(135deg,#00416a_0%,#0069a6_58%,#7cadd3_100%)] px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[rgba(0,65,106,0.24)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
               >
                 {loading ? (
                   <span className="inline-flex items-center gap-2">
@@ -189,7 +189,7 @@ export const ForgotPasswordPage = () => {
               </button>
             </form>
 
-            <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-xs leading-6 text-slate-400">
+            <div className="mt-6 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.9)] p-4 text-xs leading-6 text-[var(--unilabor-neutral)]">
               Usa el mismo correo con el que inicias sesion normalmente. Si la cuenta existe,
               recibirás una contrasena temporal y luego deberás actualizarla al entrar.
             </div>
