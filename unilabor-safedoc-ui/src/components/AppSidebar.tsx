@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  Building2,
   ChevronLeft,
   FileText,
   LayoutDashboard,
@@ -13,6 +14,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
 import { useUserAvatar } from '../hooks/useUserAvatar';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
+import type { ModuleCode } from '../types/models';
 
 interface SidebarMenuItem {
   icon: typeof LayoutDashboard;
@@ -22,26 +24,36 @@ interface SidebarMenuItem {
 }
 
 interface AppSidebarProps {
+  moduleCode: ModuleCode;
   isVisible: boolean;
   onToggleVisibility: () => void;
 }
 
-export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) => {
+export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSidebarProps) => {
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const activeModule = useAuthStore((state) => state.activeModule);
+  const availableModules = useAuthStore((state) => state.availableModules);
+  const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const displayName = user?.full_name ?? user?.name ?? 'Usuario';
   const { avatarUrl } = useUserAvatar();
   const avatarInitial =
     displayName.trim().length > 0 ? displayName.trim().charAt(0).toUpperCase() : 'U';
 
-  const menuItems: SidebarMenuItem[] = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: UserCircle2, label: 'Mi perfil', path: '/profile' },
-    { icon: FileText, label: 'Documentos', path: '/documents' },
-    { icon: Tags, label: 'Categorias', path: '/categories', roles: ['ADMIN', 'EDITOR'] },
-    { icon: Users, label: 'Personal', path: '/users', roles: ['ADMIN'] },
-    { icon: ShieldCheck, label: 'Auditoria', path: '/audit', roles: ['ADMIN'] },
-  ];
+  const menuItems: SidebarMenuItem[] =
+    moduleCode === 'RH'
+      ? [
+          { icon: LayoutDashboard, label: 'Dashboard RH', path: '/rh' },
+          { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
+        ]
+      : [
+          { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
+          { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
+          { icon: FileText, label: 'Documentos', path: '/quality/documents' },
+          { icon: Tags, label: 'Categorias', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
+          { icon: Users, label: 'Personal', path: '/quality/users', roles: ['ADMIN'] },
+          { icon: ShieldCheck, label: 'Auditoria', path: '/quality/audit', roles: ['ADMIN'] },
+        ];
 
   return (
     <aside
@@ -61,7 +73,9 @@ export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) =
             </div>
             <div>
               <h2 className="text-base font-bold tracking-tight text-[var(--color-brand-700)]">SafeDoc</h2>
-              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--unilabor-neutral)]">Unilabor</p>
+              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--unilabor-neutral)]">
+                {moduleCode === 'RH' ? 'Unilabor RH' : 'Unilabor Calidad'}
+              </p>
             </div>
           </div>
           <button
@@ -103,6 +117,16 @@ export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) =
       </nav>
 
       <div className="border-t border-[rgba(0,65,106,0.08)] p-4">
+        {availableModules.length > 1 && (
+          <NavLink
+            to="/select-module"
+            onClick={() => setActiveModule(null)}
+            className="mb-4 flex items-center gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] px-4 py-3 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.34)]"
+          >
+            <Building2 size={18} />
+            Cambiar modulo
+          </NavLink>
+        )}
         <div className="mb-4 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 overflow-hidden rounded-xl border border-[rgba(0,65,106,0.1)] bg-[rgba(124,173,211,0.28)]">
@@ -120,7 +144,9 @@ export const AppSidebar = ({ isVisible, onToggleVisibility }: AppSidebarProps) =
             </div>
             <div className="min-w-0">
               <p className="truncate text-xs font-bold text-[var(--unilabor-ink)]">{displayName}</p>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--color-brand-500)]">{user?.role}</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--color-brand-500)]">
+                {user?.role} {activeModule ? `· ${activeModule}` : ''}
+              </p>
             </div>
           </div>
         </div>

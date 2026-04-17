@@ -1,5 +1,6 @@
 ﻿import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { listUserModuleAccess } from '../services/module-access.service';
 
 export interface JWTPayload {
   id: string;
@@ -10,6 +11,8 @@ export interface JWTPayload {
 export interface AuthRequest extends Request {
   user?: JWTPayload;
 }
+
+type ModuleCode = 'QUALITY' | 'RH';
 
 export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -48,5 +51,55 @@ export const authorize = (roles: string[]) => {
       });
     }
     next();
+  };
+};
+
+export const authorizeModuleAccess = (moduleCode: ModuleCode) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user?.id) {
+      return res.status(401).json({ message: 'Sesion invalida o expirada' });
+    }
+
+    try {
+      const availableModules = await listUserModuleAccess(req.user.id, req.user.role);
+      const moduleAccess = availableModules.find((entry) => entry.code === moduleCode);
+
+      if (!moduleAccess) {
+        return res.status(403).json({ message: `No tienes acceso al modulo ${moduleCode}` });
+      }
+
+      next();
+    } catch (error) {
+      console.error('Error validando acceso al modulo:', error);
+      return res.status(500).json({ message: 'No se pudo validar el acceso al modulo' });
+    }
+  };
+};
+
+export const authorizeModuleRole = (moduleCode: ModuleCode, roles: string[]) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user?.id) {
+      return res.status(401).json({ message: 'Sesion invalida o expirada' });
+    }
+
+    try {
+      const availableModules = await listUserModuleAccess(req.user.id, req.user.role);
+      const moduleAccess = availableModules.find((entry) => entry.code === moduleCode);
+
+      if (!moduleAccess) {
+        return res.status(403).json({ message: `No tienes acceso al modulo ${moduleCode}` });
+      }
+
+      if (!roles.includes(moduleAccess.role)) {
+        return res.status(403).json({
+          message: 'No tienes los permisos necesarios para realizar esta accion en este modulo',
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error('Error validando rol por modulo:', error);
+      return res.status(500).json({ message: 'No se pudo validar el permiso por modulo' });
+    }
   };
 };

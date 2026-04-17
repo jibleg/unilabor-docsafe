@@ -6,6 +6,7 @@ import type {
   Document,
   DocumentStatus,
   ManagedUser,
+  ModuleAccess,
   User,
 } from '../types/models';
 import { tokenRequiresPasswordChange } from '../utils/auth';
@@ -18,6 +19,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string;
   user: User;
+  availableModules: ModuleAccess[];
 }
 
 export interface CreateUserPayload {
@@ -217,6 +219,31 @@ const normalizeManagedUser = (input: unknown): ManagedUser | null => {
   };
 };
 
+const normalizeModuleAccess = (input: unknown): ModuleAccess | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const code = getString(source, ['code']).toUpperCase();
+  const role = getString(source, ['role']).toUpperCase();
+  const name = getString(source, ['name']);
+
+  if ((code !== 'QUALITY' && code !== 'RH') || !name || !role) {
+    return null;
+  }
+
+  return {
+    code,
+    name,
+    description: getString(source, ['description']) || null,
+    icon: getString(source, ['icon']) || null,
+    role,
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    sort_order: getNumber(source, ['sort_order', 'sortOrder'], 0),
+  };
+};
+
 const extractUserFromPayload = (payload: unknown): User => {
   const unwrapped = unwrapPayload(payload);
   const source = asRecord(unwrapped);
@@ -392,9 +419,14 @@ export const login = async (payload: LoginRequest): Promise<LoginResponse> => {
     user.mustChangePassword = true;
   }
 
+  const availableModules = getArrayFromPayload(source, ['availableModules', 'available_modules'])
+    .map(normalizeModuleAccess)
+    .filter((moduleAccess): moduleAccess is ModuleAccess => moduleAccess !== null);
+
   return {
     token,
     user,
+    availableModules,
   };
 };
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
+  Building2,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -15,6 +16,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
 import { useUserAvatar } from '../hooks/useUserAvatar';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
+import type { ModuleCode } from '../types/models';
 
 interface NavbarItem {
   icon: typeof LayoutDashboard;
@@ -23,10 +25,12 @@ interface NavbarItem {
   roles?: string[];
 }
 
-export const AppNavbar = () => {
+export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const location = useLocation();
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const availableModules = useAuthStore((state) => state.availableModules);
+  const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const { avatarUrl } = useUserAvatar();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -35,15 +39,21 @@ export const AppNavbar = () => {
     displayName.trim().length > 0 ? displayName.trim().charAt(0).toUpperCase() : 'U';
 
   const items = useMemo<NavbarItem[]>(
-    () => [
-      { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-      { icon: UserCircle2, label: 'Mi perfil', path: '/profile' },
-      { icon: FileText, label: 'Documentos', path: '/documents' },
-      { icon: Tags, label: 'Categorias', path: '/categories', roles: ['ADMIN', 'EDITOR'] },
-      { icon: Users, label: 'Personal', path: '/users', roles: ['ADMIN'] },
-      { icon: ShieldCheck, label: 'Auditoria', path: '/audit', roles: ['ADMIN'] },
-    ],
-    [],
+    () =>
+      moduleCode === 'RH'
+        ? [
+            { icon: LayoutDashboard, label: 'Dashboard RH', path: '/rh' },
+            { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
+          ]
+        : [
+            { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
+            { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
+            { icon: FileText, label: 'Documentos', path: '/quality/documents' },
+            { icon: Tags, label: 'Categorias', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
+            { icon: Users, label: 'Personal', path: '/quality/users', roles: ['ADMIN'] },
+            { icon: ShieldCheck, label: 'Auditoria', path: '/quality/audit', roles: ['ADMIN'] },
+          ],
+    [moduleCode],
   );
 
   const visibleItems = items.filter((item) =>
@@ -58,7 +68,7 @@ export const AppNavbar = () => {
     <header className="sticky top-0 z-40 border-b border-[rgba(0,65,106,0.08)] bg-white/90 backdrop-blur-xl lg:hidden">
       <div className="navbar px-4">
         <div className="navbar-start">
-          <NavLink to="/dashboard" className="btn btn-ghost px-2 normal-case">
+          <NavLink to={moduleCode === 'RH' ? '/rh' : '/quality/dashboard'} className="btn btn-ghost px-2 normal-case">
             <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-1 shadow-[0_8px_18px_rgba(0,65,106,0.08)] sm:h-10 sm:w-10">
               <img
                 src={unilaborIcon}
@@ -66,7 +76,9 @@ export const AppNavbar = () => {
                 className="h-full w-full object-contain"
               />
             </span>
-            <span className="ml-2 text-base font-bold tracking-tight text-[var(--color-brand-700)]">SafeDoc</span>
+            <span className="ml-2 text-base font-bold tracking-tight text-[var(--color-brand-700)]">
+              {moduleCode === 'RH' ? 'SafeDoc RH' : 'SafeDoc'}
+            </span>
           </NavLink>
         </div>
 
@@ -142,6 +154,17 @@ export const AppNavbar = () => {
               </li>
             ))}
           </ul>
+
+          {availableModules.length > 1 && (
+            <NavLink
+              to="/select-module"
+              onClick={() => setActiveModule(null)}
+              className="flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.1)] bg-[rgba(239,245,250,0.95)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.34)]"
+            >
+              <Building2 size={15} />
+              Cambiar modulo
+            </NavLink>
+          )}
 
           <button
             type="button"

@@ -7,6 +7,7 @@ import { useNativeFormValidation } from '../hooks/useNativeFormValidation';
 import { useAuthStore } from '../store/useAuthStore';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import loginPageBackground from '../assets/login-page-v1.png';
+import { getModuleHomePath } from '../utils/modules';
 
 const featureCards = [
   {
@@ -31,6 +32,11 @@ const quickStats = [
   ['+10k', 'Documentos administrados'],
   ['99.9%', 'Disponibilidad esperada'],
   ['24/7', 'Acceso en la nube sin interrupciones'],
+] as const;
+
+const moduleHighlights = [
+  ['QUALITY', 'Control documental institucional y trazabilidad de calidad.'],
+  ['RH', 'Expediente digital del colaborador y gestion documental de personal.'],
 ] as const;
 
 export const LoginPage = () => {
@@ -72,9 +78,21 @@ export const LoginPage = () => {
     setError('');
 
     try {
-      const { token, user } = await login({ email, password });
-      setAuth(token, user);
-      navigate(user.mustChangePassword ? '/change-password' : '/dashboard');
+      const { token, user, availableModules } = await login({ email, password });
+      setAuth(token, user, availableModules);
+
+      if (user.mustChangePassword) {
+        navigate('/change-password');
+        return;
+      }
+
+      if (availableModules.length <= 1) {
+        const targetModule = availableModules[0]?.code ?? 'QUALITY';
+        navigate(getModuleHomePath(targetModule));
+        return;
+      }
+
+      navigate('/select-module');
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error al conectar con el servidor'));
     } finally {
@@ -122,6 +140,21 @@ export const LoginPage = () => {
               <p className="mt-6 text-base leading-8 text-[var(--unilabor-neutral)] xl:text-lg">
                 Centraliza procedimientos, formatos, evidencias, versiones y aprobaciones en una sola plataforma segura, moderna y trazable.
               </p>
+            </div>
+
+            <div className="mt-8 grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">
+              {moduleHighlights.map(([title, text]) => (
+                <div
+                  key={title}
+                  className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/78 p-5 backdrop-blur-md shadow-lg shadow-[rgba(0,65,106,0.06)]"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--color-brand-500)]">
+                    Modulo
+                  </p>
+                  <h3 className="mt-2 text-lg font-bold text-[var(--color-brand-700)]">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--unilabor-neutral)]">{text}</p>
+                </div>
+              ))}
             </div>
 
             <div className="mt-8 grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">

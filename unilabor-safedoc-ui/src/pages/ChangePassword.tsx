@@ -6,11 +6,13 @@ import { FormFieldError } from '../components/FormFieldError';
 import { useNativeFormValidation } from '../hooks/useNativeFormValidation';
 import { useAuthStore } from '../store/useAuthStore';
 import { tokenRequiresPasswordChange } from '../utils/auth';
+import { getModuleHomePath } from '../utils/modules';
 
 export const ChangePasswordPage = () => {
   const navigate = useNavigate();
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
+  const activeModule = useAuthStore((state) => state.activeModule);
   const logout = useAuthStore((state) => state.logout);
 
   const [newPassword, setNewPassword] = useState('');
@@ -29,7 +31,7 @@ export const ChangePasswordPage = () => {
 
   const mustChangePassword = user?.mustChangePassword || tokenRequiresPasswordChange(token);
   if (!mustChangePassword) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getModuleHomePath(activeModule ?? 'QUALITY')} replace />;
   }
 
   const handleSubmit = async (event: React.FormEvent) => {

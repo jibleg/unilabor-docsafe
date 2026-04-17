@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db';
+import { listUserModuleAccess } from '../services/module-access.service';
 import { recoverPasswordByEmail } from '../services/password.service';
 
 const getTrimmedString = (value: unknown): string => {
@@ -63,6 +64,7 @@ export const login = async (req: Request, res: Response) => {
     );
 
     // Registrar el acceso en la tabla de auditoría (Opcional pero recomendado)
+    const availableModules = await listUserModuleAccess(user.id, user.role);
     await logAuthAudit(user.id, 'LOGIN', req.ip);
 
     // Responder con el token y datos básicos del usuario
@@ -75,7 +77,8 @@ export const login = async (req: Request, res: Response) => {
         email: user.email,
         role: user.role,
         mustChangePassword: user.must_change_password
-      }
+      },
+      availableModules
     });
 
   } catch (error) {

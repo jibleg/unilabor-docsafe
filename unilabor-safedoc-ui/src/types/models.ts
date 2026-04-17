@@ -1,3 +1,15 @@
+export type ModuleCode = 'QUALITY' | 'RH';
+
+export interface ModuleAccess {
+  code: ModuleCode;
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+  role: string;
+  is_active: boolean;
+  sort_order?: number;
+}
+
 export interface User {
   id: string;
   name?: string;

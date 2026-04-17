@@ -6,15 +6,21 @@ import { useAuthStore } from '../store/useAuthStore';
 import { getCurrentUserProfile } from '../api/service';
 import { tokenRequiresPasswordChange } from '../utils/auth';
 import { ChevronRight } from 'lucide-react';
+import type { ModuleCode } from '../types/models';
 
-export const MainLayout = () => {
+export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
+  const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(true);
 
   const mustChangePassword =
     Boolean(user?.mustChangePassword) || (token ? tokenRequiresPasswordChange(token) : false);
+
+  useEffect(() => {
+    setActiveModule(moduleCode);
+  }, [moduleCode, setActiveModule]);
 
   useEffect(() => {
     if (!token || mustChangePassword) {
@@ -50,10 +56,11 @@ export const MainLayout = () => {
     <div className="relative min-h-screen text-[var(--unilabor-ink)]">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(124,173,211,0.18),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(191,212,230,0.42),transparent_32%)]" />
       <AppSidebar
+        moduleCode={moduleCode}
         isVisible={isDesktopSidebarVisible}
         onToggleVisibility={() => setIsDesktopSidebarVisible((visible) => !visible)}
       />
-      <AppNavbar />
+      <AppNavbar moduleCode={moduleCode} />
       {!isDesktopSidebarVisible && (
         <button
           type="button"
