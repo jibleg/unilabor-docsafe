@@ -4,7 +4,9 @@ import type {
   AuditLog,
   Category,
   Document,
+  DocumentSection,
   DocumentStatus,
+  DocumentType,
   Employee,
   EmployeeSummary,
   LinkableUser,
@@ -48,6 +50,26 @@ export interface EmployeePayload {
   email: string;
   area?: string;
   position?: string;
+}
+
+export interface DocumentSectionPayload {
+  code?: string;
+  name: string;
+  description?: string;
+  is_active?: boolean;
+  sort_order?: number;
+}
+
+export interface DocumentTypePayload {
+  section_id: number;
+  code?: string;
+  name: string;
+  description?: string;
+  is_required?: boolean;
+  is_sensitive?: boolean;
+  has_expiry?: boolean;
+  is_active?: boolean;
+  sort_order?: number;
 }
 
 export interface UpdateDocumentPayload {
@@ -334,6 +356,65 @@ const normalizeEmployeeSummary = (input: unknown): EmployeeSummary => {
     active: getNumber(source, ['active']),
     linked_users: getNumber(source, ['linked_users', 'linkedUsers']),
     unlinked_users: getNumber(source, ['unlinked_users', 'unlinkedUsers']),
+  };
+};
+
+const normalizeDocumentSection = (input: unknown): DocumentSection | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const code = getString(source, ['code']);
+  const name = getString(source, ['name']);
+
+  if (!id || !code || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    code,
+    name,
+    description: getString(source, ['description']) || null,
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    is_system_defined: getBoolean(source, ['is_system_defined', 'isSystemDefined'], false),
+    sort_order: getNumber(source, ['sort_order', 'sortOrder'], 0),
+    created_at: getString(source, ['created_at', 'createdAt']),
+    updated_at: getString(source, ['updated_at', 'updatedAt']),
+  };
+};
+
+const normalizeDocumentType = (input: unknown): DocumentType | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const sectionId = getNumber(source, ['section_id', 'sectionId']);
+  const name = getString(source, ['name']);
+
+  if (!id || !sectionId || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    section_id: sectionId,
+    code: getString(source, ['code']) || null,
+    name,
+    description: getString(source, ['description']) || null,
+    is_required: getBoolean(source, ['is_required', 'isRequired'], false),
+    is_sensitive: getBoolean(source, ['is_sensitive', 'isSensitive'], false),
+    has_expiry: getBoolean(source, ['has_expiry', 'hasExpiry'], false),
+    is_system_defined: getBoolean(source, ['is_system_defined', 'isSystemDefined'], false),
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    sort_order: getNumber(source, ['sort_order', 'sortOrder'], 0),
+    created_at: getString(source, ['created_at', 'createdAt']),
+    updated_at: getString(source, ['updated_at', 'updatedAt']),
+    section: normalizeDocumentSection(source.section),
   };
 };
 
@@ -695,6 +776,73 @@ export const listLinkableUsers = async (): Promise<LinkableUser[]> => {
   return getArrayFromPayload(response.data, ['users', 'items', 'results'])
     .map(normalizeLinkableUser)
     .filter((user): user is LinkableUser => user !== null);
+};
+
+export const listDocumentSections = async (): Promise<DocumentSection[]> => {
+  const response = await api.get('/rh/document-structure/sections');
+  return getArrayFromPayload(response.data, ['sections', 'items', 'results'])
+    .map(normalizeDocumentSection)
+    .filter((section): section is DocumentSection => section !== null);
+};
+
+export const createDocumentSection = async (
+  payload: DocumentSectionPayload,
+): Promise<DocumentSection> => {
+  const response = await api.post('/rh/document-structure/sections', payload);
+  const parsed =
+    normalizeDocumentSection(asRecord(unwrapPayload(response.data))?.section ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar la seccion documental creada');
+  }
+  return parsed;
+};
+
+export const updateDocumentSectionById = async (
+  sectionId: number,
+  payload: Partial<DocumentSectionPayload>,
+): Promise<DocumentSection | null> => {
+  const response = await api.patch(`/rh/document-structure/sections/${sectionId}`, payload);
+  return normalizeDocumentSection(asRecord(unwrapPayload(response.data))?.section ?? unwrapPayload(response.data));
+};
+
+export const deleteDocumentSectionById = async (sectionId: number): Promise<void> => {
+  await api.delete(`/rh/document-structure/sections/${sectionId}`);
+};
+
+export const listDocumentTypes = async (
+  options: { section_id?: number; is_active?: boolean } = {},
+): Promise<DocumentType[]> => {
+  const response = await api.get('/rh/document-structure/types', {
+    params: {
+      ...(options.section_id ? { section_id: options.section_id } : {}),
+      ...(typeof options.is_active === 'boolean' ? { is_active: options.is_active } : {}),
+    },
+  });
+  return getArrayFromPayload(response.data, ['types', 'items', 'results'])
+    .map(normalizeDocumentType)
+    .filter((type): type is DocumentType => type !== null);
+};
+
+export const createDocumentType = async (payload: DocumentTypePayload): Promise<DocumentType> => {
+  const response = await api.post('/rh/document-structure/types', payload);
+  const parsed =
+    normalizeDocumentType(asRecord(unwrapPayload(response.data))?.type ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar el tipo documental creado');
+  }
+  return parsed;
+};
+
+export const updateDocumentTypeById = async (
+  typeId: number,
+  payload: Partial<DocumentTypePayload>,
+): Promise<DocumentType | null> => {
+  const response = await api.patch(`/rh/document-structure/types/${typeId}`, payload);
+  return normalizeDocumentType(asRecord(unwrapPayload(response.data))?.type ?? unwrapPayload(response.data));
+};
+
+export const deleteDocumentTypeById = async (typeId: number): Promise<void> => {
+  await api.delete(`/rh/document-structure/types/${typeId}`);
 };
 
 const createDocumentListParams = (options: ListDocumentsOptions) => {

@@ -3,17 +3,17 @@ import { FileStack, ShieldCheck, UserSquare2 } from 'lucide-react';
 const cards = [
   {
     title: 'Estructura lista',
-    description: 'El expediente RH ya tiene base de colaboradores para vincular documentos por persona.',
+    description: 'El expediente RH ya tiene base de colaboradores y una estructura configurable de secciones y tipos documentales.',
     icon: UserSquare2,
   },
   {
-    title: 'Siguiente iteracion',
-    description: 'Aqui construiremos secciones, tipos documentales y carga por colaborador.',
+    title: 'Catalogo configurable',
+    description: 'RH ya puede administrar secciones y tipos documentales, mezclando base institucional y tipos personalizados.',
     icon: FileStack,
   },
   {
     title: 'Seguridad prevista',
-    description: 'La separacion multi-modulo ya permite que RH evolucione con permisos propios.',
+    description: 'La separacion multi-modulo sigue permitiendo que RH evolucione con permisos propios y controlado por rol.',
     icon: ShieldCheck,
   },
 ];
@@ -28,7 +28,7 @@ export const RhExpedientsPage = () => {
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Expedientes</h1>
           <p className="mt-2 max-w-3xl text-sm text-[var(--unilabor-neutral)]">
-            Este espacio queda habilitado desde Sprint 2 como antesala del expediente digital del colaborador.
+            Este espacio ya queda preparado para que el siguiente sprint conecte colaboradores, estructura documental y archivos del expediente.
           </p>
         </div>
       </div>

@@ -8,7 +8,9 @@ import { AuditPage } from './pages/AuditPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ChangePasswordPage } from './pages/ChangePassword';
 import { DashboardHome } from './pages/DashboardHome';
+import { DocumentSectionsPage } from './pages/DocumentSectionsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { DocumentTypesPage } from './pages/DocumentTypesPage';
 import { ForgotPasswordPage } from './pages/ForgotPassword';
 import { LoginPage } from './pages/Login';
 import { ModuleSelectorPage } from './pages/ModuleSelectorPage';
@@ -88,6 +90,22 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
               <RhExpedientsPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="document-sections"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <DocumentSectionsPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="document-types"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <DocumentTypesPage />
             </RoleGate>
           }
         />

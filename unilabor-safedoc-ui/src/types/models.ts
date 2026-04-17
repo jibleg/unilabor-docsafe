@@ -63,6 +63,35 @@ export interface EmployeeSummary {
   unlinked_users: number;
 }
 
+export interface DocumentSection {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  is_system_defined: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DocumentType {
+  id: number;
+  section_id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  is_required: boolean;
+  is_sensitive: boolean;
+  has_expiry: boolean;
+  is_system_defined: boolean;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+  section?: DocumentSection | null;
+}
+
 export type DocumentStatus = 'active' | 'inactive' | 'superseded';
 
 export interface Document {
