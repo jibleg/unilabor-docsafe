@@ -111,6 +111,9 @@ export interface EmployeeDocument {
   created_at?: string;
   updated_at?: string;
   uploaded_by_name?: string | null;
+  is_sensitive?: boolean;
+  has_expiry?: boolean;
+  expiry_status?: 'uploaded' | 'valid' | 'expiring' | 'expired';
 }
 
 export type ExpedientItemStatus = 'missing' | 'uploaded' | 'valid' | 'expiring' | 'expired';

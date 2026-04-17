@@ -111,9 +111,9 @@ export const EmployeeDocumentUploadModal = ({
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                Fecha de emision
-              </label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Fecha de emision {documentType.has_expiry ? '*' : ''}
+                  </label>
               <input
                 type="date"
                 value={issueDate}
@@ -122,9 +122,9 @@ export const EmployeeDocumentUploadModal = ({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                Fecha de vencimiento
-              </label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Fecha de vencimiento {documentType.has_expiry ? '*' : ''}
+                  </label>
               <input
                 type="date"
                 value={expiryDate}
@@ -137,7 +137,7 @@ export const EmployeeDocumentUploadModal = ({
 
           <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.88)] px-4 py-3 text-xs text-[var(--unilabor-neutral)]">
             {documentType.has_expiry
-              ? 'Este tipo documental admite vigencia. Si cargas una nueva version, la anterior quedara marcada como derogada dentro del expediente.'
+              ? 'Este tipo documental controla vigencia. Debes capturar fecha de emision y fecha de vencimiento. Si cargas una nueva version, la anterior quedara marcada como derogada dentro del expediente.'
               : 'La nueva carga sustituye la version vigente anterior y conserva el historial dentro del expediente RH.'}
           </div>
         </div>

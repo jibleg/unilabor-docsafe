@@ -24,6 +24,7 @@ export interface EmployeeDocumentFilters {
   section_id?: number;
   document_type_id?: number;
   current_only?: boolean;
+  expiry_status?: 'valid' | 'expiring' | 'expired';
 }
 
 const EXPIRING_WINDOW_DAYS = 30;
@@ -70,6 +71,36 @@ const calculateItemStatus = (
   }
 
   const expiryDate = parseIsoDate(currentDocument.expiry_date ?? null);
+  if (!expiryDate) {
+    return 'valid';
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffMs = expiryDate.getTime() - today.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return 'expired';
+  }
+
+  if (diffDays <= EXPIRING_WINDOW_DAYS) {
+    return 'expiring';
+  }
+
+  return 'valid';
+};
+
+const calculateDocumentExpiryStatus = (
+  hasExpiry: boolean,
+  expiryDateValue: string | null,
+): 'uploaded' | 'valid' | 'expiring' | 'expired' => {
+  if (!hasExpiry) {
+    return 'uploaded';
+  }
+
+  const expiryDate = parseIsoDate(expiryDateValue);
   if (!expiryDate) {
     return 'valid';
   }
@@ -144,6 +175,7 @@ const mapDocumentTypeRow = (row: any): DocumentTypeRecord => {
 };
 
 const mapEmployeeDocumentRow = (row: any): EmployeeDocumentRecord => {
+  const hasExpiry = Boolean(row.document_type_has_expiry ?? row.has_expiry);
   const document: EmployeeDocumentRecord = {
     id: Number(row.employee_document_id ?? row.id),
     employee_id: Number(row.employee_id),
@@ -165,6 +197,12 @@ const mapEmployeeDocumentRow = (row: any): EmployeeDocumentRecord => {
     is_current: Boolean(row.is_current),
     replaces_document_id: row.replaces_document_id ? Number(row.replaces_document_id) : null,
     uploaded_by_name: row.uploaded_by_name ? String(row.uploaded_by_name) : null,
+    is_sensitive: Boolean(row.document_type_is_sensitive ?? row.is_sensitive),
+    has_expiry: hasExpiry,
+    expiry_status: calculateDocumentExpiryStatus(
+      hasExpiry,
+      row.expiry_date ? String(row.expiry_date) : null,
+    ),
   };
 
   if (row.document_created_at) {
@@ -302,7 +340,9 @@ export const listEmployeeDocuments = async (
         ed.replaces_document_id,
         ed.created_at AS document_created_at,
         ed.updated_at AS document_updated_at,
-        u.full_name AS uploaded_by_name
+        u.full_name AS uploaded_by_name,
+        dt.is_sensitive AS document_type_is_sensitive,
+        dt.has_expiry AS document_type_has_expiry
       FROM public.employee_documents ed
       INNER JOIN public.document_types dt ON dt.id = ed.document_type_id
       LEFT JOIN public.users u ON u.id = ed.uploaded_by_user_id
@@ -312,7 +352,13 @@ export const listEmployeeDocuments = async (
     values,
   );
 
-  return result.rows.map((row) => mapEmployeeDocumentRow(row));
+  const documents = result.rows.map((row) => mapEmployeeDocumentRow(row));
+
+  if (!filters.expiry_status) {
+    return documents;
+  }
+
+  return documents.filter((document) => document.expiry_status === filters.expiry_status);
 };
 
 export const getEmployeeDocumentById = async (
@@ -340,8 +386,11 @@ export const getEmployeeDocumentById = async (
         ed.replaces_document_id,
         ed.created_at AS document_created_at,
         ed.updated_at AS document_updated_at,
-        u.full_name AS uploaded_by_name
+        u.full_name AS uploaded_by_name,
+        dt.is_sensitive AS document_type_is_sensitive,
+        dt.has_expiry AS document_type_has_expiry
       FROM public.employee_documents ed
+      INNER JOIN public.document_types dt ON dt.id = ed.document_type_id
       LEFT JOIN public.users u ON u.id = ed.uploaded_by_user_id
       WHERE ed.id = $1
       LIMIT 1;
@@ -501,6 +550,29 @@ export const uploadEmployeeDocument = async (
   try {
     await client.query('BEGIN');
 
+    if (documentType.has_expiry) {
+      if (!payload.issue_date || !payload.expiry_date) {
+        const error = new Error('EXPIRY_DATES_REQUIRED');
+        (error as any).code = 'EXPIRY_DATES_REQUIRED';
+        throw error;
+      }
+
+      const issueDate = parseIsoDate(payload.issue_date);
+      const expiryDate = parseIsoDate(payload.expiry_date);
+
+      if (!issueDate || !expiryDate) {
+        const error = new Error('EXPIRY_DATES_INVALID');
+        (error as any).code = 'EXPIRY_DATES_INVALID';
+        throw error;
+      }
+
+      if (expiryDate.getTime() <= issueDate.getTime()) {
+        const error = new Error('EXPIRY_MUST_BE_AFTER_ISSUE');
+        (error as any).code = 'EXPIRY_MUST_BE_AFTER_ISSUE';
+        throw error;
+      }
+    }
+
     const currentResult = await client.query(
       `
         SELECT id, version
@@ -614,4 +686,42 @@ export const resolveEmployeeDocumentPath = async (documentId: number): Promise<{
     document,
     absolutePath,
   };
+};
+
+export const canUserAccessEmployeeDocument = async (
+  userId: string,
+  role: UserRole,
+  documentId: number,
+): Promise<boolean> => {
+  if (role === 'ADMIN' || role === 'EDITOR') {
+    return true;
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        ed.id,
+        e.user_id,
+        dt.is_sensitive
+      FROM public.employee_documents ed
+      INNER JOIN public.employees e ON e.id = ed.employee_id
+      INNER JOIN public.document_types dt ON dt.id = ed.document_type_id
+      WHERE ed.id = $1
+      LIMIT 1;
+    `,
+    [documentId],
+  );
+
+  if (result.rows.length === 0) {
+    return false;
+  }
+
+  const row = result.rows[0];
+  const isOwner = row.user_id && String(row.user_id) === userId;
+
+  if (!isOwner) {
+    return false;
+  }
+
+  return true;
 };

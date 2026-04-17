@@ -124,6 +124,18 @@ export const EmployeeExpedientPage = () => {
       return;
     }
 
+    if (selectedItem.document_type.has_expiry) {
+      if (!payload.issue_date || !payload.expiry_date) {
+        notifyWarning('Las constancias requieren fecha de emision y fecha de vencimiento.');
+        return;
+      }
+
+      if (new Date(payload.expiry_date).getTime() <= new Date(payload.issue_date).getTime()) {
+        notifyWarning('La fecha de vencimiento debe ser posterior a la fecha de emision.');
+        return;
+      }
+    }
+
     const documentPayload: EmployeeDocumentPayload = {
       document_type_id: selectedItem.document_type.id,
       title: payload.title,

@@ -92,6 +92,9 @@ export interface EmployeeDocumentRecord {
   updated_at?: string;
   document_type?: DocumentTypeRecord | null;
   uploaded_by_name?: string | null;
+  is_sensitive?: boolean;
+  has_expiry?: boolean;
+  expiry_status?: 'uploaded' | 'valid' | 'expiring' | 'expired';
 }
 
 export interface EmployeeExpedientSummary {

@@ -472,8 +472,26 @@ const normalizeEmployeeDocument = (input: unknown): EmployeeDocument | null => {
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),
     uploaded_by_name: getString(source, ['uploaded_by_name', 'uploadedByName']) || null,
+    is_sensitive: getBoolean(source, ['is_sensitive', 'isSensitive'], false),
+    has_expiry: getBoolean(source, ['has_expiry', 'hasExpiry'], false),
+    expiry_status:
+      (() => {
+        const normalized = typeof (source.expiry_status ?? source.expiryStatus) === 'string'
+          ? String(source.expiry_status ?? source.expiryStatus).trim().toLowerCase()
+          : '';
+
+        switch (normalized) {
+          case 'valid':
+          case 'expiring':
+          case 'expired':
+            return normalized;
+          case 'uploaded':
+          default:
+            return 'uploaded';
+        }
+      })(),
+    };
   };
-};
 
 const normalizeExpedientStatus = (value: unknown): ExpedientItemStatus => {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';

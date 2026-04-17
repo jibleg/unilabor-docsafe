@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import {
   buildEmployeeExpedient,
+  canUserAccessEmployeeDocument,
   canUserAccessEmployeeExpedient,
   getEmployeeForAuthenticatedUser,
   listEmployeeDocuments,
@@ -83,6 +84,24 @@ const mapEmployeeDocumentError = (res: Response, error: any) => {
     return res.status(404).json({ message: 'Tipo documental no encontrado o inactivo.' });
   }
 
+  if (error?.code === 'EXPIRY_DATES_REQUIRED') {
+    return res.status(400).json({
+      message: 'Este tipo documental requiere fecha de emision y fecha de vencimiento.',
+    });
+  }
+
+  if (error?.code === 'EXPIRY_DATES_INVALID') {
+    return res.status(400).json({
+      message: 'Las fechas de vigencia del documento no tienen un formato valido.',
+    });
+  }
+
+  if (error?.code === 'EXPIRY_MUST_BE_AFTER_ISSUE') {
+    return res.status(400).json({
+      message: 'La fecha de vencimiento debe ser posterior a la fecha de emision.',
+    });
+  }
+
   if (error?.code === 'EMPLOYEE_DOCUMENT_NOT_FOUND') {
     return res.status(404).json({ message: 'Documento RH no encontrado.' });
   }
@@ -147,11 +166,18 @@ export const listEmployeeDocumentsController = async (req: AuthRequest, res: Res
       req.query.current_only === undefined
         ? true
         : String(req.query.current_only).trim().toLowerCase() !== 'false';
+    const expiryStatusRaw =
+      typeof req.query.expiry_status === 'string' ? req.query.expiry_status.trim().toLowerCase() : '';
+    const expiryStatus =
+      expiryStatusRaw === 'valid' || expiryStatusRaw === 'expiring' || expiryStatusRaw === 'expired'
+        ? expiryStatusRaw
+        : undefined;
 
     const documents = await listEmployeeDocuments(employeeId, {
       ...(sectionId ? { section_id: sectionId } : {}),
       ...(documentTypeId ? { document_type_id: documentTypeId } : {}),
       current_only: currentOnly,
+      ...(expiryStatus ? { expiry_status: expiryStatus } : {}),
     });
 
     return res.json({ documents });
@@ -247,7 +273,7 @@ export const viewEmployeeDocumentController = async (req: AuthRequest, res: Resp
 
   try {
     const { document, absolutePath } = await resolveEmployeeDocumentPath(documentId);
-    const canAccess = await canUserAccessEmployeeExpedient(user.id, user.role, document.employee_id);
+    const canAccess = await canUserAccessEmployeeDocument(user.id, user.role, documentId);
     if (!canAccess) {
       return res.status(403).json({ message: 'No tienes acceso a este documento RH.' });
     }
@@ -315,11 +341,18 @@ export const listMyDocumentsController = async (req: AuthRequest, res: Response)
       req.query.current_only === undefined
         ? true
         : String(req.query.current_only).trim().toLowerCase() !== 'false';
+    const expiryStatusRaw =
+      typeof req.query.expiry_status === 'string' ? req.query.expiry_status.trim().toLowerCase() : '';
+    const expiryStatus =
+      expiryStatusRaw === 'valid' || expiryStatusRaw === 'expiring' || expiryStatusRaw === 'expired'
+        ? expiryStatusRaw
+        : undefined;
 
     const documents = await listEmployeeDocuments(employee.id, {
       ...(sectionId ? { section_id: sectionId } : {}),
       ...(documentTypeId ? { document_type_id: documentTypeId } : {}),
       current_only: currentOnly,
+      ...(expiryStatus ? { expiry_status: expiryStatus } : {}),
     });
 
     return res.json({ documents });
