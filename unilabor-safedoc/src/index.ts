@@ -8,6 +8,7 @@ import auditRoutes from './routes/audit.routes';
 import categoryRoutes from './routes/category.routes';
 import employeeRoutes from './routes/employee.routes';
 import documentStructureRoutes from './routes/document-structure.routes';
+import employeeDocumentRoutes from './routes/employee-document.routes';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/rh/document-structure', documentStructureRoutes);
+app.use('/api/rh', employeeDocumentRoutes);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

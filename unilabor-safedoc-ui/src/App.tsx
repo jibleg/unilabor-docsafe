@@ -11,13 +11,13 @@ import { DashboardHome } from './pages/DashboardHome';
 import { DocumentSectionsPage } from './pages/DocumentSectionsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { DocumentTypesPage } from './pages/DocumentTypesPage';
+import { EmployeeExpedientPage } from './pages/EmployeeExpedientPage';
 import { ForgotPasswordPage } from './pages/ForgotPassword';
 import { LoginPage } from './pages/Login';
 import { ModuleSelectorPage } from './pages/ModuleSelectorPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RhDashboardPage } from './pages/RhDashboardPage';
 import { RhEmployeesPage } from './pages/RhEmployeesPage';
-import { RhExpedientsPage } from './pages/RhExpedientsPage';
 import { UsersPage } from './pages/UsersPage';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -89,7 +89,7 @@ function App() {
           path="expedients"
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
-              <RhExpedientsPage />
+              <EmployeeExpedientPage />
             </RoleGate>
           }
         />

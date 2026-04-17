@@ -92,6 +92,56 @@ export interface DocumentType {
   section?: DocumentSection | null;
 }
 
+export interface EmployeeDocument {
+  id: number;
+  employee_id: number;
+  document_type_id: number;
+  title: string;
+  description?: string | null;
+  file_path: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by_user_id: string;
+  issue_date?: string | null;
+  expiry_date?: string | null;
+  status: DocumentStatus;
+  version: number;
+  is_current: boolean;
+  replaces_document_id?: number | null;
+  created_at?: string;
+  updated_at?: string;
+  uploaded_by_name?: string | null;
+}
+
+export type ExpedientItemStatus = 'missing' | 'uploaded' | 'valid' | 'expiring' | 'expired';
+
+export interface EmployeeExpedientSummary {
+  total_types: number;
+  required_types: number;
+  uploaded_types: number;
+  missing_types: number;
+  completion_percent: number;
+  expiring_count: number;
+  expired_count: number;
+}
+
+export interface EmployeeExpedientItem {
+  document_type: DocumentType;
+  current_document?: EmployeeDocument | null;
+  status: ExpedientItemStatus;
+}
+
+export interface EmployeeExpedientSection {
+  section: DocumentSection;
+  items: EmployeeExpedientItem[];
+}
+
+export interface EmployeeExpedient {
+  employee: Employee;
+  summary: EmployeeExpedientSummary;
+  sections: EmployeeExpedientSection[];
+}
+
 export type DocumentStatus = 'active' | 'inactive' | 'superseded';
 
 export interface Document {

@@ -72,6 +72,49 @@ export interface DocumentTypeRecord {
   section?: DocumentSectionRecord | null;
 }
 
+export interface EmployeeDocumentRecord {
+  id: number;
+  employee_id: number;
+  document_type_id: number;
+  title: string;
+  description: string | null;
+  file_path: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by_user_id: string;
+  issue_date: string | null;
+  expiry_date: string | null;
+  status: 'active' | 'inactive' | 'superseded';
+  version: number;
+  is_current: boolean;
+  replaces_document_id: number | null;
+  created_at?: string;
+  updated_at?: string;
+  document_type?: DocumentTypeRecord | null;
+  uploaded_by_name?: string | null;
+}
+
+export interface EmployeeExpedientSummary {
+  total_types: number;
+  required_types: number;
+  uploaded_types: number;
+  missing_types: number;
+  completion_percent: number;
+  expiring_count: number;
+  expired_count: number;
+}
+
+export interface EmployeeExpedientTypeItem {
+  document_type: DocumentTypeRecord;
+  current_document: EmployeeDocumentRecord | null;
+  status: 'missing' | 'uploaded' | 'valid' | 'expiring' | 'expired';
+}
+
+export interface EmployeeExpedientSection {
+  section: DocumentSectionRecord;
+  items: EmployeeExpedientTypeItem[];
+}
+
 export interface JWTPayload {
   id: string;
   role: UserRole;

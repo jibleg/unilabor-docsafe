@@ -8,7 +8,13 @@ import type {
   DocumentStatus,
   DocumentType,
   Employee,
+  EmployeeDocument,
+  EmployeeExpedient,
+  EmployeeExpedientItem,
+  EmployeeExpedientSection,
+  EmployeeExpedientSummary,
   EmployeeSummary,
+  ExpedientItemStatus,
   LinkableUser,
   ManagedUser,
   ModuleAccess,
@@ -70,6 +76,15 @@ export interface DocumentTypePayload {
   has_expiry?: boolean;
   is_active?: boolean;
   sort_order?: number;
+}
+
+export interface EmployeeDocumentPayload {
+  document_type_id: number;
+  title: string;
+  description?: string;
+  issue_date?: string;
+  expiry_date?: string;
+  file: File;
 }
 
 export interface UpdateDocumentPayload {
@@ -415,6 +430,144 @@ const normalizeDocumentType = (input: unknown): DocumentType | null => {
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),
     section: normalizeDocumentSection(source.section),
+  };
+};
+
+const normalizeEmployeeDocument = (input: unknown): EmployeeDocument | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const employeeId = getNumber(source, ['employee_id', 'employeeId']);
+  const documentTypeId = getNumber(source, ['document_type_id', 'documentTypeId']);
+  const title = getString(source, ['title']);
+  const filePath = getString(source, ['file_path', 'filePath', 'filename']);
+  const uploadedByUserId = getString(source, ['uploaded_by_user_id', 'uploadedByUserId']);
+
+  if (!id || !employeeId || !documentTypeId || !title || !filePath || !uploadedByUserId) {
+    return null;
+  }
+
+  return {
+    id,
+    employee_id: employeeId,
+    document_type_id: documentTypeId,
+    title,
+    description: getString(source, ['description']) || null,
+    file_path: filePath,
+    file_size: getNumber(source, ['file_size', 'fileSize'], 0),
+    mime_type: getString(source, ['mime_type', 'mimeType'], 'application/pdf'),
+    uploaded_by_user_id: uploadedByUserId,
+    issue_date: getString(source, ['issue_date', 'issueDate']) || null,
+    expiry_date: getString(source, ['expiry_date', 'expiryDate']) || null,
+    status: getString(source, ['status'], 'active') as DocumentStatus,
+    version: getNumber(source, ['version'], 1),
+    is_current: getBoolean(source, ['is_current', 'isCurrent'], true),
+    replaces_document_id:
+      getNumber(source, ['replaces_document_id', 'replacesDocumentId'], 0) > 0
+        ? getNumber(source, ['replaces_document_id', 'replacesDocumentId'], 0)
+        : null,
+    created_at: getString(source, ['created_at', 'createdAt']),
+    updated_at: getString(source, ['updated_at', 'updatedAt']),
+    uploaded_by_name: getString(source, ['uploaded_by_name', 'uploadedByName']) || null,
+  };
+};
+
+const normalizeExpedientStatus = (value: unknown): ExpedientItemStatus => {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  switch (normalized) {
+    case 'uploaded':
+    case 'valid':
+    case 'expiring':
+    case 'expired':
+      return normalized;
+    case 'missing':
+    default:
+      return 'missing';
+  }
+};
+
+const normalizeEmployeeExpedientSummary = (input: unknown): EmployeeExpedientSummary => {
+  const source = asRecord(input);
+  if (!source) {
+    return {
+      total_types: 0,
+      required_types: 0,
+      uploaded_types: 0,
+      missing_types: 0,
+      completion_percent: 0,
+      expiring_count: 0,
+      expired_count: 0,
+    };
+  }
+
+  return {
+    total_types: getNumber(source, ['total_types', 'totalTypes']),
+    required_types: getNumber(source, ['required_types', 'requiredTypes']),
+    uploaded_types: getNumber(source, ['uploaded_types', 'uploadedTypes']),
+    missing_types: getNumber(source, ['missing_types', 'missingTypes']),
+    completion_percent: getNumber(source, ['completion_percent', 'completionPercent']),
+    expiring_count: getNumber(source, ['expiring_count', 'expiringCount']),
+    expired_count: getNumber(source, ['expired_count', 'expiredCount']),
+  };
+};
+
+const normalizeEmployeeExpedientItem = (input: unknown): EmployeeExpedientItem | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const documentType = normalizeDocumentType(source.document_type ?? source.documentType);
+  if (!documentType) {
+    return null;
+  }
+
+  return {
+    document_type: documentType,
+    current_document: normalizeEmployeeDocument(source.current_document ?? source.currentDocument),
+    status: normalizeExpedientStatus(source.status),
+  };
+};
+
+const normalizeEmployeeExpedientSection = (input: unknown): EmployeeExpedientSection | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const section = normalizeDocumentSection(source.section);
+  if (!section) {
+    return null;
+  }
+
+  return {
+    section,
+    items: getArrayFromPayload(source.items ?? source.types ?? [], ['items'])
+      .map(normalizeEmployeeExpedientItem)
+      .filter((item): item is EmployeeExpedientItem => item !== null),
+  };
+};
+
+const normalizeEmployeeExpedient = (input: unknown): EmployeeExpedient | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const employee = normalizeEmployee(source.employee);
+  if (!employee) {
+    return null;
+  }
+
+  return {
+    employee,
+    summary: normalizeEmployeeExpedientSummary(source.summary),
+    sections: getArrayFromPayload(source.sections, ['sections'])
+      .map(normalizeEmployeeExpedientSection)
+      .filter((section): section is EmployeeExpedientSection => section !== null),
   };
 };
 
@@ -821,6 +974,49 @@ export const listDocumentTypes = async (
   return getArrayFromPayload(response.data, ['types', 'items', 'results'])
     .map(normalizeDocumentType)
     .filter((type): type is DocumentType => type !== null);
+};
+
+export const fetchEmployeeExpedientById = async (
+  employeeId: number,
+): Promise<EmployeeExpedient | null> => {
+  const response = await api.get(`/rh/employees/${employeeId}/expedient`);
+  return normalizeEmployeeExpedient(unwrapPayload(response.data));
+};
+
+export const listEmployeeDocumentsByEmployeeId = async (
+  employeeId: number,
+): Promise<EmployeeDocument[]> => {
+  const response = await api.get(`/rh/employees/${employeeId}/documents`);
+  return getArrayFromPayload(response.data, ['documents', 'items', 'results'])
+    .map(normalizeEmployeeDocument)
+    .filter((document): document is EmployeeDocument => document !== null);
+};
+
+export const uploadEmployeeDocumentByEmployeeId = async (
+  employeeId: number,
+  payload: EmployeeDocumentPayload,
+): Promise<EmployeeDocument> => {
+  const formData = new FormData();
+  formData.append('document_type_id', String(payload.document_type_id));
+  formData.append('title', payload.title.trim());
+  formData.append('description', payload.description?.trim() ?? '');
+  formData.append('issue_date', payload.issue_date?.trim() || '');
+  formData.append('expiry_date', payload.expiry_date?.trim() || '');
+  formData.append('file', payload.file);
+
+  const response = await api.post(`/rh/employees/${employeeId}/documents`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  const parsed =
+    normalizeEmployeeDocument(asRecord(unwrapPayload(response.data))?.document ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar el documento RH cargado');
+  }
+
+  return parsed;
 };
 
 export const createDocumentType = async (payload: DocumentTypePayload): Promise<DocumentType> => {
