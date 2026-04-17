@@ -14,6 +14,35 @@ export interface ModuleAccess {
   sort_order?: number;
 }
 
+export interface LinkableUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  modules: ModuleAccess[];
+}
+
+export interface EmployeeRecord {
+  id: number;
+  employee_code: string;
+  user_id: string | null;
+  full_name: string;
+  email: string;
+  area: string | null;
+  position: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  linked_user?: LinkableUser | null;
+}
+
+export interface EmployeeSummary {
+  total: number;
+  active: number;
+  linked_users: number;
+  unlinked_users: number;
+}
+
 export interface JWTPayload {
   id: string;
   role: UserRole;

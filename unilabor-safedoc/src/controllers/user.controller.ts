@@ -3,11 +3,13 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db';
 import { sendWelcomeEmail } from '../services/email.service';
+import { listSystemModules, listUserModuleAccess, syncUserModuleAccess } from '../services/module-access.service';
 import { resetPasswordForUserById } from '../services/password.service';
 import * as categoryService from '../services/category.service';
-import { AuthRequest, UserRole } from '../types';
+import { AuthRequest, ModuleCode, UserRole } from '../types';
 
 const allowedRoles: UserRole[] = ['ADMIN', 'EDITOR', 'VIEWER'];
+const allowedModuleCodes: ModuleCode[] = ['QUALITY', 'RH'];
 
 const getStringValue = (value: unknown): string | null => {
   if (typeof value === 'string') {
@@ -36,6 +38,26 @@ const parseCategoryIds = (rawValue: unknown): number[] | null => {
   }
 
   return Array.from(new Set(parsedIds));
+};
+
+const parseModuleCodes = (rawValue: unknown): ModuleCode[] | null => {
+  if (rawValue === undefined || rawValue === null) {
+    return [];
+  }
+
+  if (!Array.isArray(rawValue)) {
+    return null;
+  }
+
+  const normalizedValues = rawValue
+    .map((value) => String(value ?? '').trim().toUpperCase())
+    .filter((value): value is ModuleCode => allowedModuleCodes.includes(value as ModuleCode));
+
+  if (normalizedValues.length !== rawValue.length) {
+    return null;
+  }
+
+  return Array.from(new Set(normalizedValues));
 };
 
 const parseUserId = (rawValue: unknown): string | null => {
@@ -80,11 +102,36 @@ const logUserAudit = async (userId: string | undefined, action: string, ipAddres
   }
 };
 
+export const getModuleCatalog = async (_req: AuthRequest, res: Response) => {
+  try {
+    const modules = await listSystemModules();
+    res.json({
+      modules: modules.map((moduleAccess) => ({
+        code: moduleAccess.code,
+        name: moduleAccess.name,
+        description: moduleAccess.description,
+        icon: moduleAccess.icon,
+        is_active: moduleAccess.is_active,
+        sort_order: moduleAccess.sort_order ?? 0,
+      })),
+    });
+  } catch (error) {
+    console.error('Error obteniendo catalogo de modulos:', error);
+    res.status(500).json({ message: 'Error al obtener el catalogo de modulos' });
+  }
+};
+
 export const createUser = async (req: AuthRequest, res: Response) => {
-  const { email, full_name, role, category_ids, categoryIds } = req.body;
+  const { email, full_name, role, category_ids, categoryIds, module_codes, moduleCodes } = req.body;
   const normalizedRole = String(role ?? '').toUpperCase() as UserRole;
   const rawCategoryIds = category_ids ?? categoryIds;
   const parsedCategoryIds = parseCategoryIds(rawCategoryIds);
+  const rawModuleCodes = module_codes ?? moduleCodes;
+  const parsedModuleCodes = parseModuleCodes(rawModuleCodes);
+  const effectiveModuleCodes: ModuleCode[] | null =
+    rawModuleCodes === undefined || rawModuleCodes === null
+      ? ['QUALITY']
+      : parsedModuleCodes;
 
   if (!email || !full_name || !normalizedRole) {
     return res.status(400).json({ message: 'Email, nombre y rol son obligatorios' });
@@ -98,7 +145,13 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ message: 'category_ids debe ser un arreglo de IDs numericos validos' });
   }
 
-  if (normalizedRole === 'VIEWER' && parsedCategoryIds.length === 0) {
+  if (effectiveModuleCodes === null) {
+    return res.status(400).json({
+      message: `module_codes debe ser un arreglo con valores validos: ${allowedModuleCodes.join(', ')}`,
+    });
+  }
+
+  if (normalizedRole === 'VIEWER' && effectiveModuleCodes.includes('QUALITY') && parsedCategoryIds.length === 0) {
     return res.status(400).json({ message: 'Un usuario VIEWER debe tener al menos una categoria asignada' });
   }
 
@@ -125,6 +178,13 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     const values = [email, passwordHash, full_name, normalizedRole];
     const result = await client.query(query, values);
     const createdUser = result.rows[0];
+
+    const assignedModules = await syncUserModuleAccess(
+      client,
+      createdUser.id,
+      effectiveModuleCodes,
+      normalizedRole,
+    );
 
     if (parsedCategoryIds.length > 0) {
       const hasUserCategoriesTable = await userCategoriesTableExists(client);
@@ -180,6 +240,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       user: {
         ...createdUser,
         category_ids: parsedCategoryIds,
+        modules: assignedModules,
       },
     });
   } catch (error: any) {
@@ -194,6 +255,12 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     if (error?.code === 'INVALID_CATEGORY_IDS') {
       return res.status(400).json({
         message: 'Una o mas categorias no existen o estan inactivas.',
+      });
+    }
+
+    if (error?.code === 'INVALID_MODULE_CODES') {
+      return res.status(400).json({
+        message: `Uno o mas modulos no existen o estan inactivos. Valores permitidos: ${allowedModuleCodes.join(', ')}`,
       });
     }
 
@@ -238,7 +305,14 @@ export const getAllUsers = async (_req: Request, res: Response) => {
       : 'SELECT id, email, full_name, role, is_active, created_at FROM users WHERE is_active = TRUE ORDER BY created_at DESC';
 
     const result = await pool.query(query);
-    res.json(result.rows);
+    const usersWithModules = await Promise.all(
+      result.rows.map(async (row) => ({
+        ...row,
+        modules: await listUserModuleAccess(String(row.id), row.role),
+      })),
+    );
+
+    res.json(usersWithModules);
   } catch (error) {
     console.error('Error obteniendo usuarios:', error);
     res.status(500).json({ message: 'Error al obtener usuarios' });
@@ -334,14 +408,22 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
   const email = getStringValue(req.body?.email);
   const fullName = getStringValue(req.body?.full_name);
   const role = getStringValue(req.body?.role);
+  const rawModuleCodes = req.body?.module_codes ?? req.body?.moduleCodes;
+  const parsedModuleCodes = parseModuleCodes(rawModuleCodes);
 
   const normalizedEmail = email?.trim().toLowerCase();
   const normalizedFullName = fullName?.trim();
   const normalizedRole = role?.trim().toUpperCase() as UserRole | undefined;
 
-  if (!normalizedEmail && !normalizedFullName && !normalizedRole) {
+  if (parsedModuleCodes === null) {
     return res.status(400).json({
-      message: 'Debes enviar al menos un campo para actualizar: email, full_name o role',
+      message: `module_codes debe ser un arreglo con valores validos: ${allowedModuleCodes.join(', ')}`,
+    });
+  }
+
+  if (!normalizedEmail && !normalizedFullName && !normalizedRole && rawModuleCodes === undefined) {
+    return res.status(400).json({
+      message: 'Debes enviar al menos un campo para actualizar: email, full_name, role o module_codes',
     });
   }
 
@@ -350,6 +432,20 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    const currentUserResult = await pool.query(
+      'SELECT id, role FROM users WHERE id = $1 LIMIT 1',
+      [userId]
+    );
+    if (currentUserResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    const effectiveRole = normalizedRole ?? String(currentUserResult.rows[0]?.role ?? '').toUpperCase() as UserRole;
+    const currentModules = await listUserModuleAccess(userId, effectiveRole);
+    const effectiveModuleCodes = rawModuleCodes !== undefined
+      ? parsedModuleCodes ?? []
+      : currentModules.map((moduleAccess) => moduleAccess.code);
+
     if (normalizedEmail) {
       const emailExists = await pool.query(
         'SELECT id FROM users WHERE email = $1 AND id <> $2 LIMIT 1',
@@ -360,7 +456,7 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    if (normalizedRole === 'VIEWER') {
+    if (effectiveRole === 'VIEWER' && effectiveModuleCodes.includes('QUALITY')) {
       const hasUserCategoriesTable = await pool.query(
         `SELECT to_regclass('public.user_categories') IS NOT NULL AS exists;`
       );
@@ -377,6 +473,11 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
         }
       }
     }
+
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
 
     const updates: string[] = [];
     const values: unknown[] = [];
@@ -406,17 +507,41 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
       RETURNING id, email, full_name, role, is_active, must_change_password, created_at, updated_at;
     `;
 
-    const result = await pool.query(query, values);
+    const result = await client.query(query, values);
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
+      const assignedModules =
+        rawModuleCodes !== undefined
+          ? await syncUserModuleAccess(client, userId, effectiveModuleCodes, effectiveRole)
+          : await listUserModuleAccess(userId, effectiveRole);
+
+      await client.query('COMMIT');
+
     await logUserAudit(req.user?.id, `USER_UPDATE:${userId}`, req.ip);
 
-    res.json({
-      message: 'Usuario actualizado correctamente',
-      user: result.rows[0],
-    });
+      res.json({
+        message: 'Usuario actualizado correctamente',
+        user: {
+          ...result.rows[0],
+          modules: assignedModules,
+        },
+      });
+    } catch (transactionError: any) {
+      await client.query('ROLLBACK');
+
+      if (transactionError?.code === 'INVALID_MODULE_CODES') {
+        return res.status(400).json({
+          message: `Uno o mas modulos no existen o estan inactivos. Valores permitidos: ${allowedModuleCodes.join(', ')}`,
+        });
+      }
+
+      throw transactionError;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Error actualizando usuario:', error);
     res.status(500).json({ message: 'Error al actualizar usuario' });

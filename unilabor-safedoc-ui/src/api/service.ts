@@ -5,8 +5,12 @@ import type {
   Category,
   Document,
   DocumentStatus,
+  Employee,
+  EmployeeSummary,
+  LinkableUser,
   ManagedUser,
   ModuleAccess,
+  ModuleCode,
   User,
 } from '../types/models';
 import { tokenRequiresPasswordChange } from '../utils/auth';
@@ -27,12 +31,23 @@ export interface CreateUserPayload {
   full_name: string;
   role: string;
   category_ids?: number[];
+  module_codes?: ModuleCode[];
 }
 
 export interface UpdateUserPayload {
   email?: string;
   full_name?: string;
   role?: string;
+  module_codes?: ModuleCode[];
+}
+
+export interface EmployeePayload {
+  employee_code?: string;
+  user_id?: string | null;
+  full_name: string;
+  email: string;
+  area?: string;
+  position?: string;
 }
 
 export interface UpdateDocumentPayload {
@@ -216,6 +231,9 @@ const normalizeManagedUser = (input: unknown): ManagedUser | null => {
     ),
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),
+    modules: getArrayFromPayload(source, ['modules'])
+      .map(normalizeModuleAccess)
+      .filter((moduleAccess): moduleAccess is ModuleAccess => moduleAccess !== null),
   };
 };
 
@@ -241,6 +259,81 @@ const normalizeModuleAccess = (input: unknown): ModuleAccess | null => {
     role,
     is_active: getBoolean(source, ['is_active', 'isActive'], true),
     sort_order: getNumber(source, ['sort_order', 'sortOrder'], 0),
+  };
+};
+
+const normalizeLinkableUser = (input: unknown): LinkableUser | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getString(source, ['id']);
+  const email = getString(source, ['email']);
+  const fullName = getString(source, ['full_name', 'fullName', 'name']);
+  const role = getString(source, ['role']).toUpperCase();
+
+  if (!id || !email || !fullName || !role) {
+    return null;
+  }
+
+  return {
+    id,
+    email,
+    full_name: fullName,
+    role,
+    modules: getArrayFromPayload(source, ['modules'])
+      .map(normalizeModuleAccess)
+      .filter((moduleAccess): moduleAccess is ModuleAccess => moduleAccess !== null),
+  };
+};
+
+const normalizeEmployee = (input: unknown): Employee | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const employeeCode = getString(source, ['employee_code', 'employeeCode']);
+  const fullName = getString(source, ['full_name', 'fullName']);
+  const email = getString(source, ['email']);
+
+  if (!id || !employeeCode || !fullName || !email) {
+    return null;
+  }
+
+  return {
+    id,
+    employee_code: employeeCode,
+    user_id: getString(source, ['user_id', 'userId']) || null,
+    full_name: fullName,
+    email,
+    area: getString(source, ['area']) || null,
+    position: getString(source, ['position']) || null,
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    created_at: getString(source, ['created_at', 'createdAt']),
+    updated_at: getString(source, ['updated_at', 'updatedAt']),
+    linked_user: normalizeLinkableUser(source.linked_user ?? source.linkedUser),
+  };
+};
+
+const normalizeEmployeeSummary = (input: unknown): EmployeeSummary => {
+  const source = asRecord(input);
+  if (!source) {
+    return {
+      total: 0,
+      active: 0,
+      linked_users: 0,
+      unlinked_users: 0,
+    };
+  }
+
+  return {
+    total: getNumber(source, ['total']),
+    active: getNumber(source, ['active']),
+    linked_users: getNumber(source, ['linked_users', 'linkedUsers']),
+    unlinked_users: getNumber(source, ['unlinked_users', 'unlinkedUsers']),
   };
 };
 
@@ -508,6 +601,13 @@ export const createUser = async (payload: CreateUserPayload): Promise<ManagedUse
   };
 };
 
+export const fetchModuleCatalog = async (): Promise<ModuleAccess[]> => {
+  const response = await api.get('/users/modules/catalog');
+  return getArrayFromPayload(response.data, ['modules', 'items', 'results'])
+    .map(normalizeModuleAccess)
+    .filter((moduleAccess): moduleAccess is ModuleAccess => moduleAccess !== null);
+};
+
 export const updateUserById = async (
   userId: string,
   payload: UpdateUserPayload,
@@ -550,6 +650,51 @@ export const updateUserCategories = async (
 export const resetUserPassword = async (userId: string): Promise<void> => {
   const encodedId = encodeURIComponent(userId);
   await api.patch(`/users/${encodedId}/reset-password`);
+};
+
+export const listEmployees = async (): Promise<Employee[]> => {
+  const response = await api.get('/employees');
+  return getArrayFromPayload(response.data, ['employees', 'items', 'results'])
+    .map(normalizeEmployee)
+    .filter((employee): employee is Employee => employee !== null);
+};
+
+export const getEmployeeSummary = async (): Promise<EmployeeSummary> => {
+  const response = await api.get('/employees/summary');
+  const payload = unwrapPayload(response.data);
+  return normalizeEmployeeSummary(asRecord(payload)?.summary ?? payload);
+};
+
+export const fetchEmployeeById = async (employeeId: number): Promise<Employee | null> => {
+  const response = await api.get(`/employees/${employeeId}`);
+  const payload = unwrapPayload(response.data);
+  return normalizeEmployee(asRecord(payload)?.employee ?? payload);
+};
+
+export const createEmployee = async (payload: EmployeePayload): Promise<Employee> => {
+  const response = await api.post('/employees', payload);
+  const parsed = normalizeEmployee(asRecord(unwrapPayload(response.data))?.employee ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar el colaborador creado');
+  }
+  return parsed;
+};
+
+export const updateEmployeeById = async (employeeId: number, payload: Partial<EmployeePayload>): Promise<Employee | null> => {
+  const response = await api.patch(`/employees/${employeeId}`, payload);
+  const parsed = normalizeEmployee(asRecord(unwrapPayload(response.data))?.employee ?? unwrapPayload(response.data));
+  return parsed;
+};
+
+export const deleteEmployeeById = async (employeeId: number): Promise<void> => {
+  await api.delete(`/employees/${employeeId}`);
+};
+
+export const listLinkableUsers = async (): Promise<LinkableUser[]> => {
+  const response = await api.get('/employees/linkable-users');
+  return getArrayFromPayload(response.data, ['users', 'items', 'results'])
+    .map(normalizeLinkableUser)
+    .filter((user): user is LinkableUser => user !== null);
 };
 
 const createDocumentListParams = (options: ListDocumentsOptions) => {

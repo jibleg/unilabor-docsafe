@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
-import { getModuleHomePath } from '../utils/modules';
+import { getModuleHomePath, getModuleRole } from '../utils/modules';
 
 interface RoleGateProps {
   allowedRoles: string[];
@@ -16,8 +16,9 @@ export const RoleGate = ({
   redirectTo,
 }: RoleGateProps) => {
   const token = useAuthStore((state) => state.token);
-  const userRole = useAuthStore((state) => state.user?.role);
   const activeModule = useAuthStore((state) => state.activeModule);
+  const availableModules = useAuthStore((state) => state.availableModules);
+  const userRole = getModuleRole(availableModules, activeModule);
 
   if (!token) {
     return <Navigate to="/login" replace />;

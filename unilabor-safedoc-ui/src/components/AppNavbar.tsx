@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
+import { getModuleRole } from '../utils/modules';
 import { useUserAvatar } from '../hooks/useUserAvatar';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
@@ -31,6 +32,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const user = useAuthStore((state) => state.user);
   const availableModules = useAuthStore((state) => state.availableModules);
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
+  const moduleRole = getModuleRole(availableModules, moduleCode) ?? user?.role ?? 'VIEWER';
   const { avatarUrl } = useUserAvatar();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -43,6 +45,8 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
       moduleCode === 'RH'
         ? [
             { icon: LayoutDashboard, label: 'Dashboard RH', path: '/rh' },
+            { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
+            { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
             { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
           ]
         : [
@@ -57,7 +61,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   );
 
   const visibleItems = items.filter((item) =>
-    item.roles ? hasAnyRole(user?.role, item.roles) : true,
+    item.roles ? hasAnyRole(moduleRole, item.roles) : true,
   );
 
   useEffect(() => {
@@ -133,7 +137,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--unilabor-ink)]">{displayName}</p>
-              <p className="text-[11px] uppercase tracking-wide text-[var(--color-brand-500)]">{user?.role}</p>
+              <p className="text-[11px] uppercase tracking-wide text-[var(--color-brand-500)]">{moduleRole}</p>
             </div>
           </div>
 

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
+import { getModuleRole } from '../utils/modules';
 import { useUserAvatar } from '../hooks/useUserAvatar';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
@@ -35,6 +36,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
   const activeModule = useAuthStore((state) => state.activeModule);
   const availableModules = useAuthStore((state) => state.availableModules);
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
+  const moduleRole = getModuleRole(availableModules, moduleCode) ?? user?.role ?? 'VIEWER';
   const displayName = user?.full_name ?? user?.name ?? 'Usuario';
   const { avatarUrl } = useUserAvatar();
   const avatarInitial =
@@ -44,6 +46,8 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
     moduleCode === 'RH'
       ? [
           { icon: LayoutDashboard, label: 'Dashboard RH', path: '/rh' },
+          { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
+          { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
           { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
         ]
       : [
@@ -92,7 +96,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
 
       <nav className="flex-1 space-y-1 p-4">
         {menuItems.map((item) => {
-          if (item.roles && !hasAnyRole(user?.role, item.roles)) {
+          if (item.roles && !hasAnyRole(moduleRole, item.roles)) {
             return null;
           }
 

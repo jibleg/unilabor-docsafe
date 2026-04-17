@@ -14,6 +14,8 @@ import { LoginPage } from './pages/Login';
 import { ModuleSelectorPage } from './pages/ModuleSelectorPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RhDashboardPage } from './pages/RhDashboardPage';
+import { RhEmployeesPage } from './pages/RhEmployeesPage';
+import { RhExpedientsPage } from './pages/RhExpedientsPage';
 import { UsersPage } from './pages/UsersPage';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -73,6 +75,22 @@ function App() {
         }
       >
         <Route index element={<RhDashboardPage />} />
+        <Route
+          path="employees"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <RhEmployeesPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="expedients"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <RhExpedientsPage />
+            </RoleGate>
+          }
+        />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

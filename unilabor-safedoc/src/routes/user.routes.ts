@@ -3,6 +3,7 @@ import {
   createUser,
   deleteUserById,
   getAllUsers,
+  getModuleCatalog,
   getMyCategories,
   getUserCategoriesById,
   replaceUserCategoriesById,
@@ -16,7 +17,7 @@ import {
   updatePassword,
   uploadMyAvatar,
 } from '../controllers/profile.controller';
-import { verifyToken, authorize, authorizeModuleAccess } from '../middlewares/auth.middleware';
+import { verifyToken, authorizeModuleAccess, authorizeModuleRole } from '../middlewares/auth.middleware';
 import { uploadAvatar } from '../middlewares/upload.middleware';
 
 const router = Router();
@@ -25,8 +26,9 @@ const router = Router();
  * ADMINISTRACIÓN DE USUARIOS
  * Solo accesible por el rol ADMIN
  */
-router.post('/', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN']), createUser);
-router.get('/', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), getAllUsers);
+router.get('/modules/catalog', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN']), getModuleCatalog);
+router.post('/', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN']), createUser);
+router.get('/', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN', 'EDITOR']), getAllUsers);
 
 /**
  * PERFIL PERSONAL
@@ -43,15 +45,15 @@ router.delete('/me/avatar', verifyToken, deleteMyAvatar);
  * ADMINISTRACION DE USUARIOS (POR ID)
  * Solo accesible por el rol ADMIN
  */
-router.patch('/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN']), updateUserById);
-router.delete('/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN']), deleteUserById);
-router.patch('/:id/reset-password', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN']), resetUserPasswordById);
+router.patch('/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN']), updateUserById);
+router.delete('/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN']), deleteUserById);
+router.patch('/:id/reset-password', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN']), resetUserPasswordById);
 
 /**
  * ASIGNACION DE CATEGORIAS A USUARIOS
  * ADMIN y EDITOR pueden administrar asignaciones
  */
-router.get('/:id/categories', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), getUserCategoriesById);
-router.put('/:id/categories', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), replaceUserCategoriesById);
+router.get('/:id/categories', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN', 'EDITOR']), getUserCategoriesById);
+router.put('/:id/categories', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN', 'EDITOR']), replaceUserCategoriesById);
 
 export default router;

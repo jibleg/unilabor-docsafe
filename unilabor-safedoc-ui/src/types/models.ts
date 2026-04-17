@@ -31,6 +31,36 @@ export interface ManagedUser {
   must_change_password?: boolean;
   created_at?: string;
   updated_at?: string;
+  modules?: ModuleAccess[];
+}
+
+export interface LinkableUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  modules: ModuleAccess[];
+}
+
+export interface Employee {
+  id: number;
+  employee_code: string;
+  user_id: string | null;
+  full_name: string;
+  email: string;
+  area?: string | null;
+  position?: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  linked_user?: LinkableUser | null;
+}
+
+export interface EmployeeSummary {
+  total: number;
+  active: number;
+  linked_users: number;
+  unlinked_users: number;
 }
 
 export type DocumentStatus = 'active' | 'inactive' | 'superseded';

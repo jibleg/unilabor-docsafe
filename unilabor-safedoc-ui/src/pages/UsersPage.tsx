@@ -6,6 +6,7 @@ import {
   createUser,
   deleteUserById,
   fetchCategories,
+  fetchModuleCatalog,
   fetchUserCategories,
   getApiErrorMessage,
   listUsers,
@@ -15,7 +16,7 @@ import {
   type CreateUserPayload,
   type UpdateUserPayload,
 } from '../api/service';
-import type { Category, ManagedUser } from '../types/models';
+import type { Category, ManagedUser, ModuleAccess, ModuleCode } from '../types/models';
 import { useAuthStore } from '../store/useAuthStore';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { normalizeRole } from '../utils/roles';
@@ -35,6 +36,7 @@ interface UserFormState {
   email: string;
   role: RoleValue;
   categoryIds: number[];
+  moduleCodes: ModuleCode[];
 }
 
 const EMPTY_FORM: UserFormState = {
@@ -42,7 +44,29 @@ const EMPTY_FORM: UserFormState = {
   email: '',
   role: 'VIEWER',
   categoryIds: [],
+  moduleCodes: ['QUALITY'],
 };
+
+const FALLBACK_MODULE_OPTIONS: ModuleAccess[] = [
+  {
+    code: 'QUALITY',
+    name: 'Documentos de Calidad',
+    description: 'Gestion documental institucional',
+    icon: 'shield-check',
+    role: 'ADMIN',
+    is_active: true,
+    sort_order: 10,
+  },
+  {
+    code: 'RH',
+    name: 'Recursos Humanos',
+    description: 'Expediente digital del colaborador',
+    icon: 'users',
+    role: 'ADMIN',
+    is_active: true,
+    sort_order: 20,
+  },
+];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -131,8 +155,10 @@ export const UsersPage = () => {
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [moduleOptions, setModuleOptions] = useState<ModuleAccess[]>(FALLBACK_MODULE_OPTIONS);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingModules, setLoadingModules] = useState(false);
 
   const [query, setQuery] = useState('');
   const [pageSize, setPageSize] = useState(10);
@@ -177,10 +203,26 @@ export const UsersPage = () => {
     }
   }, []);
 
+  const loadModules = useCallback(async () => {
+    setLoadingModules(true);
+    try {
+      const modules = await fetchModuleCatalog();
+      if (modules.length > 0) {
+        setModuleOptions(modules);
+      }
+    } catch (requestError) {
+      notifyWarning(getApiErrorMessage(requestError, 'No se pudo cargar el catalogo de modulos. Se usara la configuracion base.'));
+      setModuleOptions(FALLBACK_MODULE_OPTIONS);
+    } finally {
+      setLoadingModules(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadUsers();
     void loadCategories();
-  }, [loadCategories, loadUsers]);
+    void loadModules();
+  }, [loadCategories, loadModules, loadUsers]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -257,6 +299,30 @@ export const UsersPage = () => {
     });
   };
 
+  const toggleCreateModule = (moduleCode: ModuleCode) => {
+    setCreateForm((currentForm) => {
+      const alreadySelected = currentForm.moduleCodes.includes(moduleCode);
+      return {
+        ...currentForm,
+        moduleCodes: alreadySelected
+          ? currentForm.moduleCodes.filter((code) => code !== moduleCode)
+          : [...currentForm.moduleCodes, moduleCode],
+      };
+    });
+  };
+
+  const toggleEditModule = (moduleCode: ModuleCode) => {
+    setEditForm((currentForm) => {
+      const alreadySelected = currentForm.moduleCodes.includes(moduleCode);
+      return {
+        ...currentForm,
+        moduleCodes: alreadySelected
+          ? currentForm.moduleCodes.filter((code) => code !== moduleCode)
+          : [...currentForm.moduleCodes, moduleCode],
+      };
+    });
+  };
+
   const validateForm = (form: UserFormState): boolean => {
     if (!form.full_name.trim()) {
       notifyWarning('El nombre completo es obligatorio');
@@ -273,7 +339,7 @@ export const UsersPage = () => {
       return false;
     }
 
-    if (form.role === 'VIEWER' && form.categoryIds.length === 0) {
+    if (form.role === 'VIEWER' && form.moduleCodes.includes('QUALITY') && form.categoryIds.length === 0) {
       notifyWarning('Un usuario VIEWER debe tener al menos una categoria asignada');
       return false;
     }
@@ -304,6 +370,7 @@ export const UsersPage = () => {
       full_name: createForm.full_name.trim(),
       role: createForm.role,
       category_ids: createForm.categoryIds,
+      module_codes: createForm.moduleCodes,
     };
 
     setCreating(true);
@@ -327,6 +394,7 @@ export const UsersPage = () => {
       email: user.email,
       role: roleValue,
       categoryIds: [],
+      moduleCodes: user.modules?.map((moduleAccess) => moduleAccess.code) ?? ['QUALITY'],
     });
     setIsEditModalOpen(true);
 
@@ -368,6 +436,7 @@ export const UsersPage = () => {
       email: editForm.email.trim(),
       full_name: editForm.full_name.trim(),
       role: editForm.role,
+      module_codes: editForm.moduleCodes,
     };
 
     setSavingEdit(true);
@@ -508,6 +577,7 @@ export const UsersPage = () => {
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Nombre</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Email</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Rol</th>
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Modulos</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Estado</th>
               <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                 Acciones
@@ -517,13 +587,13 @@ export const UsersPage = () => {
           <tbody className="divide-y divide-[rgba(0,65,106,0.08)]">
             {loadingUsers ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-[var(--unilabor-neutral)]">
+                <td colSpan={6} className="p-10 text-center text-[var(--unilabor-neutral)]">
                   Cargando usuarios...
                 </td>
               </tr>
             ) : visibleUsers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-[var(--unilabor-neutral)]">
+                <td colSpan={6} className="p-10 text-center text-[var(--unilabor-neutral)]">
                   No hay usuarios para mostrar.
                 </td>
               </tr>
@@ -548,6 +618,22 @@ export const UsersPage = () => {
                       >
                         {getRoleLabel(user.role)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-2">
+                        {(user.modules ?? []).length > 0 ? (
+                          (user.modules ?? []).map((moduleAccess) => (
+                            <span
+                              key={`${user.id}-${moduleAccess.code}`}
+                              className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.34)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]"
+                            >
+                              {moduleAccess.code}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-[var(--unilabor-neutral)]">Sin modulos</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-xs text-[var(--unilabor-ink)]">
                       {user.is_active ? (
@@ -694,10 +780,45 @@ export const UsersPage = () => {
 
               <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Modulos habilitados
+                </p>
+                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
+                  El rol global sigue activo por compatibilidad. En la siguiente iteracion cada modulo podra tener su propio rol.
+                </p>
+
+                {loadingModules ? (
+                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando modulos...</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {moduleOptions.map((moduleOption) => {
+                      const selected = createForm.moduleCodes.includes(moduleOption.code);
+                      return (
+                        <label
+                          key={moduleOption.code}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleCreateModule(moduleOption.code)}
+                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
+                          />
+                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
+                            {moduleOption.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                   Categorias asignadas
                 </p>
                 <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
-                  {createForm.role === 'VIEWER'
+                  {createForm.role === 'VIEWER' && createForm.moduleCodes.includes('QUALITY')
                     ? 'El usuario VIEWER debe tener al menos una categoria para visualizar documentos.'
                     : 'La asignacion de categorias es opcional para este rol.'}
                 </p>
@@ -830,10 +951,45 @@ export const UsersPage = () => {
 
               <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Modulos habilitados
+                </p>
+                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
+                  Desde aqui ya puedes activar o retirar acceso a `QUALITY` y `RH` sin tocar la base manualmente.
+                </p>
+
+                {loadingModules ? (
+                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando modulos...</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {moduleOptions.map((moduleOption) => {
+                      const selected = editForm.moduleCodes.includes(moduleOption.code);
+                      return (
+                        <label
+                          key={moduleOption.code}
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleEditModule(moduleOption.code)}
+                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
+                          />
+                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
+                            {moduleOption.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                   Categorias asignadas
                 </p>
                 <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
-                  {editForm.role === 'VIEWER'
+                  {editForm.role === 'VIEWER' && editForm.moduleCodes.includes('QUALITY')
                     ? 'El usuario VIEWER debe tener al menos una categoria para visualizar documentos.'
                     : 'La asignacion de categorias es opcional para este rol.'}
                 </p>
