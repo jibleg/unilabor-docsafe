@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import {
   getEmployeeExpedientController,
+  getMyExpedientController,
   listEmployeeDocumentsController,
+  listMyDocumentsController,
   uploadEmployeeDocumentController,
+  uploadMyDocumentController,
   viewEmployeeDocumentController,
 } from '../controllers/employee-document.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
@@ -18,11 +21,15 @@ router.get(
   getEmployeeExpedientController,
 );
 
+router.get('/me/expedient', authorizeModuleRole('RH', ['ADMIN', 'EDITOR', 'VIEWER']), getMyExpedientController);
+
 router.get(
   '/employees/:id/documents',
   authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
   listEmployeeDocumentsController,
 );
+
+router.get('/me/documents', authorizeModuleRole('RH', ['ADMIN', 'EDITOR', 'VIEWER']), listMyDocumentsController);
 
 router.post(
   '/employees/:id/documents',
@@ -31,9 +38,16 @@ router.post(
   uploadEmployeeDocumentController,
 );
 
+router.post(
+  '/me/documents',
+  authorizeModuleRole('RH', ['ADMIN', 'EDITOR', 'VIEWER']),
+  uploadMiddleware.single('file'),
+  uploadMyDocumentController,
+);
+
 router.get(
   '/documents/:documentId/view',
-  authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
+  authorizeModuleRole('RH', ['ADMIN', 'EDITOR', 'VIEWER']),
   viewEmployeeDocumentController,
 );
 

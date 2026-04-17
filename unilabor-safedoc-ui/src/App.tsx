@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { RhHomeRedirect } from './components/RhHomeRedirect';
 import { ToastContainer, Zoom } from 'react-toastify';
 import { ModuleGuard } from './components/ModuleGuard';
 import { RoleGate } from './components/RoleGate';
@@ -15,6 +16,7 @@ import { EmployeeExpedientPage } from './pages/EmployeeExpedientPage';
 import { ForgotPasswordPage } from './pages/ForgotPassword';
 import { LoginPage } from './pages/Login';
 import { ModuleSelectorPage } from './pages/ModuleSelectorPage';
+import { MyExpedientPage } from './pages/MyExpedientPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RhDashboardPage } from './pages/RhDashboardPage';
 import { RhEmployeesPage } from './pages/RhEmployeesPage';
@@ -76,7 +78,15 @@ function App() {
           </ModuleGuard>
         }
       >
-        <Route index element={<RhDashboardPage />} />
+        <Route index element={<RhHomeRedirect />} />
+        <Route
+          path="dashboard"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <RhDashboardPage />
+            </RoleGate>
+          }
+        />
         <Route
           path="employees"
           element={
@@ -90,6 +100,14 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
               <EmployeeExpedientPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="my-expedient"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR', 'VIEWER']} redirectTo="/rh">
+              <MyExpedientPage />
             </RoleGate>
           }
         />

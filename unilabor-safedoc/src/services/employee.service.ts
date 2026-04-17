@@ -216,6 +216,26 @@ export const getEmployeeById = async (employeeId: number): Promise<EmployeeRecor
   return mapEmployeeRow(result.rows[0]);
 };
 
+export const getEmployeeByUserId = async (userId: string): Promise<EmployeeRecord | null> => {
+  await assertEmployeesTable();
+
+  const result = await pool.query(
+    `
+      ${buildEmployeeBaseQuery()}
+      WHERE e.user_id = $1
+        AND e.is_active = TRUE
+      LIMIT 1;
+    `,
+    [userId],
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return mapEmployeeRow(result.rows[0]);
+};
+
 export const createEmployee = async (payload: EmployeePayload): Promise<EmployeeRecord> => {
   await assertEmployeesTable();
 

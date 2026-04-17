@@ -983,6 +983,11 @@ export const fetchEmployeeExpedientById = async (
   return normalizeEmployeeExpedient(unwrapPayload(response.data));
 };
 
+export const fetchMyExpedient = async (): Promise<EmployeeExpedient | null> => {
+  const response = await api.get('/rh/me/expedient');
+  return normalizeEmployeeExpedient(unwrapPayload(response.data));
+};
+
 export const listEmployeeDocumentsByEmployeeId = async (
   employeeId: number,
 ): Promise<EmployeeDocument[]> => {
@@ -1014,6 +1019,32 @@ export const uploadEmployeeDocumentByEmployeeId = async (
     normalizeEmployeeDocument(asRecord(unwrapPayload(response.data))?.document ?? unwrapPayload(response.data));
   if (!parsed) {
     throw new Error('No se pudo interpretar el documento RH cargado');
+  }
+
+  return parsed;
+};
+
+export const uploadMyEmployeeDocument = async (
+  payload: EmployeeDocumentPayload,
+): Promise<EmployeeDocument> => {
+  const formData = new FormData();
+  formData.append('document_type_id', String(payload.document_type_id));
+  formData.append('title', payload.title.trim());
+  formData.append('description', payload.description?.trim() ?? '');
+  formData.append('issue_date', payload.issue_date?.trim() || '');
+  formData.append('expiry_date', payload.expiry_date?.trim() || '');
+  formData.append('file', payload.file);
+
+  const response = await api.post('/rh/me/documents', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  const parsed =
+    normalizeEmployeeDocument(asRecord(unwrapPayload(response.data))?.document ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar el documento personal cargado');
   }
 
   return parsed;

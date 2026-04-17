@@ -4,6 +4,7 @@ import type { AuthRequest } from '../types';
 import {
   buildEmployeeExpedient,
   canUserAccessEmployeeExpedient,
+  getEmployeeForAuthenticatedUser,
   listEmployeeDocuments,
   resolveEmployeeDocumentPath,
   uploadEmployeeDocument,
@@ -72,6 +73,10 @@ const mapEmployeeDocumentError = (res: Response, error: any) => {
 
   if (error?.code === 'EMPLOYEE_NOT_FOUND') {
     return res.status(404).json({ message: 'Colaborador no encontrado.' });
+  }
+
+  if (error?.code === 'EMPLOYEE_PROFILE_NOT_FOUND') {
+    return res.status(404).json({ message: 'Tu cuenta aun no esta vinculada a un expediente de colaborador.' });
   }
 
   if (error?.code === 'DOCUMENT_TYPE_NOT_FOUND') {
@@ -272,5 +277,117 @@ export const viewEmployeeDocumentController = async (req: AuthRequest, res: Resp
 
     console.error('Error visualizando documento RH:', error);
     return res.status(500).json({ message: 'No se pudo visualizar el documento RH.' });
+  }
+};
+
+export const getMyExpedientController = async (req: AuthRequest, res: Response) => {
+  const user = req.user;
+  if (!user?.id || !user.role) {
+    return res.status(401).json({ message: 'Sesion invalida o expirada.' });
+  }
+
+  try {
+    const employee = await getEmployeeForAuthenticatedUser(user.id);
+    const expedient = await buildEmployeeExpedient(employee.id);
+    return res.json(expedient);
+  } catch (error: any) {
+    const mappedError = mapEmployeeDocumentError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error obteniendo mi expediente RH:', error);
+    return res.status(500).json({ message: 'No se pudo cargar tu expediente.' });
+  }
+};
+
+export const listMyDocumentsController = async (req: AuthRequest, res: Response) => {
+  const user = req.user;
+  if (!user?.id || !user.role) {
+    return res.status(401).json({ message: 'Sesion invalida o expirada.' });
+  }
+
+  try {
+    const employee = await getEmployeeForAuthenticatedUser(user.id);
+    const sectionId = parsePositiveInt(req.query.section_id);
+    const documentTypeId = parsePositiveInt(req.query.document_type_id);
+    const currentOnly =
+      req.query.current_only === undefined
+        ? true
+        : String(req.query.current_only).trim().toLowerCase() !== 'false';
+
+    const documents = await listEmployeeDocuments(employee.id, {
+      ...(sectionId ? { section_id: sectionId } : {}),
+      ...(documentTypeId ? { document_type_id: documentTypeId } : {}),
+      current_only: currentOnly,
+    });
+
+    return res.json({ documents });
+  } catch (error: any) {
+    const mappedError = mapEmployeeDocumentError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error listando mis documentos RH:', error);
+    return res.status(500).json({ message: 'No se pudieron listar tus documentos.' });
+  }
+};
+
+export const uploadMyDocumentController = async (req: AuthRequest, res: Response) => {
+  const user = req.user;
+  if (!user?.id || !user.role) {
+    await removeUploadedFile(req.file?.path);
+    return res.status(401).json({ message: 'Sesion invalida o expirada.' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ message: 'Debes adjuntar un archivo PDF.' });
+  }
+
+  const documentTypeId = parsePositiveInt(req.body?.document_type_id);
+  const title = getText(req.body?.title);
+
+  if (!documentTypeId || !title) {
+    await removeUploadedFile(req.file.path);
+    return res.status(400).json({
+      message: 'El tipo documental y el titulo son obligatorios para cargar tu documento.',
+    });
+  }
+
+  const issueDate = parseOptionalDate(req.body?.issue_date);
+  const expiryDate = parseOptionalDate(req.body?.expiry_date);
+
+  if (issueDate === undefined || expiryDate === undefined) {
+    await removeUploadedFile(req.file.path);
+    return res.status(400).json({ message: 'Las fechas deben tener formato YYYY-MM-DD.' });
+  }
+
+  try {
+    const employee = await getEmployeeForAuthenticatedUser(user.id);
+
+    const payload: EmployeeDocumentPayload = {
+      document_type_id: documentTypeId,
+      title,
+      ...(getText(req.body?.description) ? { description: getText(req.body?.description) } : {}),
+      ...(issueDate !== undefined ? { issue_date: issueDate } : {}),
+      ...(expiryDate !== undefined ? { expiry_date: expiryDate } : {}),
+    };
+
+    const document = await uploadEmployeeDocument(employee.id, user.id, req.file, payload);
+    return res.status(201).json({
+      message: 'Documento personal cargado correctamente.',
+      document,
+    });
+  } catch (error: any) {
+    await removeUploadedFile(req.file.path);
+
+    const mappedError = mapEmployeeDocumentError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error cargando mi documento RH:', error);
+    return res.status(500).json({ message: 'No se pudo cargar tu documento.' });
   }
 };

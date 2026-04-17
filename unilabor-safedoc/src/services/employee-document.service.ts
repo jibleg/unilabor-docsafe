@@ -9,7 +9,7 @@ import type {
   EmployeeExpedientTypeItem,
   UserRole,
 } from '../types';
-import { getEmployeeById } from './employee.service';
+import { getEmployeeById, getEmployeeByUserId } from './employee.service';
 import { resolveStoredDocumentPath } from './document.service';
 
 export interface EmployeeDocumentPayload {
@@ -244,6 +244,19 @@ export const canUserAccessEmployeeExpedient = async (
   );
 
   return result.rows.length > 0;
+};
+
+export const getEmployeeForAuthenticatedUser = async (
+  userId: string,
+): Promise<EmployeeRecord> => {
+  const employee = await getEmployeeByUserId(userId);
+  if (!employee) {
+    const error = new Error('EMPLOYEE_PROFILE_NOT_FOUND');
+    (error as any).code = 'EMPLOYEE_PROFILE_NOT_FOUND';
+    throw error;
+  }
+
+  return employee;
 };
 
 export const listEmployeeDocuments = async (
