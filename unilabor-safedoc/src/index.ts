@@ -9,6 +9,7 @@ import categoryRoutes from './routes/category.routes';
 import employeeRoutes from './routes/employee.routes';
 import documentStructureRoutes from './routes/document-structure.routes';
 import employeeDocumentRoutes from './routes/employee-document.routes';
+import employeeAlertRoutes from './routes/employee-alert.routes';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/rh/document-structure', documentStructureRoutes);
 app.use('/api/rh', employeeDocumentRoutes);
+app.use('/api/rh', employeeAlertRoutes);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

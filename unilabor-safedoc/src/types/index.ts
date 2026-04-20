@@ -118,6 +118,32 @@ export interface EmployeeExpedientSection {
   items: EmployeeExpedientTypeItem[];
 }
 
+export type EmployeeAlertState = 'missing' | 'expiring' | 'expired';
+
+export interface EmployeeAlertRecord {
+  employee_id: number;
+  employee_code: string;
+  employee_name: string;
+  employee_email: string;
+  area: string | null;
+  position: string | null;
+  state: EmployeeAlertState;
+  section_id: number;
+  section_name: string;
+  document_type_id: number;
+  document_type_name: string;
+  document_id?: number;
+  expiry_date?: string | null;
+  days_remaining?: number | null;
+}
+
+export interface EmployeeAlertsSummary {
+  missing: number;
+  expiring: number;
+  expired: number;
+  total: number;
+}
+
 export interface JWTPayload {
   id: string;
   role: UserRole;

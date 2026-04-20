@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Building2, FolderKanban, ShieldCheck, Users } from 'lucide-react';
-import { getApiErrorMessage, getEmployeeSummary } from '../api/service';
-import type { EmployeeSummary } from '../types/models';
+import { AlertTriangle, Building2, CalendarClock, FolderKanban, ShieldCheck, Users } from 'lucide-react';
+import { getApiErrorMessage, getEmployeeSummary, listRhAlerts } from '../api/service';
+import type { EmployeeAlertsSummary, EmployeeSummary } from '../types/models';
 import { notifyError } from '../utils/notify';
 
 const EMPTY_SUMMARY: EmployeeSummary = {
@@ -13,15 +13,22 @@ const EMPTY_SUMMARY: EmployeeSummary = {
 
 export const RhDashboardPage = () => {
   const [summary, setSummary] = useState<EmployeeSummary>(EMPTY_SUMMARY);
+  const [alertsSummary, setAlertsSummary] = useState<EmployeeAlertsSummary>({
+    missing: 0,
+    expiring: 0,
+    expired: 0,
+    total: 0,
+  });
 
   useEffect(() => {
     let mounted = true;
 
     const loadSummary = async () => {
       try {
-        const response = await getEmployeeSummary();
+        const [response, alerts] = await Promise.all([getEmployeeSummary(), listRhAlerts()]);
         if (mounted) {
           setSummary(response);
+          setAlertsSummary(alerts.summary);
         }
       } catch (error) {
         notifyError(getApiErrorMessage(error, 'No se pudo cargar el resumen de RH.'));
@@ -39,6 +46,7 @@ export const RhDashboardPage = () => {
     { label: 'Colaboradores', value: summary.total, icon: Users },
     { label: 'Activos', value: summary.active, icon: FolderKanban },
     { label: 'Con usuario vinculado', value: summary.linked_users, icon: ShieldCheck },
+    { label: 'Alertas activas', value: alertsSummary.total, icon: AlertTriangle },
   ];
 
   return (
@@ -50,12 +58,12 @@ export const RhDashboardPage = () => {
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Panel RH</h1>
           <p className="mt-2 text-[var(--unilabor-neutral)]">
-            Sprint 2 ya habilita la base real de colaboradores, vinculacion opcional con usuarios y espacio navegable propio para RH.
+            RH ya cuenta con colaboradores, expedientes, portal del colaborador y seguimiento documental con alertas de faltantes y vigencias.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
           <div
             key={card.label}
@@ -77,25 +85,35 @@ export const RhDashboardPage = () => {
               <Building2 size={22} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Base RH lista para crecer</h2>
+              <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Seguimiento documental activo</h2>
               <p className="mt-2 text-sm leading-7 text-[var(--unilabor-neutral)]">
-                Ya puedes administrar colaboradores, vincularlos con usuarios del sistema y dejar preparada la estructura que alimentara expedientes, documentos sensibles y portal del colaborador.
+                RH ya puede identificar expedientes incompletos, constancias por vencer y documentos vencidos desde el dashboard y la vista de alertas.
               </p>
             </div>
           </div>
         </div>
 
         <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-6 backdrop-blur-xl shadow-xl shadow-[rgba(0,65,106,0.08)]">
-          <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Proximo paso natural</h2>
-          <p className="mt-2 text-sm leading-7 text-[var(--unilabor-neutral)]">
-            La siguiente capa del producto sera la estructura documental RH: secciones, tipos documentales y expediente por colaborador.
-          </p>
-          <div className="mt-4 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Sin vincular</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--color-brand-700)]">{summary.unlinked_users}</p>
-            <p className="mt-2 text-xs text-[var(--unilabor-neutral)]">
-              colaboradores aun sin usuario del sistema asociado
-            </p>
+          <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Resumen de alertas</h2>
+          <div className="mt-4 grid grid-cols-1 gap-3">
+            <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Expedientes incompletos</p>
+              <p className="mt-1 text-2xl font-bold text-[var(--color-brand-700)]">{alertsSummary.missing}</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-center gap-2 text-amber-700">
+                <CalendarClock size={16} />
+                <p className="text-xs font-semibold uppercase tracking-wide">Por vencer</p>
+              </div>
+              <p className="mt-1 text-2xl font-bold text-amber-700">{alertsSummary.expiring}</p>
+            </div>
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div className="flex items-center gap-2 text-rose-700">
+                <AlertTriangle size={16} />
+                <p className="text-xs font-semibold uppercase tracking-wide">Vencidos</p>
+              </div>
+              <p className="mt-1 text-2xl font-bold text-rose-700">{alertsSummary.expired}</p>
+            </div>
           </div>
         </div>
       </div>

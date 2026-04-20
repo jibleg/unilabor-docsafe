@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  AlertTriangle,
   Building2,
   ChevronLeft,
   FileText,
@@ -48,6 +49,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           { icon: LayoutDashboard, label: 'Dashboard RH', path: '/rh/dashboard', roles: ['ADMIN', 'EDITOR'] },
           { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
           { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
+          { icon: AlertTriangle, label: 'Alertas', path: '/rh/alerts', roles: ['ADMIN', 'EDITOR'] },
           { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', roles: ['VIEWER'] },
           { icon: Tags, label: 'Secciones', path: '/rh/document-sections', roles: ['ADMIN', 'EDITOR'] },
           { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },

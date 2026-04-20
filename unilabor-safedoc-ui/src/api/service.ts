@@ -8,6 +8,9 @@ import type {
   DocumentStatus,
   DocumentType,
   Employee,
+  EmployeeAlert,
+  EmployeeAlertsSummary,
+  EmployeeAlertState,
   EmployeeDocument,
   EmployeeExpedient,
   EmployeeExpedientItem,
@@ -85,6 +88,12 @@ export interface EmployeeDocumentPayload {
   issue_date?: string;
   expiry_date?: string;
   file: File;
+}
+
+export interface EmployeeAlertsFilters {
+  employee_id?: number;
+  area?: string;
+  state?: EmployeeAlertState;
 }
 
 export interface UpdateDocumentPayload {
@@ -589,6 +598,79 @@ const normalizeEmployeeExpedient = (input: unknown): EmployeeExpedient | null =>
   };
 };
 
+const normalizeEmployeeAlert = (input: unknown): EmployeeAlert | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const employeeId = getNumber(source, ['employee_id', 'employeeId']);
+  const employeeCode = getString(source, ['employee_code', 'employeeCode']);
+  const employeeName = getString(source, ['employee_name', 'employeeName']);
+  const employeeEmail = getString(source, ['employee_email', 'employeeEmail']);
+  const sectionId = getNumber(source, ['section_id', 'sectionId']);
+  const sectionName = getString(source, ['section_name', 'sectionName']);
+  const documentTypeId = getNumber(source, ['document_type_id', 'documentTypeId']);
+  const documentTypeName = getString(source, ['document_type_name', 'documentTypeName']);
+  const state = getString(source, ['state']).toLowerCase();
+
+  if (
+    !employeeId ||
+    !employeeCode ||
+    !employeeName ||
+    !employeeEmail ||
+    !sectionId ||
+    !sectionName ||
+    !documentTypeId ||
+    !documentTypeName ||
+    (state !== 'missing' && state !== 'expiring' && state !== 'expired')
+  ) {
+    return null;
+  }
+
+  return {
+    employee_id: employeeId,
+    employee_code: employeeCode,
+    employee_name: employeeName,
+    employee_email: employeeEmail,
+    area: getString(source, ['area']) || null,
+    position: getString(source, ['position']) || null,
+    state: state as EmployeeAlertState,
+    section_id: sectionId,
+    section_name: sectionName,
+    document_type_id: documentTypeId,
+    document_type_name: documentTypeName,
+    document_id:
+      getNumber(source, ['document_id', 'documentId'], 0) > 0
+        ? getNumber(source, ['document_id', 'documentId'], 0)
+        : undefined,
+    expiry_date: getString(source, ['expiry_date', 'expiryDate']) || null,
+    days_remaining:
+      source.days_remaining === null || source.days_remaining === undefined
+        ? null
+        : getNumber(source, ['days_remaining', 'daysRemaining'], 0),
+  };
+};
+
+const normalizeEmployeeAlertsSummary = (input: unknown): EmployeeAlertsSummary => {
+  const source = asRecord(input);
+  if (!source) {
+    return {
+      missing: 0,
+      expiring: 0,
+      expired: 0,
+      total: 0,
+    };
+  }
+
+  return {
+    missing: getNumber(source, ['missing']),
+    expiring: getNumber(source, ['expiring']),
+    expired: getNumber(source, ['expired']),
+    total: getNumber(source, ['total']),
+  };
+};
+
 const extractUserFromPayload = (payload: unknown): User => {
   const unwrapped = unwrapPayload(payload);
   const source = asRecord(unwrapped);
@@ -1004,6 +1086,26 @@ export const fetchEmployeeExpedientById = async (
 export const fetchMyExpedient = async (): Promise<EmployeeExpedient | null> => {
   const response = await api.get('/rh/me/expedient');
   return normalizeEmployeeExpedient(unwrapPayload(response.data));
+};
+
+export const listRhAlerts = async (
+  filters: EmployeeAlertsFilters = {},
+): Promise<{ summary: EmployeeAlertsSummary; alerts: EmployeeAlert[] }> => {
+  const response = await api.get('/rh/alerts', {
+    params: {
+      ...(filters.employee_id ? { employee_id: filters.employee_id } : {}),
+      ...(filters.area?.trim() ? { area: filters.area.trim() } : {}),
+      ...(filters.state ? { state: filters.state } : {}),
+    },
+  });
+
+  const payload = asRecord(unwrapPayload(response.data));
+  return {
+    summary: normalizeEmployeeAlertsSummary(payload?.summary),
+    alerts: getArrayFromPayload(payload?.alerts ?? [], ['alerts'])
+      .map(normalizeEmployeeAlert)
+      .filter((alert): alert is EmployeeAlert => alert !== null),
+  };
 };
 
 export const listEmployeeDocumentsByEmployeeId = async (
