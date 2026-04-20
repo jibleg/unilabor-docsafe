@@ -154,7 +154,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
             <div className="min-w-0">
               <p className="truncate text-xs font-bold text-[var(--unilabor-ink)]">{displayName}</p>
               <p className="text-[10px] uppercase tracking-wide text-[var(--color-brand-500)]">
-                {user?.role} {activeModule ? `· ${activeModule}` : ''}
+                {user?.role} {activeModule ? `| ${activeModule}` : ''}
               </p>
             </div>
           </div>

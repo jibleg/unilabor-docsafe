@@ -106,7 +106,7 @@ const buildExpiryAlertsQuery = (
   filters: EmployeeAlertFilters,
   state: 'expiring' | 'expired',
 ) => {
-  const values: unknown[] = [EXPIRING_WINDOW_DAYS];
+  const values: unknown[] = state === 'expiring' ? [EXPIRING_WINDOW_DAYS] : [];
   const clauses = [
     'e.is_active = TRUE',
     'dt.is_active = TRUE',

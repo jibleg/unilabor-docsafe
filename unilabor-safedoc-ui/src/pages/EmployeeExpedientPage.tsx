@@ -4,15 +4,30 @@ import { API_BASE_URL } from '../api/axios';
 import {
   fetchEmployeeExpedientById,
   getApiErrorMessage,
+  listEmployeeAlertsByEmployeeId,
   listEmployees,
   uploadEmployeeDocumentByEmployeeId,
   type EmployeeDocumentPayload,
 } from '../api/service';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
+import { EmployeeAlertsSummaryPanel } from '../components/rh/EmployeeAlertsSummaryPanel';
 import { EmployeeDocumentUploadModal } from '../components/rh/EmployeeDocumentUploadModal';
 import { ExpedientSectionCard } from '../components/rh/ExpedientSectionCard';
-import type { Employee, EmployeeExpedient, EmployeeExpedientItem } from '../types/models';
+import type {
+  Employee,
+  EmployeeAlert,
+  EmployeeAlertsSummary,
+  EmployeeExpedient,
+  EmployeeExpedientItem,
+} from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+
+const EMPTY_ALERTS_SUMMARY: EmployeeAlertsSummary = {
+  missing: 0,
+  expiring: 0,
+  expired: 0,
+  total: 0,
+};
 
 const summaryCards = (
   summary: EmployeeExpedient['summary'],
@@ -49,6 +64,9 @@ export const EmployeeExpedientPage = () => {
   const [selectedItem, setSelectedItem] = useState<EmployeeExpedientItem | null>(null);
   const [savingDocument, setSavingDocument] = useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
+  const [alertsSummary, setAlertsSummary] = useState<EmployeeAlertsSummary>(EMPTY_ALERTS_SUMMARY);
+  const [alerts, setAlerts] = useState<EmployeeAlert[]>([]);
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
 
   const loadEmployees = useCallback(async () => {
     setLoadingEmployees(true);
@@ -76,6 +94,21 @@ export const EmployeeExpedientPage = () => {
     }
   }, []);
 
+  const loadAlerts = useCallback(async (employeeId: number) => {
+    setLoadingAlerts(true);
+    try {
+      const data = await listEmployeeAlertsByEmployeeId(employeeId);
+      setAlertsSummary(data.summary);
+      setAlerts(data.alerts);
+    } catch (error) {
+      setAlertsSummary(EMPTY_ALERTS_SUMMARY);
+      setAlerts([]);
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar las alertas del colaborador.'));
+    } finally {
+      setLoadingAlerts(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadEmployees();
   }, [loadEmployees]);
@@ -83,11 +116,15 @@ export const EmployeeExpedientPage = () => {
   useEffect(() => {
     if (!selectedEmployeeId) {
       setExpedient(null);
+      setAlertsSummary(EMPTY_ALERTS_SUMMARY);
+      setAlerts([]);
+      setLoadingAlerts(false);
       return;
     }
 
     void loadExpedient(selectedEmployeeId);
-  }, [loadExpedient, selectedEmployeeId]);
+    void loadAlerts(selectedEmployeeId);
+  }, [loadAlerts, loadExpedient, selectedEmployeeId]);
 
   const filteredEmployees = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -151,6 +188,7 @@ export const EmployeeExpedientPage = () => {
       notifySuccess('Documento RH cargado correctamente en el expediente.');
       setSelectedItem(null);
       await loadExpedient(selectedEmployeeId);
+      await loadAlerts(selectedEmployeeId);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar el documento RH.'));
     } finally {
@@ -181,6 +219,7 @@ export const EmployeeExpedientPage = () => {
                 void loadEmployees();
                 if (selectedEmployeeId) {
                   void loadExpedient(selectedEmployeeId);
+                  void loadAlerts(selectedEmployeeId);
                 }
               }}
               className="inline-flex items-center gap-2 rounded-2xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
@@ -279,7 +318,7 @@ export const EmployeeExpedientPage = () => {
                       </div>
                     </div>
                     <p className="mt-3 text-sm text-[var(--unilabor-neutral)]">
-                      {currentEmployee.employee_code} · {currentEmployee.area || 'Sin area'} · {currentEmployee.position || 'Sin puesto'}
+                      {currentEmployee.employee_code} | {currentEmployee.area || 'Sin area'} | {currentEmployee.position || 'Sin puesto'}
                     </p>
                     <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">{currentEmployee.email}</p>
                   </div>
@@ -311,6 +350,13 @@ export const EmployeeExpedientPage = () => {
                   ))}
                 </div>
               </div>
+
+              <EmployeeAlertsSummaryPanel
+                title="Alertas del colaborador seleccionado"
+                summary={alertsSummary}
+                alerts={alerts}
+                loading={loadingAlerts}
+              />
 
               <div className="grid grid-cols-1 gap-6">
                 {expedient.sections.map((section) => (

@@ -197,7 +197,7 @@ export const MyExpedientPage = () => {
               </div>
             </div>
             <p className="mt-3 text-sm text-[var(--unilabor-neutral)]">
-              {expedient.employee.employee_code} · {expedient.employee.area || 'Sin area'} · {expedient.employee.position || 'Sin puesto'}
+              {expedient.employee.employee_code} | {expedient.employee.area || 'Sin area'} | {expedient.employee.position || 'Sin puesto'}
             </p>
             <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">{expedient.employee.email}</p>
           </div>

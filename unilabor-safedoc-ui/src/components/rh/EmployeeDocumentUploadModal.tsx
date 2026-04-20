@@ -60,7 +60,7 @@ export const EmployeeDocumentUploadModal = ({
             {currentDocument ? 'Reemplazar documento' : 'Cargar documento'}
           </h2>
           <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-            {employee.full_name} · {documentType.name}
+            {employee.full_name} | {documentType.name}
           </p>
         </div>
 

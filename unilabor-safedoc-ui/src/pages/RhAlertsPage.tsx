@@ -194,10 +194,10 @@ export const RhAlertsPage = () => {
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
-                    {alert.employee_code} · {alert.area || 'Sin area'} · {alert.position || 'Sin puesto'}
+                    {alert.employee_code} | {alert.area || 'Sin area'} | {alert.position || 'Sin puesto'}
                   </p>
                   <p className="mt-2 text-sm text-[var(--unilabor-ink)]">
-                    {alert.section_name} · {alert.document_type_name}
+                    {alert.section_name} | {alert.document_type_name}
                   </p>
                 </div>
 

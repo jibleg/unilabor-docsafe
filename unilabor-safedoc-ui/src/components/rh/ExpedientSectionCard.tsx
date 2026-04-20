@@ -101,7 +101,7 @@ export const ExpedientSectionCard = ({
               ) : (
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={14} className="mt-0.5 text-[var(--color-brand-500)]" />
-                  <p>Aun no existe un PDF vigente para este tipo documental.</p>
+                  <p>Todavia no existe un PDF vigente para este tipo documental.</p>
                 </div>
               )}
             </div>

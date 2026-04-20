@@ -1108,6 +1108,26 @@ export const listRhAlerts = async (
   };
 };
 
+export const listEmployeeAlertsByEmployeeId = async (
+  employeeId: number,
+  filters: Omit<EmployeeAlertsFilters, 'employee_id'> = {},
+): Promise<{ summary: EmployeeAlertsSummary; alerts: EmployeeAlert[] }> => {
+  const response = await api.get(`/rh/employees/${employeeId}/alerts`, {
+    params: {
+      ...(filters.area?.trim() ? { area: filters.area.trim() } : {}),
+      ...(filters.state ? { state: filters.state } : {}),
+    },
+  });
+
+  const payload = asRecord(unwrapPayload(response.data));
+  return {
+    summary: normalizeEmployeeAlertsSummary(payload?.summary),
+    alerts: getArrayFromPayload(payload?.alerts ?? [], ['alerts'])
+      .map(normalizeEmployeeAlert)
+      .filter((alert): alert is EmployeeAlert => alert !== null),
+  };
+};
+
 export const listEmployeeDocumentsByEmployeeId = async (
   employeeId: number,
 ): Promise<EmployeeDocument[]> => {
