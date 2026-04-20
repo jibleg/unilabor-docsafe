@@ -3,6 +3,7 @@ import { Response } from 'express';
 import pool from '../config/db';
 import { AuthRequest } from '../types';
 import * as categoryService from '../services/category.service';
+import { registerAuditEvent } from '../services/audit.service';
 import * as documentService from '../services/document.service';
 
 const parsePositiveInt = (rawValue: unknown): number | null => {
@@ -111,22 +112,15 @@ const logDocumentAudit = async (
     return;
   }
 
-  try {
-    if (documentId) {
-      await pool.query(
-        'INSERT INTO access_logs (user_id, document_id, action, ip_address) VALUES ($1, $2, $3, $4)',
-        [userId, documentId, action, ipAddress ?? null]
-      );
-      return;
-    }
-
-    await pool.query(
-      'INSERT INTO access_logs (user_id, action, ip_address) VALUES ($1, $2, $3)',
-      [userId, action, ipAddress ?? null]
-    );
-  } catch (error) {
-    console.error('No se pudo registrar auditoria documental:', error);
-  }
+  await registerAuditEvent({
+    user_id: userId,
+    action,
+    ip_address: ipAddress ?? null,
+    module_code: 'QUALITY',
+    entity_type: 'document',
+    entity_id: documentId ? Number(documentId) : null,
+    document_id: documentId ?? null,
+  });
 };
 
 const removeUploadedDocumentIfExists = async (storedPath: string | undefined) => {

@@ -9,6 +9,7 @@ import type {
   EmployeeExpedientTypeItem,
   UserRole,
 } from '../types';
+import { registerAuditEvent } from './audit.service';
 import { getEmployeeById, getEmployeeByUserId } from './employee.service';
 import { resolveStoredDocumentPath } from './document.service';
 
@@ -405,6 +406,17 @@ export const getEmployeeDocumentById = async (
   return mapEmployeeDocumentRow(result.rows[0]);
 };
 
+export const listEmployeeDocumentHistory = async (
+  employeeId: number,
+  documentTypeId: number,
+): Promise<EmployeeDocumentRecord[]> => {
+  await ensureEmployeeExists(employeeId);
+  return listEmployeeDocuments(employeeId, {
+    document_type_id: documentTypeId,
+    current_only: false,
+  });
+};
+
 export const buildEmployeeExpedient = async (employeeId: number): Promise<{
   employee: EmployeeRecord;
   summary: EmployeeExpedientSummary;
@@ -644,15 +656,20 @@ export const uploadEmployeeDocument = async (
 
     const documentId = Number(insertResult.rows[0]?.id);
 
-    await client.query(
-      `
-        INSERT INTO access_logs (user_id, action, ip_address)
-        VALUES ($1, $2, NULL);
-      `,
-      [uploadedByUserId, `RH_DOCUMENT_UPLOAD:${documentId}`],
-    );
-
     await client.query('COMMIT');
+
+    await registerAuditEvent({
+      user_id: uploadedByUserId,
+      action: `RH_DOCUMENT_UPLOAD:${documentId}`,
+      module_code: 'RH',
+      entity_type: 'employee_document',
+      entity_id: documentId,
+      employee_id: employeeId,
+      metadata: {
+        document_type_id: documentType.id,
+        version: nextVersion,
+      },
+    });
 
     const createdDocument = await getEmployeeDocumentById(documentId);
     if (!createdDocument) {

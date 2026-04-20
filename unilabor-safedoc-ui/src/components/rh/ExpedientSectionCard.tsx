@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarDays, Eye, FilePlus2, FileText, RefreshCw, Shield } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Eye, FileClock, FilePlus2, FileText, RefreshCw, Shield } from 'lucide-react';
 import type { EmployeeExpedientSection, ExpedientItemStatus } from '../../types/models';
 
 const getStatusLabel = (status: ExpedientItemStatus): string => {
@@ -37,12 +37,14 @@ interface ExpedientSectionCardProps {
   section: EmployeeExpedientSection;
   onUpload: (item: EmployeeExpedientSection['items'][number]) => void;
   onView: (documentId: number) => void;
+  onHistory?: (item: EmployeeExpedientSection['items'][number]) => void;
 }
 
 export const ExpedientSectionCard = ({
   section,
   onUpload,
   onView,
+  onHistory,
 }: ExpedientSectionCardProps) => {
   return (
     <div className="overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/92 shadow-xl shadow-[rgba(0,65,106,0.08)]">
@@ -107,6 +109,16 @@ export const ExpedientSectionCard = ({
             </div>
 
             <div className="flex flex-wrap justify-end gap-2">
+              {item.current_document ? (
+                <button
+                  type="button"
+                  onClick={() => onHistory?.(item)}
+                  className="inline-flex items-center gap-1 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                >
+                  <FileClock size={14} />
+                  Historial
+                </button>
+              ) : null}
               {item.current_document ? (
                 <button
                   type="button"

@@ -19,6 +19,7 @@ import { ModuleSelectorPage } from './pages/ModuleSelectorPage';
 import { MyExpedientPage } from './pages/MyExpedientPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RhAlertsPage } from './pages/RhAlertsPage';
+import { RhAuditPage } from './pages/RhAuditPage';
 import { RhDashboardPage } from './pages/RhDashboardPage';
 import { RhEmployeesPage } from './pages/RhEmployeesPage';
 import { UsersPage } from './pages/UsersPage';
@@ -109,6 +110,14 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
               <RhAlertsPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="audit"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <RhAuditPage />
             </RoleGate>
           }
         />

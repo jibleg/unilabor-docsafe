@@ -743,18 +743,43 @@ const normalizeAuditLog = (input: unknown): AuditLog | null => {
   const action = getString(source, ['action']);
   const ipAddress = getString(source, ['ip_address', 'ipAddress']);
 
-  if (!accessedAt || !action || !ipAddress) {
+  if (!accessedAt || !action) {
     return null;
   }
 
   const documentValue = source.document;
   return {
     accessed_at: accessedAt,
+    module_code:
+      (() => {
+        const moduleCode = getString(source, ['module_code', 'moduleCode']).toUpperCase();
+        return moduleCode === 'RH' || moduleCode === 'QUALITY' ? moduleCode : undefined;
+      })(),
     full_name: getString(source, ['full_name', 'fullName', 'name'], 'Sin nombre'),
     email: getString(source, ['email'], 'sin-correo@local'),
     document: typeof documentValue === 'string' ? documentValue : null,
     action,
-    ip_address: ipAddress,
+    ip_address: ipAddress || null,
+    employee_id:
+      getNumber(source, ['employee_id', 'employeeId'], 0) > 0
+        ? getNumber(source, ['employee_id', 'employeeId'], 0)
+        : null,
+    employee_code: getString(source, ['employee_code', 'employeeCode']) || null,
+    employee_name: getString(source, ['employee_name', 'employeeName']) || null,
+    document_id:
+      getNumber(source, ['document_id', 'documentId'], 0) > 0
+        ? getNumber(source, ['document_id', 'documentId'], 0)
+        : null,
+    document_type_id:
+      getNumber(source, ['document_type_id', 'documentTypeId'], 0) > 0
+        ? getNumber(source, ['document_type_id', 'documentTypeId'], 0)
+        : null,
+    document_type_name: getString(source, ['document_type_name', 'documentTypeName']) || null,
+    entity_type: getString(source, ['entity_type', 'entityType']) || null,
+    entity_id:
+      getNumber(source, ['entity_id', 'entityId'], 0) > 0
+        ? getNumber(source, ['entity_id', 'entityId'], 0)
+        : null,
   };
 };
 
@@ -1362,10 +1387,40 @@ export const updateDocumentStatusById = async (
 };
 
 export const listAuditLogs = async (): Promise<AuditLog[]> => {
-  const response = await api.get('/audit/logs');
+  const response = await api.get('/audit/logs', {
+    params: {
+      module_code: 'QUALITY',
+    },
+  });
   return getArrayFromPayload(response.data, ['logs', 'items', 'results'])
     .map(normalizeAuditLog)
     .filter((log): log is AuditLog => log !== null);
+};
+
+export const listRhAuditLogs = async (
+  filters: { employee_id?: number; limit?: number } = {},
+): Promise<AuditLog[]> => {
+  const response = await api.get('/audit/logs', {
+    params: {
+      module_code: 'RH',
+      ...(filters.employee_id ? { employee_id: filters.employee_id } : {}),
+      ...(filters.limit ? { limit: filters.limit } : {}),
+    },
+  });
+
+  return getArrayFromPayload(response.data, ['logs', 'items', 'results'])
+    .map(normalizeAuditLog)
+    .filter((log): log is AuditLog => log !== null);
+};
+
+export const listEmployeeDocumentHistoryByEmployeeId = async (
+  employeeId: number,
+  documentTypeId: number,
+): Promise<EmployeeDocument[]> => {
+  const response = await api.get(`/rh/employees/${employeeId}/document-types/${documentTypeId}/history`);
+  return getArrayFromPayload(response.data, ['documents', 'items', 'results'])
+    .map(normalizeEmployeeDocument)
+    .filter((document): document is EmployeeDocument => document !== null);
 };
 
 export const fetchCategories = async (token?: string): Promise<Category[]> => {

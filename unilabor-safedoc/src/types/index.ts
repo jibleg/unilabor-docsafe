@@ -144,6 +144,25 @@ export interface EmployeeAlertsSummary {
   total: number;
 }
 
+export interface AuditLogRecord {
+  accessed_at: string;
+  module_code: ModuleCode;
+  action: string;
+  ip_address: string | null;
+  user_id: string | null;
+  full_name: string | null;
+  email: string | null;
+  document: string | null;
+  document_id: number | null;
+  employee_id: number | null;
+  employee_code: string | null;
+  employee_name: string | null;
+  document_type_id: number | null;
+  document_type_name: string | null;
+  entity_type: string | null;
+  entity_id: number | null;
+}
+
 export interface JWTPayload {
   id: string;
   role: UserRole;

@@ -5,18 +5,24 @@ import {
   fetchEmployeeExpedientById,
   getApiErrorMessage,
   listEmployeeAlertsByEmployeeId,
+  listEmployeeDocumentHistoryByEmployeeId,
   listEmployees,
+  listRhAuditLogs,
   uploadEmployeeDocumentByEmployeeId,
   type EmployeeDocumentPayload,
 } from '../api/service';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { EmployeeAlertsSummaryPanel } from '../components/rh/EmployeeAlertsSummaryPanel';
+import { EmployeeDocumentHistoryModal } from '../components/rh/EmployeeDocumentHistoryModal';
 import { EmployeeDocumentUploadModal } from '../components/rh/EmployeeDocumentUploadModal';
+import { EmployeeRecentMovementsPanel } from '../components/rh/EmployeeRecentMovementsPanel';
 import { ExpedientSectionCard } from '../components/rh/ExpedientSectionCard';
 import type {
+  AuditLog,
   Employee,
   EmployeeAlert,
   EmployeeAlertsSummary,
+  EmployeeDocument,
   EmployeeExpedient,
   EmployeeExpedientItem,
 } from '../types/models';
@@ -67,6 +73,11 @@ export const EmployeeExpedientPage = () => {
   const [alertsSummary, setAlertsSummary] = useState<EmployeeAlertsSummary>(EMPTY_ALERTS_SUMMARY);
   const [alerts, setAlerts] = useState<EmployeeAlert[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(false);
+  const [recentMovements, setRecentMovements] = useState<AuditLog[]>([]);
+  const [loadingMovements, setLoadingMovements] = useState(false);
+  const [historyItem, setHistoryItem] = useState<EmployeeExpedientItem | null>(null);
+  const [historyDocuments, setHistoryDocuments] = useState<EmployeeDocument[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const loadEmployees = useCallback(async () => {
     setLoadingEmployees(true);
@@ -109,6 +120,32 @@ export const EmployeeExpedientPage = () => {
     }
   }, []);
 
+  const loadRecentMovements = useCallback(async (employeeId: number) => {
+    setLoadingMovements(true);
+    try {
+      const logs = await listRhAuditLogs({ employee_id: employeeId, limit: 8 });
+      setRecentMovements(logs);
+    } catch (error) {
+      setRecentMovements([]);
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los movimientos del expediente.'));
+    } finally {
+      setLoadingMovements(false);
+    }
+  }, []);
+
+  const loadDocumentHistory = useCallback(async (employeeId: number, documentTypeId: number) => {
+    setLoadingHistory(true);
+    try {
+      const documents = await listEmployeeDocumentHistoryByEmployeeId(employeeId, documentTypeId);
+      setHistoryDocuments(documents);
+    } catch (error) {
+      setHistoryDocuments([]);
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar el historial documental RH.'));
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadEmployees();
   }, [loadEmployees]);
@@ -119,12 +156,15 @@ export const EmployeeExpedientPage = () => {
       setAlertsSummary(EMPTY_ALERTS_SUMMARY);
       setAlerts([]);
       setLoadingAlerts(false);
+      setRecentMovements([]);
+      setLoadingMovements(false);
       return;
     }
 
     void loadExpedient(selectedEmployeeId);
     void loadAlerts(selectedEmployeeId);
-  }, [loadAlerts, loadExpedient, selectedEmployeeId]);
+    void loadRecentMovements(selectedEmployeeId);
+  }, [loadAlerts, loadExpedient, loadRecentMovements, selectedEmployeeId]);
 
   const filteredEmployees = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -189,6 +229,7 @@ export const EmployeeExpedientPage = () => {
       setSelectedItem(null);
       await loadExpedient(selectedEmployeeId);
       await loadAlerts(selectedEmployeeId);
+      await loadRecentMovements(selectedEmployeeId);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar el documento RH.'));
     } finally {
@@ -220,6 +261,7 @@ export const EmployeeExpedientPage = () => {
                 if (selectedEmployeeId) {
                   void loadExpedient(selectedEmployeeId);
                   void loadAlerts(selectedEmployeeId);
+                  void loadRecentMovements(selectedEmployeeId);
                 }
               }}
               className="inline-flex items-center gap-2 rounded-2xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
@@ -358,12 +400,21 @@ export const EmployeeExpedientPage = () => {
                 loading={loadingAlerts}
               />
 
+              <EmployeeRecentMovementsPanel
+                logs={recentMovements}
+                loading={loadingMovements}
+              />
+
               <div className="grid grid-cols-1 gap-6">
                 {expedient.sections.map((section) => (
                   <ExpedientSectionCard
                     key={section.section.id}
                     section={section}
                     onUpload={(item) => setSelectedItem(item)}
+                    onHistory={(item) => {
+                      setHistoryItem(item);
+                      void loadDocumentHistory(currentEmployee.id, item.document_type.id);
+                    }}
                     onView={(documentId) =>
                       setSelectedPdfUrl(`${API_BASE_URL}/rh/documents/${documentId}/view`)
                     }
@@ -395,6 +446,17 @@ export const EmployeeExpedientPage = () => {
         saving={savingDocument}
         onClose={() => setSelectedItem(null)}
         onSubmit={handleUpload}
+      />
+
+      <EmployeeDocumentHistoryModal
+        isOpen={historyItem !== null}
+        documentType={historyItem?.document_type ?? null}
+        documents={historyDocuments}
+        loading={loadingHistory}
+        onClose={() => {
+          setHistoryItem(null);
+          setHistoryDocuments([]);
+        }}
       />
 
       {selectedPdfUrl && (

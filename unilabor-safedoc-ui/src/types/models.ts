@@ -193,11 +193,20 @@ export interface Document {
 
 export interface AuditLog {
   accessed_at: string;
+  module_code?: ModuleCode;
   full_name: string;
   email: string;
   document: string | null;
   action: string;
-  ip_address: string;
+  ip_address: string | null;
+  employee_id?: number | null;
+  employee_code?: string | null;
+  employee_name?: string | null;
+  document_id?: number | null;
+  document_type_id?: number | null;
+  document_type_name?: string | null;
+  entity_type?: string | null;
+  entity_id?: number | null;
 }
 
 export interface Category {

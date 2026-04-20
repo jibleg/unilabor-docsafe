@@ -1,6 +1,6 @@
 import type { Response } from 'express';
-import pool from '../config/db';
 import type { AuthRequest } from '../types';
+import { registerAuditEvent } from '../services/audit.service';
 import {
   createEmployee,
   deactivateEmployee,
@@ -65,14 +65,15 @@ const logEmployeeAudit = async (userId: string | undefined, action: string, ipAd
     return;
   }
 
-  try {
-    await pool.query(
-      'INSERT INTO access_logs (user_id, action, ip_address) VALUES ($1, $2, $3)',
-      [userId, action, ipAddress ?? null],
-    );
-  } catch (error) {
-    console.error('No se pudo registrar auditoria RH:', error);
-  }
+  await registerAuditEvent({
+    user_id: userId,
+    action,
+    ip_address: ipAddress ?? null,
+    module_code: 'RH',
+    entity_type: 'employee',
+    entity_id: parseEmployeeId(action.split(':')[1]),
+    employee_id: parseEmployeeId(action.split(':')[1]),
+  });
 };
 
 export const listEmployeesController = async (_req: AuthRequest, res: Response) => {

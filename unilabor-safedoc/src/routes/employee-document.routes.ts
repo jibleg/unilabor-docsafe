@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getEmployeeExpedientController,
+  getEmployeeDocumentHistoryController,
   getMyExpedientController,
   listEmployeeDocumentsController,
   listMyDocumentsController,
@@ -27,6 +28,12 @@ router.get(
   '/employees/:id/documents',
   authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
   listEmployeeDocumentsController,
+);
+
+router.get(
+  '/employees/:id/document-types/:documentTypeId/history',
+  authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
+  getEmployeeDocumentHistoryController,
 );
 
 router.get('/me/documents', authorizeModuleRole('RH', ['ADMIN', 'EDITOR', 'VIEWER']), listMyDocumentsController);

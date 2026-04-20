@@ -6,11 +6,13 @@ import {
   canUserAccessEmployeeDocument,
   canUserAccessEmployeeExpedient,
   getEmployeeForAuthenticatedUser,
+  listEmployeeDocumentHistory,
   listEmployeeDocuments,
   resolveEmployeeDocumentPath,
   uploadEmployeeDocument,
   type EmployeeDocumentPayload,
 } from '../services/employee-document.service';
+import { registerAuditEvent } from '../services/audit.service';
 
 const parsePositiveInt = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -278,6 +280,20 @@ export const viewEmployeeDocumentController = async (req: AuthRequest, res: Resp
       return res.status(403).json({ message: 'No tienes acceso a este documento RH.' });
     }
 
+    await registerAuditEvent({
+      user_id: user.id,
+      action: `RH_DOCUMENT_VIEW:${documentId}`,
+      ip_address: req.ip ?? null,
+      module_code: 'RH',
+      entity_type: 'employee_document',
+      entity_id: documentId,
+      employee_id: document.employee_id,
+      metadata: {
+        document_type_id: document.document_type_id,
+        sensitive: Boolean(document.is_sensitive),
+      },
+    });
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="protected-view.pdf"');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -303,6 +319,38 @@ export const viewEmployeeDocumentController = async (req: AuthRequest, res: Resp
 
     console.error('Error visualizando documento RH:', error);
     return res.status(500).json({ message: 'No se pudo visualizar el documento RH.' });
+  }
+};
+
+export const getEmployeeDocumentHistoryController = async (req: AuthRequest, res: Response) => {
+  const employeeId = parsePositiveInt(req.params.id);
+  const documentTypeId = parsePositiveInt(req.params.documentTypeId);
+
+  if (!employeeId || !documentTypeId) {
+    return res.status(400).json({ message: 'Parametros de historial invalidos.' });
+  }
+
+  const user = req.user;
+  if (!user?.id || !user.role) {
+    return res.status(401).json({ message: 'Sesion invalida o expirada.' });
+  }
+
+  try {
+    const canAccess = await canUserAccessEmployeeExpedient(user.id, user.role, employeeId);
+    if (!canAccess) {
+      return res.status(403).json({ message: 'No tienes acceso al historial solicitado.' });
+    }
+
+    const documents = await listEmployeeDocumentHistory(employeeId, documentTypeId);
+    return res.json({ documents });
+  } catch (error: any) {
+    const mappedError = mapEmployeeDocumentError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error consultando historial documental RH:', error);
+    return res.status(500).json({ message: 'No se pudo consultar el historial documental RH.' });
   }
 };
 
