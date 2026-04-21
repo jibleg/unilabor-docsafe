@@ -86,6 +86,18 @@ const mapEmployeeDocumentError = (res: Response, error: any) => {
     return res.status(404).json({ message: 'Tipo documental no encontrado o inactivo.' });
   }
 
+  if (error?.code === 'EMPLOYEE_DOCUMENT_ACCESS_TABLES_NOT_AVAILABLE') {
+    return res.status(409).json({
+      message: 'Las tablas de acceso documental por colaborador no existen. Ejecuta la migracion del Sprint 9.',
+    });
+  }
+
+  if (error?.code === 'DOCUMENT_TYPE_NOT_ASSIGNED_TO_EMPLOYEE') {
+    return res.status(403).json({
+      message: 'Este tipo documental no esta habilitado para el expediente del colaborador.',
+    });
+  }
+
   if (error?.code === 'EXPIRY_DATES_REQUIRED') {
     return res.status(400).json({
       message: 'Este tipo documental requiere fecha de emision y fecha de vencimiento.',

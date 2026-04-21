@@ -2,6 +2,10 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import {
+  listEmployeeDocumentAccessMatrix,
+  updateEmployeeDocumentAccessMatrix,
+} from '../services/employee-document-access.service';
+import {
   createEmployee,
   deactivateEmployee,
   getEmployeeById,
@@ -55,6 +59,18 @@ const mapEmployeeError = (res: Response, error: any) => {
 
   if (error?.code === '23505') {
     return res.status(409).json({ message: 'El codigo o correo del colaborador ya existe.' });
+  }
+
+  if (error?.code === 'EMPLOYEE_DOCUMENT_ACCESS_TABLES_NOT_AVAILABLE') {
+    return res.status(409).json({
+      message: 'Las tablas de acceso documental por colaborador no existen. Ejecuta la migracion del Sprint 9.',
+    });
+  }
+
+  if (error?.code === 'DOCUMENT_TYPE_NOT_AVAILABLE_FOR_ACCESS') {
+    return res.status(400).json({
+      message: 'Uno o mas tipos documentales seleccionados no existen o estan inactivos.',
+    });
   }
 
   return null;
@@ -137,6 +153,83 @@ export const getEmployeeByIdController = async (req: AuthRequest, res: Response)
 
     console.error('Error obteniendo colaborador:', error);
     return res.status(500).json({ message: 'No se pudo obtener el colaborador.' });
+  }
+};
+
+const getNumericIds = (value: unknown): number[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .map((entry) => Number(entry))
+      .filter((entry) => Number.isFinite(entry) && entry > 0),
+  )];
+};
+
+export const getEmployeeDocumentAccessController = async (req: AuthRequest, res: Response) => {
+  const employeeId = parseEmployeeId(req.params.id);
+  if (!employeeId) {
+    return res.status(400).json({ message: 'ID de colaborador invalido.' });
+  }
+
+  try {
+    const employee = await getEmployeeById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ message: 'Colaborador no encontrado.' });
+    }
+
+    const access = await listEmployeeDocumentAccessMatrix(employeeId);
+    return res.json({ employee, access });
+  } catch (error: any) {
+    const mappedError = mapEmployeeError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error obteniendo acceso documental RH:', error);
+    return res.status(500).json({ message: 'No se pudo obtener el acceso documental del colaborador.' });
+  }
+};
+
+export const updateEmployeeDocumentAccessController = async (req: AuthRequest, res: Response) => {
+  const employeeId = parseEmployeeId(req.params.id);
+  if (!employeeId) {
+    return res.status(400).json({ message: 'ID de colaborador invalido.' });
+  }
+
+  const sectionIds = getNumericIds(req.body?.section_ids ?? req.body?.enabled_section_ids);
+  const documentTypeIds = getNumericIds(req.body?.document_type_ids ?? req.body?.enabled_document_type_ids);
+
+  try {
+    const employee = await getEmployeeById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ message: 'Colaborador no encontrado.' });
+    }
+
+    const access = await updateEmployeeDocumentAccessMatrix(
+      employeeId,
+      {
+        section_ids: sectionIds,
+        document_type_ids: documentTypeIds,
+      },
+      req.user?.id ?? null,
+    );
+
+    return res.json({
+      message: 'Acceso documental actualizado correctamente.',
+      employee,
+      access,
+    });
+  } catch (error: any) {
+    const mappedError = mapEmployeeError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error actualizando acceso documental RH:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar el acceso documental del colaborador.' });
   }
 };
 

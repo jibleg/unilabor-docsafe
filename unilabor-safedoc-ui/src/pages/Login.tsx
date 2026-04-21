@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { Loader2, Lock, Mail } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage, login } from '../api/service';
 import { FormFieldError } from '../components/FormFieldError';
@@ -20,11 +20,6 @@ const featureCards = [
   },
 ] as const;
 
-const quickStats = [
-  ['99.9%', 'Disponibilidad esperada'],
-  ['24/7', 'Acceso en la nube sin interrupciones'],
-] as const;
-
 const moduleHighlights = [
   ['CALIDAD', 'Control documental institucional y trazabilidad de calidad.'],
   ['RH', 'Expediente digital del colaborador y gestion documental de personal.'],
@@ -41,7 +36,6 @@ export const LoginPage = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberSession, setRememberSession] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const validation = useNativeFormValidation();

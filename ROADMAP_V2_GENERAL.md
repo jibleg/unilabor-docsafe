@@ -37,6 +37,10 @@ Cada modulo tendra:
 | 6 | Permisos sensibles y constancias | Cerrar seguridad de sensibles y vigencias de constancias | `completada` |
 | 7 | Alertas y seguimiento | Implementar alertas, faltantes y vencimientos | `completada` |
 | 8 | Auditoria e historial | Trazabilidad, historial y control institucional | `completada` |
+| 9 | Acceso documental por colaborador | Crear matriz de secciones y documentos asignados por colaborador | `completada` |
+| 10 | Aplicacion de permisos en expediente | Aplicar la matriz en expediente, portal, cargas y alertas | `completada` |
+| 11 | UI de configuracion documental | Permitir a RH configurar expediente personalizado por colaborador | `completada` |
+| 12 | QA y cierre PMV+ | Validar, documentar y preparar prueba de usuario | `completada` |
 
 ## Dependencias clave
 
@@ -81,6 +85,13 @@ Estado de cierre:
 - alertas y auditoria RH implementadas
 - la V2 funcional queda cerrada en codigo y documentacion
 
+Estado PMV+:
+
+- cada colaborador puede tener secciones documentales personalizadas
+- cada colaborador puede tener tipos documentales personalizados por seccion
+- expediente, portal, cargas, historial y alertas respetan la matriz asignada
+- RH puede configurar la matriz desde la pantalla de colaboradores
+
 ## Bitacora general
 
 | Fecha | Hito | Estado | Comentario |
@@ -88,3 +99,4 @@ Estado de cierre:
 | 2026-04-16 | Se define roadmap completo de V2 | `completada` | Base integral para ejecucion sprint por sprint. |
 | 2026-04-17 | Sprints 1 a 7 implementados en la base del producto | `completada` | Se cerraron acceso multi-modulo, base RH, estructura documental, expediente, portal, sensibles y alertas. |
 | 2026-04-20 | Sprint 8 implementado y V2 funcionalmente cerrada | `completada` | Se agregaron auditoria multi-modulo, historial RH y trazabilidad institucional. |
+| 2026-04-21 | Fase PMV+ de expediente personalizado implementada | `completada` | Se agregaron matriz documental por colaborador, aplicacion de permisos, UI de configuracion RH y entorno de validacion. |

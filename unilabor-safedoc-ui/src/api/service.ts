@@ -12,6 +12,10 @@ import type {
   EmployeeAlertsSummary,
   EmployeeAlertState,
   EmployeeDocument,
+  EmployeeDocumentAccessMatrix,
+  EmployeeDocumentAccessResponse,
+  EmployeeDocumentAccessSection,
+  EmployeeDocumentAccessTypeItem,
   EmployeeExpedient,
   EmployeeExpedientItem,
   EmployeeExpedientSection,
@@ -88,6 +92,11 @@ export interface EmployeeDocumentPayload {
   issue_date?: string;
   expiry_date?: string;
   file: File;
+}
+
+export interface EmployeeDocumentAccessPayload {
+  section_ids: number[];
+  document_type_ids: number[];
 }
 
 export interface EmployeeAlertsFilters {
@@ -598,6 +607,97 @@ const normalizeEmployeeExpedient = (input: unknown): EmployeeExpedient | null =>
   };
 };
 
+const normalizeEmployeeDocumentAccessTypeItem = (input: unknown): EmployeeDocumentAccessTypeItem | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const documentType = normalizeDocumentType(source.document_type ?? source.documentType);
+  if (!documentType) {
+    return null;
+  }
+
+  return {
+    document_type: documentType,
+    is_enabled: getBoolean(source, ['is_enabled', 'isEnabled'], false),
+  };
+};
+
+const normalizeEmployeeDocumentAccessSection = (input: unknown): EmployeeDocumentAccessSection | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const section = normalizeDocumentSection(source.section);
+  if (!section) {
+    return null;
+  }
+
+  return {
+    section,
+    is_enabled: getBoolean(source, ['is_enabled', 'isEnabled'], false),
+    document_types: getArrayFromPayload(source.document_types ?? source.documentTypes ?? [], ['document_types', 'documentTypes'])
+      .map(normalizeEmployeeDocumentAccessTypeItem)
+      .filter((item): item is EmployeeDocumentAccessTypeItem => item !== null),
+  };
+};
+
+const normalizeNumericArray = (input: unknown): number[] => {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return [...new Set(
+    input
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0),
+  )];
+};
+
+const normalizeEmployeeDocumentAccessMatrix = (input: unknown): EmployeeDocumentAccessMatrix | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const employeeId = getNumber(source, ['employee_id', 'employeeId']);
+  if (!employeeId) {
+    return null;
+  }
+
+  return {
+    employee_id: employeeId,
+    sections: getArrayFromPayload(source.sections, ['sections'])
+      .map(normalizeEmployeeDocumentAccessSection)
+      .filter((section): section is EmployeeDocumentAccessSection => section !== null),
+    enabled_section_ids: normalizeNumericArray(source.enabled_section_ids ?? source.enabledSectionIds),
+    enabled_document_type_ids: normalizeNumericArray(
+      source.enabled_document_type_ids ?? source.enabledDocumentTypeIds,
+    ),
+  };
+};
+
+const normalizeEmployeeDocumentAccessResponse = (input: unknown): EmployeeDocumentAccessResponse | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const employee = normalizeEmployee(source.employee);
+  const access = normalizeEmployeeDocumentAccessMatrix(source.access);
+
+  if (!employee || !access) {
+    return null;
+  }
+
+  return {
+    employee,
+    access,
+  };
+};
+
 const normalizeEmployeeAlert = (input: unknown): EmployeeAlert | null => {
   const source = asRecord(input);
   if (!source) {
@@ -1054,6 +1154,27 @@ export const listLinkableUsers = async (): Promise<LinkableUser[]> => {
   return getArrayFromPayload(response.data, ['users', 'items', 'results'])
     .map(normalizeLinkableUser)
     .filter((user): user is LinkableUser => user !== null);
+};
+
+export const fetchEmployeeDocumentAccess = async (
+  employeeId: number,
+): Promise<EmployeeDocumentAccessResponse | null> => {
+  const response = await api.get(`/employees/${employeeId}/document-access`);
+  return normalizeEmployeeDocumentAccessResponse(unwrapPayload(response.data));
+};
+
+export const updateEmployeeDocumentAccess = async (
+  employeeId: number,
+  payload: EmployeeDocumentAccessPayload,
+): Promise<EmployeeDocumentAccessResponse | null> => {
+  const normalizedSectionIds = normalizeNumericArray(payload.section_ids);
+  const normalizedDocumentTypeIds = normalizeNumericArray(payload.document_type_ids);
+  const response = await api.put(`/employees/${employeeId}/document-access`, {
+    section_ids: normalizedSectionIds,
+    document_type_ids: normalizedDocumentTypeIds,
+  });
+
+  return normalizeEmployeeDocumentAccessResponse(unwrapPayload(response.data));
 };
 
 export const listDocumentSections = async (): Promise<DocumentSection[]> => {

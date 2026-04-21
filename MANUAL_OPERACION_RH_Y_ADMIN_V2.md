@@ -122,7 +122,24 @@ Capacidades:
 3. Crear colaborador con codigo, nombre, correo, area y puesto.
 4. Vincular el `user_id` cuando el colaborador ya tenga cuenta del sistema.
 
-### 6.3 Configuracion documental RH
+### 6.3 Configuracion de expediente personalizado
+
+1. Entrar a `/rh/employees`.
+2. Localizar el colaborador.
+3. Usar la accion `Permisos` o abrir la ficha y seleccionar `Configurar expediente documental`.
+4. Habilitar las secciones que aplican al colaborador.
+5. Dentro de cada seccion, habilitar solo los documentos que aplican.
+6. Guardar la configuracion.
+7. Validar en `/rh/expedients` que el expediente muestre solo lo habilitado.
+
+Reglas operativas:
+
+- si una seccion queda deshabilitada, sus documentos no aparecen en el expediente
+- si un documento queda deshabilitado, no cuenta como faltante ni vencido
+- el colaborador solo ve en `/rh/my-expedient` los documentos habilitados para su expediente
+- la carga de documentos queda bloqueada si el tipo documental no esta asignado al colaborador
+
+### 6.4 Configuracion documental RH
 
 1. Abrir `/rh/document-sections`.
 2. Crear o ajustar secciones del expediente.
@@ -132,7 +149,7 @@ Capacidades:
    - sensible
    - con vencimiento
 
-### 6.4 Operacion del expediente RH
+### 6.5 Operacion del expediente RH
 
 1. Abrir `/rh/expedients`.
 2. Seleccionar colaborador.
@@ -144,7 +161,7 @@ Capacidades:
 5. Consultar historial del documento desde el boton `Historial`.
 6. Visualizar PDF con visor seguro.
 
-### 6.5 Seguimiento y control
+### 6.6 Seguimiento y control
 
 1. Abrir `/rh/alerts` para priorizar faltantes, por vencer y vencidos.
 2. Abrir `/rh/audit` para consultar trazabilidad RH.
@@ -205,6 +222,8 @@ Capacidades:
 - `GET /api/rh/me/expedient`
 - `POST /api/rh/me/documents`
 - `GET /api/rh/documents/:documentId/view`
+- `GET /api/employees/:id/document-access`
+- `PUT /api/employees/:id/document-access`
 
 ### 10.2 Auditoria
 

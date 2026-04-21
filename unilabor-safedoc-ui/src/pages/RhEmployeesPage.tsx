@@ -1,16 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Edit3, Eye, Loader2, Plus, RefreshCw, Trash2, UserCog, UserRound } from 'lucide-react';
+import {
+  CheckSquare,
+  Edit3,
+  Eye,
+  FileCog,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Square,
+  Trash2,
+  UserCog,
+  UserRound,
+} from 'lucide-react';
 import {
   createEmployee,
   deleteEmployeeById,
   fetchEmployeeById,
+  fetchEmployeeDocumentAccess,
   getApiErrorMessage,
   listEmployees,
   listLinkableUsers,
   type EmployeePayload,
+  updateEmployeeDocumentAccess,
   updateEmployeeById,
 } from '../api/service';
-import type { Employee, LinkableUser } from '../types/models';
+import type { Employee, EmployeeDocumentAccessMatrix, LinkableUser } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 
 interface EmployeeFormState {
@@ -58,6 +72,12 @@ export const RhEmployeesPage = () => {
   const [userSearchValue, setUserSearchValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [accessEmployee, setAccessEmployee] = useState<Employee | null>(null);
+  const [documentAccess, setDocumentAccess] = useState<EmployeeDocumentAccessMatrix | null>(null);
+  const [selectedSectionIds, setSelectedSectionIds] = useState<number[]>([]);
+  const [selectedDocumentTypeIds, setSelectedDocumentTypeIds] = useState<number[]>([]);
+  const [loadingAccess, setLoadingAccess] = useState(false);
+  const [savingAccess, setSavingAccess] = useState(false);
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
@@ -99,6 +119,27 @@ export const RhEmployeesPage = () => {
         .some((value) => value.toLowerCase().includes(normalizedQuery)),
     );
   }, [employees, query]);
+
+  const accessSummary = useMemo(() => {
+    if (!documentAccess) {
+      return {
+        totalSections: 0,
+        enabledSections: 0,
+        totalTypes: 0,
+        enabledTypes: 0,
+      };
+    }
+
+    return {
+      totalSections: documentAccess.sections.length,
+      enabledSections: selectedSectionIds.length,
+      totalTypes: documentAccess.sections.reduce(
+        (total, section) => total + section.document_types.length,
+        0,
+      ),
+      enabledTypes: selectedDocumentTypeIds.length,
+    };
+  }, [documentAccess, selectedDocumentTypeIds.length, selectedSectionIds.length]);
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -165,6 +206,134 @@ export const RhEmployeesPage = () => {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar el detalle del colaborador.'));
     } finally {
       setLoadingDetail(false);
+    }
+  };
+
+  const openDocumentAccess = async (employee: Employee) => {
+    setAccessEmployee(employee);
+    setDocumentAccess(null);
+    setSelectedSectionIds([]);
+    setSelectedDocumentTypeIds([]);
+    setLoadingAccess(true);
+
+    try {
+      const response = await fetchEmployeeDocumentAccess(employee.id);
+      if (!response) {
+        throw new Error('No se pudo interpretar la matriz documental.');
+      }
+
+      setDocumentAccess(response.access);
+      setSelectedSectionIds(response.access.enabled_section_ids);
+      setSelectedDocumentTypeIds(response.access.enabled_document_type_ids);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar la configuracion documental.'));
+      setAccessEmployee(null);
+    } finally {
+      setLoadingAccess(false);
+    }
+  };
+
+  const closeDocumentAccess = () => {
+    if (savingAccess) {
+      return;
+    }
+
+    setAccessEmployee(null);
+    setDocumentAccess(null);
+    setSelectedSectionIds([]);
+    setSelectedDocumentTypeIds([]);
+  };
+
+  const selectAllAccess = () => {
+    if (!documentAccess) {
+      return;
+    }
+
+    setSelectedSectionIds(documentAccess.sections.map((section) => section.section.id));
+    setSelectedDocumentTypeIds(
+      documentAccess.sections.flatMap((section) =>
+        section.document_types.map((item) => item.document_type.id),
+      ),
+    );
+  };
+
+  const clearAccess = () => {
+    setSelectedSectionIds([]);
+    setSelectedDocumentTypeIds([]);
+  };
+
+  const toggleSectionAccess = (sectionId: number) => {
+    if (!documentAccess) {
+      return;
+    }
+
+    const section = documentAccess.sections.find((entry) => entry.section.id === sectionId);
+    if (!section) {
+      return;
+    }
+
+    const sectionTypeIds = section.document_types.map((item) => item.document_type.id);
+    const isSelected = selectedSectionIds.includes(sectionId);
+
+    if (isSelected) {
+      setSelectedSectionIds((current) => current.filter((id) => id !== sectionId));
+      setSelectedDocumentTypeIds((current) => current.filter((id) => !sectionTypeIds.includes(id)));
+      return;
+    }
+
+    setSelectedSectionIds((current) => [...new Set([...current, sectionId])]);
+    setSelectedDocumentTypeIds((current) => [...new Set([...current, ...sectionTypeIds])]);
+  };
+
+  const toggleDocumentTypeAccess = (sectionId: number, documentTypeId: number) => {
+    const isSelected = selectedDocumentTypeIds.includes(documentTypeId);
+
+    if (isSelected) {
+      const nextTypeIds = selectedDocumentTypeIds.filter((id) => id !== documentTypeId);
+      const section = documentAccess?.sections.find((entry) => entry.section.id === sectionId);
+      const hasEnabledTypesInSection = section
+        ? section.document_types.some((item) => nextTypeIds.includes(item.document_type.id))
+        : false;
+
+      setSelectedDocumentTypeIds(nextTypeIds);
+      if (!hasEnabledTypesInSection) {
+        setSelectedSectionIds((current) => current.filter((id) => id !== sectionId));
+      }
+      return;
+    }
+
+    setSelectedSectionIds((current) => [...new Set([...current, sectionId])]);
+    setSelectedDocumentTypeIds((current) => [...new Set([...current, documentTypeId])]);
+  };
+
+  const handleSaveDocumentAccess = async () => {
+    if (!accessEmployee) {
+      return;
+    }
+
+    setSavingAccess(true);
+    try {
+      const response = await updateEmployeeDocumentAccess(accessEmployee.id, {
+        section_ids: selectedSectionIds,
+        document_type_ids: selectedDocumentTypeIds,
+      });
+
+      if (!response) {
+        throw new Error('No se pudo interpretar la configuracion guardada.');
+      }
+
+      setDocumentAccess(response.access);
+      setSelectedSectionIds(response.access.enabled_section_ids);
+      setSelectedDocumentTypeIds(response.access.enabled_document_type_ids);
+      notifySuccess('Configuracion documental actualizada correctamente.');
+      setAccessEmployee(null);
+      setDocumentAccess(null);
+      setSelectedSectionIds([]);
+      setSelectedDocumentTypeIds([]);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo guardar la configuracion documental.'));
+    } finally {
+      setSavingAccess(false);
     }
   };
 
@@ -327,6 +496,14 @@ export const RhEmployeesPage = () => {
                           </button>
                           <button
                             type="button"
+                            onClick={() => void openDocumentAccess(employee)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(239,245,250,0.95)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.32)]"
+                          >
+                            <FileCog size={14} />
+                            Permisos
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => void handleDelete(employee)}
                             disabled={deletingId === employee.id}
                             className="inline-flex items-center gap-1 rounded-lg border border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.16)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(151,163,172,0.24)] disabled:opacity-60"
@@ -411,6 +588,15 @@ export const RhEmployeesPage = () => {
                   <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">Aun no tiene usuario del sistema asociado.</p>
                 )}
               </div>
+
+              <button
+                type="button"
+                onClick={() => void openDocumentAccess(detailEmployee)}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.34)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+              >
+                <FileCog size={16} />
+                Configurar expediente documental
+              </button>
             </div>
           ) : (
             <div className="mt-6 rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-white/80 p-6 text-sm text-[var(--unilabor-neutral)]">
@@ -562,6 +748,202 @@ export const RhEmployeesPage = () => {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {accessEmployee && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/96 shadow-2xl shadow-[rgba(0,65,106,0.18)]">
+            <div className="flex flex-col gap-3 border-b border-[rgba(0,65,106,0.08)] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
+                  Expediente personalizado
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">
+                  {accessEmployee.full_name}
+                </h2>
+                <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
+                  {accessEmployee.employee_code} | {accessEmployee.area || 'Sin area'} | {accessEmployee.position || 'Sin puesto'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
+                  <p className="font-bold text-[var(--color-brand-700)]">{accessSummary.enabledSections}</p>
+                  <p className="text-[var(--unilabor-neutral)]">Secciones</p>
+                </div>
+                <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
+                  <p className="font-bold text-[var(--color-brand-700)]">{accessSummary.enabledTypes}</p>
+                  <p className="text-[var(--unilabor-neutral)]">Documentos</p>
+                </div>
+                <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
+                  <p className="font-bold text-[var(--color-brand-700)]">{accessSummary.totalSections}</p>
+                  <p className="text-[var(--unilabor-neutral)]">Catalogo sec.</p>
+                </div>
+                <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
+                  <p className="font-bold text-[var(--color-brand-700)]">{accessSummary.totalTypes}</p>
+                  <p className="text-[var(--unilabor-neutral)]">Catalogo doc.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.72)] px-5 py-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllAccess}
+                  disabled={loadingAccess || savingAccess || !documentAccess}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50"
+                >
+                  <CheckSquare size={14} />
+                  Seleccionar todo
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAccess}
+                  disabled={loadingAccess || savingAccess || !documentAccess}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(151,163,172,0.28)] bg-white/90 px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(151,163,172,0.16)] disabled:opacity-50"
+                >
+                  <Square size={14} />
+                  Limpiar
+                </button>
+              </div>
+
+              <p className="text-xs text-[var(--unilabor-neutral)]">
+                Los documentos deshabilitados no cuentan como faltantes ni vencidos.
+              </p>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+              {loadingAccess ? (
+                <div className="flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.95)] p-5 text-sm text-[var(--unilabor-neutral)]">
+                  <Loader2 size={16} className="animate-spin" />
+                  Cargando configuracion documental...
+                </div>
+              ) : documentAccess ? (
+                <div className="space-y-4">
+                  {documentAccess.sections.map((sectionEntry) => {
+                    const sectionId = sectionEntry.section.id;
+                    const sectionTypeIds = sectionEntry.document_types.map((item) => item.document_type.id);
+                    const enabledTypesInSection = sectionTypeIds.filter((typeId) =>
+                      selectedDocumentTypeIds.includes(typeId),
+                    ).length;
+                    const sectionSelected = selectedSectionIds.includes(sectionId);
+
+                    return (
+                      <section
+                        key={sectionId}
+                        className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.95)]"
+                      >
+                        <div className="flex flex-col gap-3 border-b border-[rgba(0,65,106,0.08)] bg-white/90 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                          <label className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={sectionSelected}
+                              onChange={() => toggleSectionAccess(sectionId)}
+                              className="mt-1 h-4 w-4 rounded border-[rgba(0,65,106,0.18)] text-[var(--color-brand-500)]"
+                            />
+                            <span>
+                              <span className="block text-sm font-bold text-[var(--color-brand-700)]">
+                                {sectionEntry.section.name}
+                              </span>
+                              <span className="mt-1 block text-xs leading-5 text-[var(--unilabor-neutral)]">
+                                {sectionEntry.section.description || 'Seccion documental RH'}
+                              </span>
+                            </span>
+                          </label>
+                          <span className="rounded-full border border-[rgba(0,65,106,0.12)] bg-[rgba(191,212,230,0.28)] px-3 py-1 text-xs font-semibold text-[var(--color-brand-700)]">
+                            {enabledTypesInSection}/{sectionEntry.document_types.length} documentos
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 divide-y divide-[rgba(0,65,106,0.08)] md:grid-cols-2 md:divide-x md:divide-y-0">
+                          {sectionEntry.document_types.map((item) => {
+                            const documentType = item.document_type;
+                            const checked = selectedDocumentTypeIds.includes(documentType.id);
+
+                            return (
+                              <label
+                                key={documentType.id}
+                                className="flex min-h-[86px] gap-3 px-4 py-3 transition hover:bg-white/86"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleDocumentTypeAccess(sectionId, documentType.id)}
+                                  className="mt-1 h-4 w-4 rounded border-[rgba(0,65,106,0.18)] text-[var(--color-brand-500)]"
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold text-[var(--color-brand-700)]">
+                                    {documentType.name}
+                                  </span>
+                                  <span className="mt-1 flex flex-wrap gap-1.5">
+                                    {documentType.is_required ? (
+                                      <span className="rounded-full bg-[rgba(3,105,161,0.1)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
+                                        Requerido
+                                      </span>
+                                    ) : null}
+                                    {documentType.is_sensitive ? (
+                                      <span className="rounded-full bg-[rgba(151,163,172,0.16)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                                        Sensible
+                                      </span>
+                                    ) : null}
+                                    {documentType.has_expiry ? (
+                                      <span className="rounded-full bg-[rgba(245,158,11,0.13)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#9a5b00]">
+                                        Vigencia
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  {documentType.description ? (
+                                    <span className="mt-1 block text-xs leading-5 text-[var(--unilabor-neutral)]">
+                                      {documentType.description}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-white/80 p-6 text-sm text-[var(--unilabor-neutral)]">
+                  No se encontro configuracion documental para este colaborador.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-5 py-4">
+              <button
+                type="button"
+                onClick={closeDocumentAccess}
+                disabled={savingAccess}
+                className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveDocumentAccess()}
+                disabled={loadingAccess || savingAccess || !documentAccess}
+                className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
+              >
+                {savingAccess ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <FileCog size={14} />
+                    Guardar configuracion
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

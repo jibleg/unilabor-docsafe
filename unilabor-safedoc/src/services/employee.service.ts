@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import type { PoolClient } from 'pg';
 import pool from '../config/db';
 import { listUserModuleAccess } from './module-access.service';
+import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
 import type { EmployeeRecord, EmployeeSummary, LinkableUser } from '../types';
 
 export interface EmployeePayload {
@@ -286,6 +287,8 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
         normalizeOptionalText(payload.position),
       ],
     );
+
+    await initializeDefaultEmployeeDocumentAccess(Number(insertResult.rows[0]?.id), null, client);
 
     await client.query('COMMIT');
 

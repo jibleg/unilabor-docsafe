@@ -145,6 +145,29 @@ export interface EmployeeExpedient {
   sections: EmployeeExpedientSection[];
 }
 
+export interface EmployeeDocumentAccessTypeItem {
+  document_type: DocumentType;
+  is_enabled: boolean;
+}
+
+export interface EmployeeDocumentAccessSection {
+  section: DocumentSection;
+  is_enabled: boolean;
+  document_types: EmployeeDocumentAccessTypeItem[];
+}
+
+export interface EmployeeDocumentAccessMatrix {
+  employee_id: number;
+  sections: EmployeeDocumentAccessSection[];
+  enabled_section_ids: number[];
+  enabled_document_type_ids: number[];
+}
+
+export interface EmployeeDocumentAccessResponse {
+  employee: Employee;
+  access: EmployeeDocumentAccessMatrix;
+}
+
 export type EmployeeAlertState = 'missing' | 'expiring' | 'expired';
 
 export interface EmployeeAlert {

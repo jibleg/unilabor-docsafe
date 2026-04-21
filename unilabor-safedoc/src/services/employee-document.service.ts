@@ -12,6 +12,7 @@ import type {
 import { registerAuditEvent } from './audit.service';
 import { getEmployeeById, getEmployeeByUserId } from './employee.service';
 import { resolveStoredDocumentPath } from './document.service';
+import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
 
 export interface EmployeeDocumentPayload {
   document_type_id: number;
@@ -261,6 +262,41 @@ const ensureDocumentTypeExists = async (documentTypeId: number): Promise<Documen
   return mapDocumentTypeRow(result.rows[0]);
 };
 
+const ensureDocumentTypeAssignedToEmployee = async (
+  employeeId: number,
+  documentTypeId: number,
+): Promise<void> => {
+  await initializeDefaultEmployeeDocumentAccess(employeeId);
+
+  const result = await pool.query(
+    `
+      SELECT 1
+      FROM public.document_types dt
+      INNER JOIN public.document_sections s
+        ON s.id = dt.section_id
+       AND s.is_active = TRUE
+      INNER JOIN public.employee_document_section_access sa
+        ON sa.employee_id = $1
+       AND sa.section_id = s.id
+       AND sa.is_enabled = TRUE
+      INNER JOIN public.employee_document_type_access ta
+        ON ta.employee_id = $1
+       AND ta.document_type_id = dt.id
+       AND ta.is_enabled = TRUE
+      WHERE dt.id = $2
+        AND dt.is_active = TRUE
+      LIMIT 1;
+    `,
+    [employeeId, documentTypeId],
+  );
+
+  if (result.rows.length === 0) {
+    const error = new Error('DOCUMENT_TYPE_NOT_ASSIGNED_TO_EMPLOYEE');
+    (error as any).code = 'DOCUMENT_TYPE_NOT_ASSIGNED_TO_EMPLOYEE';
+    throw error;
+  }
+};
+
 export const canUserAccessEmployeeExpedient = async (
   userId: string,
   role: UserRole,
@@ -303,9 +339,16 @@ export const listEmployeeDocuments = async (
   filters: EmployeeDocumentFilters = {},
 ): Promise<EmployeeDocumentRecord[]> => {
   await assertEmployeeDocumentsTable();
+  await initializeDefaultEmployeeDocumentAccess(employeeId);
 
   const values: unknown[] = [employeeId];
-  const whereClauses = ['ed.employee_id = $1'];
+  const whereClauses = [
+    'ed.employee_id = $1',
+    's.is_active = TRUE',
+    'dt.is_active = TRUE',
+    'sa.is_enabled = TRUE',
+    'ta.is_enabled = TRUE',
+  ];
 
   if (filters.section_id) {
     values.push(filters.section_id);
@@ -346,6 +389,13 @@ export const listEmployeeDocuments = async (
         dt.has_expiry AS document_type_has_expiry
       FROM public.employee_documents ed
       INNER JOIN public.document_types dt ON dt.id = ed.document_type_id
+      INNER JOIN public.document_sections s ON s.id = dt.section_id
+      INNER JOIN public.employee_document_section_access sa
+        ON sa.employee_id = ed.employee_id
+       AND sa.section_id = s.id
+      INNER JOIN public.employee_document_type_access ta
+        ON ta.employee_id = ed.employee_id
+       AND ta.document_type_id = dt.id
       LEFT JOIN public.users u ON u.id = ed.uploaded_by_user_id
       WHERE ${whereClauses.join(' AND ')}
       ORDER BY ed.created_at DESC, ed.id DESC;
@@ -411,6 +461,7 @@ export const listEmployeeDocumentHistory = async (
   documentTypeId: number,
 ): Promise<EmployeeDocumentRecord[]> => {
   await ensureEmployeeExists(employeeId);
+  await ensureDocumentTypeAssignedToEmployee(employeeId, documentTypeId);
   return listEmployeeDocuments(employeeId, {
     document_type_id: documentTypeId,
     current_only: false,
@@ -425,6 +476,7 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
   await assertEmployeeDocumentsTable();
 
   const employee = await ensureEmployeeExists(employeeId);
+  await initializeDefaultEmployeeDocumentAccess(employeeId);
 
   const result = await pool.query(
     `
@@ -472,6 +524,14 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
       INNER JOIN public.document_types dt
         ON dt.section_id = s.id
        AND dt.is_active = TRUE
+      INNER JOIN public.employee_document_section_access sa
+        ON sa.employee_id = $1
+       AND sa.section_id = s.id
+       AND sa.is_enabled = TRUE
+      INNER JOIN public.employee_document_type_access ta
+        ON ta.employee_id = $1
+       AND ta.document_type_id = dt.id
+       AND ta.is_enabled = TRUE
       LEFT JOIN public.employee_documents ed
         ON ed.document_type_id = dt.id
        AND ed.employee_id = $1
@@ -556,6 +616,7 @@ export const uploadEmployeeDocument = async (
 
   await ensureEmployeeExists(employeeId);
   const documentType = await ensureDocumentTypeExists(payload.document_type_id);
+  await ensureDocumentTypeAssignedToEmployee(employeeId, documentType.id);
 
   const client = await pool.connect();
 
@@ -710,19 +771,25 @@ export const canUserAccessEmployeeDocument = async (
   role: UserRole,
   documentId: number,
 ): Promise<boolean> => {
-  if (role === 'ADMIN' || role === 'EDITOR') {
-    return true;
-  }
-
   const result = await pool.query(
     `
       SELECT
         ed.id,
+        ed.employee_id,
         e.user_id,
-        dt.is_sensitive
+        dt.is_sensitive,
+        COALESCE(sa.is_enabled, TRUE) AS section_is_enabled,
+        COALESCE(ta.is_enabled, TRUE) AS document_type_is_enabled
       FROM public.employee_documents ed
       INNER JOIN public.employees e ON e.id = ed.employee_id
       INNER JOIN public.document_types dt ON dt.id = ed.document_type_id
+      INNER JOIN public.document_sections s ON s.id = dt.section_id
+      LEFT JOIN public.employee_document_section_access sa
+        ON sa.employee_id = ed.employee_id
+       AND sa.section_id = s.id
+      LEFT JOIN public.employee_document_type_access ta
+        ON ta.employee_id = ed.employee_id
+       AND ta.document_type_id = dt.id
       WHERE ed.id = $1
       LIMIT 1;
     `,
@@ -734,6 +801,15 @@ export const canUserAccessEmployeeDocument = async (
   }
 
   const row = result.rows[0];
+  await initializeDefaultEmployeeDocumentAccess(Number(row.employee_id));
+  if (!row.section_is_enabled || !row.document_type_is_enabled) {
+    return false;
+  }
+
+  if (role === 'ADMIN' || role === 'EDITOR') {
+    return true;
+  }
+
   const isOwner = row.user_id && String(row.user_id) === userId;
 
   if (!isOwner) {

@@ -1,4 +1,5 @@
 import pool from '../config/db';
+import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
 import type {
   EmployeeAlertRecord,
   EmployeeAlertsSummary,
@@ -61,7 +62,14 @@ const mapExpiryAlertRow = (
 
 const buildMissingAlertsQuery = (filters: EmployeeAlertFilters) => {
   const values: unknown[] = [];
-  const clauses = ['e.is_active = TRUE', 'dt.is_active = TRUE', 'dt.is_required = TRUE', 's.is_active = TRUE'];
+  const clauses = [
+    'e.is_active = TRUE',
+    'dt.is_active = TRUE',
+    'dt.is_required = TRUE',
+    's.is_active = TRUE',
+    'sa.is_enabled = TRUE',
+    'ta.is_enabled = TRUE',
+  ];
 
   if (filters.employee_id) {
     values.push(filters.employee_id);
@@ -89,8 +97,15 @@ const buildMissingAlertsQuery = (filters: EmployeeAlertFilters) => {
         dt.id AS document_type_id,
         dt.name AS document_type_name
       FROM public.employees e
-      CROSS JOIN public.document_types dt
-      INNER JOIN public.document_sections s ON s.id = dt.section_id
+      INNER JOIN public.employee_document_section_access sa
+        ON sa.employee_id = e.id
+      INNER JOIN public.document_sections s
+        ON s.id = sa.section_id
+      INNER JOIN public.document_types dt
+        ON dt.section_id = s.id
+      INNER JOIN public.employee_document_type_access ta
+        ON ta.employee_id = e.id
+       AND ta.document_type_id = dt.id
       LEFT JOIN public.employee_documents ed
         ON ed.employee_id = e.id
        AND ed.document_type_id = dt.id
@@ -111,6 +126,9 @@ const buildExpiryAlertsQuery = (
     'e.is_active = TRUE',
     'dt.is_active = TRUE',
     'dt.has_expiry = TRUE',
+    's.is_active = TRUE',
+    'sa.is_enabled = TRUE',
+    'ta.is_enabled = TRUE',
     'ed.is_current = TRUE',
     `ed.expiry_date IS NOT NULL`,
   ];
@@ -154,6 +172,12 @@ const buildExpiryAlertsQuery = (
       INNER JOIN public.employees e ON e.id = ed.employee_id
       INNER JOIN public.document_types dt ON dt.id = ed.document_type_id
       INNER JOIN public.document_sections s ON s.id = dt.section_id
+      INNER JOIN public.employee_document_section_access sa
+        ON sa.employee_id = e.id
+       AND sa.section_id = s.id
+      INNER JOIN public.employee_document_type_access ta
+        ON ta.employee_id = e.id
+       AND ta.document_type_id = dt.id
       WHERE ${clauses.join(' AND ')}
       ORDER BY e.full_name ASC, ed.expiry_date ASC NULLS LAST;
     `,
@@ -190,6 +214,40 @@ export const listEmployeeAlerts = async (
   summary: EmployeeAlertsSummary;
   alerts: EmployeeAlertRecord[];
 }> => {
+  if (filters.employee_id) {
+    await initializeDefaultEmployeeDocumentAccess(filters.employee_id);
+  } else {
+    await pool.query(`
+      INSERT INTO public.employee_document_section_access (
+        employee_id,
+        section_id,
+        is_enabled
+      )
+      SELECT e.id, s.id, TRUE
+      FROM public.employees e
+      CROSS JOIN public.document_sections s
+      WHERE e.is_active = TRUE
+        AND s.is_active = TRUE
+      ON CONFLICT (employee_id, section_id) DO NOTHING;
+    `);
+
+    await pool.query(`
+      INSERT INTO public.employee_document_type_access (
+        employee_id,
+        document_type_id,
+        is_enabled
+      )
+      SELECT e.id, dt.id, TRUE
+      FROM public.employees e
+      CROSS JOIN public.document_types dt
+      INNER JOIN public.document_sections s ON s.id = dt.section_id
+      WHERE e.is_active = TRUE
+        AND s.is_active = TRUE
+        AND dt.is_active = TRUE
+      ON CONFLICT (employee_id, document_type_id) DO NOTHING;
+    `);
+  }
+
   const [missing, expiring, expired] = await Promise.all([
     filters.state && filters.state !== 'missing' ? Promise.resolve([]) : listMissingExpedientAlerts(filters),
     filters.state && filters.state !== 'expiring' ? Promise.resolve([]) : listExpiringDocumentAlerts(filters),
