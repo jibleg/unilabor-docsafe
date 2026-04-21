@@ -73,9 +73,7 @@ export const ForgotPasswordPage = () => {
                   <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-500)]">
                     Acceso controlado
                   </p>
-                  <h2 className="mt-4 text-4xl font-black leading-tight text-[var(--color-brand-700)]">
-                    Solicita una contrasena temporal para volver a entrar.
-                  </h2>
+
                   <p className="mt-5 text-base leading-8 text-[var(--unilabor-neutral)]">
                     Te enviaremos una clave temporal al correo institucional registrado y el sistema
                     te pedira cambiarla en el siguiente inicio de sesion.

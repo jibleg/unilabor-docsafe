@@ -15,27 +15,18 @@ const featureCards = [
     text: 'Manten historial, vigencia, cambios y responsables por cada documento.',
   },
   {
-    title: 'Trazabilidad completa',
-    text: 'Consulta aprobaciones, revisiones, descargas y evidencia de uso.',
-  },
-  {
-    title: 'Acceso por roles',
-    text: 'Permisos por area, perfil y criticidad documental.',
-  },
-  {
     title: 'Cumplimiento normativo',
     text: 'Ideal para laboratorios, calidad, TI y procesos regulados.',
   },
 ] as const;
 
 const quickStats = [
-  ['+10k', 'Documentos administrados'],
   ['99.9%', 'Disponibilidad esperada'],
   ['24/7', 'Acceso en la nube sin interrupciones'],
 ] as const;
 
 const moduleHighlights = [
-  ['QUALITY', 'Control documental institucional y trazabilidad de calidad.'],
+  ['CALIDAD', 'Control documental institucional y trazabilidad de calidad.'],
   ['RH', 'Expediente digital del colaborador y gestion documental de personal.'],
 ] as const;
 
@@ -170,17 +161,7 @@ export const LoginPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 max-w-xl">
-            {quickStats.map(([value, label]) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[linear-gradient(180deg,rgba(191,212,230,0.34),rgba(255,255,255,0.96))] px-4 py-5 backdrop-blur-md shadow-lg shadow-[rgba(0,65,106,0.05)] transition-all duration-300 hover:-translate-y-0.5"
-              >
-                <p className="text-2xl font-black text-[var(--color-brand-700)]">{value}</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--unilabor-neutral)]">{label}</p>
-              </div>
-            ))}
-          </div>
+
         </div>
       </section>
 
@@ -302,20 +283,6 @@ export const LoginPage = () => {
                   <FormFieldError id="password-error" message={passwordError} />
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-3 text-[var(--unilabor-neutral)]">
-                    <input
-                      type="checkbox"
-                      checked={rememberSession}
-                      onChange={(event) => setRememberSession(event.target.checked)}
-                      className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
-                    />
-                    Recordar sesion
-                  </label>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(0,65,106,0.1)] bg-[rgba(191,212,230,0.32)] px-3 py-1 text-xs text-[var(--color-brand-700)]">
-                    <ShieldCheck size={14} /> Acceso seguro
-                  </span>
-                </div>
 
                 <button
                   type="submit"

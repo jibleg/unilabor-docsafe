@@ -1,6 +1,6 @@
 # Roadmap V2 - SafeDoc UniLabor
 
-Estado general del proyecto: `proceso`
+Estado general del proyecto: `completada`
 
 Objetivo general:
 Construir la Version 2 de SafeDoc como una plataforma multi-modulo con autenticacion unica, preservando el modulo actual de Calidad e incorporando el submodulo de Recursos Humanos para expediente digital del colaborador.
@@ -29,14 +29,14 @@ Cada modulo tendra:
 
 | Sprint | Nombre | Objetivo principal | Estado |
 | --- | --- | --- | --- |
-| 1 | Acceso multi-modulo | Preparar login unico, modulos y roles por modulo | `proceso` |
-| 2 | Base RH | Crear base del submodulo RH y CRUD de colaboradores | `pendiente` |
-| 3 | Estructura documental RH | Crear secciones y tipos documentales configurables | `pendiente` |
-| 4 | Expediente del colaborador | Construir el expediente documental por colaborador | `pendiente` |
-| 5 | Portal del colaborador | Permitir al colaborador ver y cargar sus documentos | `pendiente` |
-| 6 | Permisos sensibles y constancias | Cerrar seguridad de sensibles y vigencias de constancias | `pendiente` |
-| 7 | Alertas y seguimiento | Implementar alertas, faltantes y vencimientos | `pendiente` |
-| 8 | Auditoria e historial | Trazabilidad, historial y control institucional | `pendiente` |
+| 1 | Acceso multi-modulo | Preparar login unico, modulos y roles por modulo | `completada` |
+| 2 | Base RH | Crear base del submodulo RH y CRUD de colaboradores | `completada` |
+| 3 | Estructura documental RH | Crear secciones y tipos documentales configurables | `completada` |
+| 4 | Expediente del colaborador | Construir el expediente documental por colaborador | `completada` |
+| 5 | Portal del colaborador | Permitir al colaborador ver y cargar sus documentos | `completada` |
+| 6 | Permisos sensibles y constancias | Cerrar seguridad de sensibles y vigencias de constancias | `completada` |
+| 7 | Alertas y seguimiento | Implementar alertas, faltantes y vencimientos | `completada` |
+| 8 | Auditoria e historial | Trazabilidad, historial y control institucional | `completada` |
 
 ## Dependencias clave
 
@@ -71,8 +71,20 @@ La V2 se considera lograda cuando:
 - constancias manejan vigencia
 - existen alertas y auditoria base
 
+Estado de cierre:
+
+- acceso multi-modulo operativo y validado
+- RH operativo como submodulo separado
+- expediente digital por colaborador implementado
+- portal del colaborador implementado
+- seguridad de sensibles y vigencias implementada
+- alertas y auditoria RH implementadas
+- la V2 funcional queda cerrada en codigo y documentacion
+
 ## Bitacora general
 
 | Fecha | Hito | Estado | Comentario |
 | --- | --- | --- | --- |
 | 2026-04-16 | Se define roadmap completo de V2 | `completada` | Base integral para ejecucion sprint por sprint. |
+| 2026-04-17 | Sprints 1 a 7 implementados en la base del producto | `completada` | Se cerraron acceso multi-modulo, base RH, estructura documental, expediente, portal, sensibles y alertas. |
+| 2026-04-20 | Sprint 8 implementado y V2 funcionalmente cerrada | `completada` | Se agregaron auditoria multi-modulo, historial RH y trazabilidad institucional. |
