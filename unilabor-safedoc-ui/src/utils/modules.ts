@@ -3,15 +3,24 @@ import type { ModuleAccess, ModuleCode } from '../types/models';
 export const normalizeModuleCode = (value?: string | null): ModuleCode | null => {
   const normalizedValue = String(value ?? '').trim().toUpperCase();
 
-  if (normalizedValue === 'QUALITY' || normalizedValue === 'RH') {
+  if (normalizedValue === 'QUALITY' || normalizedValue === 'RH' || normalizedValue === 'HELPDESK') {
     return normalizedValue;
   }
 
   return null;
 };
 
-export const getModuleHomePath = (moduleCode: ModuleCode): string =>
-  moduleCode === 'RH' ? '/rh' : '/quality/dashboard';
+export const getModuleHomePath = (moduleCode: ModuleCode): string => {
+  if (moduleCode === 'RH') {
+    return '/rh';
+  }
+
+  if (moduleCode === 'HELPDESK') {
+    return '/helpdesk/dashboard';
+  }
+
+  return '/quality/dashboard';
+};
 
 export const getModuleAccess = (
   availableModules: ModuleAccess[],

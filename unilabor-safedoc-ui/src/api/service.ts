@@ -21,6 +21,23 @@ import type {
   EmployeeExpedientSection,
   EmployeeExpedientSummary,
   EmployeeSummary,
+  HelpdeskAsset,
+  HelpdeskDashboardMetrics,
+  HelpdeskAssetEmployee,
+  HelpdeskAssetSummary,
+  HelpdeskCatalogItem,
+  HelpdeskCatalogs,
+  HelpdeskTicket,
+  HelpdeskTicketCatalogs,
+  HelpdeskTicketComment,
+  HelpdeskTicketPriority,
+  HelpdeskTicketStatus,
+  HelpdeskMaintenanceCatalogs,
+  HelpdeskMaintenanceFrequency,
+  HelpdeskMaintenancePlan,
+  HelpdeskMaintenanceOrder,
+  HelpdeskMaintenanceOrderChecklistItem,
+  HelpdeskMaintenancePlanTask,
   ExpedientItemStatus,
   LinkableUser,
   ManagedUser,
@@ -63,6 +80,115 @@ export interface EmployeePayload {
   email: string;
   area?: string;
   position?: string;
+}
+
+export interface HelpdeskAssetPayload {
+  asset_code: string;
+  name: string;
+  description?: string | null;
+  category_id?: number | null;
+  unit_id?: number | null;
+  area_id?: number | null;
+  location_id?: number | null;
+  brand_id?: number | null;
+  brand_name?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  complementary_info?: string | null;
+  purchase_modality_id?: number | null;
+  purchase_condition_id?: number | null;
+  assigned_employee_id?: number | null;
+  responsible_employee_id?: number | null;
+  criticality_id?: number | null;
+  operational_status_id?: number | null;
+  acquired_on?: string | null;
+  warranty_expires_on?: string | null;
+  inventory_legacy_code?: string | null;
+  legacy_consecutive?: string | null;
+  legacy_component_consecutive?: string | null;
+  notes?: string | null;
+}
+
+export interface HelpdeskTicketPayload {
+  asset_id?: number | null;
+  request_type_id?: number | null;
+  status_id?: number | null;
+  priority_id?: number | null;
+  requester_employee_id?: number | null;
+  assigned_employee_id?: number | null;
+  title: string;
+  description: string;
+  operational_impact?: string | null;
+  affects_results?: boolean;
+  due_at?: string | null;
+}
+
+export interface HelpdeskTicketSolutionPayload {
+  solved_at: string;
+  solution_summary: string;
+  equipment_status_after_solution_id?: number | null;
+}
+
+export interface HelpdeskTicketReturnPayload {
+  return_to_operation_at: string;
+  equipment_status_after_solution_id?: number | null;
+}
+
+export interface HelpdeskTicketIsoRiskPayload {
+  risk_level: string;
+  impact_evaluation: string;
+  recent_analysis_usage?: string | null;
+  alternate_equipment_used?: boolean;
+  alternate_equipment_notes?: string | null;
+  corrective_action_required?: boolean;
+  corrective_action_notes?: string | null;
+  technical_release_required?: boolean;
+  quality_document_id?: string | null;
+  operational_lock?: boolean;
+}
+
+export interface HelpdeskTicketTechnicalReleasePayload {
+  technical_release_summary: string;
+  equipment_status_after_solution_id?: number | null;
+}
+
+export interface HelpdeskMaintenancePlanPayload {
+  asset_id: number;
+  frequency_id?: number | null;
+  responsible_employee_id?: number | null;
+  quality_document_id?: string | null;
+  title: string;
+  description?: string | null;
+  provider_name?: string | null;
+  starts_on: string;
+  next_due_on: string;
+  tolerance_before_days?: number;
+  tolerance_after_days?: number;
+  checklist_required?: boolean;
+  evidence_required?: boolean;
+  tasks?: string[];
+}
+
+export interface HelpdeskMaintenanceOrderChecklistPayload {
+  plan_task_id?: number | null;
+  task_text: string;
+  result: string;
+  notes?: string | null;
+}
+
+export interface HelpdeskMaintenanceOrderClosePayload {
+  completed_at: string;
+  performed_activities: string;
+  result: string;
+  findings?: string | null;
+  provider_name?: string | null;
+  evidence_notes?: string | null;
+  checklist?: HelpdeskMaintenanceOrderChecklistPayload[];
+}
+
+export interface HelpdeskMaintenanceOrderReschedulePayload {
+  scheduled_for: string;
+  reschedule_reason: string;
 }
 
 export interface DocumentSectionPayload {
@@ -302,7 +428,7 @@ const normalizeModuleAccess = (input: unknown): ModuleAccess | null => {
   const role = getString(source, ['role']).toUpperCase();
   const name = getString(source, ['name']);
 
-  if ((code !== 'QUALITY' && code !== 'RH') || !name || !role) {
+  if ((code !== 'QUALITY' && code !== 'RH' && code !== 'HELPDESK') || !name || !role) {
     return null;
   }
 
@@ -389,6 +515,551 @@ const normalizeEmployeeSummary = (input: unknown): EmployeeSummary => {
     active: getNumber(source, ['active']),
     linked_users: getNumber(source, ['linked_users', 'linkedUsers']),
     unlinked_users: getNumber(source, ['unlinked_users', 'unlinkedUsers']),
+  };
+};
+
+const normalizeHelpdeskCatalogItem = (input: unknown): HelpdeskCatalogItem | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const name = getString(source, ['name']);
+  if (!id || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    code: getString(source, ['code']) || null,
+    name,
+    description: getString(source, ['description']) || null,
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    sort_order: getNumber(source, ['sort_order', 'sortOrder'], 0),
+  };
+};
+
+const normalizeHelpdeskAssetEmployee = (input: unknown): HelpdeskAssetEmployee | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const employeeCode = getString(source, ['employee_code', 'employeeCode']);
+  const fullName = getString(source, ['full_name', 'fullName']);
+  if (!id || !employeeCode || !fullName) {
+    return null;
+  }
+
+  return {
+    id,
+    employee_code: employeeCode,
+    full_name: fullName,
+    area: getString(source, ['area']) || null,
+    position: getString(source, ['position']) || null,
+  };
+};
+
+const getNullableNumber = (source: Record<string, unknown>, keys: string[]): number | null => {
+  const value = getNumber(source, keys, 0);
+  return value > 0 ? value : null;
+};
+
+const normalizeHelpdeskAsset = (input: unknown): HelpdeskAsset | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const assetCode = getString(source, ['asset_code', 'assetCode']);
+  const name = getString(source, ['name']);
+  if (!id || !assetCode || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    asset_code: assetCode,
+    name,
+    description: getString(source, ['description']) || null,
+    category_id: getNullableNumber(source, ['category_id', 'categoryId']),
+    unit_id: getNullableNumber(source, ['unit_id', 'unitId']),
+    area_id: getNullableNumber(source, ['area_id', 'areaId']),
+    location_id: getNullableNumber(source, ['location_id', 'locationId']),
+    brand_id: getNullableNumber(source, ['brand_id', 'brandId']),
+    brand_name: getString(source, ['brand_name', 'brandName']) || null,
+    model: getString(source, ['model']) || null,
+    serial_number: getString(source, ['serial_number', 'serialNumber']) || null,
+    complementary_info: getString(source, ['complementary_info', 'complementaryInfo']) || null,
+    purchase_modality_id: getNullableNumber(source, ['purchase_modality_id', 'purchaseModalityId']),
+    purchase_condition_id: getNullableNumber(source, ['purchase_condition_id', 'purchaseConditionId']),
+    assigned_employee_id: getNullableNumber(source, ['assigned_employee_id', 'assignedEmployeeId']),
+    responsible_employee_id: getNullableNumber(source, ['responsible_employee_id', 'responsibleEmployeeId']),
+    criticality_id: getNullableNumber(source, ['criticality_id', 'criticalityId']),
+    operational_status_id: getNullableNumber(source, ['operational_status_id', 'operationalStatusId']),
+    acquired_on: getString(source, ['acquired_on', 'acquiredOn']) || null,
+    warranty_expires_on: getString(source, ['warranty_expires_on', 'warrantyExpiresOn']) || null,
+    inventory_legacy_code: getString(source, ['inventory_legacy_code', 'inventoryLegacyCode']) || null,
+    legacy_consecutive: getString(source, ['legacy_consecutive', 'legacyConsecutive']) || null,
+    legacy_component_consecutive:
+      getString(source, ['legacy_component_consecutive', 'legacyComponentConsecutive']) || null,
+    notes: getString(source, ['notes']) || null,
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    created_at: getString(source, ['created_at', 'createdAt']),
+    updated_at: getString(source, ['updated_at', 'updatedAt']),
+    category: normalizeHelpdeskCatalogItem(source.category),
+    unit: normalizeHelpdeskCatalogItem(source.unit),
+    area: normalizeHelpdeskCatalogItem(source.area),
+    location: normalizeHelpdeskCatalogItem(source.location),
+    brand: normalizeHelpdeskCatalogItem(source.brand),
+    purchase_modality: normalizeHelpdeskCatalogItem(source.purchase_modality ?? source.purchaseModality),
+    purchase_condition: normalizeHelpdeskCatalogItem(source.purchase_condition ?? source.purchaseCondition),
+    criticality: normalizeHelpdeskCatalogItem(source.criticality),
+    operational_status: normalizeHelpdeskCatalogItem(source.operational_status ?? source.operationalStatus),
+    assigned_employee: normalizeHelpdeskAssetEmployee(source.assigned_employee ?? source.assignedEmployee),
+    responsible_employee: normalizeHelpdeskAssetEmployee(source.responsible_employee ?? source.responsibleEmployee),
+  };
+};
+
+const normalizeHelpdeskSummary = (input: unknown): HelpdeskAssetSummary => {
+  const source = asRecord(input);
+  if (!source) {
+    return {
+      assets: 0,
+      open_tickets: 0,
+      preventive_due: 0,
+      out_of_service: 0,
+    };
+  }
+
+  return {
+    assets: getNumber(source, ['assets']),
+    open_tickets: getNumber(source, ['open_tickets', 'openTickets']),
+    preventive_due: getNumber(source, ['preventive_due', 'preventiveDue']),
+    out_of_service: getNumber(source, ['out_of_service', 'outOfService']),
+  };
+};
+
+const normalizeHelpdeskDashboardMetrics = (input: unknown): HelpdeskDashboardMetrics => {
+  const source = asRecord(input) ?? {};
+  const tickets = asRecord(source.tickets) ?? {};
+  const maintenance = asRecord(source.maintenance) ?? {};
+
+  return {
+    tickets: {
+      total: getNumber(tickets, ['total']),
+      open: getNumber(tickets, ['open']),
+      critical: getNumber(tickets, ['critical']),
+      overdue: getNumber(tickets, ['overdue']),
+      solved: getNumber(tickets, ['solved']),
+      affects_results: getNumber(tickets, ['affects_results', 'affectsResults']),
+      risk_pending_release: getNumber(tickets, ['risk_pending_release', 'riskPendingRelease']),
+      avg_solution_hours: getNullableNumber(tickets, ['avg_solution_hours', 'avgSolutionHours']),
+      avg_downtime_hours: getNullableNumber(tickets, ['avg_downtime_hours', 'avgDowntimeHours']),
+    },
+    maintenance: {
+      scheduled: getNumber(maintenance, ['scheduled']),
+      in_progress: getNumber(maintenance, ['in_progress', 'inProgress']),
+      overdue: getNumber(maintenance, ['overdue']),
+      closed: getNumber(maintenance, ['closed']),
+      compliance_percent: getNumber(maintenance, ['compliance_percent', 'compliancePercent']),
+    },
+    availability: getArrayFromPayload(source.availability ?? [], ['availability']).map((item) => {
+      const record = asRecord(item) ?? {};
+      return {
+        code: getString(record, ['code']),
+        name: getString(record, ['name'], 'Sin estado'),
+        total: getNumber(record, ['total']),
+      };
+    }),
+    recurrences: getArrayFromPayload(source.recurrences ?? [], ['recurrences']).map((item) => {
+      const record = asRecord(item) ?? {};
+      return {
+        asset_id: getNumber(record, ['asset_id', 'assetId']),
+        asset_code: getString(record, ['asset_code', 'assetCode']),
+        asset_name: getString(record, ['asset_name', 'assetName']),
+        ticket_count: getNumber(record, ['ticket_count', 'ticketCount']),
+      };
+    }),
+    by_area: getArrayFromPayload(source.by_area ?? source.byArea ?? [], ['by_area', 'byArea']).map((item) => {
+      const record = asRecord(item) ?? {};
+      return {
+        area: getString(record, ['area'], 'Sin area'),
+        ticket_count: getNumber(record, ['ticket_count', 'ticketCount']),
+        maintenance_count: getNumber(record, ['maintenance_count', 'maintenanceCount']),
+      };
+    }),
+    audit_items: getArrayFromPayload(source.audit_items ?? source.auditItems ?? [], ['audit_items', 'auditItems']).map((item) => {
+      const record = asRecord(item) ?? {};
+      return {
+        kind: getString(record, ['kind']),
+        code: getString(record, ['code']),
+        asset_code: getString(record, ['asset_code', 'assetCode']) || null,
+        asset_name: getString(record, ['asset_name', 'assetName']) || null,
+        status: getString(record, ['status']),
+        risk_level: getString(record, ['risk_level', 'riskLevel']) || null,
+        event_at: getString(record, ['event_at', 'eventAt']),
+        owner: getString(record, ['owner']) || null,
+      };
+    }),
+  };
+};
+
+const normalizeHelpdeskCatalogs = (input: unknown): HelpdeskCatalogs => {
+  const source = asRecord(input) ?? {};
+  const pickCatalog = (key: string, fallbackKey?: string) =>
+    getArrayFromPayload(source[key] ?? (fallbackKey ? source[fallbackKey] : []), [key, fallbackKey ?? key])
+      .map(normalizeHelpdeskCatalogItem)
+      .filter((item): item is HelpdeskCatalogItem => item !== null);
+
+  return {
+    categories: pickCatalog('categories'),
+    units: pickCatalog('units'),
+    areas: pickCatalog('areas'),
+    locations: pickCatalog('locations'),
+    brands: pickCatalog('brands'),
+    purchase_modalities: pickCatalog('purchase_modalities', 'purchaseModalities'),
+    purchase_conditions: pickCatalog('purchase_conditions', 'purchaseConditions'),
+    criticalities: pickCatalog('criticalities'),
+    operational_statuses: pickCatalog('operational_statuses', 'operationalStatuses'),
+  };
+};
+
+const normalizeHelpdeskTicketStatus = (input: unknown): HelpdeskTicketStatus | null => {
+  const item = normalizeHelpdeskCatalogItem(input);
+  const source = asRecord(input);
+  if (!item || !source) {
+    return null;
+  }
+
+  return {
+    ...item,
+    is_closed: getBoolean(source, ['is_closed', 'isClosed'], false),
+  };
+};
+
+const normalizeHelpdeskTicketPriority = (input: unknown): HelpdeskTicketPriority | null => {
+  const item = normalizeHelpdeskCatalogItem(input);
+  const source = asRecord(input);
+  if (!item || !source) {
+    return null;
+  }
+
+  return {
+    ...item,
+    response_hours: getNullableNumber(source, ['response_hours', 'responseHours']),
+  };
+};
+
+const normalizeHelpdeskTicketCatalogs = (input: unknown): HelpdeskTicketCatalogs => {
+  const source = asRecord(input) ?? {};
+
+  return {
+    request_types: getArrayFromPayload(source.request_types ?? source.requestTypes ?? [], ['request_types', 'requestTypes'])
+      .map(normalizeHelpdeskCatalogItem)
+      .filter((item): item is HelpdeskCatalogItem => item !== null),
+    ticket_statuses: getArrayFromPayload(source.ticket_statuses ?? source.ticketStatuses ?? [], ['ticket_statuses', 'ticketStatuses'])
+      .map(normalizeHelpdeskTicketStatus)
+      .filter((item): item is HelpdeskTicketStatus => item !== null),
+    ticket_priorities: getArrayFromPayload(source.ticket_priorities ?? source.ticketPriorities ?? [], ['ticket_priorities', 'ticketPriorities'])
+      .map(normalizeHelpdeskTicketPriority)
+      .filter((item): item is HelpdeskTicketPriority => item !== null),
+  };
+};
+
+const normalizeHelpdeskTicketComment = (input: unknown): HelpdeskTicketComment | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const ticketId = getNumber(source, ['ticket_id', 'ticketId']);
+  const comment = getString(source, ['comment']);
+  if (!id || !ticketId || !comment) {
+    return null;
+  }
+
+  return {
+    id,
+    ticket_id: ticketId,
+    comment,
+    is_internal: getBoolean(source, ['is_internal', 'isInternal'], false),
+    created_by_user_id: getString(source, ['created_by_user_id', 'createdByUserId']) || null,
+    created_by_name: getString(source, ['created_by_name', 'createdByName']) || null,
+    created_at: getString(source, ['created_at', 'createdAt']),
+  };
+};
+
+const normalizeHelpdeskTicket = (input: unknown): HelpdeskTicket | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const ticketCode = getString(source, ['ticket_code', 'ticketCode']);
+  const title = getString(source, ['title']);
+  const description = getString(source, ['description']);
+  if (!id || !ticketCode || !title || !description) {
+    return null;
+  }
+
+  const assetRecord = asRecord(source.asset);
+
+  return {
+    id,
+    ticket_code: ticketCode,
+    asset_id: getNullableNumber(source, ['asset_id', 'assetId']),
+    request_type_id: getNullableNumber(source, ['request_type_id', 'requestTypeId']),
+    status_id: getNullableNumber(source, ['status_id', 'statusId']),
+    priority_id: getNullableNumber(source, ['priority_id', 'priorityId']),
+    requester_user_id: getString(source, ['requester_user_id', 'requesterUserId']) || null,
+    requester_employee_id: getNullableNumber(source, ['requester_employee_id', 'requesterEmployeeId']),
+    assigned_employee_id: getNullableNumber(source, ['assigned_employee_id', 'assignedEmployeeId']),
+    title,
+    description,
+    operational_impact: getString(source, ['operational_impact', 'operationalImpact']) || null,
+    affects_results: getBoolean(source, ['affects_results', 'affectsResults'], false),
+    reported_at: getString(source, ['reported_at', 'reportedAt']),
+    due_at: getString(source, ['due_at', 'dueAt']) || null,
+    solved_at: getString(source, ['solved_at', 'solvedAt']) || null,
+    solution_summary: getString(source, ['solution_summary', 'solutionSummary']) || null,
+    return_to_operation_at: getString(source, ['return_to_operation_at', 'returnToOperationAt']) || null,
+    validated_by_user_id: getString(source, ['validated_by_user_id', 'validatedByUserId']) || null,
+    validated_at: getString(source, ['validated_at', 'validatedAt']) || null,
+    downtime_minutes: getNullableNumber(source, ['downtime_minutes', 'downtimeMinutes']),
+    equipment_status_after_solution_id: getNullableNumber(
+      source,
+      ['equipment_status_after_solution_id', 'equipmentStatusAfterSolutionId'],
+    ),
+    risk_level: getString(source, ['risk_level', 'riskLevel'], 'NOT_EVALUATED'),
+    impact_evaluation: getString(source, ['impact_evaluation', 'impactEvaluation']) || null,
+    recent_analysis_usage: getString(source, ['recent_analysis_usage', 'recentAnalysisUsage']) || null,
+    alternate_equipment_used: getBoolean(source, ['alternate_equipment_used', 'alternateEquipmentUsed'], false),
+    alternate_equipment_notes: getString(source, ['alternate_equipment_notes', 'alternateEquipmentNotes']) || null,
+    corrective_action_required: getBoolean(source, ['corrective_action_required', 'correctiveActionRequired'], false),
+    corrective_action_notes: getString(source, ['corrective_action_notes', 'correctiveActionNotes']) || null,
+    impact_evaluated_by_user_id: getString(source, ['impact_evaluated_by_user_id', 'impactEvaluatedByUserId']) || null,
+    impact_evaluated_at: getString(source, ['impact_evaluated_at', 'impactEvaluatedAt']) || null,
+    technical_release_required: getBoolean(source, ['technical_release_required', 'technicalReleaseRequired'], false),
+    technical_release_summary: getString(source, ['technical_release_summary', 'technicalReleaseSummary']) || null,
+    technical_released_by_user_id: getString(source, ['technical_released_by_user_id', 'technicalReleasedByUserId']) || null,
+    technical_released_at: getString(source, ['technical_released_at', 'technicalReleasedAt']) || null,
+    quality_document_id: getString(source, ['quality_document_id', 'qualityDocumentId']) || null,
+    operational_lock: getBoolean(source, ['operational_lock', 'operationalLock'], false),
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    created_at: getString(source, ['created_at', 'createdAt']),
+    updated_at: getString(source, ['updated_at', 'updatedAt']),
+    asset: assetRecord
+      ? {
+          id: getNumber(assetRecord, ['id']),
+          asset_code: getString(assetRecord, ['asset_code', 'assetCode']),
+          name: getString(assetRecord, ['name']),
+          operational_status_name: getString(assetRecord, ['operational_status_name', 'operationalStatusName']) || null,
+        }
+      : null,
+    request_type: normalizeHelpdeskCatalogItem(source.request_type ?? source.requestType),
+    status: normalizeHelpdeskTicketStatus(source.status),
+    priority: normalizeHelpdeskTicketPriority(source.priority),
+    equipment_status_after_solution: normalizeHelpdeskCatalogItem(
+      source.equipment_status_after_solution ?? source.equipmentStatusAfterSolution,
+    ),
+    requester_employee: normalizeHelpdeskAssetEmployee(source.requester_employee ?? source.requesterEmployee),
+    assigned_employee: normalizeHelpdeskAssetEmployee(source.assigned_employee ?? source.assignedEmployee),
+    comments: getArrayFromPayload(source.comments ?? [], ['comments'])
+      .map(normalizeHelpdeskTicketComment)
+      .filter((comment): comment is HelpdeskTicketComment => comment !== null),
+  };
+};
+
+const normalizeMaintenanceFrequency = (input: unknown): HelpdeskMaintenanceFrequency | null => {
+  const item = normalizeHelpdeskCatalogItem(input);
+  const source = asRecord(input);
+  if (!item || !source) {
+    return null;
+  }
+
+  return {
+    ...item,
+    interval_months: getNumber(source, ['interval_months', 'intervalMonths']),
+  };
+};
+
+const normalizeMaintenanceCatalogs = (input: unknown): HelpdeskMaintenanceCatalogs => {
+  const source = asRecord(input) ?? {};
+  return {
+    frequencies: getArrayFromPayload(source.frequencies ?? [], ['frequencies'])
+      .map(normalizeMaintenanceFrequency)
+      .filter((item): item is HelpdeskMaintenanceFrequency => item !== null),
+  };
+};
+
+const normalizeMaintenanceTask = (input: unknown): HelpdeskMaintenancePlanTask | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const taskText = getString(source, ['task_text', 'taskText']);
+  if (!id || !taskText) {
+    return null;
+  }
+
+  return {
+    id,
+    task_text: taskText,
+    is_required: getBoolean(source, ['is_required', 'isRequired'], true),
+    sort_order: getNumber(source, ['sort_order', 'sortOrder'], 0),
+  };
+};
+
+const normalizeMaintenanceOrder = (input: unknown): HelpdeskMaintenanceOrder | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const orderCode = getString(source, ['order_code', 'orderCode']);
+  const scheduledFor = getString(source, ['scheduled_for', 'scheduledFor']);
+  if (!id || !orderCode || !scheduledFor) {
+    return null;
+  }
+
+  const planRecord = asRecord(source.plan);
+  const assetRecord = asRecord(source.asset);
+
+  return {
+    id,
+    order_code: orderCode,
+    plan_id: getNullableNumber(source, ['plan_id', 'planId']) ?? undefined,
+    asset_id: getNullableNumber(source, ['asset_id', 'assetId']) ?? undefined,
+    scheduled_for: scheduledFor,
+    window_starts_on: getString(source, ['window_starts_on', 'windowStartsOn']) || null,
+    window_ends_on: getString(source, ['window_ends_on', 'windowEndsOn']) || null,
+    status: getString(source, ['status'], 'SCHEDULED'),
+    started_at: getString(source, ['started_at', 'startedAt']) || null,
+    completed_at: getString(source, ['completed_at', 'completedAt']) || null,
+    completed_by_user_id: getString(source, ['completed_by_user_id', 'completedByUserId']) || null,
+    performed_activities: getString(source, ['performed_activities', 'performedActivities']) || null,
+    findings: getString(source, ['findings']) || null,
+    provider_name: getString(source, ['provider_name', 'providerName']) || null,
+    result: getString(source, ['result']) || null,
+    evidence_notes: getString(source, ['evidence_notes', 'evidenceNotes']) || null,
+    rescheduled_from: getString(source, ['rescheduled_from', 'rescheduledFrom']) || null,
+    rescheduled_at: getString(source, ['rescheduled_at', 'rescheduledAt']) || null,
+    reschedule_reason: getString(source, ['reschedule_reason', 'rescheduleReason']) || null,
+    plan: planRecord
+      ? {
+          id: getNumber(planRecord, ['id']),
+          plan_code: getString(planRecord, ['plan_code', 'planCode']),
+          title: getString(planRecord, ['title']),
+          frequency_id: getNullableNumber(planRecord, ['frequency_id', 'frequencyId']),
+          interval_months: getNullableNumber(planRecord, ['interval_months', 'intervalMonths']),
+          tolerance_before_days: getNumber(planRecord, ['tolerance_before_days', 'toleranceBeforeDays']),
+          tolerance_after_days: getNumber(planRecord, ['tolerance_after_days', 'toleranceAfterDays']),
+        }
+      : null,
+    asset: assetRecord
+      ? {
+          id: getNumber(assetRecord, ['id']),
+          asset_code: getString(assetRecord, ['asset_code', 'assetCode']),
+          name: getString(assetRecord, ['name']),
+          operational_status_name: getString(assetRecord, ['operational_status_name', 'operationalStatusName']) || null,
+        }
+      : null,
+    checklist: getArrayFromPayload(source.checklist ?? [], ['checklist'])
+      .map(normalizeMaintenanceOrderChecklist)
+      .filter((item): item is HelpdeskMaintenanceOrderChecklistItem => item !== null),
+  };
+};
+
+const normalizeMaintenanceOrderChecklist = (input: unknown): HelpdeskMaintenanceOrderChecklistItem | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const taskText = getString(source, ['task_text', 'taskText']);
+  if (!id || !taskText) {
+    return null;
+  }
+
+  return {
+    id,
+    plan_task_id: getNullableNumber(source, ['plan_task_id', 'planTaskId']),
+    task_text: taskText,
+    result: getString(source, ['result'], 'PENDING'),
+    notes: getString(source, ['notes']) || null,
+    sort_order: getNumber(source, ['sort_order', 'sortOrder'], 0),
+  };
+};
+
+const normalizeMaintenancePlan = (input: unknown): HelpdeskMaintenancePlan | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const planCode = getString(source, ['plan_code', 'planCode']);
+  const assetId = getNumber(source, ['asset_id', 'assetId']);
+  const title = getString(source, ['title']);
+  if (!id || !planCode || !assetId || !title) {
+    return null;
+  }
+
+  return {
+    id,
+    plan_code: planCode,
+    asset_id: assetId,
+    frequency_id: getNullableNumber(source, ['frequency_id', 'frequencyId']),
+    responsible_employee_id: getNullableNumber(source, ['responsible_employee_id', 'responsibleEmployeeId']),
+    quality_document_id: getString(source, ['quality_document_id', 'qualityDocumentId']) || null,
+    title,
+    description: getString(source, ['description']) || null,
+    provider_name: getString(source, ['provider_name', 'providerName']) || null,
+    starts_on: getString(source, ['starts_on', 'startsOn']),
+    next_due_on: getString(source, ['next_due_on', 'nextDueOn']),
+    tolerance_before_days: getNumber(source, ['tolerance_before_days', 'toleranceBeforeDays']),
+    tolerance_after_days: getNumber(source, ['tolerance_after_days', 'toleranceAfterDays']),
+    checklist_required: getBoolean(source, ['checklist_required', 'checklistRequired'], true),
+    evidence_required: getBoolean(source, ['evidence_required', 'evidenceRequired'], true),
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    created_at: getString(source, ['created_at', 'createdAt']),
+    updated_at: getString(source, ['updated_at', 'updatedAt']),
+    asset: asRecord(source.asset)
+      ? {
+          id: getNumber(asRecord(source.asset)!, ['id']),
+          asset_code: getString(asRecord(source.asset)!, ['asset_code', 'assetCode']),
+          name: getString(asRecord(source.asset)!, ['name']),
+          operational_status_name: getString(
+            asRecord(source.asset)!,
+            ['operational_status_name', 'operationalStatusName'],
+          ) || null,
+        }
+      : null,
+    frequency: normalizeMaintenanceFrequency(source.frequency),
+    responsible_employee: normalizeHelpdeskAssetEmployee(source.responsible_employee ?? source.responsibleEmployee),
+    quality_document: asRecord(source.quality_document ?? source.qualityDocument)
+      ? {
+          id: getString(asRecord(source.quality_document ?? source.qualityDocument)!, ['id']),
+          title: getString(asRecord(source.quality_document ?? source.qualityDocument)!, ['title']),
+          filename: getString(asRecord(source.quality_document ?? source.qualityDocument)!, ['filename']) || null,
+        }
+      : null,
+    tasks: getArrayFromPayload(source.tasks ?? [], ['tasks'])
+      .map(normalizeMaintenanceTask)
+      .filter((task): task is HelpdeskMaintenancePlanTask => task !== null),
+    orders: getArrayFromPayload(source.orders ?? [], ['orders'])
+      .map(normalizeMaintenanceOrder)
+      .filter((order): order is HelpdeskMaintenanceOrder => order !== null),
   };
 };
 
@@ -853,7 +1524,9 @@ const normalizeAuditLog = (input: unknown): AuditLog | null => {
     module_code:
       (() => {
         const moduleCode = getString(source, ['module_code', 'moduleCode']).toUpperCase();
-        return moduleCode === 'RH' || moduleCode === 'QUALITY' ? moduleCode : undefined;
+        return moduleCode === 'RH' || moduleCode === 'QUALITY' || moduleCode === 'HELPDESK'
+          ? moduleCode
+          : undefined;
       })(),
     full_name: getString(source, ['full_name', 'fullName', 'name'], 'Sin nombre'),
     email: getString(source, ['email'], 'sin-correo@local'),
@@ -1147,6 +1820,250 @@ export const updateEmployeeById = async (employeeId: number, payload: Partial<Em
 
 export const deleteEmployeeById = async (employeeId: number): Promise<void> => {
   await api.delete(`/employees/${employeeId}`);
+};
+
+export const getHelpdeskSummary = async (): Promise<HelpdeskAssetSummary> => {
+  const response = await api.get('/helpdesk/summary');
+  const payload = unwrapPayload(response.data);
+  return normalizeHelpdeskSummary(asRecord(payload)?.summary ?? payload);
+};
+
+export const getHelpdeskDashboard = async (): Promise<HelpdeskDashboardMetrics> => {
+  const response = await api.get('/helpdesk/dashboard');
+  const payload = unwrapPayload(response.data);
+  return normalizeHelpdeskDashboardMetrics(asRecord(payload)?.dashboard ?? payload);
+};
+
+export const listHelpdeskCatalogs = async (): Promise<HelpdeskCatalogs> => {
+  const response = await api.get('/helpdesk/catalogs');
+  const payload = asRecord(unwrapPayload(response.data));
+  return normalizeHelpdeskCatalogs(payload?.catalogs ?? payload);
+};
+
+export const listHelpdeskAssets = async (): Promise<HelpdeskAsset[]> => {
+  const response = await api.get('/helpdesk/assets');
+  return getArrayFromPayload(response.data, ['assets', 'items', 'results'])
+    .map(normalizeHelpdeskAsset)
+    .filter((asset): asset is HelpdeskAsset => asset !== null);
+};
+
+export const listMyHelpdeskAssets = async (): Promise<{ employee: Employee | null; assets: HelpdeskAsset[] }> => {
+  const response = await api.get('/helpdesk/me/assets');
+  const payload = asRecord(unwrapPayload(response.data));
+
+  return {
+    employee: normalizeEmployee(payload?.employee),
+    assets: getArrayFromPayload(payload?.assets ?? [], ['assets'])
+      .map(normalizeHelpdeskAsset)
+      .filter((asset): asset is HelpdeskAsset => asset !== null),
+  };
+};
+
+export const fetchHelpdeskAssetById = async (assetId: number): Promise<HelpdeskAsset | null> => {
+  const response = await api.get(`/helpdesk/assets/${assetId}`);
+  const payload = unwrapPayload(response.data);
+  return normalizeHelpdeskAsset(asRecord(payload)?.asset ?? payload);
+};
+
+export const createHelpdeskAsset = async (payload: HelpdeskAssetPayload): Promise<HelpdeskAsset> => {
+  const response = await api.post('/helpdesk/assets', payload);
+  const parsed = normalizeHelpdeskAsset(asRecord(unwrapPayload(response.data))?.asset ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar el activo creado');
+  }
+  return parsed;
+};
+
+export const updateHelpdeskAssetById = async (
+  assetId: number,
+  payload: HelpdeskAssetPayload,
+): Promise<HelpdeskAsset | null> => {
+  const response = await api.patch(`/helpdesk/assets/${assetId}`, payload);
+  return normalizeHelpdeskAsset(asRecord(unwrapPayload(response.data))?.asset ?? unwrapPayload(response.data));
+};
+
+export const deleteHelpdeskAssetById = async (assetId: number): Promise<void> => {
+  await api.delete(`/helpdesk/assets/${assetId}`);
+};
+
+export const listHelpdeskTicketCatalogs = async (): Promise<HelpdeskTicketCatalogs> => {
+  const response = await api.get('/helpdesk/ticket-catalogs');
+  const payload = asRecord(unwrapPayload(response.data));
+  return normalizeHelpdeskTicketCatalogs(payload?.catalogs ?? payload);
+};
+
+export const listHelpdeskTickets = async (): Promise<HelpdeskTicket[]> => {
+  const response = await api.get('/helpdesk/tickets');
+  return getArrayFromPayload(response.data, ['tickets', 'items', 'results'])
+    .map(normalizeHelpdeskTicket)
+    .filter((ticket): ticket is HelpdeskTicket => ticket !== null);
+};
+
+export const listMyHelpdeskTickets = async (): Promise<HelpdeskTicket[]> => {
+  const response = await api.get('/helpdesk/me/tickets');
+  return getArrayFromPayload(response.data, ['tickets', 'items', 'results'])
+    .map(normalizeHelpdeskTicket)
+    .filter((ticket): ticket is HelpdeskTicket => ticket !== null);
+};
+
+export const fetchMyHelpdeskTicketById = async (ticketId: number): Promise<HelpdeskTicket | null> => {
+  const response = await api.get(`/helpdesk/me/tickets/${ticketId}`);
+  const payload = unwrapPayload(response.data);
+  return normalizeHelpdeskTicket(asRecord(payload)?.ticket ?? payload);
+};
+
+export const fetchHelpdeskTicketById = async (ticketId: number): Promise<HelpdeskTicket | null> => {
+  const response = await api.get(`/helpdesk/tickets/${ticketId}`);
+  const payload = unwrapPayload(response.data);
+  return normalizeHelpdeskTicket(asRecord(payload)?.ticket ?? payload);
+};
+
+export const createHelpdeskTicket = async (payload: HelpdeskTicketPayload): Promise<HelpdeskTicket> => {
+  const response = await api.post('/helpdesk/tickets', payload);
+  const parsed = normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar la solicitud creada');
+  }
+  return parsed;
+};
+
+export const createMyHelpdeskTicket = async (payload: HelpdeskTicketPayload): Promise<HelpdeskTicket> => {
+  const response = await api.post('/helpdesk/me/tickets', payload);
+  const parsed = normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar la solicitud creada');
+  }
+  return parsed;
+};
+
+export const updateHelpdeskTicketById = async (
+  ticketId: number,
+  payload: HelpdeskTicketPayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.patch(`/helpdesk/tickets/${ticketId}`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const addHelpdeskTicketComment = async (
+  ticketId: number,
+  comment: string,
+  isInternal = false,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/comments`, {
+    comment,
+    is_internal: isInternal,
+  });
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const addMyHelpdeskTicketComment = async (
+  ticketId: number,
+  comment: string,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/me/tickets/${ticketId}/comments`, {
+    comment,
+    is_internal: false,
+  });
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const confirmMyHelpdeskTicketFunctionality = async (
+  ticketId: number,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/me/tickets/${ticketId}/confirm-functionality`);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const solveHelpdeskTicket = async (
+  ticketId: number,
+  payload: HelpdeskTicketSolutionPayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/solve`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const validateHelpdeskTicketReturn = async (
+  ticketId: number,
+  payload: HelpdeskTicketReturnPayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/validate-return`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const evaluateHelpdeskTicketIsoRisk = async (
+  ticketId: number,
+  payload: HelpdeskTicketIsoRiskPayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/iso-risk`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const releaseHelpdeskTicketTechnically = async (
+  ticketId: number,
+  payload: HelpdeskTicketTechnicalReleasePayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/technical-release`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const listMaintenanceCatalogs = async (): Promise<HelpdeskMaintenanceCatalogs> => {
+  const response = await api.get('/helpdesk/maintenance-catalogs');
+  const payload = asRecord(unwrapPayload(response.data));
+  return normalizeMaintenanceCatalogs(payload?.catalogs ?? payload);
+};
+
+export const listMaintenancePlans = async (): Promise<HelpdeskMaintenancePlan[]> => {
+  const response = await api.get('/helpdesk/maintenance/plans');
+  return getArrayFromPayload(response.data, ['plans', 'items', 'results'])
+    .map(normalizeMaintenancePlan)
+    .filter((plan): plan is HelpdeskMaintenancePlan => plan !== null);
+};
+
+export const listMaintenanceOrders = async (): Promise<HelpdeskMaintenanceOrder[]> => {
+  const response = await api.get('/helpdesk/maintenance/orders');
+  return getArrayFromPayload(response.data, ['orders', 'items', 'results'])
+    .map(normalizeMaintenanceOrder)
+    .filter((order): order is HelpdeskMaintenanceOrder => order !== null);
+};
+
+export const createMaintenancePlan = async (
+  payload: HelpdeskMaintenancePlanPayload,
+): Promise<HelpdeskMaintenancePlan> => {
+  const response = await api.post('/helpdesk/maintenance/plans', payload);
+  const parsed = normalizeMaintenancePlan(asRecord(unwrapPayload(response.data))?.plan ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar el plan de mantenimiento creado');
+  }
+  return parsed;
+};
+
+export const updateMaintenancePlanById = async (
+  planId: number,
+  payload: HelpdeskMaintenancePlanPayload,
+): Promise<HelpdeskMaintenancePlan | null> => {
+  const response = await api.patch(`/helpdesk/maintenance/plans/${planId}`, payload);
+  return normalizeMaintenancePlan(asRecord(unwrapPayload(response.data))?.plan ?? unwrapPayload(response.data));
+};
+
+export const startMaintenanceOrderById = async (orderId: number): Promise<HelpdeskMaintenanceOrder | null> => {
+  const response = await api.post(`/helpdesk/maintenance/orders/${orderId}/start`);
+  return normalizeMaintenanceOrder(asRecord(unwrapPayload(response.data))?.order ?? unwrapPayload(response.data));
+};
+
+export const rescheduleMaintenanceOrderById = async (
+  orderId: number,
+  payload: HelpdeskMaintenanceOrderReschedulePayload,
+): Promise<HelpdeskMaintenanceOrder | null> => {
+  const response = await api.post(`/helpdesk/maintenance/orders/${orderId}/reschedule`, payload);
+  return normalizeMaintenanceOrder(asRecord(unwrapPayload(response.data))?.order ?? unwrapPayload(response.data));
+};
+
+export const closeMaintenanceOrderById = async (
+  orderId: number,
+  payload: HelpdeskMaintenanceOrderClosePayload,
+): Promise<HelpdeskMaintenanceOrder | null> => {
+  const response = await api.post(`/helpdesk/maintenance/orders/${orderId}/close`, payload);
+  return normalizeMaintenanceOrder(asRecord(unwrapPayload(response.data))?.order ?? unwrapPayload(response.data));
 };
 
 export const listLinkableUsers = async (): Promise<LinkableUser[]> => {

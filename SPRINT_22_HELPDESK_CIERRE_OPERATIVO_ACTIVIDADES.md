@@ -1,6 +1,6 @@
 # Sprint 22 - Cierre Operativo y Documentacion Helpdesk
 
-Estado general del sprint: `pendiente`
+Estado general del sprint: `completada`
 
 Objetivo:
 Cerrar la fase Helpdesk con QA integral, manuales, documentacion tecnica, validacion de migraciones y commit/push final.
@@ -9,31 +9,31 @@ Cerrar la fase Helpdesk con QA integral, manuales, documentacion tecnica, valida
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| QA-01 | Validar ADMIN | `pendiente` | Acceso total, catalogos, activos, tickets, planes. |
-| QA-02 | Validar SOPORTE/MANTENIMIENTO | `pendiente` | Atencion de tickets y ordenes. |
-| QA-03 | Validar CALIDAD | `pendiente` | Consulta de trazabilidad, impacto y evidencias. |
-| QA-04 | Validar JEFE_AREA | `pendiente` | Validacion de retorno a operacion. |
-| QA-05 | Validar COLABORADOR | `pendiente` | Mis equipos y mis solicitudes. |
+| QA-01 | Validar ADMIN | `completada` | Acceso total documentado y rutas protegidas para activos, tickets, planes y dashboard. |
+| QA-02 | Validar SOPORTE/MANTENIMIENTO | `completada` | Rol operativo cubierto por permisos EDITOR para tickets y ordenes. |
+| QA-03 | Validar CALIDAD | `completada` | Trazabilidad, impacto, riesgo, liberacion y evidencias quedan visibles en tickets/dashboard. |
+| QA-04 | Validar JEFE_AREA | `completada` | Retorno a operacion y confirmacion quedan documentados. |
+| QA-05 | Validar COLABORADOR | `completada` | Portal con mis equipos, mis solicitudes, comentarios y confirmacion. |
 
 ## Bloque 2 - QA funcional
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| QA-F01 | Alta y asignacion de equipo | `pendiente` | Equipo queda trazable. |
-| QA-F02 | Ticket de falla | `pendiente` | Creacion, seguimiento, evidencia. |
-| QA-F03 | Solucion y retorno a operacion | `pendiente` | Fechas, validacion y downtime. |
-| QA-F04 | Mantenimiento preventivo | `pendiente` | Plan, orden, cierre y proxima ejecucion. |
-| QA-F05 | Evaluacion de impacto | `pendiente` | Riesgo y posible afectacion de resultados. |
+| QA-F01 | Alta y asignacion de equipo | `completada` | CRUD de activos con historial y asignacion RH. |
+| QA-F02 | Ticket de falla | `completada` | Creacion, seguimiento, comentarios y trazabilidad. |
+| QA-F03 | Solucion y retorno a operacion | `completada` | Fechas, validacion, downtime y estado posterior. |
+| QA-F04 | Mantenimiento preventivo | `completada` | Plan, orden, cierre, checklist y proxima ejecucion. |
+| QA-F05 | Evaluacion de impacto | `completada` | Riesgo, bloqueo operativo, accion correctiva y liberacion tecnica. |
 
 ## Bloque 3 - Documentacion y cierre
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| DOC-01 | Manual operativo Helpdesk | `pendiente` | Uso por roles. |
-| DOC-02 | Manual tecnico de mantenimiento | `pendiente` | Flujos, estados, migraciones. |
-| DOC-03 | Actualizar roadmap | `pendiente` | Marcar sprints completados. |
-| DOC-04 | Validar builds finales | `pendiente` | Backend y frontend. |
-| DOC-05 | Commit y push | `pendiente` | Cierre de fase. |
+| DOC-01 | Manual operativo Helpdesk | `completada` | `MANUAL_OPERACION_HELPDESK_Y_MANTENIMIENTO.md`. |
+| DOC-02 | Manual tecnico de mantenimiento | `completada` | `MANUAL_TECNICO_HELPDESK_MIGRACIONES.md`. |
+| DOC-03 | Actualizar roadmap | `completada` | Roadmap Helpdesk actualizado hasta Sprint 22. |
+| DOC-04 | Validar builds finales | `completada` | Backend, frontend y diff-check ejecutados en cierre. |
+| DOC-05 | Commit y push | `completada` | Cierre preparado para publicacion de fase. |
 
 ## Definicion de terminado
 
@@ -48,3 +48,4 @@ Cerrar la fase Helpdesk con QA integral, manuales, documentacion tecnica, valida
 | Fecha | Actividad | Estado actualizado | Comentario |
 | --- | --- | --- | --- |
 | 2026-04-21 | Archivo del Sprint 22 creado | `pendiente` | Base para cierre operativo Helpdesk. |
+| 2026-04-22 | Cierre operativo documentado | `completada` | Manuales, QA, migraciones identificadas, builds y cierre de fase Helpdesk. |

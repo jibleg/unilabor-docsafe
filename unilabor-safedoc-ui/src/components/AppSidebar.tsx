@@ -2,14 +2,18 @@ import { NavLink } from 'react-router-dom';
 import {
   AlertTriangle,
   Building2,
+  CalendarClock,
   ChevronLeft,
   FileText,
+  Laptop,
+  LifeBuoy,
   LayoutDashboard,
   LogOut,
   ShieldCheck,
   Tags,
   UserCircle2,
   Users,
+  Wrench,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
@@ -56,7 +60,17 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },
           { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
         ]
-      : [
+      : moduleCode === 'HELPDESK'
+        ? [
+            { icon: LayoutDashboard, label: 'Dashboard', path: '/helpdesk/dashboard' },
+            { icon: UserCircle2, label: 'Mi portal', path: '/helpdesk/my-portal' },
+            { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', roles: ['ADMIN', 'EDITOR'] },
+            { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets', roles: ['ADMIN', 'EDITOR'] },
+            { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
+            { icon: Wrench, label: 'Catalogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
+            { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
+          ]
+        : [
           { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
           { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
           { icon: FileText, label: 'Documentos', path: '/quality/documents' },
@@ -84,7 +98,11 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
             <div>
               <h2 className="text-base font-bold tracking-tight text-[var(--color-brand-700)]">SafeDoc</h2>
               <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--unilabor-neutral)]">
-                {moduleCode === 'RH' ? 'Unilabor RH' : 'Unilabor Calidad'}
+                {moduleCode === 'RH'
+                  ? 'Unilabor RH'
+                  : moduleCode === 'HELPDESK'
+                    ? 'Unilabor Helpdesk'
+                    : 'Unilabor Calidad'}
               </p>
             </div>
           </div>

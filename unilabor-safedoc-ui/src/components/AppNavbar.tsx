@@ -3,14 +3,18 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
   Building2,
+  CalendarClock,
   FileText,
   LayoutDashboard,
+  Laptop,
+  LifeBuoy,
   LogOut,
   Menu,
   ShieldCheck,
   Tags,
   UserCircle2,
   Users,
+  Wrench,
   X,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -55,7 +59,16 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
             { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },
             { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
           ]
-        : [
+        : moduleCode === 'HELPDESK'
+          ? [
+              { icon: LayoutDashboard, label: 'Dashboard', path: '/helpdesk/dashboard' },
+              { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', roles: ['ADMIN', 'EDITOR'] },
+              { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets' },
+              { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
+              { icon: Wrench, label: 'Catalogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
+              { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
+            ]
+          : [
             { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
             { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
             { icon: FileText, label: 'Documentos', path: '/quality/documents' },
@@ -78,7 +91,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
     <header className="sticky top-0 z-40 border-b border-[rgba(0,65,106,0.08)] bg-white/90 backdrop-blur-xl lg:hidden">
       <div className="navbar px-4">
         <div className="navbar-start">
-          <NavLink to={moduleCode === 'RH' ? '/rh' : '/quality/dashboard'} className="btn btn-ghost px-2 normal-case">
+          <NavLink to={moduleCode === 'RH' ? '/rh' : moduleCode === 'HELPDESK' ? '/helpdesk/dashboard' : '/quality/dashboard'} className="btn btn-ghost px-2 normal-case">
             <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-1 shadow-[0_8px_18px_rgba(0,65,106,0.08)] sm:h-10 sm:w-10">
               <img
                 src={unilaborIcon}
@@ -87,7 +100,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
               />
             </span>
             <span className="ml-2 text-base font-bold tracking-tight text-[var(--color-brand-700)]">
-              {moduleCode === 'RH' ? 'SafeDoc RH' : 'SafeDoc'}
+              {moduleCode === 'RH' ? 'SafeDoc RH' : moduleCode === 'HELPDESK' ? 'SafeDoc Helpdesk' : 'SafeDoc'}
             </span>
           </NavLink>
         </div>

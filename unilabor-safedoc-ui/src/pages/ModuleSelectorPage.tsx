@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, FlaskConical } from 'lucide-react';
+import { ArrowRight, Building2, FlaskConical, LifeBuoy } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import type { ModuleAccess, ModuleCode } from '../types/models';
@@ -21,6 +21,11 @@ const moduleVisuals: Record<
     icon: Building2,
     eyebrow: 'Modulo RH',
     description: 'Expediente digital del colaborador, seguimiento documental y gestion de personal.',
+  },
+  HELPDESK: {
+    icon: LifeBuoy,
+    eyebrow: 'Modulo Helpdesk',
+    description: 'Mesa de ayuda, activos, tickets y mantenimiento de equipos del laboratorio.',
   },
 };
 

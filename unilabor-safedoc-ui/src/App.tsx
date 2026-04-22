@@ -5,6 +5,7 @@ import { ModuleGuard } from './components/ModuleGuard';
 import { RoleGate } from './components/RoleGate';
 import { QualityLayout } from './layouts/QualityLayout';
 import { RhLayout } from './layouts/RhLayout';
+import { HelpdeskLayout } from './layouts/HelpdeskLayout';
 import { AuditPage } from './pages/AuditPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { ChangePasswordPage } from './pages/ChangePassword';
@@ -13,7 +14,13 @@ import { DocumentSectionsPage } from './pages/DocumentSectionsPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { DocumentTypesPage } from './pages/DocumentTypesPage';
 import { EmployeeExpedientPage } from './pages/EmployeeExpedientPage';
+import { HelpdeskAssetsPage } from './pages/HelpdeskAssetsPage';
 import { ForgotPasswordPage } from './pages/ForgotPassword';
+import { HelpdeskDashboardPage } from './pages/HelpdeskDashboardPage';
+import { HelpdeskMaintenancePage } from './pages/HelpdeskMaintenancePage';
+import { HelpdeskMyPortalPage } from './pages/HelpdeskMyPortalPage';
+import { HelpdeskPlaceholderPage } from './pages/HelpdeskPlaceholderPage';
+import { HelpdeskTicketsPage } from './pages/HelpdeskTicketsPage';
 import { LoginPage } from './pages/Login';
 import { ModuleSelectorPage } from './pages/ModuleSelectorPage';
 import { MyExpedientPage } from './pages/MyExpedientPage';
@@ -145,6 +152,31 @@ function App() {
             </RoleGate>
           }
         />
+        <Route path="profile" element={<ProfilePage />} />
+      </Route>
+
+      <Route
+        path="/helpdesk"
+        element={
+          <ModuleGuard moduleCode="HELPDESK">
+            <HelpdeskLayout />
+          </ModuleGuard>
+        }
+      >
+        <Route index element={<Navigate to="/helpdesk/dashboard" replace />} />
+        <Route path="dashboard" element={<HelpdeskDashboardPage />} />
+        <Route path="my-portal" element={<HelpdeskMyPortalPage />} />
+        <Route path="assets" element={<HelpdeskAssetsPage />} />
+        <Route
+          path="tickets"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskTicketsPage />
+            </RoleGate>
+          }
+        />
+        <Route path="maintenance" element={<HelpdeskMaintenancePage />} />
+        <Route path="catalogs" element={<HelpdeskPlaceholderPage title="Catalogos" />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

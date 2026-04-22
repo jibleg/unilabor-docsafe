@@ -1,6 +1,6 @@
 # Roadmap - Modulo Mesa de Ayuda, Activos y Mantenimiento
 
-Estado general del modulo: `planeado`
+Estado general del modulo: `completada`
 
 Objetivo general:
 Construir un modulo `HELPDESK` para mesa de ayuda operativa, gestion tecnica de activos del laboratorio, mantenimiento preventivo/correctivo, trazabilidad, retorno a operacion y soporte al cumplimiento ISO 15189:2022.
@@ -88,16 +88,16 @@ Regla central:
 
 | Sprint | Nombre | Objetivo principal | Estado |
 | --- | --- | --- | --- |
-| 13 | Arquitectura del modulo HELP DESK | Habilitar modulo, permisos, rutas y catalogos base | `pendiente` |
-| 14 | Gestion tecnica de activos | Crear inventario tecnico y asignacion de equipos | `pendiente` |
-| 15 | Mesa de ayuda operativa | Crear y gestionar tickets de soporte/falla/reparacion | `pendiente` |
-| 16 | Solucion y retorno a operacion | Registrar solucion, validacion y disponibilidad del equipo | `pendiente` |
-| 17 | Planes de mantenimiento preventivo | Crear planes, frecuencias, calendario y alertas | `pendiente` |
-| 18 | Ejecucion de mantenimiento | Ejecutar ordenes, checklist, evidencias y cierre | `pendiente` |
-| 19 | Cumplimiento ISO y evaluacion de riesgo | Evaluar impacto, liberar equipo y vincular procedimientos | `pendiente` |
-| 20 | Dashboards, KPIs y reportes | Dar seguimiento operativo y reportes auditables | `pendiente` |
-| 21 | Portal del colaborador para mesa de ayuda | Mostrar mis equipos y mis solicitudes | `pendiente` |
-| 22 | Cierre operativo y documentacion | QA, manuales, migraciones finales y commit/push | `pendiente` |
+| 13 | Arquitectura del modulo HELP DESK | Habilitar modulo, permisos, rutas y catalogos base | `completada` |
+| 14 | Gestion tecnica de activos | Crear inventario tecnico y asignacion de equipos | `completada` |
+| 15 | Mesa de ayuda operativa | Crear y gestionar tickets de soporte/falla/reparacion | `completada` |
+| 16 | Solucion y retorno a operacion | Registrar solucion, validacion y disponibilidad del equipo | `completada` |
+| 17 | Planes de mantenimiento preventivo | Crear planes, frecuencias, calendario y alertas | `completada` |
+| 18 | Ejecucion de mantenimiento | Ejecutar ordenes, checklist, evidencias y cierre | `completada` |
+| 19 | Cumplimiento ISO y evaluacion de riesgo | Evaluar impacto, liberar equipo y vincular procedimientos | `completada` |
+| 20 | Dashboards, KPIs y reportes | Dar seguimiento operativo y reportes auditables | `completada` |
+| 21 | Portal del colaborador para mesa de ayuda | Mostrar mis equipos y mis solicitudes | `completada` |
+| 22 | Cierre operativo y documentacion | QA, manuales, migraciones finales y commit/push | `completada` |
 
 ## Lineas de accion por sprint
 
@@ -227,3 +227,13 @@ Regla central:
 | Fecha | Hito | Estado | Comentario |
 | --- | --- | --- | --- |
 | 2026-04-21 | Se define roadmap del modulo HELPDESK | `completada` | Se documenta alcance, integracion con RH/QUALITY y sprints 13 a 22. |
+| 2026-04-21 | Sprint 13 implementado | `completada` | Modulo, permisos, rutas, dashboard y catalogos base quedaron disponibles. |
+| 2026-04-21 | Sprint 14 implementado | `completada` | Inventario tecnico normalizado, CRUD de activos, asignacion RH y migracion local aplicada. |
+| 2026-04-21 | Sprint 15 implementado | `completada` | Mesa de ayuda operativa con tickets, estados, prioridades, comentarios y trazabilidad. |
+| 2026-04-22 | Sprint 16 implementado | `completada` | Solucion tecnica, retorno a operacion, downtime, validacion y estado posterior del activo. |
+| 2026-04-22 | Sprint 17 implementado | `completada` | Planes preventivos con frecuencia, calendario operativo, checklist, responsable y orden inicial. |
+| 2026-04-22 | Sprint 18 implementado | `completada` | Ejecucion de ordenes con inicio, reprogramacion justificada, cierre, resultado y checklist ejecutado. |
+| 2026-04-22 | Sprint 19 implementado | `completada` | Evaluacion ISO/riesgo en tickets con impacto, bloqueo operativo, accion correctiva y liberacion tecnica. |
+| 2026-04-22 | Sprint 20 implementado | `completada` | Dashboard con KPIs de tickets, mantenimiento, disponibilidad, reincidencias, areas y trazabilidad auditable. |
+| 2026-04-22 | Sprint 21 implementado | `completada` | Portal del colaborador con equipos propios, solicitudes propias, comentarios y confirmacion de funcionamiento. |
+| 2026-04-22 | Sprint 22 implementado | `completada` | Cierre operativo con QA por roles, manuales, migraciones identificadas y validacion final de builds. |

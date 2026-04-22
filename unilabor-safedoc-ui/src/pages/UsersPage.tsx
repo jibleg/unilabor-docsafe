@@ -66,6 +66,15 @@ const FALLBACK_MODULE_OPTIONS: ModuleAccess[] = [
     is_active: true,
     sort_order: 20,
   },
+  {
+    code: 'HELPDESK',
+    name: 'Mesa de Ayuda',
+    description: 'Gestion de activos, tickets y mantenimiento',
+    icon: 'life-buoy',
+    role: 'ADMIN',
+    is_active: true,
+    sort_order: 30,
+  },
 ];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -954,7 +963,7 @@ export const UsersPage = () => {
                   Modulos habilitados
                 </p>
                 <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
-                  Desde aqui ya puedes activar o retirar acceso a `QUALITY` y `RH` sin tocar la base manualmente.
+                  Desde aqui ya puedes activar o retirar acceso a `QUALITY`, `RH` y `HELPDESK` sin tocar la base manualmente.
                 </p>
 
                 {loadingModules ? (

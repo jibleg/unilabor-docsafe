@@ -12,7 +12,7 @@ export interface AuthRequest extends Request {
   user?: JWTPayload;
 }
 
-type ModuleCode = 'QUALITY' | 'RH';
+type ModuleCode = 'QUALITY' | 'RH' | 'HELPDESK';
 
 export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;

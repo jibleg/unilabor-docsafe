@@ -9,7 +9,7 @@ import * as categoryService from '../services/category.service';
 import { AuthRequest, ModuleCode, UserRole } from '../types';
 
 const allowedRoles: UserRole[] = ['ADMIN', 'EDITOR', 'VIEWER'];
-const allowedModuleCodes: ModuleCode[] = ['QUALITY', 'RH'];
+const allowedModuleCodes: ModuleCode[] = ['QUALITY', 'RH', 'HELPDESK'];
 
 const getStringValue = (value: unknown): string | null => {
   if (typeof value === 'string') {

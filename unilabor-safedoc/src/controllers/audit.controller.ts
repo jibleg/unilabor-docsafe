@@ -14,7 +14,7 @@ const parsePositiveInt = (value: unknown): number | null => {
 
 const resolveRequestedModule = (value: unknown): ModuleCode | undefined => {
   const normalized = typeof value === 'string' ? value.trim().toUpperCase() : '';
-  if (normalized === 'QUALITY' || normalized === 'RH') {
+  if (normalized === 'QUALITY' || normalized === 'RH' || normalized === 'HELPDESK') {
     return normalized;
   }
 

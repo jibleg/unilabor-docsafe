@@ -23,6 +23,7 @@ const featureCards = [
 const moduleHighlights = [
   ['CALIDAD', 'Control documental institucional y trazabilidad de calidad.'],
   ['RH', 'Expediente digital del colaborador y gestion documental de personal.'],
+  ['HELPDESK', 'Mesa de ayuda, activos y mantenimiento de equipos.'],
 ] as const;
 
 export const LoginPage = () => {

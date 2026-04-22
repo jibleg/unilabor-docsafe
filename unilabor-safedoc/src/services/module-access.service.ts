@@ -10,7 +10,11 @@ type Queryable = {
 
 const normalizeModuleCode = (value: unknown): ModuleCode => {
   const normalizedValue = String(value ?? '').trim().toUpperCase();
-  return normalizedValue === 'RH' ? 'RH' : 'QUALITY';
+  if (normalizedValue === 'RH' || normalizedValue === 'HELPDESK') {
+    return normalizedValue;
+  }
+
+  return 'QUALITY';
 };
 
 const normalizeUserRole = (value: unknown): UserRole => {
@@ -148,7 +152,9 @@ export const syncUserModuleAccess = async (
     new Set(
       moduleCodes
         .map((moduleCode) => normalizeModuleCode(moduleCode))
-        .filter((moduleCode): moduleCode is ModuleCode => moduleCode === 'QUALITY' || moduleCode === 'RH'),
+        .filter((moduleCode): moduleCode is ModuleCode =>
+          moduleCode === 'QUALITY' || moduleCode === 'RH' || moduleCode === 'HELPDESK',
+        ),
     ),
   );
 

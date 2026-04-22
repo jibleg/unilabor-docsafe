@@ -1,6 +1,6 @@
 # Sprint 19 - Cumplimiento ISO y Evaluacion de Riesgo
 
-Estado general del sprint: `pendiente`
+Estado general del sprint: `completada`
 
 Objetivo:
 Fortalecer el modulo para cumplimiento ISO 15189:2022 mediante evaluacion de impacto, gestion de riesgo, liberacion tecnica y trazabilidad auditable.
@@ -9,27 +9,27 @@ Fortalecer el modulo para cumplimiento ISO 15189:2022 mediante evaluacion de imp
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| ISO-01 | Registrar si falla afecta resultados | `pendiente` | Pregunta obligatoria para equipos criticos. |
-| ISO-02 | Registrar uso en analisis recientes | `pendiente` | Base para investigar impacto. |
-| ISO-03 | Registrar uso de equipo alterno | `pendiente` | Continuidad operativa. |
-| ISO-04 | Registrar necesidad de accion correctiva | `pendiente` | Posible integracion futura con Calidad. |
-| ISO-05 | Registrar responsable de evaluacion | `pendiente` | Calidad o jefe de area. |
+| ISO-01 | Registrar si falla afecta resultados | `completada` | Campo existente reforzado con evaluacion ISO/riesgo. |
+| ISO-02 | Registrar uso en analisis recientes | `completada` | Campo de uso reciente o lotes potencialmente afectados. |
+| ISO-03 | Registrar uso de equipo alterno | `completada` | Continuidad operativa documentada. |
+| ISO-04 | Registrar necesidad de accion correctiva | `completada` | Bandera y notas para futura integracion con Calidad. |
+| ISO-05 | Registrar responsable de evaluacion | `completada` | Usuario evaluador y fecha quedan trazados. |
 
 ## Bloque 2 - Control operativo
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| BE-01 | Senalizar equipo fuera de servicio | `pendiente` | Estado visible y auditable. |
-| BE-02 | Bloquear uso operativo cuando aplique | `pendiente` | Evita retorno sin validacion. |
-| BE-03 | Liberacion tecnica documentada | `pendiente` | Antes de retorno a operacion. |
-| BE-04 | Vincular procedimientos QUALITY | `pendiente` | Procedimiento de verificacion/mantenimiento. |
+| BE-01 | Senalizar equipo fuera de servicio | `completada` | Evaluacion de riesgo puede bloquear activo como fuera de servicio. |
+| BE-02 | Bloquear uso operativo cuando aplique | `completada` | Retorno a operacion exige liberacion cuando hay riesgo/impacto. |
+| BE-03 | Liberacion tecnica documentada | `completada` | Resumen, usuario y fecha de liberacion tecnica. |
+| BE-04 | Vincular procedimientos QUALITY | `completada` | Campo de documento controlado preparado para QUALITY. |
 
 ## Bloque 3 - Auditoria
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| AUD-01 | Vista de auditoria por equipo | `pendiente` | Tickets, mantenimiento, cambios y validaciones. |
-| AUD-02 | Reporte de impacto por falla | `pendiente` | Evidencia para auditoria ISO. |
+| AUD-01 | Vista de auditoria por equipo | `completada` | Historial del ticket y cambios de estado del activo quedan trazados. |
+| AUD-02 | Reporte de impacto por falla | `completada` | Detalle del ticket muestra evaluacion, bloqueo, liberacion y retorno. |
 
 ## Definicion de terminado
 
@@ -43,3 +43,4 @@ Fortalecer el modulo para cumplimiento ISO 15189:2022 mediante evaluacion de imp
 | Fecha | Actividad | Estado actualizado | Comentario |
 | --- | --- | --- | --- |
 | 2026-04-21 | Archivo del Sprint 19 creado | `pendiente` | Base para cumplimiento ISO y riesgo. |
+| 2026-04-22 | Evaluacion ISO/riesgo implementada | `completada` | Tickets con impacto, riesgo, accion correctiva, bloqueo operativo y liberacion tecnica. |

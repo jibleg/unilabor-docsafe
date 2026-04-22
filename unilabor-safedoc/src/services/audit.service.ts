@@ -72,6 +72,10 @@ const inferModuleCode = (action: string, documentId: number | null): ModuleCode 
     return 'RH';
   }
 
+  if (action.startsWith('HELPDESK_')) {
+    return 'HELPDESK';
+  }
+
   if (documentId) {
     return 'QUALITY';
   }
