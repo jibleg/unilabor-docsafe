@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { RhHomeRedirect } from './components/RhHomeRedirect';
 import { ToastContainer, Zoom } from 'react-toastify';
@@ -6,35 +7,85 @@ import { RoleGate } from './components/RoleGate';
 import { QualityLayout } from './layouts/QualityLayout';
 import { RhLayout } from './layouts/RhLayout';
 import { HelpdeskLayout } from './layouts/HelpdeskLayout';
-import { AuditPage } from './pages/AuditPage';
-import { CategoriesPage } from './pages/CategoriesPage';
-import { ChangePasswordPage } from './pages/ChangePassword';
-import { DashboardHome } from './pages/DashboardHome';
-import { DocumentSectionsPage } from './pages/DocumentSectionsPage';
-import { DocumentsPage } from './pages/DocumentsPage';
-import { DocumentTypesPage } from './pages/DocumentTypesPage';
-import { EmployeeExpedientPage } from './pages/EmployeeExpedientPage';
-import { HelpdeskAssetsPage } from './pages/HelpdeskAssetsPage';
-import { ForgotPasswordPage } from './pages/ForgotPassword';
-import { HelpdeskDashboardPage } from './pages/HelpdeskDashboardPage';
-import { HelpdeskMaintenancePage } from './pages/HelpdeskMaintenancePage';
-import { HelpdeskMyPortalPage } from './pages/HelpdeskMyPortalPage';
-import { HelpdeskPlaceholderPage } from './pages/HelpdeskPlaceholderPage';
-import { HelpdeskTicketsPage } from './pages/HelpdeskTicketsPage';
-import { LoginPage } from './pages/Login';
-import { ModuleSelectorPage } from './pages/ModuleSelectorPage';
-import { MyExpedientPage } from './pages/MyExpedientPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { RhAlertsPage } from './pages/RhAlertsPage';
-import { RhAuditPage } from './pages/RhAuditPage';
-import { RhDashboardPage } from './pages/RhDashboardPage';
-import { RhEmployeesPage } from './pages/RhEmployeesPage';
-import { UsersPage } from './pages/UsersPage';
 import 'react-toastify/dist/ReactToastify.css';
+
+const AuditPage = lazy(() => import('./pages/AuditPage').then((module) => ({ default: module.AuditPage })));
+const CategoriesPage = lazy(() =>
+  import('./pages/CategoriesPage').then((module) => ({ default: module.CategoriesPage })),
+);
+const ChangePasswordPage = lazy(() =>
+  import('./pages/ChangePassword').then((module) => ({ default: module.ChangePasswordPage })),
+);
+const DashboardHome = lazy(() =>
+  import('./pages/DashboardHome').then((module) => ({ default: module.DashboardHome })),
+);
+const DocumentSectionsPage = lazy(() =>
+  import('./pages/DocumentSectionsPage').then((module) => ({ default: module.DocumentSectionsPage })),
+);
+const DocumentsPage = lazy(() =>
+  import('./pages/DocumentsPage').then((module) => ({ default: module.DocumentsPage })),
+);
+const DocumentTypesPage = lazy(() =>
+  import('./pages/DocumentTypesPage').then((module) => ({ default: module.DocumentTypesPage })),
+);
+const EmployeeExpedientPage = lazy(() =>
+  import('./pages/EmployeeExpedientPage').then((module) => ({ default: module.EmployeeExpedientPage })),
+);
+const ForgotPasswordPage = lazy(() =>
+  import('./pages/ForgotPassword').then((module) => ({ default: module.ForgotPasswordPage })),
+);
+const HelpdeskAssetsPage = lazy(() =>
+  import('./pages/HelpdeskAssetsPage').then((module) => ({ default: module.HelpdeskAssetsPage })),
+);
+const HelpdeskDashboardPage = lazy(() =>
+  import('./pages/HelpdeskDashboardPage').then((module) => ({ default: module.HelpdeskDashboardPage })),
+);
+const HelpdeskMaintenancePage = lazy(() =>
+  import('./pages/HelpdeskMaintenancePage').then((module) => ({ default: module.HelpdeskMaintenancePage })),
+);
+const HelpdeskMyPortalPage = lazy(() =>
+  import('./pages/HelpdeskMyPortalPage').then((module) => ({ default: module.HelpdeskMyPortalPage })),
+);
+const HelpdeskPlaceholderPage = lazy(() =>
+  import('./pages/HelpdeskPlaceholderPage').then((module) => ({ default: module.HelpdeskPlaceholderPage })),
+);
+const HelpdeskTicketsPage = lazy(() =>
+  import('./pages/HelpdeskTicketsPage').then((module) => ({ default: module.HelpdeskTicketsPage })),
+);
+const LoginPage = lazy(() => import('./pages/Login').then((module) => ({ default: module.LoginPage })));
+const ModuleSelectorPage = lazy(() =>
+  import('./pages/ModuleSelectorPage').then((module) => ({ default: module.ModuleSelectorPage })),
+);
+const MyExpedientPage = lazy(() =>
+  import('./pages/MyExpedientPage').then((module) => ({ default: module.MyExpedientPage })),
+);
+const ProfilePage = lazy(() =>
+  import('./pages/ProfilePage').then((module) => ({ default: module.ProfilePage })),
+);
+const RhAlertsPage = lazy(() =>
+  import('./pages/RhAlertsPage').then((module) => ({ default: module.RhAlertsPage })),
+);
+const RhAuditPage = lazy(() =>
+  import('./pages/RhAuditPage').then((module) => ({ default: module.RhAuditPage })),
+);
+const RhDashboardPage = lazy(() =>
+  import('./pages/RhDashboardPage').then((module) => ({ default: module.RhDashboardPage })),
+);
+const RhEmployeesPage = lazy(() =>
+  import('./pages/RhEmployeesPage').then((module) => ({ default: module.RhEmployeesPage })),
+);
+const UsersPage = lazy(() => import('./pages/UsersPage').then((module) => ({ default: module.UsersPage })));
+
+const RouteFallback = () => (
+  <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-600">
+    Cargando modulo...
+  </div>
+);
 
 function App() {
   return (
   <BrowserRouter>
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -189,6 +240,7 @@ function App() {
 
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
+    </Suspense>
     <ToastContainer
       position="top-center"
       autoClose={5000}

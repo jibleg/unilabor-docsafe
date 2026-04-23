@@ -6,19 +6,8 @@ import { FormFieldError } from '../components/FormFieldError';
 import { useNativeFormValidation } from '../hooks/useNativeFormValidation';
 import { useAuthStore } from '../store/useAuthStore';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
-import loginPageBackground from '../assets/login-page-v1.png';
+import loginPageBackground from '../assets/login-page-v1-optimized.jpg';
 import { getModuleHomePath } from '../utils/modules';
-
-const featureCards = [
-  {
-    title: 'Versionado controlado',
-    text: 'Manten historial, vigencia, cambios y responsables por cada documento.',
-  },
-  {
-    title: 'Cumplimiento normativo',
-    text: 'Ideal para laboratorios, calidad, TI y procesos regulados.',
-  },
-] as const;
 
 const moduleHighlights = [
   ['CALIDAD', 'Control documental institucional y trazabilidad de calidad.'],
