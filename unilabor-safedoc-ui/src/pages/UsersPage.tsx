@@ -51,7 +51,7 @@ const FALLBACK_MODULE_OPTIONS: ModuleAccess[] = [
   {
     code: 'QUALITY',
     name: 'Documentos de Calidad',
-    description: 'Gestion documental institucional',
+    description: 'Gestión documental institucional',
     icon: 'shield-check',
     role: 'ADMIN',
     is_active: true,
@@ -69,7 +69,7 @@ const FALLBACK_MODULE_OPTIONS: ModuleAccess[] = [
   {
     code: 'HELPDESK',
     name: 'Mesa de Ayuda',
-    description: 'Gestion de activos, tickets y mantenimiento',
+    description: 'Gestión de activos, tickets y mantenimiento',
     icon: 'life-buoy',
     role: 'ADMIN',
     is_active: true,

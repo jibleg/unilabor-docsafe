@@ -11,7 +11,7 @@ import { getModuleHomePath } from '../utils/modules';
 
 const moduleHighlights = [
   ['CALIDAD', 'Control documental institucional y trazabilidad de calidad.'],
-  ['RH', 'Expediente digital del colaborador y gestion documental de personal.'],
+  ['RH', 'Expediente digital del colaborador y gestión documental de personal.'],
   ['HELPDESK', 'Mesa de ayuda, activos y mantenimiento de equipos.'],
 ] as const;
 
@@ -103,7 +103,7 @@ export const LoginPage = () => {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">ISO 15189:2022</p>
-                <h1 className="text-xl font-semibold text-[var(--color-brand-700)]">Gestion Documental</h1>
+                <h1 className="text-xl font-semibold text-[var(--color-brand-700)]">Gestión Documental</h1>
               </div>
             </div>
 
@@ -124,7 +124,7 @@ export const LoginPage = () => {
                   className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/78 p-5 backdrop-blur-md shadow-lg shadow-[rgba(0,65,106,0.06)]"
                 >
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--color-brand-500)]">
-                    Modulo
+                    Módulo
                   </p>
                   <h3 className="mt-2 text-lg font-bold text-[var(--color-brand-700)]">{title}</h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--unilabor-neutral)]">{text}</p>
@@ -152,7 +152,7 @@ export const LoginPage = () => {
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">UNILABOR</p>
-                <h1 className="text-lg font-semibold text-[var(--color-brand-700)]">Gestion Documental</h1>
+                <h1 className="text-lg font-semibold text-[var(--color-brand-700)]">Gestión Documental</h1>
               </div>
             </div>
           </div>
@@ -162,9 +162,9 @@ export const LoginPage = () => {
             <div className="p-8 sm:p-9">
               <div>
                 <p className="text-sm uppercase tracking-[0.30em] text-[var(--color-brand-300)]">Bienvenido</p>
-                <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--color-brand-700)]">Iniciar sesion</h2>
+                <h2 className="mt-3 text-3xl font-bold tracking-tight text-[var(--color-brand-700)]">Iniciar sesión</h2>
                 <p className="mt-3 text-sm leading-6 text-[var(--unilabor-neutral)]">
-                  Accede al portal centralizado para administrar documentos, politicas, procedimientos y registros de calidad.
+                  Accede al portal centralizado para administrar documentos, políticas, procedimientos y registros de calidad.
                 </p>
               </div>
 
@@ -203,9 +203,9 @@ export const LoginPage = () => {
                       autoComplete="email"
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
-                      placeholder="usuario@unilabor.com"
-                      data-value-missing="Ingresa tu correo institucional."
-                      data-type-mismatch="Ingresa un correo institucional valido."
+                      placeholder="usuario@unilabor.mx"
+                      data-value-missing="Ingresa tu correo."
+                      data-type-mismatch="Ingresa un correo válido."
                       {...validation.getFieldProps('email')}
                       className={`w-full rounded-2xl border py-3.5 pl-11 pr-4 text-sm text-[var(--unilabor-ink)] outline-none transition ${
                         emailError
@@ -220,13 +220,13 @@ export const LoginPage = () => {
                 <div>
                   <div className="mb-2 flex items-center justify-between">
                     <label className="block text-sm font-medium text-[var(--color-brand-700)]">
-                      Contrasena <span className="text-rose-500">*</span>
+                      Contraseña <span className="text-rose-500">*</span>
                     </label>
                     <Link
                       to="/forgot-password"
                       className="text-sm text-[var(--color-brand-500)] transition hover:text-[var(--color-brand-700)]"
                     >
-                      Olvide mi contrasena
+                      Olvidé mi contraseña
                     </Link>
                   </div>
                   <div className="relative">
@@ -243,7 +243,7 @@ export const LoginPage = () => {
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       placeholder="************"
-                      data-value-missing="Ingresa tu contrasena."
+                      data-value-missing="Ingresa tu contraseña."
                       {...validation.getFieldProps('password')}
                       className={`w-full rounded-2xl border py-3.5 pl-11 pr-4 text-sm text-[var(--unilabor-ink)] outline-none transition ${
                         passwordError
@@ -285,7 +285,7 @@ export const LoginPage = () => {
           </div>
 
           <p className="mt-4 text-center text-xs leading-5 text-[var(--unilabor-neutral)]">
-            Copyright 2026 UNILABOR. Plataforma de gestion documental para entornos regulados, clinicos y administrativos.
+            Copyright 2026 UNILABOR. Plataforma de gestión documental para entornos regulados, clínicos y administrativos.
           </p>
         </div>
       </section>

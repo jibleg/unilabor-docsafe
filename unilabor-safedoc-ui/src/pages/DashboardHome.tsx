@@ -25,7 +25,7 @@ export const DashboardHome = () => {
     },
     {
       label: 'Estado del sistema',
-      value: 'Optimo',
+      value: 'Óptimo',
       icon: Activity,
       color: 'text-[var(--color-brand-700)]',
       bg: 'bg-[rgba(191,212,230,0.32)]',

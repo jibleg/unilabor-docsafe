@@ -14,17 +14,17 @@ const moduleVisuals: Record<
 > = {
   QUALITY: {
     icon: FlaskConical,
-    eyebrow: 'Modulo Quality',
-    description: 'Gestion documental institucional, control de calidad y trazabilidad operativa.',
+    eyebrow: 'Módulo Quality',
+    description: 'Gestión documental institucional, control de calidad y trazabilidad operativa.',
   },
   RH: {
     icon: Building2,
-    eyebrow: 'Modulo RH',
-    description: 'Expediente digital del colaborador, seguimiento documental y gestion de personal.',
+    eyebrow: 'Módulo RH',
+    description: 'Expediente digital del colaborador, seguimiento documental y gestión de personal.',
   },
   HELPDESK: {
     icon: LifeBuoy,
-    eyebrow: 'Modulo Helpdesk',
+    eyebrow: 'Módulo Helpdesk',
     description: 'Mesa de ayuda, activos, tickets y mantenimiento de equipos del laboratorio.',
   },
 };
@@ -61,7 +61,7 @@ const ModuleCard = ({
       <p className="mt-3 text-sm leading-7 text-[var(--unilabor-neutral)]">{visual.description}</p>
 
       <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-brand-700)]">
-        Entrar al modulo
+        Entrar al módulo
         <ArrowRight
           size={16}
           className="transition-transform group-hover:translate-x-1"
@@ -95,7 +95,10 @@ export const ModuleSelectorPage = () => {
     return <Navigate to={getModuleHomePath(uniqueModule)} replace />;
   }
 
-  const displayName = user?.full_name ?? user?.name ?? 'Usuario';
+  const displayName =
+    [user?.full_name, user?.name, user?.email, 'Usuario']
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .find((value) => value.length > 0) ?? 'Usuario';
 
   const handleSelectModule = (moduleCode: ModuleCode) => {
     setActiveModule(moduleCode);
@@ -110,10 +113,10 @@ export const ModuleSelectorPage = () => {
             SafeDoc UniLabor
           </p>
           <h1 className="mt-4 text-4xl font-black leading-tight text-[var(--color-brand-700)]">
-            Selecciona el modulo al que deseas ingresar
+            Selecciona el módulo al que deseas ingresar
           </h1>
           <p className="mt-4 text-base leading-8 text-[var(--unilabor-neutral)]">
-            {displayName}, tu cuenta tiene acceso a mas de un espacio de trabajo. Elige el modulo con el que deseas continuar.
+            {displayName}, tu cuenta tiene acceso a más de un espacio de trabajo. Elige el módulo con el que deseas continuar.
           </p>
         </div>
 

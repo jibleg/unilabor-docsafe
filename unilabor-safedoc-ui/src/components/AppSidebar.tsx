@@ -54,7 +54,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
           { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
           { icon: AlertTriangle, label: 'Alertas', path: '/rh/alerts', roles: ['ADMIN', 'EDITOR'] },
-          { icon: ShieldCheck, label: 'Auditoria RH', path: '/rh/audit', roles: ['ADMIN', 'EDITOR'] },
+          { icon: ShieldCheck, label: 'Auditoría RH', path: '/rh/audit', roles: ['ADMIN', 'EDITOR'] },
           { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', roles: ['VIEWER'] },
           { icon: Tags, label: 'Secciones', path: '/rh/document-sections', roles: ['ADMIN', 'EDITOR'] },
           { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },
@@ -74,9 +74,9 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
           { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
           { icon: FileText, label: 'Documentos', path: '/quality/documents' },
-          { icon: Tags, label: 'Categorias', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
+          { icon: Tags, label: 'Categorías', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
           { icon: Users, label: 'Personal', path: '/quality/users', roles: ['ADMIN'] },
-          { icon: ShieldCheck, label: 'Auditoria', path: '/quality/audit', roles: ['ADMIN'] },
+          { icon: ShieldCheck, label: 'Auditoría', path: '/quality/audit', roles: ['ADMIN'] },
         ];
 
   return (
@@ -152,7 +152,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
             className="mb-4 flex items-center gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] px-4 py-3 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.34)]"
           >
             <Building2 size={18} />
-            Cambiar modulo
+            Cambiar módulo
           </NavLink>
         )}
         <div className="mb-4 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
@@ -183,7 +183,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           className="flex w-full items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-medium text-[var(--color-brand-700)] transition-colors hover:border-[rgba(0,65,106,0.1)] hover:bg-[rgba(191,212,230,0.28)]"
         >
           <LogOut size={20} />
-          Cerrar sesion
+          Cerrar sesión
         </button>
       </div>
     </aside>
