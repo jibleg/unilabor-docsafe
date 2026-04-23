@@ -33,3 +33,6 @@ lerna-debug.log*
 .eslintcache
 .nyc_output/
 
+# Local build artifacts
+.docx-build/
+unilabor-safe-20260417T1535.zip

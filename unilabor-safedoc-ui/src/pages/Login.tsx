@@ -113,15 +113,15 @@ export const LoginPage = () => {
                 />
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">UNILABOR</p>
+                <p className="text-xs uppercase tracking-[0.30em] text-[var(--unilabor-neutral)]">ISO 15189:2022</p>
                 <h1 className="text-xl font-semibold text-[var(--color-brand-700)]">Gestion Documental</h1>
               </div>
             </div>
 
             <div className="mt-8 max-w-xl">
-              <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-500)]">Plataforma SaaS</p>
+              <p className="text-sm uppercase tracking-[0.35em] text-[var(--color-brand-500)]">UNILABOR en la nube</p>
               <h2 className="mt-4 text-4xl font-black leading-tight text-[var(--color-brand-700)] xl:text-5xl">
-                Control inteligente de documentos clinicos y operativos.
+                Sistema electrónico documental ISO 15189:2022
               </h2>
               <p className="mt-6 text-base leading-8 text-[var(--unilabor-neutral)] xl:text-lg">
                 Centraliza procedimientos, formatos, evidencias, versiones y aprobaciones en una sola plataforma segura, moderna y trazable.
@@ -143,19 +143,7 @@ export const LoginPage = () => {
               ))}
             </div>
 
-            <div className="mt-8 grid max-w-2xl grid-cols-1 gap-4 md:grid-cols-2">
-              {featureCards.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-5 backdrop-blur-md shadow-lg shadow-[rgba(0,65,106,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[rgba(124,173,211,0.32)]"
-                >
-                  <h3 className="text-lg font-semibold text-[var(--color-brand-700)]">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--unilabor-neutral)]">{item.text}</p>
-                </div>
-              ))}
-            </div>
           </div>
-
 
         </div>
       </section>

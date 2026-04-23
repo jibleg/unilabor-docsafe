@@ -252,11 +252,17 @@ const buildAssetQuery = () => `
   LEFT JOIN public.employees re ON re.id = a.responsible_employee_id
 `;
 
-const listCatalog = async (tableName: string, hasCode = true): Promise<HelpdeskCatalogItem[]> => {
+const listCatalog = async (
+  tableName: string,
+  options?: { hasCode?: boolean; hasDescription?: boolean },
+): Promise<HelpdeskCatalogItem[]> => {
+  const hasCode = options?.hasCode ?? true;
+  const hasDescription = options?.hasDescription ?? true;
   const codeProjection = hasCode ? 'code,' : 'NULL AS code,';
+  const descriptionProjection = hasDescription ? 'description,' : 'NULL AS description,';
   const sortProjection = hasCode ? 'sort_order' : '0 AS sort_order';
   const result = await pool.query(`
-    SELECT id, ${codeProjection} name, description, is_active, ${sortProjection}
+    SELECT id, ${codeProjection} name, ${descriptionProjection} is_active, ${sortProjection}
     FROM public.${tableName}
     WHERE is_active = TRUE
     ORDER BY ${hasCode ? 'sort_order ASC,' : ''} name ASC;
@@ -366,7 +372,7 @@ export const listHelpdeskCatalogs = async (): Promise<HelpdeskCatalogs> => {
     listCatalog('helpdesk_asset_units'),
     listCatalog('helpdesk_asset_areas'),
     listCatalog('helpdesk_locations'),
-    listCatalog('helpdesk_asset_brands', false),
+    listCatalog('helpdesk_asset_brands', { hasCode: false, hasDescription: false }),
     listCatalog('helpdesk_purchase_modalities'),
     listCatalog('helpdesk_purchase_conditions'),
     listCatalog('helpdesk_criticalities'),
