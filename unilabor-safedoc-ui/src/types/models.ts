@@ -278,6 +278,49 @@ export interface HelpdeskMaintenanceCatalogs {
   frequencies: HelpdeskMaintenanceFrequency[];
 }
 
+export type HelpdeskCatalogAdminKey =
+  | 'categories'
+  | 'units'
+  | 'areas'
+  | 'locations'
+  | 'brands'
+  | 'purchase_modalities'
+  | 'purchase_conditions'
+  | 'criticalities'
+  | 'operational_statuses'
+  | 'request_types'
+  | 'ticket_statuses'
+  | 'ticket_priorities'
+  | 'frequencies';
+
+export interface HelpdeskCatalogAdminItem extends HelpdeskCatalogItem {
+  is_closed?: boolean;
+  response_hours?: number | null;
+  interval_months?: number | null;
+}
+
+export interface HelpdeskCatalogAdminResponse {
+  assets: {
+    categories: HelpdeskCatalogAdminItem[];
+    units: HelpdeskCatalogAdminItem[];
+    areas: HelpdeskCatalogAdminItem[];
+    locations: HelpdeskCatalogAdminItem[];
+    brands: HelpdeskCatalogAdminItem[];
+    purchase_modalities: HelpdeskCatalogAdminItem[];
+    purchase_conditions: HelpdeskCatalogAdminItem[];
+    criticalities: HelpdeskCatalogAdminItem[];
+    operational_statuses: HelpdeskCatalogAdminItem[];
+  };
+  tickets: {
+    request_types: HelpdeskCatalogAdminItem[];
+    ticket_statuses: HelpdeskCatalogAdminItem[];
+    ticket_priorities: HelpdeskCatalogAdminItem[];
+  };
+  maintenance: {
+    frequencies: HelpdeskCatalogAdminItem[];
+  };
+}
+
 export interface HelpdeskMaintenancePlanTask {
   id: number;
   task_text: string;

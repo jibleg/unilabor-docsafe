@@ -241,7 +241,7 @@ export const HelpdeskMaintenancePage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [planData, orderData, catalogData, assetData, employeeData] = await Promise.all([
+      const [planResult, orderResult, catalogResult, assetResult, employeeResult] = await Promise.allSettled([
         listMaintenancePlans(),
         listMaintenanceOrders(),
         listMaintenanceCatalogs(),
@@ -249,23 +249,57 @@ export const HelpdeskMaintenancePage = () => {
         listEmployees(),
       ]);
 
-      setPlans(planData);
-      setOrders(orderData);
-      setCatalogs(catalogData);
-      setAssets(assetData);
-      setEmployees(employeeData);
-      if (selectedPlan) {
-        setSelectedPlan(planData.find((plan) => plan.id === selectedPlan.id) ?? selectedPlan);
+      if (planResult.status === 'fulfilled') {
+        const planData = planResult.value;
+        setPlans(planData);
+        setSelectedPlan((current) => {
+          if (!current) {
+            return current;
+          }
+
+          const refreshed = planData.find((plan) => plan.id === current.id);
+          return refreshed ?? current;
+        });
+      } else {
+        notifyError(getApiErrorMessage(planResult.reason, 'No se pudieron cargar los planes de mantenimiento.'));
       }
-      if (selectedOrder) {
-        setSelectedOrder(orderData.find((order) => order.id === selectedOrder.id) ?? selectedOrder);
+
+      if (orderResult.status === 'fulfilled') {
+        const orderData = orderResult.value;
+        setOrders(orderData);
+        setSelectedOrder((current) => {
+          if (!current) {
+            return current;
+          }
+
+          const refreshed = orderData.find((order) => order.id === current.id);
+          return refreshed ?? current;
+        });
+      } else {
+        notifyError(getApiErrorMessage(orderResult.reason, 'No se pudieron cargar las ordenes de mantenimiento.'));
       }
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los planes de mantenimiento.'));
+
+      if (catalogResult.status === 'fulfilled') {
+        setCatalogs(catalogResult.value);
+      } else {
+        notifyError(getApiErrorMessage(catalogResult.reason, 'No se pudieron cargar los catalogos de mantenimiento.'));
+      }
+
+      if (assetResult.status === 'fulfilled') {
+        setAssets(assetResult.value);
+      } else {
+        notifyError(getApiErrorMessage(assetResult.reason, 'No se pudieron cargar los activos de Helpdesk.'));
+      }
+
+      if (employeeResult.status === 'fulfilled') {
+        setEmployees(employeeResult.value);
+      } else {
+        notifyError(getApiErrorMessage(employeeResult.reason, 'No se pudieron cargar los colaboradores.'));
+      }
     } finally {
       setLoading(false);
     }
-  }, [selectedOrder, selectedPlan]);
+  }, []);
 
   useEffect(() => {
     void loadData();

@@ -281,16 +281,20 @@ export const HelpdeskTicketsPage = () => {
       setOperationalStatuses(assetCatalogData.operational_statuses);
       setAssets(assetData);
       setEmployees(employeeData);
-      if (selectedTicket) {
-        const refreshed = ticketData.find((ticket) => ticket.id === selectedTicket.id);
-        setSelectedTicket(refreshed ?? selectedTicket);
-      }
+      setSelectedTicket((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const refreshed = ticketData.find((ticket) => ticket.id === current.id);
+        return refreshed ?? current;
+      });
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron cargar las solicitudes.'));
     } finally {
       setLoading(false);
     }
-  }, [selectedTicket]);
+  }, []);
 
   useEffect(() => {
     void loadData();

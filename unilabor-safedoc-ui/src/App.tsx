@@ -40,14 +40,14 @@ const HelpdeskAssetsPage = lazy(() =>
 const HelpdeskDashboardPage = lazy(() =>
   import('./pages/HelpdeskDashboardPage').then((module) => ({ default: module.HelpdeskDashboardPage })),
 );
+const HelpdeskCatalogsPage = lazy(() =>
+  import('./pages/HelpdeskCatalogsPage').then((module) => ({ default: module.HelpdeskCatalogsPage })),
+);
 const HelpdeskMaintenancePage = lazy(() =>
   import('./pages/HelpdeskMaintenancePage').then((module) => ({ default: module.HelpdeskMaintenancePage })),
 );
 const HelpdeskMyPortalPage = lazy(() =>
   import('./pages/HelpdeskMyPortalPage').then((module) => ({ default: module.HelpdeskMyPortalPage })),
-);
-const HelpdeskPlaceholderPage = lazy(() =>
-  import('./pages/HelpdeskPlaceholderPage').then((module) => ({ default: module.HelpdeskPlaceholderPage })),
 );
 const HelpdeskTicketsPage = lazy(() =>
   import('./pages/HelpdeskTicketsPage').then((module) => ({ default: module.HelpdeskTicketsPage })),
@@ -227,7 +227,14 @@ function App() {
           }
         />
         <Route path="maintenance" element={<HelpdeskMaintenancePage />} />
-        <Route path="catalogs" element={<HelpdeskPlaceholderPage title="Catalogos" />} />
+        <Route
+          path="catalogs"
+          element={
+            <RoleGate allowedRoles={['ADMIN']} redirectTo="/helpdesk/dashboard">
+              <HelpdeskCatalogsPage />
+            </RoleGate>
+          }
+        />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

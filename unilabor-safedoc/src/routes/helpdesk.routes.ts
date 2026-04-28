@@ -5,9 +5,11 @@ import {
   closeMaintenanceOrderController,
   confirmMyHelpdeskTicketFunctionalityController,
   createHelpdeskAssetController,
+  createHelpdeskCatalogItemController,
   createMaintenancePlanController,
   createHelpdeskTicketController,
   createMyHelpdeskTicketController,
+  deactivateHelpdeskCatalogItemController,
   deleteHelpdeskAssetController,
   evaluateHelpdeskTicketIsoRiskController,
   getHelpdeskAssetByIdController,
@@ -15,6 +17,7 @@ import {
   getHelpdeskSummaryController,
   getHelpdeskTicketByIdController,
   getMyHelpdeskTicketByIdController,
+  listHelpdeskCatalogAdminDataController,
   listHelpdeskAssetsController,
   listHelpdeskCatalogsController,
   listHelpdeskTicketCatalogsController,
@@ -29,6 +32,7 @@ import {
   solveHelpdeskTicketController,
   startMaintenanceOrderController,
   updateHelpdeskAssetController,
+  updateHelpdeskCatalogItemController,
   updateMaintenancePlanController,
   updateHelpdeskTicketController,
   validateHelpdeskTicketReturnController,
@@ -93,6 +97,26 @@ router.get(
   '/maintenance-catalogs',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
   listMaintenanceCatalogsController,
+);
+router.get(
+  '/catalog-admin',
+  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  listHelpdeskCatalogAdminDataController,
+);
+router.post(
+  '/catalog-admin/:catalogKey',
+  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  createHelpdeskCatalogItemController,
+);
+router.patch(
+  '/catalog-admin/:catalogKey/:id',
+  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  updateHelpdeskCatalogItemController,
+);
+router.post(
+  '/catalog-admin/:catalogKey/:id/deactivate',
+  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  deactivateHelpdeskCatalogItemController,
 );
 router.get(
   '/maintenance/plans',

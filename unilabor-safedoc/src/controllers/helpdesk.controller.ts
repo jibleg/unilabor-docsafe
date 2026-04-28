@@ -2,6 +2,15 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import {
+  createHelpdeskCatalogItem,
+  deactivateHelpdeskCatalogItem,
+  isHelpdeskCatalogAdminKey,
+  listHelpdeskCatalogAdminData,
+  type HelpdeskCatalogAdminKey,
+  type HelpdeskCatalogAdminPayload,
+  updateHelpdeskCatalogItem,
+} from '../services/helpdesk-catalog-admin.service';
+import {
   createHelpdeskAsset,
   deactivateHelpdeskAsset,
   getHelpdeskAssetById,
@@ -151,7 +160,56 @@ const mapHelpdeskError = (res: Response, error: any) => {
   return null;
 };
 
+const mapHelpdeskCatalogAdminError = (res: Response, error: any) => {
+  if (error?.code === 'HELPDESK_CATALOG_KEY_INVALID') {
+    return res.status(400).json({ message: 'Catalogo invalido.' });
+  }
+
+  if (error?.code === 'HELPDESK_CATALOG_NAME_REQUIRED') {
+    return res.status(400).json({ message: 'El nombre del catalogo es obligatorio.' });
+  }
+
+  if (error?.code === 'HELPDESK_CATALOG_CODE_REQUIRED') {
+    return res.status(400).json({ message: 'El codigo del catalogo es obligatorio.' });
+  }
+
+  if (error?.code === 'HELPDESK_CATALOG_SORT_ORDER_INVALID') {
+    return res.status(400).json({ message: 'El orden del catalogo debe ser un numero entero igual o mayor a cero.' });
+  }
+
+  if (error?.code === 'HELPDESK_CATALOG_RESPONSE_HOURS_INVALID') {
+    return res.status(400).json({ message: 'Las horas de respuesta deben ser un numero entero igual o mayor a cero.' });
+  }
+
+  if (error?.code === 'HELPDESK_CATALOG_INTERVAL_MONTHS_INVALID') {
+    return res.status(400).json({ message: 'La frecuencia debe indicar meses enteros mayores a cero.' });
+  }
+
+  if (error?.code === '23505') {
+    return res.status(409).json({ message: 'Ya existe un registro de catalogo con ese codigo o nombre.' });
+  }
+
+  return null;
+};
+
 const getBoolean = (value: unknown): boolean => value === true || value === 'true' || value === 1 || value === '1';
+
+const getHelpdeskCatalogAdminPayload = (body: any): HelpdeskCatalogAdminPayload | null => {
+  const name = getText(body?.name);
+  if (!name) {
+    return null;
+  }
+
+  return {
+    code: getText(body?.code),
+    name,
+    description: getText(body?.description),
+    sort_order: body?.sort_order === undefined ? null : Number(body?.sort_order),
+    is_closed: body?.is_closed === undefined ? null : getBoolean(body?.is_closed),
+    response_hours: body?.response_hours === undefined || body?.response_hours === '' ? null : Number(body?.response_hours),
+    interval_months: body?.interval_months === undefined || body?.interval_months === '' ? null : Number(body?.interval_months),
+  };
+};
 
 const getAssetPayload = (body: any): HelpdeskAssetPayload | null => {
   const assetCode = getText(body?.asset_code);
@@ -1068,6 +1126,116 @@ export const listHelpdeskCatalogsController = async (_req: AuthRequest, res: Res
 
     console.error('Error listando catalogos Helpdesk:', error);
     return res.status(500).json({ message: 'No se pudieron cargar los catalogos Helpdesk.' });
+  }
+};
+
+export const listHelpdeskCatalogAdminDataController = async (_req: AuthRequest, res: Response) => {
+  try {
+    const catalogs = await listHelpdeskCatalogAdminData();
+    return res.json({ catalogs });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskCatalogAdminError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error listando catalogos administrables Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudieron cargar los catalogos administrables.' });
+  }
+};
+
+export const createHelpdeskCatalogItemController = async (req: AuthRequest, res: Response) => {
+  const catalogKey = String(req.params.catalogKey ?? '');
+  if (!isHelpdeskCatalogAdminKey(catalogKey)) {
+    return res.status(400).json({ message: 'Catalogo invalido.' });
+  }
+
+  const payload = getHelpdeskCatalogAdminPayload(req.body);
+  if (!payload) {
+    return res.status(400).json({ message: 'El nombre del catalogo es obligatorio.' });
+  }
+
+  try {
+    const item = await createHelpdeskCatalogItem(catalogKey as HelpdeskCatalogAdminKey, payload);
+    return res.status(201).json({
+      message: 'Registro de catalogo creado correctamente.',
+      item,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskCatalogAdminError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error creando registro de catalogo Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo crear el registro del catalogo.' });
+  }
+};
+
+export const updateHelpdeskCatalogItemController = async (req: AuthRequest, res: Response) => {
+  const catalogKey = String(req.params.catalogKey ?? '');
+  const itemId = getNumberId(req.params.id);
+  if (!isHelpdeskCatalogAdminKey(catalogKey)) {
+    return res.status(400).json({ message: 'Catalogo invalido.' });
+  }
+  if (!itemId) {
+    return res.status(400).json({ message: 'ID de catalogo invalido.' });
+  }
+
+  const payload = getHelpdeskCatalogAdminPayload(req.body);
+  if (!payload) {
+    return res.status(400).json({ message: 'El nombre del catalogo es obligatorio.' });
+  }
+
+  try {
+    const item = await updateHelpdeskCatalogItem(catalogKey as HelpdeskCatalogAdminKey, itemId, payload);
+    if (!item) {
+      return res.status(404).json({ message: 'Registro de catalogo no encontrado.' });
+    }
+
+    return res.json({
+      message: 'Registro de catalogo actualizado correctamente.',
+      item,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskCatalogAdminError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error actualizando registro de catalogo Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar el registro del catalogo.' });
+  }
+};
+
+export const deactivateHelpdeskCatalogItemController = async (req: AuthRequest, res: Response) => {
+  const catalogKey = String(req.params.catalogKey ?? '');
+  const itemId = getNumberId(req.params.id);
+  if (!isHelpdeskCatalogAdminKey(catalogKey)) {
+    return res.status(400).json({ message: 'Catalogo invalido.' });
+  }
+  if (!itemId) {
+    return res.status(400).json({ message: 'ID de catalogo invalido.' });
+  }
+
+  try {
+    const item = await deactivateHelpdeskCatalogItem(catalogKey as HelpdeskCatalogAdminKey, itemId);
+    if (!item) {
+      return res.status(404).json({ message: 'Registro de catalogo no encontrado.' });
+    }
+
+    return res.json({
+      message: 'Registro de catalogo desactivado correctamente.',
+      item,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskCatalogAdminError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error desactivando registro de catalogo Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo desactivar el registro del catalogo.' });
   }
 };
 

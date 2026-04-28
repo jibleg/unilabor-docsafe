@@ -22,6 +22,9 @@ import type {
   EmployeeExpedientSummary,
   EmployeeSummary,
   HelpdeskAsset,
+  HelpdeskCatalogAdminItem,
+  HelpdeskCatalogAdminKey,
+  HelpdeskCatalogAdminResponse,
   HelpdeskDashboardMetrics,
   HelpdeskAssetEmployee,
   HelpdeskAssetSummary,
@@ -189,6 +192,16 @@ export interface HelpdeskMaintenanceOrderClosePayload {
 export interface HelpdeskMaintenanceOrderReschedulePayload {
   scheduled_for: string;
   reschedule_reason: string;
+}
+
+export interface HelpdeskCatalogAdminPayload {
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  sort_order?: number | null;
+  is_closed?: boolean | null;
+  response_hours?: number | null;
+  interval_months?: number | null;
 }
 
 export interface DocumentSectionPayload {
@@ -895,6 +908,56 @@ const normalizeMaintenanceCatalogs = (input: unknown): HelpdeskMaintenanceCatalo
     frequencies: getArrayFromPayload(source.frequencies ?? [], ['frequencies'])
       .map(normalizeMaintenanceFrequency)
       .filter((item): item is HelpdeskMaintenanceFrequency => item !== null),
+  };
+};
+
+const normalizeHelpdeskCatalogAdminItem = (input: unknown): HelpdeskCatalogAdminItem | null => {
+  const item = normalizeHelpdeskCatalogItem(input);
+  const source = asRecord(input);
+  if (!item || !source) {
+    return null;
+  }
+
+  return {
+    ...item,
+    is_closed: source.is_closed === undefined && source.isClosed === undefined
+      ? undefined
+      : getBoolean(source, ['is_closed', 'isClosed'], false),
+    response_hours: getNullableNumber(source, ['response_hours', 'responseHours']),
+    interval_months: getNullableNumber(source, ['interval_months', 'intervalMonths']),
+  };
+};
+
+const normalizeHelpdeskCatalogAdminResponse = (input: unknown): HelpdeskCatalogAdminResponse => {
+  const source = asRecord(input) ?? {};
+  const assets = asRecord(source.assets) ?? {};
+  const tickets = asRecord(source.tickets) ?? {};
+  const maintenance = asRecord(source.maintenance) ?? {};
+  const pick = (record: Record<string, unknown>, key: string, fallbackKey?: string) =>
+    getArrayFromPayload(record[key] ?? (fallbackKey ? record[fallbackKey] : []), [key, fallbackKey ?? key])
+      .map(normalizeHelpdeskCatalogAdminItem)
+      .filter((item): item is HelpdeskCatalogAdminItem => item !== null);
+
+  return {
+    assets: {
+      categories: pick(assets, 'categories'),
+      units: pick(assets, 'units'),
+      areas: pick(assets, 'areas'),
+      locations: pick(assets, 'locations'),
+      brands: pick(assets, 'brands'),
+      purchase_modalities: pick(assets, 'purchase_modalities', 'purchaseModalities'),
+      purchase_conditions: pick(assets, 'purchase_conditions', 'purchaseConditions'),
+      criticalities: pick(assets, 'criticalities'),
+      operational_statuses: pick(assets, 'operational_statuses', 'operationalStatuses'),
+    },
+    tickets: {
+      request_types: pick(tickets, 'request_types', 'requestTypes'),
+      ticket_statuses: pick(tickets, 'ticket_statuses', 'ticketStatuses'),
+      ticket_priorities: pick(tickets, 'ticket_priorities', 'ticketPriorities'),
+    },
+    maintenance: {
+      frequencies: pick(maintenance, 'frequencies'),
+    },
   };
 };
 
@@ -2010,6 +2073,37 @@ export const listMaintenanceCatalogs = async (): Promise<HelpdeskMaintenanceCata
   const response = await api.get('/helpdesk/maintenance-catalogs');
   const payload = asRecord(unwrapPayload(response.data));
   return normalizeMaintenanceCatalogs(payload?.catalogs ?? payload);
+};
+
+export const listHelpdeskCatalogAdminData = async (): Promise<HelpdeskCatalogAdminResponse> => {
+  const response = await api.get('/helpdesk/catalog-admin');
+  const payload = asRecord(unwrapPayload(response.data));
+  return normalizeHelpdeskCatalogAdminResponse(payload?.catalogs ?? payload);
+};
+
+export const createHelpdeskCatalogAdminItem = async (
+  catalogKey: HelpdeskCatalogAdminKey,
+  payload: HelpdeskCatalogAdminPayload,
+): Promise<HelpdeskCatalogAdminItem | null> => {
+  const response = await api.post(`/helpdesk/catalog-admin/${catalogKey}`, payload);
+  return normalizeHelpdeskCatalogAdminItem(asRecord(unwrapPayload(response.data))?.item ?? unwrapPayload(response.data));
+};
+
+export const updateHelpdeskCatalogAdminItem = async (
+  catalogKey: HelpdeskCatalogAdminKey,
+  itemId: number,
+  payload: HelpdeskCatalogAdminPayload,
+): Promise<HelpdeskCatalogAdminItem | null> => {
+  const response = await api.patch(`/helpdesk/catalog-admin/${catalogKey}/${itemId}`, payload);
+  return normalizeHelpdeskCatalogAdminItem(asRecord(unwrapPayload(response.data))?.item ?? unwrapPayload(response.data));
+};
+
+export const deactivateHelpdeskCatalogAdminItem = async (
+  catalogKey: HelpdeskCatalogAdminKey,
+  itemId: number,
+): Promise<HelpdeskCatalogAdminItem | null> => {
+  const response = await api.post(`/helpdesk/catalog-admin/${catalogKey}/${itemId}/deactivate`);
+  return normalizeHelpdeskCatalogAdminItem(asRecord(unwrapPayload(response.data))?.item ?? unwrapPayload(response.data));
 };
 
 export const listMaintenancePlans = async (): Promise<HelpdeskMaintenancePlan[]> => {

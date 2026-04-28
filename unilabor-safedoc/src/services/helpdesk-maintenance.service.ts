@@ -198,7 +198,7 @@ const buildPlanQuery = () => `
     e.area AS responsible_employee_area,
     e.position AS responsible_employee_position,
     d.title AS quality_document_title,
-    d.filename AS quality_document_filename
+    d.file_path AS quality_document_filename
   FROM public.helpdesk_maintenance_plans p
   LEFT JOIN public.helpdesk_assets a ON a.id = p.asset_id
   LEFT JOIN public.helpdesk_maintenance_frequencies f ON f.id = p.frequency_id
