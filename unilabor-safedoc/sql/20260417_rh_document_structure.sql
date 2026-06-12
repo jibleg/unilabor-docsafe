@@ -131,6 +131,11 @@ WHERE NOT EXISTS (
   FROM public.document_types existing
   WHERE existing.section_id = sections.id
     AND UPPER(existing.name) = UPPER(source.name)
+)
+AND NOT EXISTS (
+  SELECT 1
+  FROM public.document_types existing
+  WHERE UPPER(existing.code) = UPPER(source.code)
 );
 
 COMMIT;

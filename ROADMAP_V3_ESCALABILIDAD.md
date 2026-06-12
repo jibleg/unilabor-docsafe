@@ -18,8 +18,8 @@ Convertir el PMV+ funcional (V2 + Helpdesk) en una base sostenible y escalable, 
 | Sprint | Nombre | Recomendacion que resuelve | Urgencia | Estado |
 | --- | --- | --- | --- | --- |
 | 23 | Higiene tecnica y baseline | Limpieza rapida (lint, excludes, lockfile, puertos) | alta | `completada` |
-| 24 | Migration runner y control de schema | Sin runner de migraciones | alta | `pendiente` |
-| 25 | Aplicacion y validacion de migraciones Helpdesk | Migraciones Helpdesk no aplicadas en BD real | alta | `pendiente` |
+| 24 | Migration runner y control de schema | Sin runner de migraciones | alta | `completada` |
+| 25 | Aplicacion y validacion de migraciones Helpdesk | Migraciones Helpdesk no aplicadas en BD real | alta | `en progreso` |
 | 26 | Infraestructura de pruebas | Sin tests | media | `pendiente` |
 | 27 | Validacion de entrada centralizada | Sin libreria de validacion | media | `pendiente` |
 | 28 | Endurecimiento de auth y sesion | JWT/localStorage sin refresh ni 401 handling | media | `pendiente` |
@@ -53,3 +53,4 @@ Nota: no es obligatorio completar los 8 sprints. El roadmap esta disenado para e
 | --- | --- | --- | --- |
 | 2026-06-12 | Se define roadmap V3 de escalabilidad | `pendiente` | Un sprint por recomendacion tecnica, ejecucion selectiva. |
 | 2026-06-12 | Sprint 23 (higiene tecnica) ejecutado | `completada` | Primer sprint de la V3 cerrado; baseline limpio. |
+| 2026-06-12 | Sprint 24 (migration runner) ejecutado | `completada` | Runner transaccional + `schema_migrations`; 19 migraciones aplicadas en BD local. Falta validacion en navegador (Sprint 25). |

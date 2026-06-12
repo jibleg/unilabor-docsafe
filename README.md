@@ -32,7 +32,7 @@ Repositorio de trabajo con dos proyectos relacionados:
 - Contrato API: `unilabor-safedoc/API_CONTRACT.md`
 - Utilidad local: `npm run hash-password -- <password> <email>`
 - Recursos de apoyo:
-  - `unilabor-safedoc/sql/`: scripts SQL y migraciones manuales.
+  - `unilabor-safedoc/sql/`: migraciones de base de datos (ver "Migraciones de base de datos").
   - `unilabor-safedoc/postman/`: coleccion y environment para pruebas.
 
 ### Frontend: `unilabor-safedoc-ui`
@@ -109,6 +109,30 @@ Frontend:
 cd unilabor-safedoc-ui
 npm run dev
 ```
+
+## Migraciones de base de datos
+
+Las migraciones viven en `unilabor-safedoc/sql/` con prefijo de fecha `AAAAMMDD_*.sql`
+y se aplican con un runner versionado (ya no a mano). El runner usa las variables
+`DB_*` del `.env`, por lo que apunta a la base de datos configurada localmente.
+
+```powershell
+cd unilabor-safedoc
+npm run migrate:status   # lista aplicadas vs pendientes (no modifica nada)
+npm run migrate          # aplica en orden solo las pendientes
+```
+
+Caracteristicas:
+
+- Cada migracion se aplica dentro de una transaccion propia; si falla, se hace
+  rollback de esa migracion y se detiene el proceso.
+- Lo aplicado se registra en la tabla `schema_migrations` (nombre, checksum, fecha);
+  volver a correr `migrate` solo aplica lo pendiente.
+- Las migraciones son inmutables: si una ya esta aplicada y editas su contenido, el
+  runner avisa del cambio de checksum. Para corregir, crea una migracion nueva.
+
+Importante: no apuntar el runner a la base de datos de produccion. Aplicar primero
+en local y validar en el navegador.
 
 ## Build
 

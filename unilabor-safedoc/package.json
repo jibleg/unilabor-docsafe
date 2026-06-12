@@ -6,6 +6,8 @@
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "migrate": "ts-node src/scripts/migrate.ts migrate",
+    "migrate:status": "ts-node src/scripts/migrate.ts status",
     "hash-password": "node scripts/hash-password.js"
   },
   "keywords": [],
