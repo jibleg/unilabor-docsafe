@@ -150,6 +150,32 @@ cd unilabor-safedoc-ui
 npm run build
 ```
 
+## Pruebas
+
+Ambos proyectos usan Vitest. Es una red minima de smoke tests sobre flujos
+criticos (no busca cobertura total): autorizacion por modulo, login/JWT,
+calculo de downtime, guards de ruta, normalizacion de respuestas y store de
+sesion.
+
+Backend (entorno node):
+
+```powershell
+cd unilabor-safedoc
+npm test           # corre una vez
+npm run test:watch # modo watch
+```
+
+Frontend (entorno jsdom + React Testing Library):
+
+```powershell
+cd unilabor-safedoc-ui
+npm test
+npm run test:watch
+```
+
+Convencion: los archivos de prueba viven junto al codigo como `*.test.ts` /
+`*.test.tsx`. En el backend se excluyen del build de produccion (`dist/`).
+
 ## Versionado
 
 El repositorio ya esta preparado para evitar ruido en Git:

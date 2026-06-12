@@ -404,7 +404,7 @@ const getTicketStatusId = async (code: string): Promise<number | null> => {
   return result.rows[0]?.id ? Number(result.rows[0].id) : null;
 };
 
-const calculateDowntimeMinutes = (reportedAt: string, returnAt: string): number | null => {
+export const calculateDowntimeMinutes = (reportedAt: string, returnAt: string): number | null => {
   const start = new Date(reportedAt).getTime();
   const end = new Date(returnAt).getTime();
 
