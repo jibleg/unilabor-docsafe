@@ -1,5 +1,6 @@
 ﻿import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../config/env';
 import { listUserModuleAccess } from '../services/module-access.service';
 
 export interface JWTPayload {
@@ -23,7 +24,7 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JWTPayload;
+    const decoded = jwt.verify(token, getJwtSecret()) as JWTPayload;
     req.user = decoded;
 
     const isChangePasswordRoute =
@@ -39,7 +40,9 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
 
     next();
   } catch (_error) {
-    return res.status(403).json({ message: 'Token invalido o expirado' });
+    // 401 (no 403) para que el frontend distinga "sesion expirada/invalida"
+    // (-> logout + redirect) de "permisos insuficientes" (403 de authorize*).
+    return res.status(401).json({ message: 'Token invalido o expirado' });
   }
 };
 

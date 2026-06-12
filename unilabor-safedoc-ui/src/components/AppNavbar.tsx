@@ -34,6 +34,11 @@ interface NavbarItem {
 export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const location = useLocation();
   const logout = useAuthStore((state) => state.logout);
+  const handleLogout = () => {
+    if (window.confirm('¿Seguro que deseas cerrar sesión?')) {
+      logout();
+    }
+  };
   const user = useAuthStore((state) => state.user);
   const availableModules = useAuthStore((state) => state.availableModules);
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
@@ -194,7 +199,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
 
           <button
             type="button"
-            onClick={logout}
+            onClick={handleLogout}
             className="btn btn-sm w-full border-[rgba(0,65,106,0.1)] bg-[rgba(191,212,230,0.32)] text-[var(--color-brand-700)] hover:border-[rgba(0,65,106,0.14)] hover:bg-[rgba(124,173,211,0.34)]"
           >
             <LogOut size={14} />

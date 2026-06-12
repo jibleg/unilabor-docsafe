@@ -37,6 +37,11 @@ interface AppSidebarProps {
 
 export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSidebarProps) => {
   const logout = useAuthStore((state) => state.logout);
+  const handleLogout = () => {
+    if (window.confirm('¿Seguro que deseas cerrar sesión?')) {
+      logout();
+    }
+  };
   const user = useAuthStore((state) => state.user);
   const activeModule = useAuthStore((state) => state.activeModule);
   const availableModules = useAuthStore((state) => state.availableModules);
@@ -179,7 +184,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           </div>
         </div>
         <button
-          onClick={logout}
+          onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-medium text-[var(--color-brand-700)] transition-colors hover:border-[rgba(0,65,106,0.1)] hover:bg-[rgba(191,212,230,0.28)]"
         >
           <LogOut size={20} />

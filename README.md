@@ -150,6 +150,28 @@ cd unilabor-safedoc-ui
 npm run build
 ```
 
+## Sesion y seguridad
+
+- **JWT_SECRET obligatorio**: el backend no arranca si `JWT_SECRET` falta o conserva
+  el valor por defecto `change-me` (validacion al inicio). Genera uno fuerte con
+  `openssl rand -hex 32`.
+- **Expiracion configurable**: `JWT_EXPIRES_IN` (default `8h`, formato de
+  `jsonwebtoken`: `30m`, `8h`, `1d`).
+- **Manejo uniforme de sesion (frontend)**: un interceptor de respuesta de axios
+  detecta `401` (sesion expirada o token invalido), cierra sesion y redirige a
+  `/login`. Los `401` de los endpoints de login/recuperacion se excluyen para que el
+  error se muestre en pantalla. El backend devuelve `401` para token expirado/invalido
+  y reserva `403` para permisos insuficientes (no cierran sesion).
+- **Almacenamiento del token (riesgo XSS, AUT-06)**: el token se guarda en
+  `localStorage` (`auth-storage`) por simplicidad de la SPA. Esto es vulnerable a XSS
+  si se inyecta script en la pagina. Mitigaciones actuales: expiracion corta + cierre
+  de sesion centralizado ante `401`. Mitigacion futura recomendada: cookie `httpOnly`
+  + `SameSite` emitida por el backend (requiere endpoint de refresh y manejo CSRF).
+- **Refresh token (decision AUT-03)**: por ahora se opta por re-autenticacion
+  controlada (al expirar el token, el `401` lleva al login) en vez de implementar
+  refresh tokens. Con el token en `localStorage`, un refresh token aportaria poca
+  ganancia de seguridad y si complejidad; se difiere hasta migrar a cookies `httpOnly`.
+
 ## Pruebas
 
 Ambos proyectos usan Vitest. Es una red minima de smoke tests sobre flujos

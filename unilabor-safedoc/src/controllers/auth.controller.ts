@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db';
+import { getJwtExpiresIn, getJwtSecret } from '../config/env';
 import { listUserModuleAccess } from '../services/module-access.service';
 import { recoverPasswordByEmail } from '../services/password.service';
 
@@ -49,15 +50,15 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
-    // Generar el token JWT con expiración de 8 horas
+    // Generar el token JWT (expiracion configurable via JWT_EXPIRES_IN, default 8h)
     const token = jwt.sign(
-      { 
-        id: user.id, 
-        role: user.role, 
-        mustChangePassword: user.must_change_password 
+      {
+        id: user.id,
+        role: user.role,
+        mustChangePassword: user.must_change_password
       },
-      process.env.JWT_SECRET as string,
-      { expiresIn: '8h' }
+      getJwtSecret(),
+      { expiresIn: getJwtExpiresIn() }
     );
 
     // Registrar el acceso en la tabla de auditoría (Opcional pero recomendado)

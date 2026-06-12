@@ -11,8 +11,17 @@ import documentStructureRoutes from './routes/document-structure.routes';
 import employeeDocumentRoutes from './routes/employee-document.routes';
 import employeeAlertRoutes from './routes/employee-alert.routes';
 import helpdeskRoutes from './routes/helpdesk.routes';
+import { assertRequiredEnv } from './config/env';
 
 dotenv.config();
+
+// Falla rapido si la configuracion critica (JWT_SECRET) es insegura o falta.
+try {
+  assertRequiredEnv();
+} catch (error) {
+  console.error('Configuracion invalida:', error instanceof Error ? error.message : error);
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 4000;
