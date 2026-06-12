@@ -54,3 +54,4 @@ Nota: no es obligatorio completar los 8 sprints. El roadmap esta disenado para e
 | 2026-06-12 | Se define roadmap V3 de escalabilidad | `pendiente` | Un sprint por recomendacion tecnica, ejecucion selectiva. |
 | 2026-06-12 | Sprint 23 (higiene tecnica) ejecutado | `completada` | Primer sprint de la V3 cerrado; baseline limpio. |
 | 2026-06-12 | Sprint 24 (migration runner) ejecutado | `completada` | Runner transaccional + `schema_migrations`; 19 migraciones aplicadas en BD local. Falta validacion en navegador (Sprint 25). |
+| 2026-06-12 | Sprint 25 (migraciones Helpdesk) aplicado en BD local | `en progreso` | Tablas, catalogos y modulo HELPDESK verificados. Resta validacion manual en navegador (Bloque 3). |
