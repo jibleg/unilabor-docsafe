@@ -1,7 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { loginSchema, recoverPasswordSchema } from './auth.schema';
-import { changePasswordSchema, createUserSchema } from './user.schema';
-import { maintenancePlanSchema } from './helpdesk.schema';
+import {
+  changePasswordSchema,
+  createUserSchema,
+  replaceUserCategoriesSchema,
+  resetUserPasswordSchema,
+  updateUserSchema,
+} from './user.schema';
+import {
+  helpdeskAssetSchema,
+  helpdeskTicketSchema,
+  maintenanceOrderCloseSchema,
+  maintenancePlanSchema,
+} from './helpdesk.schema';
+import {
+  createCategorySchema,
+  updateCategoryStatusSchema,
+} from './category.schema';
+import {
+  updateDocumentMetadataSchema,
+  updateDocumentStatusSchema,
+} from './document.schema';
+import { createEmployeeSchema, updateEmployeeSchema } from './employee.schema';
 
 describe('auth.schema', () => {
   it('loginSchema acepta email no vacio y recorta', () => {
@@ -83,5 +103,98 @@ describe('helpdesk.schema (maintenancePlanSchema)', () => {
     expect(
       maintenancePlanSchema.safeParse({ asset_id: 1, starts_on: '2026-06-12', next_due_on: '2026-07-12' }).success,
     ).toBe(false);
+  });
+});
+
+describe('user.schema (restantes)', () => {
+  it('updateUserSchema exige al menos un campo', () => {
+    expect(updateUserSchema.safeParse({}).success).toBe(false);
+    expect(updateUserSchema.safeParse({ full_name: 'Nuevo' }).success).toBe(true);
+  });
+
+  it('updateUserSchema rechaza rol invalido y conserva campos extra', () => {
+    expect(updateUserSchema.safeParse({ role: 'BOSS' }).success).toBe(false);
+    const r = updateUserSchema.safeParse({ role: 'editor', full_name: 'X' });
+    expect(r.success && (r.data as any).role).toBe('EDITOR');
+  });
+
+  it('resetUserPasswordSchema trata vacio como ausente y exige min 6 si viene', () => {
+    expect(resetUserPasswordSchema.safeParse({ temporaryPassword: '' }).success).toBe(true);
+    expect(resetUserPasswordSchema.safeParse({ temporaryPassword: '123' }).success).toBe(false);
+    expect(resetUserPasswordSchema.safeParse({ temporaryPassword: '123456' }).success).toBe(true);
+  });
+
+  it('replaceUserCategoriesSchema acepta arreglos por cualquiera de las dos claves', () => {
+    expect(replaceUserCategoriesSchema.safeParse({ categoryIds: [1, 2] }).success).toBe(true);
+    expect(replaceUserCategoriesSchema.safeParse({ category_ids: [1] }).success).toBe(true);
+  });
+});
+
+describe('category.schema', () => {
+  it('createCategorySchema exige nombre >= 2 y conserva claves extra', () => {
+    expect(createCategorySchema.safeParse({ name: 'A' }).success).toBe(false);
+    const r = createCategorySchema.safeParse({ name: ' Calidad ', extra: 'keep' });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.name).toBe('Calidad');
+      expect((r.data as any).extra).toBe('keep'); // passthrough
+    }
+  });
+
+  it('updateCategoryStatusSchema exige is_active presente', () => {
+    expect(updateCategoryStatusSchema.safeParse({}).success).toBe(false);
+    expect(updateCategoryStatusSchema.safeParse({ is_active: false }).success).toBe(true);
+    expect(updateCategoryStatusSchema.safeParse({ is_active: 'true' }).success).toBe(true);
+  });
+});
+
+describe('document.schema', () => {
+  it('updateDocumentStatusSchema normaliza y restringe a active/inactive', () => {
+    const r = updateDocumentStatusSchema.safeParse({ status: ' ACTIVE ' });
+    expect(r.success && (r.data as any).status).toBe('active');
+    expect(updateDocumentStatusSchema.safeParse({ status: 'borrado' }).success).toBe(false);
+  });
+
+  it('updateDocumentMetadataSchema exige al menos un campo', () => {
+    expect(updateDocumentMetadataSchema.safeParse({}).success).toBe(false);
+    expect(updateDocumentMetadataSchema.safeParse({ title: 'Nuevo titulo' }).success).toBe(true);
+  });
+});
+
+describe('employee.schema', () => {
+  it('createEmployeeSchema exige nombre y correo', () => {
+    expect(createEmployeeSchema.safeParse({ full_name: 'Ana' }).success).toBe(false);
+    expect(createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx' }).success).toBe(true);
+  });
+
+  it('updateEmployeeSchema exige al menos un campo y rechaza vacios explicitos', () => {
+    expect(updateEmployeeSchema.safeParse({}).success).toBe(false);
+    expect(updateEmployeeSchema.safeParse({ area: 'Laboratorio' }).success).toBe(true);
+    expect(updateEmployeeSchema.safeParse({ full_name: '' }).success).toBe(false);
+  });
+});
+
+describe('helpdesk.schema (resto)', () => {
+  it('helpdeskAssetSchema exige asset_code y name', () => {
+    expect(helpdeskAssetSchema.safeParse({ name: 'PC' }).success).toBe(false);
+    expect(helpdeskAssetSchema.safeParse({ asset_code: 'PC1', name: 'PC' }).success).toBe(true);
+  });
+
+  it('helpdeskTicketSchema exige titulo y descripcion', () => {
+    expect(helpdeskTicketSchema.safeParse({ title: 'Falla' }).success).toBe(false);
+    expect(helpdeskTicketSchema.safeParse({ title: 'Falla', description: 'No enciende' }).success).toBe(true);
+  });
+
+  it('maintenanceOrderCloseSchema exige completed_at, actividades y resultado', () => {
+    expect(
+      maintenanceOrderCloseSchema.safeParse({ completed_at: '2026-06-12', performed_activities: 'Limpieza' }).success,
+    ).toBe(false);
+    expect(
+      maintenanceOrderCloseSchema.safeParse({
+        completed_at: '2026-06-12',
+        performed_activities: 'Limpieza',
+        result: 'COMPLETED',
+      }).success,
+    ).toBe(true);
   });
 });

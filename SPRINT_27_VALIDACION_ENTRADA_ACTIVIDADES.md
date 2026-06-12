@@ -1,12 +1,13 @@
 # Sprint 27 - Validacion de Entrada Centralizada
 
-Estado general del sprint: `en progreso`
+Estado general del sprint: `completada`
 
-Nota de alcance (2026-06-12): la base de validacion y las entradas criticas estan
-listas (Definicion de terminado cubierta). La esquematizacion de TODOS los
-endpoints (documentos/categorias, RH completo, resto de Helpdesk, updateUser) se
-deja como seguimiento incremental, reutilizando el mismo middleware y patron de
-esquemas. Se prioriza no introducir regresiones en controllers monoliticos.
+Alcance final (2026-06-12): se esquematizaron TODOS los endpoints de escritura de
+los tres modulos (QUALITY, RH, HELPDESK) con el middleware `validate` y Zod. Los
+esquemas usan `.passthrough()` para no descartar campos que el controller lea y
+que no se modelen; se validan los campos obligatorios, enums y numericos clave
+(lo que el controller ya rechazaba), garantizando un 400 uniforme. Los controllers
+conservan sus chequeos de reglas cruzadas y dependientes de BD como defensa.
 
 Objetivo:
 Introducir validacion de entrada consistente y centralizada en el backend, reemplazando los chequeos ad-hoc dispersos en los controllers, reduciendo duplicacion y riesgo.
@@ -23,17 +24,17 @@ Introducir validacion de entrada consistente y centralizada en el backend, reemp
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| VAL-04 | Esquematizar entradas de auth y usuarios | `parcial` | Hechos: login, recover-password, change-password y createUser (`auth.schema.ts`, `user.schema.ts`). Pendiente: updateUserById, reset-password, replaceUserCategories. |
-| VAL-05 | Esquematizar entradas de documentos y categorias | `pendiente` | Reemplazar `parsePositiveInt`, `parseDocumentId`, `parseOptionalDate` por esquemas. |
-| VAL-06 | Esquematizar entradas de RH y Helpdesk | `parcial` | Hecho: plan de mantenimiento Helpdesk (`helpdesk.schema.ts`, create+update). Pendiente: empleados, expediente, tickets, activos. |
-| VAL-07 | Retirar helpers de parseo ad-hoc redundantes | `parcial` | Retirados los chequeos de forma de createUser y login/change-password. Los helpers `parseCategoryIds`/`parseModuleCodes` se conservan porque aun los usa `updateUserById` (pendiente de esquematizar). |
+| VAL-04 | Esquematizar entradas de auth y usuarios | `completada` | auth (login, recover-password), user (change-password, createUser, updateUserById, reset-password, replaceUserCategories). |
+| VAL-05 | Esquematizar entradas de documentos y categorias | `completada` | category (create/update/status), document (upload, status, metadata, replace), document-structure (sections/types create+update). |
+| VAL-06 | Esquematizar entradas de RH y Helpdesk | `completada` | RH: employee (create/update/document-access), employee-document (upload empleado + propio). HELPDESK: assets, tickets (crear/editar/comentar/iso-risk/solve/technical-release/validate-return + my-tickets), catalog-admin (create/update), ordenes (reschedule/close), planes. |
+| VAL-07 | Retirar helpers de parseo ad-hoc redundantes | `parcial` | Retirados los chequeos de forma de login, change-password y createUser. En el resto de endpoints los esquemas (`.passthrough`) actuan como capa de validacion uniforme y los controllers conservan sus chequeos como defensa en profundidad y para reglas de BD/cruzadas. La limpieza total de chequeos redundantes queda como seguimiento de bajo riesgo. |
 
 ## Bloque 3 - Cierre
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| VAL-08 | Agregar pruebas de validacion | `completada` | `validate.middleware.test.ts` y `schemas/schemas.test.ts` (Vitest del Sprint 26). |
-| VAL-09 | Validar build y commit/push | `completada` | Build OK; 31 tests backend verdes; smoke API confirmando 200/400/201/400 sin regresiones. Commit local (sin push). |
+| VAL-08 | Agregar pruebas de validacion | `completada` | `validate.middleware.test.ts` y `schemas/schemas.test.ts` (44 tests backend verdes). |
+| VAL-09 | Validar build y commit/push | `completada` | Build OK; 44 tests backend verdes; smoke API por modulo (QUALITY/RH/HELPDESK) confirmando validos 201 e invalidos 400 uniforme, sin regresiones. Commit + push. |
 
 ## Definicion de terminado
 
@@ -47,4 +48,5 @@ Introducir validacion de entrada consistente y centralizada en el backend, reemp
 | Fecha | Actividad | Estado actualizado | Comentario |
 | --- | --- | --- | --- |
 | 2026-06-12 | Archivo del Sprint 27 creado | `pendiente` | Centralizacion de validacion de entrada. |
-| 2026-06-12 | Base de validacion (Zod + middleware) y entradas criticas | `en progreso` | DoD cubierta: middleware reutilizable, 400 uniforme, auth/createUser/plan de mantenimiento por esquema, tests verdes. Resto de endpoints como seguimiento incremental. |
+| 2026-06-12 | Base de validacion (Zod + middleware) y entradas criticas | `completada` | Middleware reutilizable, 400 uniforme, auth/createUser/plan de mantenimiento por esquema, tests verdes. |
+| 2026-06-12 | Esquematizacion completa de los 3 modulos | `completada` | Todos los endpoints de escritura de QUALITY, RH y HELPDESK con `validate(...)` + Zod. 44 tests backend verdes; smoke por modulo sin regresiones. |

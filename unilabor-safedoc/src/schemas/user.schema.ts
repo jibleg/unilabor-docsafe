@@ -63,3 +63,43 @@ export const createUserSchema = z.preprocess(
       },
     ),
 );
+
+// Campos que el controller permite actualizar; al menos uno debe venir.
+const UPDATE_USER_FIELDS = ['email', 'full_name', 'role', 'module_codes', 'moduleCodes'] as const;
+
+const optionalRole = z.string().trim().toUpperCase().pipe(z.enum(ROLES)).optional();
+const optionalModuleCodes = z
+  .array(z.string().trim().toUpperCase().pipe(z.enum(MODULE_CODES)))
+  .optional();
+
+export const updateUserSchema = z
+  .object({
+    email: z.string().trim().min(1).pipe(z.email('Email invalido')).optional(),
+    role: optionalRole,
+    // El controller lee module_codes ?? moduleCodes; aceptamos ambas claves.
+    module_codes: optionalModuleCodes,
+    moduleCodes: optionalModuleCodes,
+  })
+  .passthrough()
+  .refine((data) => UPDATE_USER_FIELDS.some((field) => (data as Record<string, unknown>)[field] !== undefined), {
+    message: 'Debes enviar al menos un campo para actualizar',
+  });
+
+export const resetUserPasswordSchema = z
+  .object({
+    // Cadena vacia o ausente -> el controller genera una temporal aleatoria.
+    temporaryPassword: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().trim().min(6, 'La contrasena temporal debe tener al menos 6 caracteres').optional(),
+    ),
+  })
+  .passthrough();
+
+const optionalIdArray = z.array(z.coerce.number().int().positive()).optional();
+
+export const replaceUserCategoriesSchema = z
+  .object({
+    category_ids: optionalIdArray,
+    categoryIds: optionalIdArray,
+  })
+  .passthrough();

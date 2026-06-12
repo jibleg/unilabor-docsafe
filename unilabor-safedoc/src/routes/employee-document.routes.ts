@@ -11,6 +11,8 @@ import {
 } from '../controllers/employee-document.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
 import { upload as uploadMiddleware } from '../middlewares/upload.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import { uploadEmployeeDocumentSchema } from '../schemas/employee.schema';
 
 const router = Router();
 
@@ -42,6 +44,7 @@ router.post(
   '/employees/:id/documents',
   authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
   uploadMiddleware.single('file'),
+  validate(uploadEmployeeDocumentSchema),
   uploadEmployeeDocumentController,
 );
 
@@ -49,6 +52,7 @@ router.post(
   '/me/documents',
   authorizeModuleRole('RH', ['ADMIN', 'EDITOR', 'VIEWER']),
   uploadMiddleware.single('file'),
+  validate(uploadEmployeeDocumentSchema),
   uploadMyDocumentController,
 );
 

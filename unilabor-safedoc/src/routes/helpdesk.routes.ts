@@ -39,7 +39,19 @@ import {
 } from '../controllers/helpdesk.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { maintenancePlanSchema } from '../schemas/helpdesk.schema';
+import {
+  helpdeskAssetSchema,
+  helpdeskCatalogItemSchema,
+  helpdeskTicketCommentSchema,
+  helpdeskTicketIsoRiskSchema,
+  helpdeskTicketSchema,
+  helpdeskTicketSolveSchema,
+  helpdeskTicketTechnicalReleaseSchema,
+  helpdeskTicketValidateReturnSchema,
+  maintenanceOrderCloseSchema,
+  maintenanceOrderRescheduleSchema,
+  maintenancePlanSchema,
+} from '../schemas/helpdesk.schema';
 
 const router = Router();
 
@@ -73,11 +85,13 @@ router.get(
 router.post(
   '/me/tickets',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  validate(helpdeskTicketSchema),
   createMyHelpdeskTicketController,
 );
 router.post(
   '/me/tickets/:id/comments',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  validate(helpdeskTicketCommentSchema),
   addMyHelpdeskTicketCommentController,
 );
 router.post(
@@ -108,11 +122,13 @@ router.get(
 router.post(
   '/catalog-admin/:catalogKey',
   authorizeModuleRole('HELPDESK', ['ADMIN']),
+  validate(helpdeskCatalogItemSchema),
   createHelpdeskCatalogItemController,
 );
 router.patch(
   '/catalog-admin/:catalogKey/:id',
   authorizeModuleRole('HELPDESK', ['ADMIN']),
+  validate(helpdeskCatalogItemSchema),
   updateHelpdeskCatalogItemController,
 );
 router.post(
@@ -150,11 +166,13 @@ router.post(
 router.post(
   '/maintenance/orders/:id/reschedule',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(maintenanceOrderRescheduleSchema),
   rescheduleMaintenanceOrderController,
 );
 router.post(
   '/maintenance/orders/:id/close',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(maintenanceOrderCloseSchema),
   closeMaintenanceOrderController,
 );
 router.get(
@@ -170,36 +188,43 @@ router.get(
 router.post(
   '/tickets',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskTicketSchema),
   createHelpdeskTicketController,
 );
 router.patch(
   '/tickets/:id',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskTicketSchema),
   updateHelpdeskTicketController,
 );
 router.post(
   '/tickets/:id/comments',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskTicketCommentSchema),
   addHelpdeskTicketCommentController,
 );
 router.post(
   '/tickets/:id/iso-risk',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskTicketIsoRiskSchema),
   evaluateHelpdeskTicketIsoRiskController,
 );
 router.post(
   '/tickets/:id/technical-release',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskTicketTechnicalReleaseSchema),
   releaseHelpdeskTicketTechnicallyController,
 );
 router.post(
   '/tickets/:id/solve',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskTicketSolveSchema),
   solveHelpdeskTicketController,
 );
 router.post(
   '/tickets/:id/validate-return',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskTicketValidateReturnSchema),
   validateHelpdeskTicketReturnController,
 );
 router.get(
@@ -215,11 +240,13 @@ router.get(
 router.post(
   '/assets',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskAssetSchema),
   createHelpdeskAssetController,
 );
 router.patch(
   '/assets/:id',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(helpdeskAssetSchema),
   updateHelpdeskAssetController,
 );
 router.delete(

@@ -11,6 +11,12 @@ import {
   updateEmployeeController,
 } from '../controllers/employee.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import {
+  createEmployeeSchema,
+  updateEmployeeDocumentAccessSchema,
+  updateEmployeeSchema,
+} from '../schemas/employee.schema';
 
 const router = Router();
 
@@ -33,11 +39,12 @@ router.get(
   authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
   getEmployeeDocumentAccessController,
 );
-router.post('/', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), createEmployeeController);
-router.patch('/:id', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), updateEmployeeController);
+router.post('/', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), validate(createEmployeeSchema), createEmployeeController);
+router.patch('/:id', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), validate(updateEmployeeSchema), updateEmployeeController);
 router.put(
   '/:id/document-access',
   authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
+  validate(updateEmployeeDocumentAccessSchema),
   updateEmployeeDocumentAccessController,
 );
 router.delete('/:id', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), deleteEmployeeController);
