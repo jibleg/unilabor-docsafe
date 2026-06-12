@@ -46,6 +46,16 @@ export const PdfSafeViewer = ({ fileUrl }: { fileUrl: string }) => {
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.15);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadedFileUrl, setLoadedFileUrl] = useState(fileUrl);
+
+  // Reinicia el estado del visor cuando cambia el documento, durante el render
+  // (patron recomendado por React en lugar de un efecto que llama setState).
+  if (fileUrl !== loadedFileUrl) {
+    setLoadedFileUrl(fileUrl);
+    setNumPages(0);
+    setPageNumber(1);
+    setLoadError(null);
+  }
 
   const watermarkText = useMemo(() => {
     const identity = user?.full_name?.trim() || user?.email?.trim() || 'Usuario autenticado';
@@ -68,12 +78,6 @@ export const PdfSafeViewer = ({ fileUrl }: { fileUrl: string }) => {
     }),
     [token],
   );
-
-  useEffect(() => {
-    setNumPages(0);
-    setPageNumber(1);
-    setLoadError(null);
-  }, [fileUrl]);
 
   useEffect(() => {
     const handleBlockedShortcuts = (event: KeyboardEvent) => {

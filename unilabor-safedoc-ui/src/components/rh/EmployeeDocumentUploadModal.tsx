@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Loader2, UploadCloud } from 'lucide-react';
 import type { DocumentType, Employee, EmployeeDocument } from '../../types/models';
 
@@ -32,18 +32,28 @@ export const EmployeeDocumentUploadModal = ({
   const [issueDate, setIssueDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [lastSync, setLastSync] = useState<{
+    doc: EmployeeDocument | null | undefined;
+    type: DocumentType | null;
+    open: boolean;
+  }>({ doc: currentDocument, type: documentType, open: isOpen });
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
+  // Reinicia el formulario al abrir el modal o al cambiar el documento/tipo,
+  // durante el render (en lugar de un efecto que llama setState).
+  if (
+    lastSync.doc !== currentDocument ||
+    lastSync.type !== documentType ||
+    lastSync.open !== isOpen
+  ) {
+    setLastSync({ doc: currentDocument, type: documentType, open: isOpen });
+    if (isOpen) {
+      setTitle(currentDocument?.title ?? documentType?.name ?? '');
+      setDescription(currentDocument?.description ?? '');
+      setIssueDate(currentDocument?.issue_date ?? '');
+      setExpiryDate(currentDocument?.expiry_date ?? '');
+      setFile(null);
     }
-
-    setTitle(currentDocument?.title ?? documentType?.name ?? '');
-    setDescription(currentDocument?.description ?? '');
-    setIssueDate(currentDocument?.issue_date ?? '');
-    setExpiryDate(currentDocument?.expiry_date ?? '');
-    setFile(null);
-  }, [currentDocument, documentType, isOpen]);
+  }
 
   if (!isOpen || !employee || !documentType) {
     return null;

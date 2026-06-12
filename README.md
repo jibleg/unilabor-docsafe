@@ -69,6 +69,15 @@ Frontend:
 Copy-Item unilabor-safedoc-ui/.env.example unilabor-safedoc-ui/.env
 ```
 
+### Puertos del backend (importante)
+
+El backend escucha en puertos distintos segun el entorno:
+
+- Desarrollo: `PORT=4000` (valor por defecto en `.env.example` y en `src/index.ts`). El proxy de Vite del frontend apunta a este puerto via `VITE_API_PROXY_TARGET`.
+- Produccion (PM2): `ecosystem.config.js` arranca el proceso con `PORT=5060`.
+
+Si cambias el puerto de produccion, actualiza tambien el reverse proxy (nginx) o el `VITE_API_PROXY_TARGET` que use el frontend para no romper la comunicacion `/api`.
+
 ### 2. Instalar dependencias
 
 Backend:

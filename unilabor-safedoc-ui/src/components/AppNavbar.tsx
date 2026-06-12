@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -40,6 +40,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const moduleRole = getModuleRole(availableModules, moduleCode) ?? user?.role ?? 'VIEWER';
   const { avatarUrl } = useUserAvatar();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [lastPath, setLastPath] = useState(location.pathname);
 
   const displayName = user?.full_name ?? user?.name ?? 'Usuario';
   const avatarInitial =
@@ -83,9 +84,11 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
     item.roles ? hasAnyRole(moduleRole, item.roles) : true,
   );
 
-  useEffect(() => {
+  // Cierra el menu movil al cambiar de ruta, durante el render.
+  if (location.pathname !== lastPath) {
+    setLastPath(location.pathname);
     setIsMobileMenuOpen(false);
-  }, [location.pathname]);
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-[rgba(0,65,106,0.08)] bg-white/90 backdrop-blur-xl lg:hidden">
