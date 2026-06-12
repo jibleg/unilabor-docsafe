@@ -25,11 +25,8 @@ const logAuthAudit = async (userId: string, action: string, ipAddress: string | 
 };
 
 export const login = async (req: Request, res: Response) => {
+  // La presencia y forma de email/password las garantiza validate(loginSchema).
   const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email y contraseña son requeridos' });
-  }
 
   try {
     // Consulta SQL pura para obtener el usuario

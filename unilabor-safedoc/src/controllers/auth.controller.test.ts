@@ -44,11 +44,9 @@ beforeEach(() => {
 });
 
 describe('login', () => {
-  it('responde 400 si faltan credenciales', async () => {
-    const res = buildRes();
-    await login({ body: {} } as any, res);
-    expect(res.statusCode).toBe(400);
-  });
+  // La validacion de presencia de credenciales se cubre en validate.middleware
+  // + auth.schema (ver validate.middleware.test.ts); aqui se prueba la logica
+  // del controller asumiendo entrada ya validada.
 
   it('responde 401 si el usuario no existe', async () => {
     mockedQuery.mockResolvedValueOnce({ rows: [] } as any);

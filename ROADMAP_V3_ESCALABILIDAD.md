@@ -21,7 +21,7 @@ Convertir el PMV+ funcional (V2 + Helpdesk) en una base sostenible y escalable, 
 | 24 | Migration runner y control de schema | Sin runner de migraciones | alta | `completada` |
 | 25 | Aplicacion y validacion de migraciones Helpdesk | Migraciones Helpdesk no aplicadas en BD real | alta | `completada` |
 | 26 | Infraestructura de pruebas | Sin tests | media | `completada` |
-| 27 | Validacion de entrada centralizada | Sin libreria de validacion | media | `pendiente` |
+| 27 | Validacion de entrada centralizada | Sin libreria de validacion | media | `en progreso` |
 | 28 | Endurecimiento de auth y sesion | JWT/localStorage sin refresh ni 401 handling | media | `pendiente` |
 | 29 | Paginacion y rendimiento en listados | Listados sin paginacion real | media | `pendiente` |
 | 30 | Modularidad y reduccion de archivos monoliticos | service.ts y paginas/servicios gigantes | baja | `pendiente` |
@@ -57,3 +57,4 @@ Nota: no es obligatorio completar los 8 sprints. El roadmap esta disenado para e
 | 2026-06-12 | Sprint 25 (migraciones Helpdesk) aplicado en BD local | `en progreso` | Tablas, catalogos y modulo HELPDESK verificados. Resta validacion manual en navegador (Bloque 3). |
 | 2026-06-12 | Sprint 25 cerrado: flujos Helpdesk validados en navegador | `completada` | Activos, tickets, mantenimiento y dashboard validados. Corregido bug de fechas (locale vs ISO). Cierra el unico pendiente operativo del proyecto. |
 | 2026-06-12 | Sprint 26 (infraestructura de pruebas) ejecutado | `completada` | Vitest en backend y frontend; 42 smoke tests verdes sobre flujos criticos. Habilita refactors con red de seguridad para sprints 27/29/30. |
+| 2026-06-12 | Sprint 27 (validacion con Zod) base + entradas criticas | `en progreso` | Middleware `validate` + 400 uniforme; auth, createUser y plan de mantenimiento por esquema; tests verdes. Resto de endpoints como seguimiento incremental. |

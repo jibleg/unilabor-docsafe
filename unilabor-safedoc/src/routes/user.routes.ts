@@ -19,6 +19,8 @@ import {
 } from '../controllers/profile.controller';
 import { verifyToken, authorizeModuleAccess, authorizeModuleRole } from '../middlewares/auth.middleware';
 import { uploadAvatar } from '../middlewares/upload.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import { changePasswordSchema, createUserSchema } from '../schemas/user.schema';
 
 const router = Router();
 
@@ -27,14 +29,14 @@ const router = Router();
  * Solo accesible por el rol ADMIN
  */
 router.get('/modules/catalog', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN']), getModuleCatalog);
-router.post('/', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN']), createUser);
+router.post('/', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN']), validate(createUserSchema), createUser);
 router.get('/', verifyToken, authorizeModuleAccess('QUALITY'), authorizeModuleRole('QUALITY', ['ADMIN', 'EDITOR']), getAllUsers);
 
 /**
  * PERFIL PERSONAL
  * Accesible por cualquier usuario autenticado (ADMIN, EDITOR, VIEWER)
  */
-router.patch('/change-password', verifyToken, updatePassword);
+router.patch('/change-password', verifyToken, validate(changePasswordSchema), updatePassword);
 router.get('/me', verifyToken, getMyProfile);
 router.get('/me/categories', verifyToken, authorizeModuleAccess('QUALITY'), getMyCategories);
 router.patch('/me/avatar', verifyToken, uploadAvatar.single('avatar'), uploadMyAvatar);

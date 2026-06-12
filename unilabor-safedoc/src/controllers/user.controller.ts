@@ -122,38 +122,19 @@ export const getModuleCatalog = async (_req: AuthRequest, res: Response) => {
 };
 
 export const createUser = async (req: AuthRequest, res: Response) => {
-  const { email, full_name, role, category_ids, categoryIds, module_codes, moduleCodes } = req.body;
-  const normalizedRole = String(role ?? '').toUpperCase() as UserRole;
-  const rawCategoryIds = category_ids ?? categoryIds;
-  const parsedCategoryIds = parseCategoryIds(rawCategoryIds);
-  const rawModuleCodes = module_codes ?? moduleCodes;
-  const parsedModuleCodes = parseModuleCodes(rawModuleCodes);
-  const effectiveModuleCodes: ModuleCode[] | null =
-    rawModuleCodes === undefined || rawModuleCodes === null
-      ? ['QUALITY']
-      : parsedModuleCodes;
-
-  if (!email || !full_name || !normalizedRole) {
-    return res.status(400).json({ message: 'Email, nombre y rol son obligatorios' });
-  }
-
-  if (!allowedRoles.includes(normalizedRole)) {
-    return res.status(400).json({ message: `Rol invalido. Valores permitidos: ${allowedRoles.join(', ')}` });
-  }
-
-  if (parsedCategoryIds === null) {
-    return res.status(400).json({ message: 'category_ids debe ser un arreglo de IDs numericos validos' });
-  }
-
-  if (effectiveModuleCodes === null) {
-    return res.status(400).json({
-      message: `module_codes debe ser un arreglo con valores validos: ${allowedModuleCodes.join(', ')}`,
-    });
-  }
-
-  if (normalizedRole === 'VIEWER' && effectiveModuleCodes.includes('QUALITY') && parsedCategoryIds.length === 0) {
-    return res.status(400).json({ message: 'Un usuario VIEWER debe tener al menos una categoria asignada' });
-  }
+  // Entrada validada/normalizada por validate(createUserSchema): role en
+  // mayusculas, category_ids numericos unicos, module_codes (default ['QUALITY'])
+  // y la regla "VIEWER requiere al menos una categoria" ya verificadas.
+  const { email, full_name, role, category_ids, module_codes } = req.body as {
+    email: string;
+    full_name: string;
+    role: UserRole;
+    category_ids: number[];
+    module_codes: ModuleCode[];
+  };
+  const normalizedRole = role;
+  const parsedCategoryIds = category_ids;
+  const effectiveModuleCodes = module_codes;
 
   const client = await pool.connect();
 

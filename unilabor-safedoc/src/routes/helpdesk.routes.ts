@@ -38,6 +38,8 @@ import {
   validateHelpdeskTicketReturnController,
 } from '../controllers/helpdesk.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import { maintenancePlanSchema } from '../schemas/helpdesk.schema';
 
 const router = Router();
 
@@ -131,11 +133,13 @@ router.get(
 router.post(
   '/maintenance/plans',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(maintenancePlanSchema),
   createMaintenancePlanController,
 );
 router.patch(
   '/maintenance/plans/:id',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(maintenancePlanSchema),
   updateMaintenancePlanController,
 );
 router.post(

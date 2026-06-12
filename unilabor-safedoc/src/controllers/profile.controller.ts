@@ -96,9 +96,7 @@ export const updatePassword = async (req: AuthRequest, res: Response) => {
     return res.status(401).json({ message: 'Sesion invalida o expirada' });
   }
 
-  if (!newPassword || String(newPassword).trim().length < 6) {
-    return res.status(400).json({ message: 'La nueva contrasena debe tener al menos 6 caracteres' });
-  }
+  // La longitud minima de newPassword la garantiza validate(changePasswordSchema).
 
   try {
     const salt = await bcrypt.genSalt(10);
