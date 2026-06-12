@@ -1,4 +1,5 @@
 import pool from '../config/db';
+import { toIsoDateTime } from '../utils/date-serialization';
 import { getEmployeeByUserId } from './employee.service';
 import { employeeCanAccessHelpdeskAsset } from './helpdesk-asset.service';
 import { getHelpdeskSummary, type HelpdeskCatalogItem, type HelpdeskAssetSummary } from './helpdesk-asset.service';
@@ -258,13 +259,13 @@ const mapTicketRow = (row: any): HelpdeskTicketRecord => ({
   description: String(row.description),
   operational_impact: row.operational_impact ? String(row.operational_impact) : null,
   affects_results: Boolean(row.affects_results),
-  reported_at: row.reported_at ? String(row.reported_at) : '',
-  due_at: row.due_at ? String(row.due_at) : null,
-  solved_at: row.solved_at ? String(row.solved_at) : null,
+  reported_at: row.reported_at ? toIsoDateTime(row.reported_at) : '',
+  due_at: row.due_at ? toIsoDateTime(row.due_at) : null,
+  solved_at: row.solved_at ? toIsoDateTime(row.solved_at) : null,
   solution_summary: row.solution_summary ? String(row.solution_summary) : null,
-  return_to_operation_at: row.return_to_operation_at ? String(row.return_to_operation_at) : null,
+  return_to_operation_at: row.return_to_operation_at ? toIsoDateTime(row.return_to_operation_at) : null,
   validated_by_user_id: row.validated_by_user_id ? String(row.validated_by_user_id) : null,
-  validated_at: row.validated_at ? String(row.validated_at) : null,
+  validated_at: row.validated_at ? toIsoDateTime(row.validated_at) : null,
   downtime_minutes: row.downtime_minutes ? Number(row.downtime_minutes) : null,
   equipment_status_after_solution_id: row.equipment_status_after_solution_id
     ? Number(row.equipment_status_after_solution_id)
@@ -277,16 +278,16 @@ const mapTicketRow = (row: any): HelpdeskTicketRecord => ({
   corrective_action_required: Boolean(row.corrective_action_required),
   corrective_action_notes: row.corrective_action_notes ? String(row.corrective_action_notes) : null,
   impact_evaluated_by_user_id: row.impact_evaluated_by_user_id ? String(row.impact_evaluated_by_user_id) : null,
-  impact_evaluated_at: row.impact_evaluated_at ? String(row.impact_evaluated_at) : null,
+  impact_evaluated_at: row.impact_evaluated_at ? toIsoDateTime(row.impact_evaluated_at) : null,
   technical_release_required: Boolean(row.technical_release_required),
   technical_release_summary: row.technical_release_summary ? String(row.technical_release_summary) : null,
   technical_released_by_user_id: row.technical_released_by_user_id ? String(row.technical_released_by_user_id) : null,
-  technical_released_at: row.technical_released_at ? String(row.technical_released_at) : null,
+  technical_released_at: row.technical_released_at ? toIsoDateTime(row.technical_released_at) : null,
   quality_document_id: row.quality_document_id ? String(row.quality_document_id) : null,
   operational_lock: Boolean(row.operational_lock),
   is_active: Boolean(row.is_active),
-  created_at: row.created_at ? String(row.created_at) : undefined,
-  updated_at: row.updated_at ? String(row.updated_at) : undefined,
+  created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
+  updated_at: row.updated_at ? toIsoDateTime(row.updated_at) : undefined,
   asset: row.asset_id
     ? {
         id: Number(row.asset_id),
@@ -804,7 +805,7 @@ export const getHelpdeskDashboardMetrics = async (): Promise<HelpdeskDashboardMe
       asset_name: row.asset_name ? String(row.asset_name) : null,
       status: String(row.status ?? ''),
       risk_level: row.risk_level ? String(row.risk_level) : null,
-      event_at: row.event_at ? String(row.event_at) : '',
+      event_at: row.event_at ? toIsoDateTime(row.event_at) : '',
       owner: row.owner ? String(row.owner) : null,
     })),
   };
@@ -875,7 +876,7 @@ export const listTicketComments = async (ticketId: number): Promise<HelpdeskTick
     is_internal: Boolean(row.is_internal),
     created_by_user_id: row.created_by_user_id ? String(row.created_by_user_id) : null,
     created_by_name: row.created_by_name ? String(row.created_by_name) : null,
-    created_at: row.created_at ? String(row.created_at) : undefined,
+    created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
   }));
 };
 

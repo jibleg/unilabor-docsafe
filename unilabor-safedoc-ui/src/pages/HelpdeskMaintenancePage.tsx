@@ -128,7 +128,11 @@ const formatDate = (value?: string | null): string => {
     return 'Sin fecha';
   }
 
-  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }).format(new Date(`${value.slice(0, 10)}T00:00:00`));
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return 'Sin fecha';
+  }
+  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }).format(date);
 };
 
 const formatDateTime = (value?: string | null): string => {
@@ -136,10 +140,14 @@ const formatDateTime = (value?: string | null): string => {
     return 'Sin fecha';
   }
 
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Sin fecha';
+  }
   return new Intl.DateTimeFormat('es-MX', {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(new Date(value));
+  }).format(date);
 };
 
 const nowInputValue = (): string => new Date().toISOString().slice(0, 16);

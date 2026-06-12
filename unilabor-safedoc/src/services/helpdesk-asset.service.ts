@@ -1,4 +1,5 @@
 import pool from '../config/db';
+import { toIsoDate, toIsoDateTime } from '../utils/date-serialization';
 
 export interface HelpdeskCatalogItem {
   id: number;
@@ -165,15 +166,15 @@ const mapAssetRow = (row: any): HelpdeskAssetRecord => ({
   responsible_employee_id: row.responsible_employee_id ? Number(row.responsible_employee_id) : null,
   criticality_id: row.criticality_id ? Number(row.criticality_id) : null,
   operational_status_id: row.operational_status_id ? Number(row.operational_status_id) : null,
-  acquired_on: row.acquired_on ? String(row.acquired_on) : null,
-  warranty_expires_on: row.warranty_expires_on ? String(row.warranty_expires_on) : null,
+  acquired_on: row.acquired_on ? toIsoDate(row.acquired_on) : null,
+  warranty_expires_on: row.warranty_expires_on ? toIsoDate(row.warranty_expires_on) : null,
   inventory_legacy_code: row.inventory_legacy_code ? String(row.inventory_legacy_code) : null,
   legacy_consecutive: row.legacy_consecutive ? String(row.legacy_consecutive) : null,
   legacy_component_consecutive: row.legacy_component_consecutive ? String(row.legacy_component_consecutive) : null,
   notes: row.notes ? String(row.notes) : null,
   is_active: Boolean(row.is_active),
-  created_at: row.created_at ? String(row.created_at) : undefined,
-  updated_at: row.updated_at ? String(row.updated_at) : undefined,
+  created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
+  updated_at: row.updated_at ? toIsoDateTime(row.updated_at) : undefined,
   category: mapCatalog(row.category_id, row.category_name, row.category_code, row.category_description),
   unit: mapCatalog(row.unit_id, row.unit_name, row.unit_code, row.unit_description),
   area: mapCatalog(row.area_id, row.area_name, row.area_code, row.area_description),

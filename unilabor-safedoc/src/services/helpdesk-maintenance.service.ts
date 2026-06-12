@@ -1,4 +1,5 @@
 import pool from '../config/db';
+import { toIsoDate, toIsoDateTime } from '../utils/date-serialization';
 import type { HelpdeskCatalogItem } from './helpdesk-asset.service';
 
 export interface HelpdeskMaintenancePlanPayload {
@@ -184,6 +185,7 @@ const addMonths = (dateValue: string, months: number): string => {
   return date.toISOString().slice(0, 10);
 };
 
+
 const buildPlanQuery = () => `
   SELECT
     p.*,
@@ -240,12 +242,12 @@ const listPlanOrders = async (planId: number): Promise<HelpdeskMaintenancePlanRe
   return result.rows.map((row) => ({
     id: Number(row.id),
     order_code: String(row.order_code),
-    scheduled_for: row.scheduled_for ? String(row.scheduled_for) : '',
-    window_starts_on: row.window_starts_on ? String(row.window_starts_on) : null,
-    window_ends_on: row.window_ends_on ? String(row.window_ends_on) : null,
+    scheduled_for: row.scheduled_for ? toIsoDate(row.scheduled_for) : '',
+    window_starts_on: row.window_starts_on ? toIsoDate(row.window_starts_on) : null,
+    window_ends_on: row.window_ends_on ? toIsoDate(row.window_ends_on) : null,
     status: String(row.status),
-    started_at: row.started_at ? String(row.started_at) : null,
-    completed_at: row.completed_at ? String(row.completed_at) : null,
+    started_at: row.started_at ? toIsoDateTime(row.started_at) : null,
+    completed_at: row.completed_at ? toIsoDateTime(row.completed_at) : null,
     result: row.result ? String(row.result) : null,
   }));
 };
@@ -318,12 +320,12 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
     order_code: String(row.order_code),
     plan_id: Number(row.plan_id),
     asset_id: Number(row.asset_id),
-    scheduled_for: row.scheduled_for ? String(row.scheduled_for) : '',
-    window_starts_on: row.window_starts_on ? String(row.window_starts_on) : null,
-    window_ends_on: row.window_ends_on ? String(row.window_ends_on) : null,
+    scheduled_for: row.scheduled_for ? toIsoDate(row.scheduled_for) : '',
+    window_starts_on: row.window_starts_on ? toIsoDate(row.window_starts_on) : null,
+    window_ends_on: row.window_ends_on ? toIsoDate(row.window_ends_on) : null,
     status: String(row.status),
-    started_at: row.started_at ? String(row.started_at) : null,
-    completed_at: row.completed_at ? String(row.completed_at) : null,
+    started_at: row.started_at ? toIsoDateTime(row.started_at) : null,
+    completed_at: row.completed_at ? toIsoDateTime(row.completed_at) : null,
     completed_by_user_id: row.completed_by_user_id ? String(row.completed_by_user_id) : null,
     performed_activities: row.performed_activities ? String(row.performed_activities) : null,
     findings: row.findings ? String(row.findings) : null,
@@ -331,7 +333,7 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
     result: row.result ? String(row.result) : null,
     evidence_notes: row.evidence_notes ? String(row.evidence_notes) : null,
     rescheduled_from: row.rescheduled_from ? String(row.rescheduled_from) : null,
-    rescheduled_at: row.rescheduled_at ? String(row.rescheduled_at) : null,
+    rescheduled_at: row.rescheduled_at ? toIsoDateTime(row.rescheduled_at) : null,
     reschedule_reason: row.reschedule_reason ? String(row.reschedule_reason) : null,
     plan: row.plan_id
       ? {
@@ -355,10 +357,10 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
   };
 
   if (row.created_at) {
-    order.created_at = String(row.created_at);
+    order.created_at = toIsoDateTime(row.created_at);
   }
   if (row.updated_at) {
-    order.updated_at = String(row.updated_at);
+    order.updated_at = toIsoDateTime(row.updated_at);
   }
 
   return order;
@@ -377,15 +379,15 @@ const mapPlanRow = async (row: any): Promise<HelpdeskMaintenancePlanRecord> => {
     title: String(row.title),
     description: row.description ? String(row.description) : null,
     provider_name: row.provider_name ? String(row.provider_name) : null,
-    starts_on: row.starts_on ? String(row.starts_on) : '',
-    next_due_on: row.next_due_on ? String(row.next_due_on) : '',
+    starts_on: row.starts_on ? toIsoDate(row.starts_on) : '',
+    next_due_on: row.next_due_on ? toIsoDate(row.next_due_on) : '',
     tolerance_before_days: Number(row.tolerance_before_days ?? 0),
     tolerance_after_days: Number(row.tolerance_after_days ?? 0),
     checklist_required: Boolean(row.checklist_required),
     evidence_required: Boolean(row.evidence_required),
     is_active: Boolean(row.is_active),
-    created_at: row.created_at ? String(row.created_at) : undefined,
-    updated_at: row.updated_at ? String(row.updated_at) : undefined,
+    created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
+    updated_at: row.updated_at ? toIsoDateTime(row.updated_at) : undefined,
     asset: row.asset_id
       ? {
           id: Number(row.asset_id),
