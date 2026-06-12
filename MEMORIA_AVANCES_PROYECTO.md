@@ -104,6 +104,8 @@ Nota:
 
 Durante el cierre se intento aplicar migraciones con el `DATABASE_URL` local, pero PostgreSQL rechazo la autenticacion. Para validar en navegador se requiere corregir credenciales y aplicar migraciones.
 
+Actualizacion 2026-06-12 (Sprints 24-25): resuelto. Las migraciones Helpdesk se aplicaron y verificaron en BD local con el migration runner (`npm run migrate`). Flujos validados en navegador (activos, tickets, mantenimiento, dashboard). Durante la validacion se corrigio un bug de serializacion de fechas (locale vs ISO) que dejaba en blanco la pagina de mantenimiento.
+
 ## Validaciones realizadas
 
 Ultimo cierre Helpdesk:
@@ -115,8 +117,8 @@ Ultimo cierre Helpdesk:
 
 ## Pendientes conocidos
 
-- Aplicar migraciones Helpdesk en base de datos con credenciales correctas.
-- Validar flujo completo en navegador contra base actualizada.
+- ~~Aplicar migraciones Helpdesk en base de datos con credenciales correctas.~~ Resuelto (Sprint 24-25, 2026-06-12).
+- ~~Validar flujo completo en navegador contra base actualizada.~~ Resuelto (Sprint 25, 2026-06-12).
 - Ignorar artefactos locales no versionados:
   - `.docx-build/`
   - `unilabor-safe-20260417T1535.zip`

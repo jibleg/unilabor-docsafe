@@ -1,6 +1,6 @@
 # Sprint 25 - Aplicacion y Validacion de Migraciones Helpdesk
 
-Estado general del sprint: `en progreso`
+Estado general del sprint: `completada`
 
 Objetivo:
 Aplicar y validar en base de datos real las migraciones del modulo Helpdesk, que quedaron identificadas pero no ejecutadas en el cierre de la fase (fallo de autenticacion de PostgreSQL). Es el unico pendiente operativo real para que Helpdesk funcione end to end.
@@ -33,10 +33,10 @@ usuario con acceso al modulo HELPDESK, y marcar cada flujo al validarlo.
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| APP-07 | Validar `/helpdesk/assets` | `pendiente (validacion manual)` | Alta y asignacion de equipo. |
-| APP-08 | Validar `/helpdesk/tickets` | `pendiente (validacion manual)` | Ticket de falla, solucion y retorno a operacion. |
-| APP-09 | Validar `/helpdesk/maintenance` | `pendiente (validacion manual)` | Plan, orden y checklist. |
-| APP-10 | Validar `/helpdesk/dashboard` y `/helpdesk/my-portal` | `pendiente (validacion manual)` | KPIs y portal del colaborador. |
+| APP-07 | Validar `/helpdesk/assets` | `completada` | Validado en navegador por el equipo. |
+| APP-08 | Validar `/helpdesk/tickets` | `completada` | Validado en navegador por el equipo. |
+| APP-09 | Validar `/helpdesk/maintenance` | `completada` | Validado tras corregir el bug de fechas (pagina en blanco al guardar plan). |
+| APP-10 | Validar `/helpdesk/dashboard` y `/helpdesk/my-portal` | `completada` | Validado en navegador por el equipo. |
 
 ## Definicion de terminado
 
