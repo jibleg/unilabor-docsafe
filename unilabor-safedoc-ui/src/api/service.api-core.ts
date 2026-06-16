@@ -129,6 +129,14 @@ export const listUsers = async (): Promise<ManagedUser[]> => {
     .filter((user): user is ManagedUser => user !== null);
 };
 
+export const listUsersPaginated = async (query: PageQuery = {}): Promise<PageResult<ManagedUser>> => {
+  const response = await api.get('/users', { params: buildPageParams(query) });
+  const data = getArrayFromPayload(response.data, ['users', 'items', 'results'])
+    .map(normalizeManagedUser)
+    .filter((user): user is ManagedUser => user !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
 export const createUser = async (payload: CreateUserPayload): Promise<ManagedUser> => {
   const response = await api.post('/users', payload);
   const parsed =

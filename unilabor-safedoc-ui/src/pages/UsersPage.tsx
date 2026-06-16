@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Edit3, KeyRound, Loader2, Plus, RefreshCw, Trash2, UserPlus } from 'lucide-react';
 import {
   createUser,
@@ -8,7 +8,7 @@ import {
   fetchModuleCatalog,
   fetchUserCategories,
   getApiErrorMessage,
-  listUsers,
+  listUsersPaginated,
   resetUserPassword,
   updateUserById,
   updateUserCategories,
@@ -18,7 +18,6 @@ import {
 import type { Category, ManagedUser, ModuleAccess, ModuleCode } from '../types/models';
 import { useAuthStore } from '../store/useAuthStore';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
-import { normalizeRole } from '../utils/roles';
 
 import {
   PAGE_SIZE_OPTIONS,
@@ -29,7 +28,6 @@ import {
   getRoleLabel,
   getRoleBadgeClassName,
   normalizeRoleValue,
-  sortUsers,
   confirmAction,
   type RoleValue,
   type UserFormState,
@@ -47,8 +45,10 @@ export const UsersPage = () => {
   const [loadingModules, setLoadingModules] = useState(false);
 
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState<UserFormState>(EMPTY_FORM);
@@ -66,14 +66,19 @@ export const UsersPage = () => {
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const usersData = await listUsers();
-      setUsers(sortUsers(usersData));
+      const result = await listUsersPaginated({
+        page: currentPage,
+        limit: pageSize,
+        search: debouncedQuery,
+      });
+      setUsers(result.data);
+      setTotal(result.pagination.total);
     } catch (requestError) {
       notifyError(getApiErrorMessage(requestError, 'No se pudo cargar el listado de usuarios'));
     } finally {
       setLoadingUsers(false);
     }
-  }, []);
+  }, [currentPage, pageSize, debouncedQuery]);
 
   const loadCategories = useCallback(async () => {
     setLoadingCategories(true);
@@ -105,30 +110,25 @@ export const UsersPage = () => {
   }, []);
 
   useEffect(() => {
-    void loadUsers();
     void loadCategories();
     void loadModules();
-  }, [loadCategories, loadModules, loadUsers]);
+  }, [loadCategories, loadModules]);
 
+  // Búsqueda con debounce: vuelve a la primera página al cambiar el término.
   useEffect(() => {
-    setCurrentPage(1);
-  }, [query, pageSize]);
+    const handle = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setCurrentPage(1);
+    }, 350);
+    return () => window.clearTimeout(handle);
+  }, [query]);
 
-  const filteredUsers = useMemo(() => {
-    const queryValue = query.trim().toLowerCase();
-    if (queryValue.length === 0) {
-      return users;
-    }
+  // Refetch del servidor cuando cambian página, tamaño o búsqueda efectiva.
+  useEffect(() => {
+    void loadUsers();
+  }, [loadUsers]);
 
-    return users.filter((user) => {
-      const fullName = user.full_name.toLowerCase();
-      const email = user.email.toLowerCase();
-      const role = normalizeRole(user.role).toLowerCase();
-      return fullName.includes(queryValue) || email.includes(queryValue) || role.includes(queryValue);
-    });
-  }, [query, users]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -136,14 +136,8 @@ export const UsersPage = () => {
     }
   }, [currentPage, totalPages]);
 
-  const visibleUsers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    const end = start + pageSize;
-    return filteredUsers.slice(start, end);
-  }, [currentPage, filteredUsers, pageSize]);
-
-  const startRecord = filteredUsers.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endRecord = Math.min(currentPage * pageSize, filteredUsers.length);
+  const startRecord = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRecord = Math.min(currentPage * pageSize, total);
 
   const updateCreateRole = (role: RoleValue) => {
     setCreateForm((currentForm) => ({
@@ -443,7 +437,7 @@ export const UsersPage = () => {
             <span>Filas por pagina</span>
             <select
               value={pageSize}
-              onChange={(event) => setPageSize(Number(event.target.value))}
+              onChange={(event) => { setPageSize(Number(event.target.value)); setCurrentPage(1); }}
               className="rounded-lg border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-2.5 py-1.5 text-xs text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
             >
               {PAGE_SIZE_OPTIONS.map((option) => (
@@ -477,14 +471,14 @@ export const UsersPage = () => {
                   Cargando usuarios...
                 </td>
               </tr>
-            ) : visibleUsers.length === 0 ? (
+            ) : users.length === 0 ? (
               <tr>
                 <td colSpan={6} className="p-10 text-center text-[var(--unilabor-neutral)]">
                   No hay usuarios para mostrar.
                 </td>
               </tr>
             ) : (
-              visibleUsers.map((user) => {
+              users.map((user) => {
                 const isCurrentUser =
                   (currentUserId.length > 0 && currentUserId === user.id) ||
                   (currentUserEmail.length > 0 &&
@@ -577,7 +571,7 @@ export const UsersPage = () => {
 
       <div className="flex flex-col gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 px-4 py-3 text-sm text-[var(--unilabor-neutral)] shadow-xl shadow-[rgba(0,65,106,0.08)] sm:flex-row sm:items-center sm:justify-between">
         <span>
-          Mostrando {startRecord} - {endRecord} de {filteredUsers.length}
+          Mostrando {startRecord} - {endRecord} de {total}
         </span>
         <div className="flex items-center gap-2">
           <button
