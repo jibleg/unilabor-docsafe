@@ -24,7 +24,6 @@ import {
   releaseHelpdeskTicketTechnically,
   solveHelpdeskTicket,
   type HelpdeskTicketIsoRiskPayload,
-  type HelpdeskTicketPayload,
   type HelpdeskTicketTechnicalReleasePayload,
   updateHelpdeskTicketById,
   validateHelpdeskTicketReturn,
@@ -36,9 +35,7 @@ import type {
   HelpdeskCatalogItem,
   HelpdeskTicket,
   HelpdeskTicketCatalogs,
-  HelpdeskTicketPriority,
   HelpdeskTicketStats,
-  HelpdeskTicketStatus,
 } from '../types/models';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
@@ -46,207 +43,30 @@ import { getModuleRole } from '../utils/modules';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { hasAnyRole } from '../utils/roles';
 
-const EMPTY_TICKET_STATS: HelpdeskTicketStats = {
-  total: 0,
-  open: 0,
-  critical: 0,
-  affects_results: 0,
-};
-
-interface TicketFormState {
-  asset_id: string;
-  request_type_id: string;
-  status_id: string;
-  priority_id: string;
-  requester_employee_id: string;
-  assigned_employee_id: string;
-  title: string;
-  description: string;
-  operational_impact: string;
-  affects_results: boolean;
-  due_at: string;
-}
-
-interface SolutionFormState {
-  solved_at: string;
-  solution_summary: string;
-  equipment_status_after_solution_id: string;
-}
-
-interface ReturnFormState {
-  return_to_operation_at: string;
-  equipment_status_after_solution_id: string;
-}
-
-interface IsoRiskFormState {
-  risk_level: string;
-  impact_evaluation: string;
-  recent_analysis_usage: string;
-  alternate_equipment_used: boolean;
-  alternate_equipment_notes: string;
-  corrective_action_required: boolean;
-  corrective_action_notes: string;
-  technical_release_required: boolean;
-  operational_lock: boolean;
-}
-
-interface TechnicalReleaseFormState {
-  technical_release_summary: string;
-  equipment_status_after_solution_id: string;
-}
-
-const EMPTY_CATALOGS: HelpdeskTicketCatalogs = {
-  request_types: [],
-  ticket_statuses: [],
-  ticket_priorities: [],
-};
-
-const EMPTY_FORM: TicketFormState = {
-  asset_id: '',
-  request_type_id: '',
-  status_id: '',
-  priority_id: '',
-  requester_employee_id: '',
-  assigned_employee_id: '',
-  title: '',
-  description: '',
-  operational_impact: '',
-  affects_results: false,
-  due_at: '',
-};
-
-const EMPTY_SOLUTION_FORM: SolutionFormState = {
-  solved_at: '',
-  solution_summary: '',
-  equipment_status_after_solution_id: '',
-};
-
-const EMPTY_RETURN_FORM: ReturnFormState = {
-  return_to_operation_at: '',
-  equipment_status_after_solution_id: '',
-};
-
-const EMPTY_ISO_RISK_FORM: IsoRiskFormState = {
-  risk_level: 'LOW',
-  impact_evaluation: '',
-  recent_analysis_usage: '',
-  alternate_equipment_used: false,
-  alternate_equipment_notes: '',
-  corrective_action_required: false,
-  corrective_action_notes: '',
-  technical_release_required: false,
-  operational_lock: false,
-};
-
-const EMPTY_TECHNICAL_RELEASE_FORM: TechnicalReleaseFormState = {
-  technical_release_summary: '',
-  equipment_status_after_solution_id: '',
-};
-
-const numericOrNull = (value: string): number | null => {
-  const parsedValue = Number(value);
-  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null;
-};
-
-const catalogName = (item?: HelpdeskCatalogItem | null): string => item?.name ?? 'Sin clasificar';
-const statusName = (item?: HelpdeskTicketStatus | null): string => item?.name ?? 'Sin estado';
-const priorityName = (item?: HelpdeskTicketPriority | null): string => item?.name ?? 'Sin prioridad';
-
-const riskLabel = (risk?: string | null): string => {
-  const labels: Record<string, string> = {
-    NOT_EVALUATED: 'No evaluado',
-    LOW: 'Bajo',
-    MEDIUM: 'Medio',
-    HIGH: 'Alto',
-    CRITICAL: 'Critico',
-  };
-
-  return labels[risk ?? 'NOT_EVALUATED'] ?? risk ?? 'No evaluado';
-};
-
-const formatDateTime = (value?: string | null): string => {
-  if (!value) {
-    return 'Sin fecha';
-  }
-
-  return new Intl.DateTimeFormat('es-MX', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
-};
-
-const formatDowntime = (minutes?: number | null): string => {
-  if (!minutes || minutes <= 0) {
-    return 'Sin calcular';
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-
-  if (hours <= 0) {
-    return `${remainingMinutes} min`;
-  }
-
-  return `${hours} h ${remainingMinutes} min`;
-};
-
-const toFormState = (ticket: HelpdeskTicket): TicketFormState => ({
-  asset_id: ticket.asset_id ? String(ticket.asset_id) : '',
-  request_type_id: ticket.request_type_id ? String(ticket.request_type_id) : '',
-  status_id: ticket.status_id ? String(ticket.status_id) : '',
-  priority_id: ticket.priority_id ? String(ticket.priority_id) : '',
-  requester_employee_id: ticket.requester_employee_id ? String(ticket.requester_employee_id) : '',
-  assigned_employee_id: ticket.assigned_employee_id ? String(ticket.assigned_employee_id) : '',
-  title: ticket.title,
-  description: ticket.description,
-  operational_impact: ticket.operational_impact ?? '',
-  affects_results: ticket.affects_results,
-  due_at: ticket.due_at ? ticket.due_at.slice(0, 16) : '',
-});
-
-const toPayload = (form: TicketFormState): HelpdeskTicketPayload => ({
-  asset_id: numericOrNull(form.asset_id),
-  request_type_id: numericOrNull(form.request_type_id),
-  status_id: numericOrNull(form.status_id),
-  priority_id: numericOrNull(form.priority_id),
-  requester_employee_id: numericOrNull(form.requester_employee_id),
-  assigned_employee_id: numericOrNull(form.assigned_employee_id),
-  title: form.title.trim(),
-  description: form.description.trim(),
-  operational_impact: form.operational_impact.trim() || null,
-  affects_results: form.affects_results,
-  due_at: form.due_at || null,
-});
-
-const CatalogSelect = ({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: HelpdeskCatalogItem[];
-  onChange: (value: string) => void;
-}) => (
-  <label className="block">
-    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-      {label}
-    </span>
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-    >
-      <option value="">Sin seleccionar</option>
-      {options.map((option) => (
-        <option key={option.id} value={option.id}>
-          {option.name}
-        </option>
-      ))}
-    </select>
-  </label>
-);
+import { TicketFormModal } from './HelpdeskTicketForm';
+import {
+  EMPTY_TICKET_STATS,
+  EMPTY_CATALOGS,
+  EMPTY_FORM,
+  EMPTY_SOLUTION_FORM,
+  EMPTY_RETURN_FORM,
+  EMPTY_ISO_RISK_FORM,
+  EMPTY_TECHNICAL_RELEASE_FORM,
+  numericOrNull,
+  catalogName,
+  statusName,
+  priorityName,
+  riskLabel,
+  formatDateTime,
+  formatDowntime,
+  toFormState,
+  toPayload,
+  type TicketFormState,
+  type SolutionFormState,
+  type ReturnFormState,
+  type IsoRiskFormState,
+  type TechnicalReleaseFormState,
+} from './HelpdeskTicketsPage.helpers';
 
 export const HelpdeskTicketsPage = () => {
   const availableModules = useAuthStore((state) => state.availableModules);
@@ -1031,164 +851,22 @@ export const HelpdeskTicketsPage = () => {
         </aside>
       </div>
 
-      {isFormOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
-          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/96 shadow-2xl shadow-[rgba(0,65,106,0.18)]">
-            <div className="border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-                Mesa de ayuda
-              </p>
-              <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">
-                {editingTicket ? 'Editar solicitud' : 'Nueva solicitud'}
-              </h2>
-            </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <label className="block md:col-span-2">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Titulo
-                  </span>
-                  <input
-                    value={form.title}
-                    onChange={(event) => setField('title', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Activo relacionado
-                  </span>
-                  <select
-                    value={form.asset_id}
-                    onChange={(event) => setField('asset_id', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  >
-                    <option value="">Sin activo</option>
-                    {assets.map((asset) => (
-                      <option key={asset.id} value={asset.id}>
-                        {asset.asset_code} - {asset.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <CatalogSelect label="Tipo de solicitud" value={form.request_type_id} options={catalogs.request_types} onChange={(value) => setField('request_type_id', value)} />
-                <CatalogSelect label="Prioridad" value={form.priority_id} options={catalogs.ticket_priorities} onChange={(value) => setField('priority_id', value)} />
-                <CatalogSelect label="Estado" value={form.status_id} options={catalogs.ticket_statuses} onChange={(value) => setField('status_id', value)} />
-
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Colaborador solicitante
-                  </span>
-                  <select
-                    value={form.requester_employee_id}
-                    onChange={(event) => setField('requester_employee_id', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  >
-                    <option value="">Sin solicitante</option>
-                    {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {employee.employee_code} - {employee.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Responsable
-                  </span>
-                  <select
-                    value={form.assigned_employee_id}
-                    onChange={(event) => setField('assigned_employee_id', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  >
-                    <option value="">Sin responsable</option>
-                    {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {employee.employee_code} - {employee.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Fecha compromiso
-                  </span>
-                  <input
-                    type="datetime-local"
-                    value={form.due_at}
-                    onChange={(event) => setField('due_at', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  />
-                </label>
-
-                <label className="flex items-center gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={form.affects_results}
-                    onChange={(event) => setField('affects_results', event.target.checked)}
-                    className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] text-[var(--color-brand-500)]"
-                  />
-                  <span className="text-sm font-semibold text-[var(--color-brand-700)]">
-                    Puede afectar resultados
-                  </span>
-                </label>
-
-                <label className="block md:col-span-2">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Descripcion
-                  </span>
-                  <textarea
-                    value={form.description}
-                    onChange={(event) => setField('description', event.target.value)}
-                    rows={4}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  />
-                </label>
-
-                <label className="block md:col-span-2">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Impacto operativo
-                  </span>
-                  <textarea
-                    value={form.operational_impact}
-                    onChange={(event) => setField('operational_impact', event.target.value)}
-                    rows={3}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-5 py-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsFormOpen(false);
-                  resetForm();
-                }}
-                disabled={saving}
-                className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={saving}
-                className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
-              >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <LifeBuoy size={14} />}
-                Guardar solicitud
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <TicketFormModal
+        open={isFormOpen}
+        isEditing={Boolean(editingTicket)}
+        form={form}
+        setField={setField}
+        assets={assets}
+        employees={employees}
+        catalogs={catalogs}
+        saving={saving}
+        onCancel={() => {
+          setIsFormOpen(false);
+          resetForm();
+        }}
+        onSave={() => void handleSave()}
+      />
     </div>
   );
 };
