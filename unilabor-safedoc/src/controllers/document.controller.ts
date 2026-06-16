@@ -807,8 +807,10 @@ export const searchDocuments = async (req: AuthRequest, res: Response): Promise<
     const includeInactive =
       includeInactiveRequested && (user.role === 'ADMIN' || user.role === 'EDITOR');
 
-    const documents = await documentService.searchDocumentsForUser(user.id, user.role, {
+    const result = await documentService.searchDocumentsForUser(user.id, user.role, {
       includeInactive,
+      page: req.query.page,
+      limit: req.query.limit,
       filters: {
         ...(categoryId ? { category_id: categoryId } : {}),
         ...(title ? { title } : {}),
@@ -818,9 +820,25 @@ export const searchDocuments = async (req: AuthRequest, res: Response): Promise<
       },
     });
 
-    res.json(documents);
+    res.json(result);
   } catch (error) {
     console.error('Error buscando documentos:', error);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+export const getDocumentStats = async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user;
+  if (!user?.id || !user.role) {
+    res.status(401).json({ message: 'Sesion invalida o expirada' });
+    return;
+  }
+
+  try {
+    const stats = await documentService.getDocumentStatsForUser(user.id, user.role);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error obteniendo estadisticas de documentos:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };

@@ -25,6 +25,7 @@ import type {
   Category,
   Document,
   DocumentSection,
+  DocumentStats,
   DocumentStatus,
   DocumentType,
   Employee,
@@ -650,6 +651,33 @@ export const listDocuments = async (options: ListDocumentsOptions = {}): Promise
   return getArrayFromPayload(response.data, ['documents', 'items', 'results'])
     .map(normalizeDocument)
     .filter((doc): doc is Document => doc !== null);
+};
+
+export const listDocumentsPaginated = async (
+  options: ListDocumentsOptions = {},
+  pageQuery: PageQuery = {},
+): Promise<PageResult<Document>> => {
+  const shouldUseSearchEndpoint = hasDocumentSearchFilters(options);
+  const params = { ...(createDocumentListParams(options) ?? {}), ...buildPageParams(pageQuery) };
+  const response = await api.get(shouldUseSearchEndpoint ? '/documents/search' : '/documents', {
+    params,
+  });
+
+  const data = getArrayFromPayload(response.data, ['documents', 'items', 'results'])
+    .map(normalizeDocument)
+    .filter((doc): doc is Document => doc !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
+export const getDocumentStats = async (): Promise<DocumentStats> => {
+  const response = await api.get('/documents/stats');
+  const source = asRecord(unwrapPayload(response.data)) ?? {};
+  return {
+    active: Number(source.active ?? 0),
+    inactive: Number(source.inactive ?? 0),
+    superseded: Number(source.superseded ?? 0),
+    total: Number(source.total ?? 0),
+  };
 };
 
 export const deleteDocumentById = async (

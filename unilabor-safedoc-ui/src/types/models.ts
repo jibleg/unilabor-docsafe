@@ -138,6 +138,13 @@ export interface HelpdeskTicketStats {
   affects_results: number;
 }
 
+export interface DocumentStats {
+  active: number;
+  inactive: number;
+  superseded: number;
+  total: number;
+}
+
 export interface HelpdeskDashboardMetrics {
   tickets: {
     total: number;

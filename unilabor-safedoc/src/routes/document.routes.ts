@@ -3,6 +3,7 @@ import {
   deleteDocument,
   getAllDocuments,
   getCategories,
+  getDocumentStats,
   replaceDocumentFile,
   searchDocuments,
   toggleDocumentStatus,
@@ -33,6 +34,9 @@ router.get('/', verifyToken, authorizeModuleAccess('QUALITY'), getAllDocuments);
 
 // Busqueda filtrada de documentos
 router.get('/search', verifyToken, authorizeModuleAccess('QUALITY'), searchDocuments);
+
+// Estadisticas por estado (para tarjetas de resumen)
+router.get('/stats', verifyToken, authorizeModuleAccess('QUALITY'), getDocumentStats);
 
 // Visualizacion segura de PDF
 router.get('/view/:filename', verifyToken, authorizeModuleAccess('QUALITY'), viewDocument);

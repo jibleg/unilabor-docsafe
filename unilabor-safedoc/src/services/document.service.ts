@@ -542,46 +542,108 @@ export const listDocumentsForUser = async (
   return buildPaginatedResult(dataResult.rows, countResult.rows[0]?.total, page, limit);
 };
 
+/**
+ * Resuelve el alcance documental por rol (JOIN de permisos + filtro de estado base)
+ * compartido por busqueda y estadisticas. `applyStatusFilter` controla si se limita
+ * a documentos activos (false en stats de ADMIN/EDITOR para contar todos los estados).
+ */
+const resolveDocumentScope = async (
+  userId: string,
+  role: UserRole,
+  options: { includeInactive: boolean; applyStatusFilter: boolean },
+): Promise<{ joinClause: string; whereParts: string[]; values: unknown[]; visible: boolean }> => {
+  const hasUserCategoriesTable = await resolveUserCategoriesTable();
+  const hasCategoryStatusColumn = await resolveCategoryStatusColumn();
+  const joinPartsValues: unknown[] = [];
+  const whereParts: string[] = [];
+  let joinClause = '';
+
+  if (role === 'ADMIN') {
+    if (options.applyStatusFilter && !options.includeInactive) {
+      whereParts.push("d.status = 'active'");
+    }
+  } else if (role === 'EDITOR') {
+    const assignmentCount = await getEditorAssignmentCount(userId);
+    if (hasUserCategoriesTable && assignmentCount > 0) {
+      joinPartsValues.push(userId);
+      joinClause = `INNER JOIN user_categories uc ON uc.category_id = d.category_id AND uc.user_id = $${joinPartsValues.length}`;
+    }
+    if (options.applyStatusFilter && !options.includeInactive) {
+      whereParts.push("d.status = 'active'");
+    }
+  } else {
+    if (!hasUserCategoriesTable) {
+      return { joinClause: '', whereParts: [], values: [], visible: false };
+    }
+    joinPartsValues.push(userId);
+    joinClause = `INNER JOIN user_categories uc ON uc.category_id = d.category_id AND uc.user_id = $${joinPartsValues.length}`;
+    whereParts.push("d.status = 'active'");
+    if (hasCategoryStatusColumn) {
+      whereParts.push('(c.is_active = TRUE OR c.is_active IS NULL)');
+    }
+  }
+
+  return { joinClause, whereParts, values: joinPartsValues, visible: true };
+};
+
+export interface DocumentStats {
+  active: number;
+  inactive: number;
+  superseded: number;
+  total: number;
+}
+
+export const getDocumentStatsForUser = async (
+  userId: string,
+  role: UserRole,
+): Promise<DocumentStats> => {
+  const scope = await resolveDocumentScope(userId, role, {
+    includeInactive: true,
+    applyStatusFilter: false,
+  });
+  if (!scope.visible) {
+    return { active: 0, inactive: 0, superseded: 0, total: 0 };
+  }
+
+  const whereClause = scope.whereParts.length > 0 ? `WHERE ${scope.whereParts.join(' AND ')}` : '';
+  const result = await pool.query(
+    `
+      SELECT
+        COUNT(*) FILTER (WHERE d.status = 'active')::int AS active,
+        COUNT(*) FILTER (WHERE d.status = 'inactive')::int AS inactive,
+        COUNT(*) FILTER (WHERE d.status = 'superseded')::int AS superseded,
+        COUNT(*)::int AS total
+      FROM documents d
+      INNER JOIN users u ON d.uploaded_by = u.id
+      LEFT JOIN categories c ON d.category_id = c.id
+      ${scope.joinClause}
+      ${whereClause};
+    `,
+    scope.values,
+  );
+
+  const row = result.rows[0] ?? {};
+  return {
+    active: Number(row.active ?? 0),
+    inactive: Number(row.inactive ?? 0),
+    superseded: Number(row.superseded ?? 0),
+    total: Number(row.total ?? 0),
+  };
+};
+
 export const searchDocumentsForUser = async (
   userId: string,
   role: UserRole,
   options: SearchDocumentsOptions
-): Promise<DocumentRecord[]> => {
+): Promise<PaginatedResult<DocumentRecord>> => {
   const { filters } = options;
   const includeInactive = Boolean(options.includeInactive);
-  const hasUserCategoriesTable = await resolveUserCategoriesTable();
-  const hasCategoryStatusColumn = await resolveCategoryStatusColumn();
+  const paginate = isPaginationRequested(options);
+  const { page, limit, offset } = resolvePagination(options);
 
-  const values: unknown[] = [];
-  const whereClauses: string[] = [];
-
-  if (!includeInactive) {
-    whereClauses.push(`d.status = 'active'`);
-  }
-
-  if (filters.category_id !== undefined) {
-    values.push(filters.category_id);
-    whereClauses.push(`d.category_id = $${values.length}`);
-  }
-
-  if (filters.title) {
-    values.push(`%${filters.title}%`);
-    whereClauses.push(`d.title ILIKE $${values.length}`);
-  }
-
-  if (filters.description) {
-    values.push(`%${filters.description}%`);
-    whereClauses.push(`COALESCE(d.description, '') ILIKE $${values.length}`);
-  }
-
-  if (filters.publish_date) {
-    values.push(filters.publish_date);
-    whereClauses.push(`d.publish_date = $${values.length}`);
-  }
-
-  if (filters.expiry_date) {
-    values.push(filters.expiry_date);
-    whereClauses.push(`d.expiry_date = $${values.length}`);
+  const scope = await resolveDocumentScope(userId, role, { includeInactive, applyStatusFilter: true });
+  if (!scope.visible) {
+    return buildPaginatedResult<DocumentRecord>([], 0, page, limit);
   }
 
   const baseSelect = `
@@ -602,75 +664,46 @@ export const searchDocumentsForUser = async (
     LEFT JOIN categories c ON d.category_id = c.id
   `;
 
-  const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+  const whereParts = [...scope.whereParts];
+  const values = [...scope.values];
 
-  if (role === 'ADMIN') {
-    const query = `
-      ${baseSelect}
-      ${whereSql}
-      ORDER BY d.created_at DESC;
-    `;
-    const result = await pool.query(query, values);
-    return result.rows;
+  if (filters.category_id !== undefined) {
+    values.push(filters.category_id);
+    whereParts.push(`d.category_id = $${values.length}`);
+  }
+  if (filters.title) {
+    values.push(`%${filters.title}%`);
+    whereParts.push(`d.title ILIKE $${values.length}`);
+  }
+  if (filters.description) {
+    values.push(`%${filters.description}%`);
+    whereParts.push(`COALESCE(d.description, '') ILIKE $${values.length}`);
+  }
+  if (filters.publish_date) {
+    values.push(filters.publish_date);
+    whereParts.push(`d.publish_date = $${values.length}`);
+  }
+  if (filters.expiry_date) {
+    values.push(filters.expiry_date);
+    whereParts.push(`d.expiry_date = $${values.length}`);
   }
 
-  if (role === 'EDITOR') {
-    const assignmentCount = await getEditorAssignmentCount(userId);
+  const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
+  const innerQuery = `${baseSelect} ${scope.joinClause} ${whereClause}`;
+  const limitSql = paginate ? `LIMIT $${values.length + 1} OFFSET $${values.length + 2}` : '';
+  const dataValues = paginate ? [...values, limit, offset] : values;
 
-    if (!hasUserCategoriesTable || assignmentCount === 0) {
-      const query = `
-        ${baseSelect}
-        ${whereSql}
-        ORDER BY d.created_at DESC;
-      `;
-      const result = await pool.query(query, values);
-      return result.rows;
-    }
+  const dataResult = await pool.query(
+    `${innerQuery} ORDER BY d.created_at DESC ${limitSql};`,
+    dataValues,
+  );
 
-    values.push(userId);
-    const editorUserIdIndex = values.length;
-    const editorWhereClauses = [
-      ...whereClauses,
-      `uc.user_id = $${editorUserIdIndex}`,
-    ];
-
-    const query = `
-      ${baseSelect}
-      INNER JOIN user_categories uc
-        ON uc.category_id = d.category_id
-      WHERE ${editorWhereClauses.join(' AND ')}
-      ORDER BY d.created_at DESC;
-    `;
-
-    const result = await pool.query(query, values);
-    return result.rows;
+  if (!paginate) {
+    return buildPaginatedResult(dataResult.rows, dataResult.rows.length, 1, dataResult.rows.length || 1);
   }
 
-  if (!hasUserCategoriesTable) {
-    return [];
-  }
-
-  values.push(userId);
-  const viewerUserIdIndex = values.length;
-  const viewerWhereClauses = [
-    ...whereClauses,
-    `uc.user_id = $${viewerUserIdIndex}`,
-  ];
-
-  if (hasCategoryStatusColumn) {
-    viewerWhereClauses.push('(c.is_active = TRUE OR c.is_active IS NULL)');
-  }
-
-  const query = `
-    ${baseSelect}
-    INNER JOIN user_categories uc
-      ON uc.category_id = d.category_id
-    WHERE ${viewerWhereClauses.join(' AND ')}
-    ORDER BY d.created_at DESC;
-  `;
-
-  const result = await pool.query(query, values);
-  return result.rows;
+  const countResult = await pool.query(`SELECT COUNT(*)::int AS total FROM (${innerQuery}) sub;`, values);
+  return buildPaginatedResult(dataResult.rows, countResult.rows[0]?.total, page, limit);
 };
 
 export const findDocumentByFilename = async (filename: string): Promise<DocumentLookup | null> => {

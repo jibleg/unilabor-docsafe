@@ -8,6 +8,7 @@ import { API_BASE_URL } from '../api/axios';
 import { useAuthStore } from '../store/useAuthStore';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { hasAnyRole } from '../utils/roles';
+import { Pagination } from '../components/Pagination';
 import type { Category, Document, DocumentStatus } from '../types/models';
 import type { ListDocumentsOptions } from '../api/service';
 import { fetchDocumentCategories, getApiErrorMessage, updateDocumentStatusById } from '../api/service';
@@ -64,22 +65,31 @@ export const DocumentsPage = () => {
   const [statusUpdatingDocumentId, setStatusUpdatingDocumentId] = useState<string | number | null>(
     null,
   );
+  const [page, setPage] = useState(1);
   const token = useAuthStore((state) => state.token);
   const userRole = useAuthStore((state) => state.user?.role);
-  const { documents, fetchDocuments, loading, error } = useDocumentStore();
+  const { documents, pagination, stats, fetchDocuments, fetchStats, loading, error } =
+    useDocumentStore();
   const canManageDocuments = hasAnyRole(userRole, ['ADMIN', 'EDITOR']);
   const isViewer = hasAnyRole(userRole, ['VIEWER']);
 
   const loadDocuments = useCallback(async () => {
-    await fetchDocuments({
-      ...(canManageDocuments && showAllStatuses ? { includeInactive: true } : {}),
-      ...appliedFilters,
-    });
-  }, [appliedFilters, canManageDocuments, fetchDocuments, showAllStatuses]);
+    await fetchDocuments(
+      {
+        ...(canManageDocuments && showAllStatuses ? { includeInactive: true } : {}),
+        ...appliedFilters,
+      },
+      { page, limit: 20 },
+    );
+  }, [appliedFilters, canManageDocuments, fetchDocuments, showAllStatuses, page]);
 
   useEffect(() => {
     void loadDocuments();
   }, [loadDocuments]);
+
+  useEffect(() => {
+    void fetchStats();
+  }, [fetchStats]);
 
   useEffect(() => {
     let isMounted = true;
@@ -116,14 +126,8 @@ export const DocumentsPage = () => {
     [documents],
   );
 
-  const documentSummary = useMemo(
-    () => ({
-      active: documents.filter((doc) => doc.status === 'active').length,
-      inactive: documents.filter((doc) => doc.status === 'inactive').length,
-      superseded: documents.filter((doc) => doc.status === 'superseded').length,
-    }),
-    [documents],
-  );
+  // Resumen agregado del lado servidor (no se limita a la pagina visible).
+  const documentSummary = stats;
 
   const appliedFiltersCount = useMemo(
     () =>
@@ -189,11 +193,13 @@ export const DocumentsPage = () => {
     }
 
     setAppliedFilters(nextFilters);
+    setPage(1);
   };
 
   const clearFilters = () => {
     setFilterForm(createInitialFilterForm());
     setAppliedFilters({});
+    setPage(1);
   };
 
   const confirmDocumentAction = ({
@@ -269,6 +275,7 @@ export const DocumentsPage = () => {
 
     setEditingDocument(null);
     await loadDocuments();
+    void fetchStats();
     notifySuccess(
       replacedFile
         ? 'Documento vigente publicado correctamente. La version anterior quedo derogada.'
@@ -305,6 +312,7 @@ export const DocumentsPage = () => {
     try {
       await updateDocumentStatusById(document.id, nextStatus);
       await loadDocuments();
+      void fetchStats();
       notifySuccess(
         nextStatus === 'inactive'
           ? 'Documento inactivado correctamente.'
@@ -348,7 +356,10 @@ export const DocumentsPage = () => {
           {canManageDocuments && (
             <button
               type="button"
-              onClick={() => setShowAllStatuses((current) => !current)}
+              onClick={() => {
+                setShowAllStatuses((current) => !current);
+                setPage(1);
+              }}
               className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
                 showAllStatuses
                   ? 'border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.38)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'
@@ -654,12 +665,24 @@ export const DocumentsPage = () => {
         </div>
       )}
 
+      {!loading && (
+        <Pagination
+          page={page}
+          totalPages={pagination.totalPages}
+          total={pagination.total}
+          pageSize={pagination.limit}
+          onPageChange={setPage}
+          loading={loading}
+        />
+      )}
+
       {canManageDocuments && (
         <UploadDocumentModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onUploadSuccess={() => {
             void loadDocuments();
+            void fetchStats();
           }}
           token={token ?? undefined}
         />
