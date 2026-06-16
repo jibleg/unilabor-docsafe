@@ -23,8 +23,8 @@ Convertir el PMV+ funcional (V2 + Helpdesk) en una base sostenible y escalable, 
 | 26 | Infraestructura de pruebas | Sin tests | media | `completada` |
 | 27 | Validacion de entrada centralizada | Sin libreria de validacion | media | `completada` |
 | 28 | Endurecimiento de auth y sesion | JWT/localStorage sin refresh ni 401 handling | media | `completada` |
-| 29 | Paginacion y rendimiento en listados | Listados sin paginacion real | media | `pendiente` |
-| 30 | Modularidad y reduccion de archivos monoliticos | service.ts y paginas/servicios gigantes | baja | `pendiente` |
+| 29 | Paginacion y rendimiento en listados | Listados sin paginacion real | media | `completada` |
+| 30 | Modularidad y reduccion de archivos monoliticos | service.ts y paginas/servicios gigantes | baja | `completada` |
 
 ## Dependencias sugeridas
 
