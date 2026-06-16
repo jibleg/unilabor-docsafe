@@ -22,6 +22,8 @@ const EMPTY_SUMMARY: HelpdeskAssetSummary = {
   open_tickets: 0,
   preventive_due: 0,
   out_of_service: 0,
+  critical: 0,
+  assigned: 0,
 };
 
 const EMPTY_DASHBOARD: HelpdeskDashboardMetrics = {

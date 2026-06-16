@@ -1,5 +1,11 @@
 import pool from '../config/db';
 import { UserRole } from '../types';
+import {
+  PaginatedResult,
+  PaginationMeta,
+  buildPaginatedResult,
+  resolvePagination,
+} from '../utils/pagination';
 
 export interface CategoryRecord {
   id: number;
@@ -9,17 +15,9 @@ export interface CategoryRecord {
   updated_at: string;
 }
 
-export interface CategoryPagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
+export type CategoryPagination = PaginationMeta;
 
-export interface CategoryPageResult {
-  data: CategoryRecord[];
-  pagination: CategoryPagination;
-}
+export type CategoryPageResult = PaginatedResult<CategoryRecord>;
 
 interface CategoryListOptions {
   page: number;
@@ -30,16 +28,6 @@ interface CategoryListOptions {
 
 let categoryStatusColumnAvailable: boolean | null = null;
 let userCategoriesTableAvailable: boolean | null = null;
-
-const maxPageSize = 100;
-
-const asPositiveInt = (value: unknown, fallbackValue: number): number => {
-  const parsed = Number.parseInt(String(value ?? ''), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallbackValue;
-  }
-  return parsed;
-};
 
 const resolveCategoryStatusColumn = async (): Promise<boolean> => {
   if (categoryStatusColumnAvailable !== null) {
@@ -117,10 +105,8 @@ const buildCategoryWhereClause = (
 
 export const getCategoriesPaginated = async (options: CategoryListOptions): Promise<CategoryPageResult> => {
   const includeStatusColumn = await resolveCategoryStatusColumn();
-  const page = asPositiveInt(options.page, 1);
-  const limit = Math.min(asPositiveInt(options.limit, 10), maxPageSize);
+  const { page, limit, offset } = resolvePagination(options, { defaultLimit: 10 });
   const includeInactive = Boolean(options.includeInactive);
-  const offset = (page - 1) * limit;
 
   const { whereClause, values } = buildCategoryWhereClause(
     includeStatusColumn,
@@ -149,18 +135,7 @@ export const getCategoriesPaginated = async (options: CategoryListOptions): Prom
     pool.query(countQuery, values),
   ]);
 
-  const total = Number.parseInt(String(countResult.rows[0]?.total ?? 0), 10);
-  const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
-
-  return {
-    data: dataResult.rows,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+  return buildPaginatedResult(dataResult.rows, countResult.rows[0]?.total, page, limit);
 };
 
 export const getCategoryById = async (categoryId: number): Promise<CategoryRecord | null> => {

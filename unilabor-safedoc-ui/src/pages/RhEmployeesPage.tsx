@@ -18,7 +18,7 @@ import {
   fetchEmployeeById,
   fetchEmployeeDocumentAccess,
   getApiErrorMessage,
-  listEmployees,
+  listEmployeesPaginated,
   listLinkableUsers,
   type EmployeePayload,
   updateEmployeeDocumentAccess,
@@ -26,6 +26,8 @@ import {
 } from '../api/service';
 import type { Employee, EmployeeDocumentAccessMatrix, LinkableUser } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+import { usePaginatedList } from '../hooks/usePaginatedList';
+import { Pagination } from '../components/Pagination';
 
 interface EmployeeFormState {
   employee_code: string;
@@ -58,11 +60,25 @@ const toEmployeePayload = (form: EmployeeFormState): EmployeePayload => ({
 });
 
 export const RhEmployeesPage = () => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const {
+    items: employees,
+    pagination,
+    page,
+    setPage,
+    search: query,
+    setSearch: setQuery,
+    loading,
+    reload: reloadEmployees,
+  } = usePaginatedList<Employee>(
+    (q) => listEmployeesPaginated({ page: q.page, limit: q.limit, search: q.search }),
+    {
+      pageSize: 20,
+      onError: (error) =>
+        notifyError(getApiErrorMessage(error, 'No se pudieron cargar los colaboradores.')),
+    },
+  );
   const [linkableUsers, setLinkableUsers] = useState<LinkableUser[]>([]);
-  const [loading, setLoading] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [query, setQuery] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -79,18 +95,6 @@ export const RhEmployeesPage = () => {
   const [loadingAccess, setLoadingAccess] = useState(false);
   const [savingAccess, setSavingAccess] = useState(false);
 
-  const loadEmployees = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await listEmployees();
-      setEmployees(data);
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los colaboradores.'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const loadLinkableUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
@@ -104,21 +108,8 @@ export const RhEmployeesPage = () => {
   }, []);
 
   useEffect(() => {
-    void loadEmployees();
     void loadLinkableUsers();
-  }, [loadEmployees, loadLinkableUsers]);
-
-  const filteredEmployees = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return employees;
-    }
-
-    return employees.filter((employee) =>
-      [employee.employee_code, employee.full_name, employee.email, employee.area ?? '', employee.position ?? '']
-        .some((value) => value.toLowerCase().includes(normalizedQuery)),
-    );
-  }, [employees, query]);
+  }, [loadLinkableUsers]);
 
   const accessSummary = useMemo(() => {
     if (!documentAccess) {
@@ -348,7 +339,7 @@ export const RhEmployeesPage = () => {
       notifySuccess('Colaborador creado correctamente.');
       setIsCreateOpen(false);
       resetForm();
-      await loadEmployees();
+      await reloadEmployees();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo crear el colaborador.'));
     } finally {
@@ -367,7 +358,7 @@ export const RhEmployeesPage = () => {
       notifySuccess('Colaborador actualizado correctamente.');
       setIsEditOpen(false);
       resetForm();
-      await loadEmployees();
+      await reloadEmployees();
       if (detailEmployee?.id === selectedEmployee.id) {
         await openDetail(selectedEmployee.id);
       }
@@ -386,7 +377,7 @@ export const RhEmployeesPage = () => {
       if (detailEmployee?.id === employee.id) {
         setDetailEmployee(null);
       }
-      await loadEmployees();
+      await reloadEmployees();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo inactivar el colaborador.'));
     } finally {
@@ -411,7 +402,7 @@ export const RhEmployeesPage = () => {
           <button
             type="button"
             onClick={() => {
-              void loadEmployees();
+              reloadEmployees();
               void loadLinkableUsers();
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
@@ -458,14 +449,14 @@ export const RhEmployeesPage = () => {
                       Cargando colaboradores...
                     </td>
                   </tr>
-                ) : filteredEmployees.length === 0 ? (
+                ) : employees.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
                       No hay colaboradores para mostrar.
                     </td>
                   </tr>
                 ) : (
-                  filteredEmployees.map((employee) => (
+                  employees.map((employee) => (
                     <tr key={employee.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
                       <td className="px-5 py-4 text-sm font-semibold text-[var(--color-brand-700)]">{employee.employee_code}</td>
                       <td className="px-5 py-4">
@@ -518,6 +509,16 @@ export const RhEmployeesPage = () => {
                 )}
               </tbody>
             </table>
+            <div className="border-t border-[rgba(0,65,106,0.08)]">
+              <Pagination
+                page={page}
+                totalPages={pagination.totalPages}
+                total={pagination.total}
+                pageSize={pagination.limit}
+                onPageChange={setPage}
+                loading={loading}
+              />
+            </div>
           </div>
         </div>
 

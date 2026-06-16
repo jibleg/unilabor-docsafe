@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Edit3,
   Eye,
@@ -13,17 +13,35 @@ import {
   createHelpdeskAsset,
   deleteHelpdeskAssetById,
   getApiErrorMessage,
+  getHelpdeskSummary,
   listEmployees,
-  listHelpdeskAssets,
+  listHelpdeskAssetsPaginated,
   listHelpdeskCatalogs,
   type HelpdeskAssetPayload,
   updateHelpdeskAssetById,
 } from '../api/service';
 import { useAuthStore } from '../store/useAuthStore';
-import type { Employee, HelpdeskAsset, HelpdeskCatalogItem, HelpdeskCatalogs } from '../types/models';
+import type {
+  Employee,
+  HelpdeskAsset,
+  HelpdeskAssetSummary,
+  HelpdeskCatalogItem,
+  HelpdeskCatalogs,
+} from '../types/models';
 import { getModuleRole } from '../utils/modules';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { hasAnyRole } from '../utils/roles';
+import { usePaginatedList } from '../hooks/usePaginatedList';
+import { Pagination } from '../components/Pagination';
+
+const EMPTY_ASSET_SUMMARY: HelpdeskAssetSummary = {
+  assets: 0,
+  open_tickets: 0,
+  preventive_due: 0,
+  out_of_service: 0,
+  critical: 0,
+  assigned: 0,
+};
 
 interface AssetFormState {
   asset_code: string;
@@ -198,73 +216,70 @@ export const HelpdeskAssetsPage = () => {
   const canWrite = hasAnyRole(moduleRole, ['ADMIN', 'EDITOR']);
   const canDelete = hasAnyRole(moduleRole, ['ADMIN']);
 
-  const [assets, setAssets] = useState<HelpdeskAsset[]>([]);
+  const {
+    items: assets,
+    pagination,
+    page,
+    setPage,
+    search: query,
+    setSearch: setQuery,
+    loading,
+    reload: reloadAssets,
+  } = usePaginatedList<HelpdeskAsset>(
+    (q) => listHelpdeskAssetsPaginated({ page: q.page, limit: q.limit, search: q.search }),
+    {
+      pageSize: 20,
+      onError: (error) =>
+        notifyError(getApiErrorMessage(error, 'No se pudo cargar el inventario tecnico.')),
+    },
+  );
   const [catalogs, setCatalogs] = useState<HelpdeskCatalogs>(EMPTY_CATALOGS);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [assetSummary, setAssetSummary] = useState<HelpdeskAssetSummary>(EMPTY_ASSET_SUMMARY);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [query, setQuery] = useState('');
   const [selectedAsset, setSelectedAsset] = useState<HelpdeskAsset | null>(null);
   const [editingAsset, setEditingAsset] = useState<HelpdeskAsset | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadAuxData = useCallback(async () => {
     try {
-      const [assetData, catalogData, employeeData] = await Promise.all([
-        listHelpdeskAssets(),
+      const [catalogData, employeeData] = await Promise.all([
         listHelpdeskCatalogs(),
         listEmployees(),
       ]);
-
-      setAssets(assetData);
       setCatalogs(catalogData);
       setEmployees(employeeData);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo cargar el inventario tecnico.'));
-    } finally {
-      setLoading(false);
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catalogos del inventario.'));
+    }
+  }, []);
+
+  const loadSummary = useCallback(async () => {
+    try {
+      setAssetSummary(await getHelpdeskSummary());
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar el resumen de activos.'));
     }
   }, []);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadAuxData();
+    void loadSummary();
+  }, [loadAuxData, loadSummary]);
 
-  const filteredAssets = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return assets;
-    }
+  const refreshAssets = useCallback(() => {
+    reloadAssets();
+    void loadSummary();
+  }, [reloadAssets, loadSummary]);
 
-    return assets.filter((asset) =>
-      [
-        asset.asset_code,
-        asset.name,
-        asset.description ?? '',
-        asset.brand?.name ?? asset.brand_name ?? '',
-        asset.model ?? '',
-        asset.serial_number ?? '',
-        asset.category?.name ?? '',
-        asset.location?.name ?? '',
-        asset.assigned_employee?.full_name ?? '',
-      ].some((value) => value.toLowerCase().includes(normalizedQuery)),
-    );
-  }, [assets, query]);
-
-  const summary = useMemo(() => {
-    const outOfService = assets.filter((asset) => asset.operational_status?.code === 'OUT_OF_SERVICE').length;
-    const critical = assets.filter((asset) => asset.criticality?.code === 'CRITICAL').length;
-
-    return {
-      total: assets.length,
-      outOfService,
-      critical,
-      assigned: assets.filter((asset) => asset.assigned_employee_id).length,
-    };
-  }, [assets]);
+  const summary = {
+    total: assetSummary.assets,
+    outOfService: assetSummary.out_of_service,
+    critical: assetSummary.critical,
+    assigned: assetSummary.assigned,
+  };
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -317,7 +332,7 @@ export const HelpdeskAssetsPage = () => {
 
       setIsFormOpen(false);
       resetForm();
-      await loadData();
+      await refreshAssets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo guardar el activo.'));
     } finally {
@@ -337,7 +352,7 @@ export const HelpdeskAssetsPage = () => {
       if (selectedAsset?.id === asset.id) {
         setSelectedAsset(null);
       }
-      await loadData();
+      await refreshAssets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo dar de baja el activo.'));
     } finally {
@@ -365,7 +380,7 @@ export const HelpdeskAssetsPage = () => {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => void loadData()}
+            onClick={() => refreshAssets()}
             className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -427,14 +442,14 @@ export const HelpdeskAssetsPage = () => {
                       Cargando inventario...
                     </td>
                   </tr>
-                ) : filteredAssets.length === 0 ? (
+                ) : assets.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
                       No hay activos registrados.
                     </td>
                   </tr>
                 ) : (
-                  filteredAssets.map((asset) => (
+                  assets.map((asset) => (
                     <tr key={asset.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
                       <td className="px-5 py-4">
                         <p className="text-sm font-bold text-[var(--color-brand-700)]">{asset.asset_code}</p>
@@ -495,6 +510,16 @@ export const HelpdeskAssetsPage = () => {
                 )}
               </tbody>
             </table>
+            <div className="border-t border-[rgba(0,65,106,0.08)]">
+              <Pagination
+                page={page}
+                totalPages={pagination.totalPages}
+                total={pagination.total}
+                pageSize={pagination.limit}
+                onPageChange={setPage}
+                loading={loading}
+              />
+            </div>
           </div>
         </div>
 

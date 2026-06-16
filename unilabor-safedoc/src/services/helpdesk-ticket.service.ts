@@ -1,5 +1,13 @@
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
+import {
+  PaginatedResult,
+  PaginationInput,
+  buildIlikeSearch,
+  buildPaginatedResult,
+  isPaginationRequested,
+  resolvePagination,
+} from '../utils/pagination';
 import { getEmployeeByUserId } from './employee.service';
 import { employeeCanAccessHelpdeskAsset } from './helpdesk-asset.service';
 import { getHelpdeskSummary, type HelpdeskCatalogItem, type HelpdeskAssetSummary } from './helpdesk-asset.service';
@@ -811,16 +819,84 @@ export const getHelpdeskDashboardMetrics = async (): Promise<HelpdeskDashboardMe
   };
 };
 
-export const listHelpdeskTickets = async (): Promise<HelpdeskTicketRecord[]> => {
+const TICKET_SEARCH_COLUMNS = [
+  't.ticket_code',
+  't.title',
+  't.description',
+  'a.asset_code',
+  'a.name',
+  're.full_name',
+  'ae.full_name',
+  'ts.name',
+  'tp.name',
+];
+
+export interface TicketListOptions extends PaginationInput {
+  search?: string | undefined;
+}
+
+export const listHelpdeskTickets = async (
+  options: TicketListOptions = {},
+): Promise<PaginatedResult<HelpdeskTicketRecord>> => {
+  await assertTicketsTable();
+
+  const paginate = isPaginationRequested(options);
+  const { page, limit, offset } = resolvePagination(options);
+  const search = buildIlikeSearch(TICKET_SEARCH_COLUMNS, options.search, 0);
+  const whereClause = ['t.is_active = TRUE', search.clause].filter(Boolean).join(' AND ');
+
+  const base = buildTicketQuery();
+  const limitSql = paginate
+    ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}`
+    : '';
+  const dataValues = paginate ? [...search.values, limit, offset] : search.values;
+
+  const dataResult = await pool.query(
+    `${base} WHERE ${whereClause} ORDER BY t.updated_at DESC, t.reported_at DESC ${limitSql};`,
+    dataValues,
+  );
+  const data = dataResult.rows.map(mapTicketRow);
+
+  if (!paginate) {
+    return buildPaginatedResult(data, data.length, 1, data.length || 1);
+  }
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM (${base} WHERE ${whereClause}) sub;`,
+    search.values,
+  );
+  return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
+};
+
+export interface HelpdeskTicketStats {
+  total: number;
+  open: number;
+  critical: number;
+  affects_results: number;
+}
+
+export const getHelpdeskTicketStats = async (): Promise<HelpdeskTicketStats> => {
   await assertTicketsTable();
 
   const result = await pool.query(`
-    ${buildTicketQuery()}
-    WHERE t.is_active = TRUE
-    ORDER BY t.updated_at DESC, t.reported_at DESC;
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE COALESCE(ts.is_closed, FALSE) = FALSE)::int AS open,
+      COUNT(*) FILTER (WHERE UPPER(COALESCE(tp.code, '')) = 'CRITICAL')::int AS critical,
+      COUNT(*) FILTER (WHERE t.affects_results = TRUE)::int AS affects_results
+    FROM public.helpdesk_tickets t
+    LEFT JOIN public.helpdesk_ticket_statuses ts ON ts.id = t.status_id
+    LEFT JOIN public.helpdesk_ticket_priorities tp ON tp.id = t.priority_id
+    WHERE t.is_active = TRUE;
   `);
 
-  return result.rows.map(mapTicketRow);
+  const row = result.rows[0] ?? {};
+  return {
+    total: Number(row.total ?? 0),
+    open: Number(row.open ?? 0),
+    critical: Number(row.critical ?? 0),
+    affects_results: Number(row.affects_results ?? 0),
+  };
 };
 
 export const listMyHelpdeskTickets = async (userId: string): Promise<HelpdeskTicketRecord[]> => {

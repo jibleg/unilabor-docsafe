@@ -127,6 +127,15 @@ export interface HelpdeskAssetSummary {
   open_tickets: number;
   preventive_due: number;
   out_of_service: number;
+  critical: number;
+  assigned: number;
+}
+
+export interface HelpdeskTicketStats {
+  total: number;
+  open: number;
+  critical: number;
+  affects_results: number;
 }
 
 export interface HelpdeskDashboardMetrics {

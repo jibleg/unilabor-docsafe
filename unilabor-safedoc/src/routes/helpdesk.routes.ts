@@ -22,6 +22,7 @@ import {
   listHelpdeskCatalogsController,
   listHelpdeskTicketCatalogsController,
   listHelpdeskTicketsController,
+  getHelpdeskTicketStatsController,
   listMyHelpdeskAssetsController,
   listMyHelpdeskTicketsController,
   listMaintenanceCatalogsController,
@@ -179,6 +180,11 @@ router.get(
   '/tickets',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
   listHelpdeskTicketsController,
+);
+router.get(
+  '/tickets/summary',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  getHelpdeskTicketStatsController,
 );
 router.get(
   '/tickets/:id',

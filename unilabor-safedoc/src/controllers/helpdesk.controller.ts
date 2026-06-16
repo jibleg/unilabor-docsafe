@@ -30,6 +30,7 @@ import {
   getHelpdeskDashboardMetrics,
   getHelpdeskSummaryWithTickets,
   getHelpdeskTicketById,
+  getHelpdeskTicketStats,
   getMyHelpdeskTicketById,
   listHelpdeskTicketCatalogs,
   listHelpdeskTickets,
@@ -660,10 +661,14 @@ export const listMaintenancePlansController = async (_req: AuthRequest, res: Res
   }
 };
 
-export const listMaintenanceOrdersController = async (_req: AuthRequest, res: Response) => {
+export const listMaintenanceOrdersController = async (req: AuthRequest, res: Response) => {
   try {
-    const orders = await listMaintenanceOrders();
-    return res.json({ orders });
+    const result = await listMaintenanceOrders({
+      page: req.query.page,
+      limit: req.query.limit,
+      search: typeof req.query.search === 'string' ? req.query.search : undefined,
+    });
+    return res.json(result);
   } catch (error: any) {
     const mappedError = mapHelpdeskError(res, error);
     if (mappedError) {
@@ -846,10 +851,14 @@ export const listHelpdeskTicketCatalogsController = async (_req: AuthRequest, re
   }
 };
 
-export const listHelpdeskTicketsController = async (_req: AuthRequest, res: Response) => {
+export const listHelpdeskTicketsController = async (req: AuthRequest, res: Response) => {
   try {
-    const tickets = await listHelpdeskTickets();
-    return res.json({ tickets });
+    const result = await listHelpdeskTickets({
+      page: req.query.page,
+      limit: req.query.limit,
+      search: typeof req.query.search === 'string' ? req.query.search : undefined,
+    });
+    return res.json(result);
   } catch (error: any) {
     const mappedError = mapHelpdeskError(res, error);
     if (mappedError) {
@@ -858,6 +867,21 @@ export const listHelpdeskTicketsController = async (_req: AuthRequest, res: Resp
 
     console.error('Error listando tickets Helpdesk:', error);
     return res.status(500).json({ message: 'No se pudieron cargar las solicitudes.' });
+  }
+};
+
+export const getHelpdeskTicketStatsController = async (_req: AuthRequest, res: Response) => {
+  try {
+    const summary = await getHelpdeskTicketStats();
+    return res.json({ summary });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error obteniendo resumen de tickets Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo obtener el resumen de solicitudes.' });
   }
 };
 
@@ -1239,10 +1263,14 @@ export const deactivateHelpdeskCatalogItemController = async (req: AuthRequest, 
   }
 };
 
-export const listHelpdeskAssetsController = async (_req: AuthRequest, res: Response) => {
+export const listHelpdeskAssetsController = async (req: AuthRequest, res: Response) => {
   try {
-    const assets = await listHelpdeskAssets();
-    return res.json({ assets });
+    const result = await listHelpdeskAssets({
+      page: req.query.page,
+      limit: req.query.limit,
+      search: typeof req.query.search === 'string' ? req.query.search : undefined,
+    });
+    return res.json(result);
   } catch (error: any) {
     const mappedError = mapHelpdeskError(res, error);
     if (mappedError) {

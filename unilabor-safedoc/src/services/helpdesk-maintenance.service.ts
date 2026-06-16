@@ -1,6 +1,14 @@
 import pool from '../config/db';
 import { toIsoDate, toIsoDateTime } from '../utils/date-serialization';
 import type { HelpdeskCatalogItem } from './helpdesk-asset.service';
+import {
+  PaginatedResult,
+  PaginationInput,
+  buildIlikeSearch,
+  buildPaginatedResult,
+  isPaginationRequested,
+  resolvePagination,
+} from '../utils/pagination';
 
 export interface HelpdeskMaintenancePlanPayload {
   asset_id: number;
@@ -461,11 +469,30 @@ export const listMaintenancePlans = async (): Promise<HelpdeskMaintenancePlanRec
   return Promise.all(result.rows.map(mapPlanRow));
 };
 
-export const listMaintenanceOrders = async (): Promise<HelpdeskMaintenanceOrderRecord[]> => {
+const ORDER_SEARCH_COLUMNS = [
+  'a.asset_code',
+  'a.name',
+  'p.plan_code',
+  'p.title',
+  'o.status',
+];
+
+export interface MaintenanceOrderListOptions extends PaginationInput {
+  search?: string | undefined;
+}
+
+export const listMaintenanceOrders = async (
+  options: MaintenanceOrderListOptions = {},
+): Promise<PaginatedResult<HelpdeskMaintenanceOrderRecord>> => {
   await assertMaintenanceTables();
 
-  const result = await pool.query(`
-    ${buildOrderQuery()}
+  const paginate = isPaginationRequested(options);
+  const { page, limit, offset } = resolvePagination(options);
+  const search = buildIlikeSearch(ORDER_SEARCH_COLUMNS, options.search, 0);
+  const whereClause = search.clause ? `WHERE ${search.clause}` : '';
+
+  const base = buildOrderQuery();
+  const orderBy = `
     ORDER BY
       CASE o.status
         WHEN 'IN_PROGRESS' THEN 1
@@ -475,10 +502,28 @@ export const listMaintenanceOrders = async (): Promise<HelpdeskMaintenanceOrderR
         ELSE 5
       END,
       o.scheduled_for ASC,
-      o.updated_at DESC;
-  `);
+      o.updated_at DESC
+  `;
+  const limitSql = paginate
+    ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}`
+    : '';
+  const dataValues = paginate ? [...search.values, limit, offset] : search.values;
 
-  return Promise.all(result.rows.map(mapOrderRow));
+  const dataResult = await pool.query(
+    `${base} ${whereClause} ${orderBy} ${limitSql};`,
+    dataValues,
+  );
+  const data = await Promise.all(dataResult.rows.map(mapOrderRow));
+
+  if (!paginate) {
+    return buildPaginatedResult(data, data.length, 1, data.length || 1);
+  }
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM (${base} ${whereClause}) sub;`,
+    search.values,
+  );
+  return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };
 
 export const getMaintenanceOrderById = async (orderId: number): Promise<HelpdeskMaintenanceOrderRecord | null> => {

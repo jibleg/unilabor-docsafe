@@ -4,6 +4,14 @@ import pool from '../config/db';
 import { listUserModuleAccess } from './module-access.service';
 import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
 import type { EmployeeRecord, EmployeeSummary, LinkableUser } from '../types';
+import {
+  PaginatedResult,
+  PaginationInput,
+  buildIlikeSearch,
+  buildPaginatedResult,
+  isPaginationRequested,
+  resolvePagination,
+} from '../utils/pagination';
 
 export interface EmployeePayload {
   employee_code?: string | null;
@@ -186,16 +194,49 @@ const buildEmployeeBaseQuery = () => `
   LEFT JOIN public.users u ON u.id = e.user_id
 `;
 
-export const listEmployees = async (): Promise<EmployeeRecord[]> => {
+const EMPLOYEE_SEARCH_COLUMNS = [
+  'e.employee_code',
+  'e.full_name',
+  'e.email',
+  'e.area',
+  'e.position',
+];
+
+export interface EmployeeListOptions extends PaginationInput {
+  search?: string | undefined;
+}
+
+export const listEmployees = async (
+  options: EmployeeListOptions = {},
+): Promise<PaginatedResult<EmployeeRecord>> => {
   await assertEmployeesTable();
 
-  const result = await pool.query(`
-    ${buildEmployeeBaseQuery()}
-    WHERE e.is_active = TRUE
-    ORDER BY e.full_name ASC, e.created_at DESC;
-  `);
+  const paginate = isPaginationRequested(options);
+  const { page, limit, offset } = resolvePagination(options);
+  const search = buildIlikeSearch(EMPLOYEE_SEARCH_COLUMNS, options.search, 0);
+  const whereClause = ['e.is_active = TRUE', search.clause].filter(Boolean).join(' AND ');
 
-  return Promise.all(result.rows.map((row) => mapEmployeeRow(row)));
+  const base = buildEmployeeBaseQuery();
+  const limitSql = paginate
+    ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}`
+    : '';
+  const dataValues = paginate ? [...search.values, limit, offset] : search.values;
+
+  const dataResult = await pool.query(
+    `${base} WHERE ${whereClause} ORDER BY e.full_name ASC, e.created_at DESC ${limitSql};`,
+    dataValues,
+  );
+  const data = await Promise.all(dataResult.rows.map((row) => mapEmployeeRow(row)));
+
+  if (!paginate) {
+    return buildPaginatedResult(data, data.length, 1, data.length || 1);
+  }
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM (${base} WHERE ${whereClause}) sub;`,
+    search.values,
+  );
+  return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };
 
 export const getEmployeeById = async (employeeId: number): Promise<EmployeeRecord | null> => {

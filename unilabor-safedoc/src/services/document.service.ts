@@ -3,6 +3,14 @@ import path from 'path';
 import pool from '../config/db';
 import { UserRole } from '../types';
 import * as categoryService from './category.service';
+import {
+  PaginatedResult,
+  PaginationInput,
+  buildIlikeSearch,
+  buildPaginatedResult,
+  isPaginationRequested,
+  resolvePagination,
+} from './../utils/pagination';
 
 type DocumentId = string | number;
 
@@ -89,8 +97,9 @@ export interface DocumentReplacementResult {
   };
 }
 
-interface ListDocumentsOptions {
+interface ListDocumentsOptions extends PaginationInput {
   includeInactive?: boolean;
+  search?: string | undefined;
 }
 
 export interface SearchDocumentsFilters {
@@ -446,14 +455,18 @@ export const getAllCategories = async (userId: string, role: UserRole) => {
   return categoryService.listCategoriesForUser(userId, role);
 };
 
+const DOCUMENT_SEARCH_COLUMNS = ['d.title', 'd.description', 'c.name'];
+
 export const listDocumentsForUser = async (
   userId: string,
   role: UserRole,
   options: ListDocumentsOptions = {}
-): Promise<DocumentRecord[]> => {
+): Promise<PaginatedResult<DocumentRecord>> => {
   const hasUserCategoriesTable = await resolveUserCategoriesTable();
   const hasCategoryStatusColumn = await resolveCategoryStatusColumn();
   const includeInactive = Boolean(options.includeInactive);
+  const paginate = isPaginationRequested(options);
+  const { page, limit, offset } = resolvePagination(options);
 
   const baseSelect = `
     SELECT
@@ -473,57 +486,60 @@ export const listDocumentsForUser = async (
     LEFT JOIN categories c ON d.category_id = c.id
   `;
 
+  // Cada rol define el JOIN de permisos y el filtro de estado; el resto del
+  // armado (búsqueda, paginación, conteo) es uniforme.
+  let joinClause = '';
+  const whereParts: string[] = [];
+  const values: unknown[] = [];
+
   if (role === 'ADMIN') {
-    const query = `
-      ${baseSelect}
-      ${includeInactive ? '' : "WHERE d.status = 'active'"}
-      ORDER BY d.created_at DESC;
-    `;
-    const result = await pool.query(query);
-    return result.rows;
-  }
-
-  if (role === 'EDITOR') {
-    const assignmentCount = await getEditorAssignmentCount(userId);
-
-    if (!hasUserCategoriesTable || assignmentCount === 0) {
-      const query = `
-        ${baseSelect}
-        ${includeInactive ? '' : "WHERE d.status = 'active'"}
-        ORDER BY d.created_at DESC;
-      `;
-      const result = await pool.query(query);
-      return result.rows;
+    if (!includeInactive) {
+      whereParts.push("d.status = 'active'");
     }
-
-    const query = `
-      ${baseSelect}
-      INNER JOIN user_categories uc
-        ON uc.category_id = d.category_id
-       AND uc.user_id = $1
-      ${includeInactive ? '' : "WHERE d.status = 'active'"}
-      ORDER BY d.created_at DESC;
-    `;
-    const result = await pool.query(query, [userId]);
-    return result.rows;
+  } else if (role === 'EDITOR') {
+    const assignmentCount = await getEditorAssignmentCount(userId);
+    if (hasUserCategoriesTable && assignmentCount > 0) {
+      values.push(userId);
+      joinClause = `INNER JOIN user_categories uc ON uc.category_id = d.category_id AND uc.user_id = $${values.length}`;
+    }
+    if (!includeInactive) {
+      whereParts.push("d.status = 'active'");
+    }
+  } else {
+    // VIEWER: sin tabla de asignaciones no ve nada.
+    if (!hasUserCategoriesTable) {
+      return buildPaginatedResult<DocumentRecord>([], 0, page, limit);
+    }
+    values.push(userId);
+    joinClause = `INNER JOIN user_categories uc ON uc.category_id = d.category_id AND uc.user_id = $${values.length}`;
+    whereParts.push("d.status = 'active'");
+    if (hasCategoryStatusColumn) {
+      whereParts.push('(c.is_active = TRUE OR c.is_active IS NULL)');
+    }
   }
 
-  if (!hasUserCategoriesTable) {
-    return [];
+  const search = buildIlikeSearch(DOCUMENT_SEARCH_COLUMNS, options.search, values.length);
+  if (search.clause) {
+    whereParts.push(search.clause);
+    values.push(...search.values);
   }
 
-  const query = `
-    ${baseSelect}
-    INNER JOIN user_categories uc
-      ON uc.category_id = d.category_id
-     AND uc.user_id = $1
-    WHERE d.status = 'active'
-      ${hasCategoryStatusColumn ? 'AND (c.is_active = TRUE OR c.is_active IS NULL)' : ''}
-    ORDER BY d.created_at DESC;
-  `;
+  const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
+  const innerQuery = `${baseSelect} ${joinClause} ${whereClause}`;
+  const limitSql = paginate ? `LIMIT $${values.length + 1} OFFSET $${values.length + 2}` : '';
+  const dataValues = paginate ? [...values, limit, offset] : values;
 
-  const result = await pool.query(query, [userId]);
-  return result.rows;
+  const dataResult = await pool.query(
+    `${innerQuery} ORDER BY d.created_at DESC ${limitSql};`,
+    dataValues,
+  );
+
+  if (!paginate) {
+    return buildPaginatedResult(dataResult.rows, dataResult.rows.length, 1, dataResult.rows.length || 1);
+  }
+
+  const countResult = await pool.query(`SELECT COUNT(*)::int AS total FROM (${innerQuery}) sub;`, values);
+  return buildPaginatedResult(dataResult.rows, countResult.rows[0]?.total, page, limit);
 };
 
 export const searchDocumentsForUser = async (

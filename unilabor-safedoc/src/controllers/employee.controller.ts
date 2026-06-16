@@ -92,10 +92,14 @@ const logEmployeeAudit = async (userId: string | undefined, action: string, ipAd
   });
 };
 
-export const listEmployeesController = async (_req: AuthRequest, res: Response) => {
+export const listEmployeesController = async (req: AuthRequest, res: Response) => {
   try {
-    const employees = await listEmployees();
-    return res.json({ employees });
+    const result = await listEmployees({
+      page: req.query.page,
+      limit: req.query.limit,
+      search: typeof req.query.search === 'string' ? req.query.search : undefined,
+    });
+    return res.json(result);
   } catch (error: any) {
     const mappedError = mapEmployeeError(res, error);
     if (mappedError) {

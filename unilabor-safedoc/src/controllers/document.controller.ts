@@ -730,10 +730,13 @@ export const getAllDocuments = async (req: AuthRequest, res: Response): Promise<
     const includeInactive =
       includeInactiveRequested && (user.role === 'ADMIN' || user.role === 'EDITOR');
 
-    const documents = await documentService.listDocumentsForUser(user.id, user.role, {
+    const result = await documentService.listDocumentsForUser(user.id, user.role, {
       includeInactive,
+      page: req.query.page,
+      limit: req.query.limit,
+      search: typeof req.query.search === 'string' ? req.query.search : undefined,
     });
-    res.json(documents);
+    res.json(result);
   } catch (error) {
     console.error('Error al obtener documentos:', error);
     res.status(500).json({ message: 'Error interno del servidor' });

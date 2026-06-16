@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Edit3,
   Eye,
@@ -15,11 +15,12 @@ import {
   createHelpdeskTicket,
   evaluateHelpdeskTicketIsoRisk,
   getApiErrorMessage,
+  getHelpdeskTicketStats,
   listEmployees,
   listHelpdeskAssets,
   listHelpdeskCatalogs,
   listHelpdeskTicketCatalogs,
-  listHelpdeskTickets,
+  listHelpdeskTicketsPaginated,
   releaseHelpdeskTicketTechnically,
   solveHelpdeskTicket,
   type HelpdeskTicketIsoRiskPayload,
@@ -36,11 +37,21 @@ import type {
   HelpdeskTicket,
   HelpdeskTicketCatalogs,
   HelpdeskTicketPriority,
+  HelpdeskTicketStats,
   HelpdeskTicketStatus,
 } from '../types/models';
+import { usePaginatedList } from '../hooks/usePaginatedList';
+import { Pagination } from '../components/Pagination';
 import { getModuleRole } from '../utils/modules';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { hasAnyRole } from '../utils/roles';
+
+const EMPTY_TICKET_STATS: HelpdeskTicketStats = {
+  total: 0,
+  open: 0,
+  critical: 0,
+  affects_results: 0,
+};
 
 interface TicketFormState {
   asset_id: string;
@@ -242,14 +253,29 @@ export const HelpdeskTicketsPage = () => {
   const moduleRole = getModuleRole(availableModules, 'HELPDESK') ?? 'VIEWER';
   const canManage = hasAnyRole(moduleRole, ['ADMIN', 'EDITOR']);
 
-  const [tickets, setTickets] = useState<HelpdeskTicket[]>([]);
+  const {
+    items: tickets,
+    pagination,
+    page,
+    setPage,
+    search: query,
+    setSearch: setQuery,
+    loading,
+    reload: reloadTickets,
+  } = usePaginatedList<HelpdeskTicket>(
+    (q) => listHelpdeskTicketsPaginated({ page: q.page, limit: q.limit, search: q.search }),
+    {
+      pageSize: 20,
+      onError: (error) =>
+        notifyError(getApiErrorMessage(error, 'No se pudieron cargar las solicitudes.')),
+    },
+  );
   const [catalogs, setCatalogs] = useState<HelpdeskTicketCatalogs>(EMPTY_CATALOGS);
   const [operationalStatuses, setOperationalStatuses] = useState<HelpdeskCatalogItem[]>([]);
   const [assets, setAssets] = useState<HelpdeskAsset[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [ticketStats, setTicketStats] = useState<HelpdeskTicketStats>(EMPTY_TICKET_STATS);
   const [saving, setSaving] = useState(false);
-  const [query, setQuery] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<HelpdeskTicket | null>(null);
   const [editingTicket, setEditingTicket] = useState<HelpdeskTicket | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -265,40 +291,41 @@ export const HelpdeskTicketsPage = () => {
   const [comment, setComment] = useState('');
   const [savingComment, setSavingComment] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadAuxData = useCallback(async () => {
     try {
-      const [ticketData, catalogData, assetCatalogData, assetData, employeeData] = await Promise.all([
-        listHelpdeskTickets(),
+      const [catalogData, assetCatalogData, assetData, employeeData] = await Promise.all([
         listHelpdeskTicketCatalogs(),
         listHelpdeskCatalogs(),
         listHelpdeskAssets(),
         listEmployees(),
       ]);
 
-      setTickets(ticketData);
       setCatalogs(catalogData);
       setOperationalStatuses(assetCatalogData.operational_statuses);
       setAssets(assetData);
       setEmployees(employeeData);
-      setSelectedTicket((current) => {
-        if (!current) {
-          return current;
-        }
-
-        const refreshed = ticketData.find((ticket) => ticket.id === current.id);
-        return refreshed ?? current;
-      });
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudieron cargar las solicitudes.'));
-    } finally {
-      setLoading(false);
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catalogos de solicitudes.'));
+    }
+  }, []);
+
+  const loadSummary = useCallback(async () => {
+    try {
+      setTicketStats(await getHelpdeskTicketStats());
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar el resumen de solicitudes.'));
     }
   }, []);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadAuxData();
+    void loadSummary();
+  }, [loadAuxData, loadSummary]);
+
+  const refreshTickets = useCallback(() => {
+    reloadTickets();
+    void loadSummary();
+  }, [reloadTickets, loadSummary]);
 
   useEffect(() => {
     if (!selectedTicket) {
@@ -321,39 +348,12 @@ export const HelpdeskTicketsPage = () => {
     });
   }, [selectedTicket]);
 
-  const filteredTickets = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return tickets;
-    }
-
-    return tickets.filter((ticket) =>
-      [
-        ticket.ticket_code,
-        ticket.title,
-        ticket.description,
-        ticket.asset?.asset_code ?? '',
-        ticket.asset?.name ?? '',
-        ticket.requester_employee?.full_name ?? '',
-        ticket.assigned_employee?.full_name ?? '',
-        ticket.status?.name ?? '',
-        ticket.priority?.name ?? '',
-      ].some((value) => value.toLowerCase().includes(normalizedQuery)),
-    );
-  }, [query, tickets]);
-
-  const summary = useMemo(() => {
-    const open = tickets.filter((ticket) => !ticket.status?.is_closed).length;
-    const critical = tickets.filter((ticket) => ticket.priority?.code === 'CRITICAL').length;
-    const affectsResults = tickets.filter((ticket) => ticket.affects_results).length;
-
-    return {
-      total: tickets.length,
-      open,
-      critical,
-      affectsResults,
-    };
-  }, [tickets]);
+  const summary = {
+    total: ticketStats.total,
+    open: ticketStats.open,
+    critical: ticketStats.critical,
+    affectsResults: ticketStats.affects_results,
+  };
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -404,7 +404,7 @@ export const HelpdeskTicketsPage = () => {
 
       setIsFormOpen(false);
       resetForm();
-      await loadData();
+      refreshTickets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo guardar la solicitud.'));
     } finally {
@@ -424,7 +424,7 @@ export const HelpdeskTicketsPage = () => {
       setSelectedTicket(updated ?? selectedTicket);
       setComment('');
       notifySuccess('Comentario agregado correctamente.');
-      await loadData();
+      refreshTickets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo agregar el comentario.'));
     } finally {
@@ -452,7 +452,7 @@ export const HelpdeskTicketsPage = () => {
       setSelectedTicket(updated ?? selectedTicket);
       setSolutionForm(EMPTY_SOLUTION_FORM);
       notifySuccess('Solucion tecnica registrada correctamente.');
-      await loadData();
+      refreshTickets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo registrar la solucion tecnica.'));
     } finally {
@@ -479,7 +479,7 @@ export const HelpdeskTicketsPage = () => {
       setSelectedTicket(updated ?? selectedTicket);
       setReturnForm(EMPTY_RETURN_FORM);
       notifySuccess('Retorno a operacion validado correctamente.');
-      await loadData();
+      refreshTickets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo validar el retorno a operacion.'));
     } finally {
@@ -513,7 +513,7 @@ export const HelpdeskTicketsPage = () => {
       const updated = await evaluateHelpdeskTicketIsoRisk(selectedTicket.id, payload);
       setSelectedTicket(updated ?? selectedTicket);
       notifySuccess('Evaluacion ISO/riesgo registrada correctamente.');
-      await loadData();
+      refreshTickets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo registrar la evaluacion ISO/riesgo.'));
     } finally {
@@ -541,7 +541,7 @@ export const HelpdeskTicketsPage = () => {
       setSelectedTicket(updated ?? selectedTicket);
       setTechnicalReleaseForm(EMPTY_TECHNICAL_RELEASE_FORM);
       notifySuccess('Liberacion tecnica documentada correctamente.');
-      await loadData();
+      refreshTickets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo documentar la liberacion tecnica.'));
     } finally {
@@ -569,7 +569,7 @@ export const HelpdeskTicketsPage = () => {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => void loadData()}
+            onClick={() => refreshTickets()}
             className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -629,14 +629,14 @@ export const HelpdeskTicketsPage = () => {
                       Cargando solicitudes...
                     </td>
                   </tr>
-                ) : filteredTickets.length === 0 ? (
+                ) : tickets.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
                       No hay solicitudes registradas.
                     </td>
                   </tr>
                 ) : (
-                  filteredTickets.map((ticket) => (
+                  tickets.map((ticket) => (
                     <tr key={ticket.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
                       <td className="px-5 py-4">
                         <p className="text-sm font-bold text-[var(--color-brand-700)]">{ticket.ticket_code}</p>
@@ -682,6 +682,16 @@ export const HelpdeskTicketsPage = () => {
                 )}
               </tbody>
             </table>
+            <div className="border-t border-[rgba(0,65,106,0.08)]">
+              <Pagination
+                page={page}
+                totalPages={pagination.totalPages}
+                total={pagination.total}
+                pageSize={pagination.limit}
+                onPageChange={setPage}
+                loading={loading}
+              />
+            </div>
           </div>
         </div>
 

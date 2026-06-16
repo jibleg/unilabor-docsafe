@@ -34,6 +34,7 @@ import type {
   HelpdeskTicketCatalogs,
   HelpdeskTicketComment,
   HelpdeskTicketPriority,
+  HelpdeskTicketStats,
   HelpdeskTicketStatus,
   HelpdeskMaintenanceCatalogs,
   HelpdeskMaintenanceFrequency,
@@ -371,6 +372,59 @@ const getArrayFromPayload = (payload: unknown, keys: string[]): unknown[] => {
   return [];
 };
 
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PageResult<T> {
+  data: T[];
+  pagination: PaginationMeta;
+}
+
+export interface PageQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+const toPositiveInt = (value: unknown, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : fallback;
+};
+
+const extractPagination = (payload: unknown, fallbackCount: number): PaginationMeta => {
+  const meta = asRecord(asRecord(payload)?.pagination);
+  const total = (() => {
+    const parsed = Number(meta?.total);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : fallbackCount;
+  })();
+
+  return {
+    page: toPositiveInt(meta?.page, 1),
+    limit: toPositiveInt(meta?.limit, fallbackCount || 1),
+    total,
+    totalPages: toPositiveInt(meta?.totalPages, 1),
+  };
+};
+
+const buildPageParams = (query: PageQuery): Record<string, string | number> => {
+  const params: Record<string, string | number> = {};
+  if (query.page) {
+    params.page = query.page;
+  }
+  if (query.limit) {
+    params.limit = query.limit;
+  }
+  const trimmedSearch = query.search?.trim();
+  if (trimmedSearch) {
+    params.search = trimmedSearch;
+  }
+  return params;
+};
+
 const normalizeUser = (input: unknown): User => {
   const source = asRecord(input);
   if (!source) {
@@ -645,6 +699,8 @@ const normalizeHelpdeskSummary = (input: unknown): HelpdeskAssetSummary => {
       open_tickets: 0,
       preventive_due: 0,
       out_of_service: 0,
+      critical: 0,
+      assigned: 0,
     };
   }
 
@@ -653,6 +709,18 @@ const normalizeHelpdeskSummary = (input: unknown): HelpdeskAssetSummary => {
     open_tickets: getNumber(source, ['open_tickets', 'openTickets']),
     preventive_due: getNumber(source, ['preventive_due', 'preventiveDue']),
     out_of_service: getNumber(source, ['out_of_service', 'outOfService']),
+    critical: getNumber(source, ['critical']),
+    assigned: getNumber(source, ['assigned']),
+  };
+};
+
+const normalizeHelpdeskTicketStats = (input: unknown): HelpdeskTicketStats => {
+  const source = asRecord(input) ?? {};
+  return {
+    total: getNumber(source, ['total']),
+    open: getNumber(source, ['open']),
+    critical: getNumber(source, ['critical']),
+    affects_results: getNumber(source, ['affects_results', 'affectsResults']),
   };
 };
 
@@ -1854,6 +1922,14 @@ export const listEmployees = async (): Promise<Employee[]> => {
     .filter((employee): employee is Employee => employee !== null);
 };
 
+export const listEmployeesPaginated = async (query: PageQuery = {}): Promise<PageResult<Employee>> => {
+  const response = await api.get('/employees', { params: buildPageParams(query) });
+  const data = getArrayFromPayload(response.data, ['employees', 'items', 'results'])
+    .map(normalizeEmployee)
+    .filter((employee): employee is Employee => employee !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
 export const getEmployeeSummary = async (): Promise<EmployeeSummary> => {
   const response = await api.get('/employees/summary');
   const payload = unwrapPayload(response.data);
@@ -1910,6 +1986,16 @@ export const listHelpdeskAssets = async (): Promise<HelpdeskAsset[]> => {
     .filter((asset): asset is HelpdeskAsset => asset !== null);
 };
 
+export const listHelpdeskAssetsPaginated = async (
+  query: PageQuery = {},
+): Promise<PageResult<HelpdeskAsset>> => {
+  const response = await api.get('/helpdesk/assets', { params: buildPageParams(query) });
+  const data = getArrayFromPayload(response.data, ['assets', 'items', 'results'])
+    .map(normalizeHelpdeskAsset)
+    .filter((asset): asset is HelpdeskAsset => asset !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
 export const listMyHelpdeskAssets = async (): Promise<{ employee: Employee | null; assets: HelpdeskAsset[] }> => {
   const response = await api.get('/helpdesk/me/assets');
   const payload = asRecord(unwrapPayload(response.data));
@@ -1960,6 +2046,22 @@ export const listHelpdeskTickets = async (): Promise<HelpdeskTicket[]> => {
   return getArrayFromPayload(response.data, ['tickets', 'items', 'results'])
     .map(normalizeHelpdeskTicket)
     .filter((ticket): ticket is HelpdeskTicket => ticket !== null);
+};
+
+export const listHelpdeskTicketsPaginated = async (
+  query: PageQuery = {},
+): Promise<PageResult<HelpdeskTicket>> => {
+  const response = await api.get('/helpdesk/tickets', { params: buildPageParams(query) });
+  const data = getArrayFromPayload(response.data, ['tickets', 'items', 'results'])
+    .map(normalizeHelpdeskTicket)
+    .filter((ticket): ticket is HelpdeskTicket => ticket !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
+export const getHelpdeskTicketStats = async (): Promise<HelpdeskTicketStats> => {
+  const response = await api.get('/helpdesk/tickets/summary');
+  const payload = unwrapPayload(response.data);
+  return normalizeHelpdeskTicketStats(asRecord(payload)?.summary ?? payload);
 };
 
 export const listMyHelpdeskTickets = async (): Promise<HelpdeskTicket[]> => {

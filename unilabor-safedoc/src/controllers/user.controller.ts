@@ -7,6 +7,12 @@ import { listSystemModules, listUserModuleAccess, syncUserModuleAccess } from '.
 import { resetPasswordForUserById } from '../services/password.service';
 import * as categoryService from '../services/category.service';
 import { AuthRequest, ModuleCode, UserRole } from '../types';
+import {
+  buildIlikeSearch,
+  buildPaginatedResult,
+  isPaginationRequested,
+  resolvePagination,
+} from '../utils/pagination';
 
 const allowedRoles: UserRole[] = ['ADMIN', 'EDITOR', 'VIEWER'];
 const allowedModuleCodes: ModuleCode[] = ['QUALITY', 'RH', 'HELPDESK'];
@@ -252,7 +258,9 @@ export const createUser = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const getAllUsers = async (_req: Request, res: Response) => {
+const USER_SEARCH_COLUMNS = ['u.email', 'u.full_name', 'u.role'];
+
+export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const hasUserCategoriesTableResult = await pool.query(
       `SELECT to_regclass('public.user_categories') IS NOT NULL AS exists;`
@@ -260,7 +268,20 @@ export const getAllUsers = async (_req: Request, res: Response) => {
 
     const hasUserCategoriesTable = Boolean(hasUserCategoriesTableResult.rows[0]?.exists);
 
-    const query = hasUserCategoriesTable
+    const paginationInput = { page: req.query.page, limit: req.query.limit };
+    const paginate = isPaginationRequested(paginationInput);
+    const { page, limit, offset } = resolvePagination(paginationInput);
+    const search = buildIlikeSearch(
+      USER_SEARCH_COLUMNS,
+      typeof req.query.search === 'string' ? req.query.search : undefined,
+      0,
+    );
+    const whereClause = ['u.is_active = TRUE', search.clause].filter(Boolean).join(' AND ');
+    const limitSql = paginate
+      ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}`
+      : '';
+
+    const dataQuery = hasUserCategoriesTable
       ? `
           SELECT
             u.id,
@@ -279,13 +300,22 @@ export const getAllUsers = async (_req: Request, res: Response) => {
           FROM users u
           LEFT JOIN user_categories uc ON uc.user_id = u.id
           LEFT JOIN categories c ON c.id = uc.category_id
-          WHERE u.is_active = TRUE
+          WHERE ${whereClause}
           GROUP BY u.id, u.email, u.full_name, u.role, u.is_active, u.created_at
-          ORDER BY u.created_at DESC;
+          ORDER BY u.created_at DESC
+          ${limitSql};
         `
-      : 'SELECT id, email, full_name, role, is_active, created_at FROM users WHERE is_active = TRUE ORDER BY created_at DESC';
+      : `
+          SELECT id, email, full_name, role, is_active, created_at
+          FROM users u
+          WHERE ${whereClause}
+          ORDER BY created_at DESC
+          ${limitSql};
+        `;
 
-    const result = await pool.query(query);
+    const dataValues = paginate ? [...search.values, limit, offset] : search.values;
+    const result = await pool.query(dataQuery, dataValues);
+
     const usersWithModules = await Promise.all(
       result.rows.map(async (row) => ({
         ...row,
@@ -293,7 +323,20 @@ export const getAllUsers = async (_req: Request, res: Response) => {
       })),
     );
 
-    res.json(usersWithModules);
+    if (!paginate) {
+      res.json(
+        buildPaginatedResult(usersWithModules, usersWithModules.length, 1, usersWithModules.length || 1),
+      );
+      return;
+    }
+
+    // El conteo no requiere los JOIN de categorías: la búsqueda sólo toca columnas de `users`.
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM users u WHERE ${whereClause};`,
+      search.values,
+    );
+
+    res.json(buildPaginatedResult(usersWithModules, countResult.rows[0]?.total, page, limit));
   } catch (error) {
     console.error('Error obteniendo usuarios:', error);
     res.status(500).json({ message: 'Error al obtener usuarios' });

@@ -1,5 +1,13 @@
 import pool from '../config/db';
 import { toIsoDate, toIsoDateTime } from '../utils/date-serialization';
+import {
+  PaginatedResult,
+  PaginationInput,
+  buildIlikeSearch,
+  buildPaginatedResult,
+  isPaginationRequested,
+  resolvePagination,
+} from '../utils/pagination';
 
 export interface HelpdeskCatalogItem {
   id: number;
@@ -72,6 +80,8 @@ export interface HelpdeskAssetSummary {
   open_tickets: number;
   preventive_due: number;
   out_of_service: number;
+  critical: number;
+  assigned: number;
 }
 
 export interface HelpdeskCatalogs {
@@ -401,6 +411,8 @@ export const getHelpdeskSummary = async (): Promise<HelpdeskAssetSummary> => {
       open_tickets: 0,
       preventive_due: 0,
       out_of_service: 0,
+      critical: 0,
+      assigned: 0,
     };
   }
 
@@ -409,9 +421,16 @@ export const getHelpdeskSummary = async (): Promise<HelpdeskAssetSummary> => {
       COUNT(*) FILTER (WHERE a.is_active = TRUE)::int AS assets,
       COUNT(*) FILTER (
         WHERE a.is_active = TRUE AND UPPER(COALESCE(os.code, '')) = 'OUT_OF_SERVICE'
-      )::int AS out_of_service
+      )::int AS out_of_service,
+      COUNT(*) FILTER (
+        WHERE a.is_active = TRUE AND UPPER(COALESCE(cr.code, '')) = 'CRITICAL'
+      )::int AS critical,
+      COUNT(*) FILTER (
+        WHERE a.is_active = TRUE AND a.assigned_employee_id IS NOT NULL
+      )::int AS assigned
     FROM public.helpdesk_assets a
-    LEFT JOIN public.helpdesk_operational_statuses os ON os.id = a.operational_status_id;
+    LEFT JOIN public.helpdesk_operational_statuses os ON os.id = a.operational_status_id
+    LEFT JOIN public.helpdesk_criticalities cr ON cr.id = a.criticality_id;
   `);
 
   return {
@@ -419,19 +438,58 @@ export const getHelpdeskSummary = async (): Promise<HelpdeskAssetSummary> => {
     open_tickets: 0,
     preventive_due: 0,
     out_of_service: Number(result.rows[0]?.out_of_service ?? 0),
+    critical: Number(result.rows[0]?.critical ?? 0),
+    assigned: Number(result.rows[0]?.assigned ?? 0),
   };
 };
 
-export const listHelpdeskAssets = async (): Promise<HelpdeskAssetRecord[]> => {
+const ASSET_SEARCH_COLUMNS = [
+  'a.asset_code',
+  'a.name',
+  'a.description',
+  'a.model',
+  'a.serial_number',
+  'b.name',
+  'c.name',
+  'l.name',
+  'ae.full_name',
+];
+
+export interface AssetListOptions extends PaginationInput {
+  search?: string | undefined;
+}
+
+export const listHelpdeskAssets = async (
+  options: AssetListOptions = {},
+): Promise<PaginatedResult<HelpdeskAssetRecord>> => {
   await assertHelpdeskAssetsTable();
 
-  const result = await pool.query(`
-    ${buildAssetQuery()}
-    WHERE a.is_active = TRUE
-    ORDER BY a.updated_at DESC, a.name ASC;
-  `);
+  const paginate = isPaginationRequested(options);
+  const { page, limit, offset } = resolvePagination(options);
+  const search = buildIlikeSearch(ASSET_SEARCH_COLUMNS, options.search, 0);
+  const whereClause = ['a.is_active = TRUE', search.clause].filter(Boolean).join(' AND ');
 
-  return result.rows.map(mapAssetRow);
+  const base = buildAssetQuery();
+  const limitSql = paginate
+    ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}`
+    : '';
+  const dataValues = paginate ? [...search.values, limit, offset] : search.values;
+
+  const dataResult = await pool.query(
+    `${base} WHERE ${whereClause} ORDER BY a.updated_at DESC, a.name ASC ${limitSql};`,
+    dataValues,
+  );
+  const data = dataResult.rows.map(mapAssetRow);
+
+  if (!paginate) {
+    return buildPaginatedResult(data, data.length, 1, data.length || 1);
+  }
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM (${base} WHERE ${whereClause}) sub;`,
+    search.values,
+  );
+  return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };
 
 export const listHelpdeskAssetsByEmployee = async (employeeId: number): Promise<HelpdeskAssetRecord[]> => {
