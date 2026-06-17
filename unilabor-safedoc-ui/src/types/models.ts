@@ -48,6 +48,7 @@ export interface Employee {
   user_id: string | null;
   full_name: string;
   email: string;
+  phone?: string | null;
   area?: string | null;
   position?: string | null;
   is_active: boolean;
@@ -589,4 +590,57 @@ export interface AuditLog {
 export interface Category {
   id: number;
   name: string;
+}
+
+// --- Modulo de Evaluaciones de capacitacion y constancias (ISO 15189) ---
+
+export type EvaluationQuestionType = 'single' | 'multiple' | 'boolean' | 'open';
+export type EvaluationSelectionMode = 'all' | 'random';
+export type EvaluationTemplateStatus = 'draft' | 'published';
+
+export interface TrainingCourse {
+  id: number;
+  code: string;
+  title: string;
+  description: string | null;
+  certificate_validity_months: number;
+  is_active: boolean;
+  template_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EvaluationQuestionOption {
+  id?: number;
+  text: string;
+  is_correct: boolean;
+  sort_order?: number;
+}
+
+export interface EvaluationQuestion {
+  id?: number;
+  template_id?: number;
+  type: EvaluationQuestionType;
+  text: string;
+  points: number;
+  sort_order?: number;
+  options: EvaluationQuestionOption[];
+}
+
+export interface EvaluationTemplate {
+  id: number;
+  training_course_id: number;
+  title: string;
+  instructions: string | null;
+  passing_score: number;
+  window_hours: number;
+  selection_mode: EvaluationSelectionMode;
+  random_count: number | null;
+  status: EvaluationTemplateStatus;
+  is_active: boolean;
+  requires_manual_grading: boolean;
+  question_count?: number;
+  questions?: EvaluationQuestion[];
+  created_at?: string;
+  updated_at?: string;
 }

@@ -251,6 +251,7 @@ export const createEmployeeController = async (req: AuthRequest, res: Response) 
       user_id: getText(req.body?.user_id),
       full_name,
       email,
+      phone: getText(req.body?.phone),
       area: getText(req.body?.area),
       position: getText(req.body?.position),
     });
@@ -292,6 +293,9 @@ export const updateEmployeeController = async (req: AuthRequest, res: Response) 
   if (req.body?.email !== undefined) {
     payload.email = getText(req.body?.email) ?? '';
   }
+  if (req.body?.phone !== undefined) {
+    payload.phone = getText(req.body?.phone);
+  }
   if (req.body?.area !== undefined) {
     payload.area = getText(req.body?.area);
   }
@@ -304,6 +308,7 @@ export const updateEmployeeController = async (req: AuthRequest, res: Response) 
       payload.user_id === undefined &&
       payload.full_name === undefined &&
       payload.email === undefined &&
+      payload.phone === undefined &&
       payload.area === undefined &&
       payload.position === undefined
   ) {

@@ -3,3 +3,4 @@ export * from './service.normalizers';
 export * from './service.parsers';
 export * from './service.api-core';
 export * from './service.api-helpdesk';
+export * from './service.api-training';

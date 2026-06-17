@@ -28,12 +28,67 @@ export interface EmployeeRecord {
   user_id: string | null;
   full_name: string;
   email: string;
+  phone: string | null;
   area: string | null;
   position: string | null;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
   linked_user?: LinkableUser | null;
+}
+
+// --- Modulo de Evaluaciones de capacitacion y constancias (ISO 15189) ---
+
+export type EvaluationQuestionType = 'single' | 'multiple' | 'boolean' | 'open';
+export type EvaluationSelectionMode = 'all' | 'random';
+export type EvaluationTemplateStatus = 'draft' | 'published';
+
+export interface TrainingCourseRecord {
+  id: number;
+  code: string;
+  title: string;
+  description: string | null;
+  certificate_validity_months: number;
+  is_active: boolean;
+  template_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EvaluationQuestionOptionRecord {
+  id: number;
+  question_id: number;
+  text: string;
+  is_correct: boolean;
+  sort_order: number;
+}
+
+export interface EvaluationQuestionRecord {
+  id: number;
+  template_id: number;
+  type: EvaluationQuestionType;
+  text: string;
+  points: number;
+  sort_order: number;
+  options: EvaluationQuestionOptionRecord[];
+}
+
+export interface EvaluationTemplateRecord {
+  id: number;
+  training_course_id: number;
+  title: string;
+  instructions: string | null;
+  passing_score: number;
+  window_hours: number;
+  selection_mode: EvaluationSelectionMode;
+  random_count: number | null;
+  status: EvaluationTemplateStatus;
+  is_active: boolean;
+  requires_manual_grading: boolean;
+  question_count?: number;
+  questions?: EvaluationQuestionRecord[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface EmployeeSummary {

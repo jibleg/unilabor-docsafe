@@ -2,20 +2,32 @@ import { z } from 'zod';
 
 const requiredText = (message: string) => z.string().trim().min(1, message);
 
+// Telefono opcional en formato E.164 (ej. +5215512345678). Se acepta vacio/nulo;
+// habilita el SMS (LabsMobile) de sprints posteriores.
+const optionalPhone = z
+  .string()
+  .trim()
+  .regex(/^\+?[1-9]\d{6,14}$/, 'El telefono debe ser un numero valido en formato E.164 (ej. +5215512345678)')
+  .optional()
+  .or(z.literal('').transform(() => undefined))
+  .nullable();
+
 export const createEmployeeSchema = z
   .object({
     full_name: requiredText('El nombre completo es obligatorio'),
     email: requiredText('El correo es obligatorio'),
+    phone: optionalPhone,
   })
   .passthrough();
 
-const UPDATE_EMPLOYEE_FIELDS = ['employee_code', 'user_id', 'full_name', 'email', 'area', 'position'] as const;
+const UPDATE_EMPLOYEE_FIELDS = ['employee_code', 'user_id', 'full_name', 'email', 'phone', 'area', 'position'] as const;
 
 export const updateEmployeeSchema = z
   .object({
     // Si se envian, no pueden quedar vacios (coincide con los chequeos del controller).
     full_name: requiredText('El nombre completo no puede quedar vacio').optional(),
     email: requiredText('El correo no puede quedar vacio').optional(),
+    phone: optionalPhone,
   })
   .passthrough()
   .refine((data) => UPDATE_EMPLOYEE_FIELDS.some((field) => (data as Record<string, unknown>)[field] !== undefined), {

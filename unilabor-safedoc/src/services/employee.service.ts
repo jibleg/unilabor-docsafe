@@ -18,6 +18,7 @@ export interface EmployeePayload {
   user_id?: string | null;
   full_name: string;
   email: string;
+  phone?: string | null;
   area?: string | null;
   position?: string | null;
 }
@@ -56,6 +57,7 @@ const mapEmployeeRow = async (row: any): Promise<EmployeeRecord> => {
     user_id: row.user_id ? String(row.user_id) : null,
     full_name: String(row.full_name),
     email: String(row.email),
+    phone: row.phone ? String(row.phone) : null,
     area: row.area ? String(row.area) : null,
     position: row.position ? String(row.position) : null,
     is_active: Boolean(row.is_active),
@@ -182,6 +184,7 @@ const buildEmployeeBaseQuery = () => `
     e.user_id,
     e.full_name,
     e.email,
+    e.phone,
     e.area,
     e.position,
     e.is_active,
@@ -304,6 +307,7 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
           user_id,
           full_name,
           email,
+          phone,
           area,
           position
         )
@@ -314,7 +318,8 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
           $4,
           $5,
           $6,
-          $7
+          $7,
+          $8
         )
         RETURNING id;
       `,
@@ -324,6 +329,7 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
         normalizedUserId,
         payload.full_name.trim(),
         normalizedEmail,
+        normalizeOptionalText(payload.phone),
         normalizeOptionalText(payload.area),
         normalizeOptionalText(payload.position),
       ],
@@ -396,16 +402,18 @@ export const updateEmployee = async (
           user_id = $2,
           full_name = $3,
           email = $4,
-          area = $5,
-          position = $6,
+          phone = $5,
+          area = $6,
+          position = $7,
           updated_at = NOW()
-        WHERE id = $7;
+        WHERE id = $8;
       `,
       [
         resolvedEmployeeCode,
         resolvedUserId,
         payload.full_name !== undefined ? payload.full_name.trim() : String(currentEmployee.full_name),
         resolvedEmail,
+        payload.phone !== undefined ? normalizeOptionalText(payload.phone) : currentEmployee.phone,
         payload.area !== undefined ? normalizeOptionalText(payload.area) : currentEmployee.area,
         payload.position !== undefined ? normalizeOptionalText(payload.position) : currentEmployee.position,
         employeeId,

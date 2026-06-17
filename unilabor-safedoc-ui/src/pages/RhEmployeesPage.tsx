@@ -34,6 +34,7 @@ interface EmployeeFormState {
   user_id: string;
   full_name: string;
   email: string;
+  phone: string;
   area: string;
   position: string;
 }
@@ -43,6 +44,7 @@ const EMPTY_FORM: EmployeeFormState = {
   user_id: '',
   full_name: '',
   email: '',
+  phone: '',
   area: '',
   position: '',
 };
@@ -55,6 +57,7 @@ const toEmployeePayload = (form: EmployeeFormState): EmployeePayload => ({
   user_id: form.user_id || null,
   full_name: form.full_name.trim(),
   email: form.email.trim(),
+  phone: form.phone.trim() || null,
   area: form.area.trim() || undefined,
   position: form.position.trim() || undefined,
 });
@@ -168,6 +171,7 @@ export const RhEmployeesPage = () => {
       user_id: employee.user_id ?? '',
       full_name: employee.full_name,
       email: employee.email,
+      phone: employee.phone ?? '',
       area: employee.area ?? '',
       position: employee.position ?? '',
     });
@@ -688,6 +692,21 @@ export const RhEmployeesPage = () => {
                     onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                   />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Telefono / celular
+                  </label>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+                    placeholder="+5215512345678"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--unilabor-neutral)]">
+                    Formato internacional (E.164). Se usara para avisar por SMS las evaluaciones de capacitacion.
+                  </p>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">

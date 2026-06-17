@@ -167,6 +167,7 @@ export const normalizeEmployee = (input: unknown): Employee | null => {
     user_id: getString(source, ['user_id', 'userId']) || null,
     full_name: fullName,
     email,
+    phone: getString(source, ['phone']) || null,
     area: getString(source, ['area']) || null,
     position: getString(source, ['position']) || null,
     is_active: getBoolean(source, ['is_active', 'isActive'], true),
