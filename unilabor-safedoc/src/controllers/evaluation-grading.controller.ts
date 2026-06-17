@@ -8,6 +8,7 @@ import {
 } from '../services/evaluation-grading.service';
 import { listNotificationLog } from '../services/notification.service';
 import { authorizeLateAttempt, listExpiredAssignments } from '../services/evaluation-assignment.service';
+import { getEvaluationDashboard, getTraceabilityReport } from '../services/evaluation-report.service';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -63,6 +64,38 @@ export const listNotificationLogController = async (req: AuthRequest, res: Respo
   } catch (error) {
     console.error('Error listando bitacora de notificaciones:', error);
     return res.status(500).json({ message: 'No se pudo cargar la bitacora de notificaciones.' });
+  }
+};
+
+export const evaluationDashboardController = async (_req: AuthRequest, res: Response) => {
+  try {
+    const dashboard = await getEvaluationDashboard();
+    return res.json(dashboard);
+  } catch (error) {
+    console.error('Error obteniendo dashboard de evaluaciones:', error);
+    return res.status(500).json({ message: 'No se pudo cargar el dashboard de capacitacion.' });
+  }
+};
+
+export const traceabilityReportController = async (req: AuthRequest, res: Response) => {
+  try {
+    const courseId = Number.parseInt(String(req.query.course_id ?? ''), 10);
+    const employeeId = Number.parseInt(String(req.query.employee_id ?? ''), 10);
+    const filters: Parameters<typeof getTraceabilityReport>[0] = {
+      page: req.query.page,
+      limit: req.query.limit,
+    };
+    if (Number.isFinite(courseId) && courseId > 0) {
+      filters.course_id = courseId;
+    }
+    if (Number.isFinite(employeeId) && employeeId > 0) {
+      filters.employee_id = employeeId;
+    }
+    const result = await getTraceabilityReport(filters);
+    return res.json(result);
+  } catch (error) {
+    console.error('Error obteniendo reporte de trazabilidad:', error);
+    return res.status(500).json({ message: 'No se pudo cargar el reporte de trazabilidad.' });
   }
 };
 

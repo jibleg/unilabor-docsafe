@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import {
   authorizeLateController,
+  evaluationDashboardController,
   getGradingDetailController,
   gradeEvaluationController,
   listExpiredAssignmentsController,
   listGradingQueueController,
   listNotificationLogController,
+  traceabilityReportController,
 } from '../controllers/evaluation-grading.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
@@ -22,6 +24,8 @@ router.use(verifyToken, authorizeModuleAccess('RH'), authorizeModuleRole('RH', [
 router.get('/grading', listGradingQueueController);
 router.get('/notifications', listNotificationLogController);
 router.get('/expired', listExpiredAssignmentsController);
+router.get('/dashboard', evaluationDashboardController);
+router.get('/report', traceabilityReportController);
 router.get('/:id/grading', getGradingDetailController);
 router.post('/:id/grade', validate(gradeEvaluationSchema), gradeEvaluationController);
 router.post('/:id/authorize-late', authorizeLateController);

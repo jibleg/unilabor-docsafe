@@ -25,9 +25,11 @@ import type {
   EvaluationTakingQuestion,
   EvaluationTakingView,
   EvaluationTemplate,
+  EvaluationDashboard,
   EvaluationTemplateStatus,
   NotificationLogEntry,
   OpenAnswerToGrade,
+  TraceabilityRow,
   TrainingCourse,
 } from '../types/models';
 
@@ -418,6 +420,75 @@ const normalizeSubmitResult = (raw: unknown, fallbackId: number): EvaluationSubm
 export const getEmployeeDocumentUrl = async (documentId: number): Promise<string> => {
   const response = await api.get(`/rh/documents/${documentId}/view`, { responseType: 'blob' });
   return URL.createObjectURL(response.data as Blob);
+};
+
+export const getEvaluationDashboard = async (): Promise<EvaluationDashboard> => {
+  const response = await api.get('/rh/evaluations/dashboard');
+  const payload = asRecord(unwrapPayload(response.data));
+  const totals = asRecord(payload?.totals) ?? {};
+  const num = (source: Record<string, unknown>, key: string) => Number(source[key] ?? 0);
+  const courses = Array.isArray(payload?.courses)
+    ? (payload!.courses as unknown[]).map((raw) => {
+        const c = asRecord(raw) ?? {};
+        return {
+          course_id: num(c, 'course_id'),
+          course_title: String(c.course_title ?? ''),
+          total: num(c, 'total'),
+          passed: num(c, 'passed'),
+          failed: num(c, 'failed'),
+          pending: num(c, 'pending'),
+          in_progress: num(c, 'in_progress'),
+          grading: num(c, 'grading'),
+          expired: num(c, 'expired'),
+          authorized_late: num(c, 'authorized_late'),
+          compliance_pct: num(c, 'compliance_pct'),
+        };
+      })
+    : [];
+  return {
+    totals: {
+      total: num(totals, 'total'),
+      passed: num(totals, 'passed'),
+      failed: num(totals, 'failed'),
+      in_progress: num(totals, 'in_progress'),
+      pending: num(totals, 'pending'),
+      grading: num(totals, 'grading'),
+      expired: num(totals, 'expired'),
+      compliance_pct: num(totals, 'compliance_pct'),
+    },
+    courses,
+  };
+};
+
+export const getTraceabilityReport = async (
+  query: PageQuery & { course_id?: number } = {},
+): Promise<PageResult<TraceabilityRow>> => {
+  const params: Record<string, string | number> = { ...buildPageParams(query) };
+  if (query.course_id) {
+    params.course_id = query.course_id;
+  }
+  const response = await api.get('/rh/evaluations/report', { params });
+  const data = getArrayFromPayload(response.data, ['data', 'items'])
+    .map((raw): TraceabilityRow | null => {
+      const r = asRecord(raw);
+      if (!r) return null;
+      return {
+        assignment_id: getNumber(r, ['assignment_id']) ?? 0,
+        employee_name: getString(r, ['employee_name']),
+        employee_code: getString(r, ['employee_code']),
+        course_title: getString(r, ['course_title']),
+        template_title: getString(r, ['template_title']),
+        status: (getString(r, ['status']) as TraceabilityRow['status']) || 'pending',
+        percentage: getNumber(r, ['percentage']) ?? null,
+        passing_score: getNumber(r, ['passing_score']) ?? 0,
+        submitted_at: getString(r, ['submitted_at']) || null,
+        graded_at: getString(r, ['graded_at']) || null,
+        certificate_issue_date: getString(r, ['certificate_issue_date']) || null,
+        certificate_expiry_date: getString(r, ['certificate_expiry_date']) || null,
+      };
+    })
+    .filter((row): row is TraceabilityRow => row !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
 };
 
 export const requestLateAuthorization = async (assignmentId: number): Promise<void> => {

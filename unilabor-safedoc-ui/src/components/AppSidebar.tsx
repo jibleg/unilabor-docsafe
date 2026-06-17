@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   AlertTriangle,
+  BarChart3,
   Bell,
   Building2,
   CalendarClock,
@@ -66,6 +67,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
           { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
           { icon: GraduationCap, label: 'Capacitaciones', path: '/rh/trainings', roles: ['ADMIN', 'EDITOR'] },
+          { icon: BarChart3, label: 'Panel capacitacion', path: '/rh/training-dashboard', roles: ['ADMIN', 'EDITOR'] },
           { icon: ClipboardCheck, label: 'Calificacion', path: '/rh/grading', roles: ['ADMIN', 'EDITOR'] },
           { icon: Bell, label: 'Notificaciones', path: '/rh/notifications', roles: ['ADMIN', 'EDITOR'] },
           { icon: Clock, label: 'Extemporaneos', path: '/rh/late-requests', roles: ['ADMIN', 'EDITOR'] },

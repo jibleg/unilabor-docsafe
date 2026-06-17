@@ -1,6 +1,6 @@
 # Roadmap - Modulo de Evaluaciones de Capacitacion y Constancias (ISO 15189:2022)
 
-Estado general del roadmap: `pendiente`
+Estado general del roadmap: `completada`
 
 Objetivo general:
 Construir, dentro del modulo RH, un flujo completo de evaluacion de capacitacion para colaboradores exigido por ISO 15189:2022: cerrada una capacitacion, el sistema instancia una evaluacion por colaborador, le notifica (SMS + correo + aviso in-app) que cuenta con 72 horas para realizarla, la califica de forma automatica (o manual cuando hay preguntas abiertas) y, si obtiene >= 80%, genera y archiva en automatico su constancia anual en su seccion de Constancias del expediente, visualizable al instante.
@@ -28,15 +28,15 @@ Construir, dentro del modulo RH, un flujo completo de evaluacion de capacitacion
 
 | Sprint | Nombre | Entrega | Estado |
 | --- | --- | --- | --- |
-| 31 | Base: capacitaciones, plantillas y banco de preguntas | Modelo de datos + CRUD + UI de diseno; campo telefono en alta de colaborador | `pendiente` |
-| 32 | Asignacion e instanciacion + aviso in-app | Instanciar evaluacion por colaborador (all/random), estados, deadline 72h, badge/banner de pendiente | `pendiente` |
-| 33 | Captura, auto-calificacion y resultados (motion) | UI responsiva con motion.dev, envio, auto-calificacion, pantalla de resultados con mensaje segun nota | `pendiente` |
-| 34 | Calificacion manual (operador / RH) | Redaccion de preguntas manuales y calificacion de respuestas abiertas; recalculo y resolucion | `pendiente` |
-| 35 | Disenador de constancia + vista preliminar | Motor PDF (pdfkit), plantilla disenable (logo/texto/firmas), endpoint de preliminar con datos de muestra | `pendiente` |
-| 36 | Generacion real de constancia + auto-archivo | Al passed (>=80%) generar PDF real, archivar en expediente (issue+expiry 12m), visualizacion inmediata | `pendiente` |
-| 37 | Notificaciones (correo + LabsMobile SMS) | Canal de notificacion abstracto, SMS LabsMobile, aviso de disponibilidad y de no-acreditado, log de envios | `pendiente` |
-| 38 | Scheduler 72h, vencimiento y extemporaneo | node-cron: recordatorio, marcar vencidas + avisar RH, flujo de autorizacion extemporanea | `pendiente` |
-| 39 | QA, trazabilidad ISO, dashboard y cierre | Dashboard RH, reporte de trazabilidad ISO 15189, auditoria, tests, documentacion | `pendiente` |
+| 31 | Base: capacitaciones, plantillas y banco de preguntas | Modelo de datos + CRUD + UI de diseno; campo telefono en alta de colaborador | `completada` |
+| 32 | Asignacion e instanciacion + aviso in-app | Instanciar evaluacion por colaborador (all/random), estados, deadline 72h, badge/banner de pendiente | `completada` |
+| 33 | Captura, auto-calificacion y resultados (motion) | UI responsiva con motion.dev, envio, auto-calificacion, pantalla de resultados con mensaje segun nota | `completada` |
+| 34 | Calificacion manual (operador / RH) | Redaccion de preguntas manuales y calificacion de respuestas abiertas; recalculo y resolucion | `completada` |
+| 35 | Disenador de constancia + vista preliminar | Motor PDF (pdfkit), plantilla disenable (logo/texto/firmas), endpoint de preliminar con datos de muestra | `completada` |
+| 36 | Generacion real de constancia + auto-archivo | Al passed (>=80%) generar PDF real, archivar en expediente (issue+expiry 12m), visualizacion inmediata | `completada` |
+| 37 | Notificaciones (correo + LabsMobile SMS) | Canal de notificacion abstracto, SMS LabsMobile, aviso de disponibilidad y de no-acreditado, log de envios | `completada` |
+| 38 | Scheduler 72h, vencimiento y extemporaneo | node-cron: recordatorio, marcar vencidas + avisar RH, flujo de autorizacion extemporanea | `completada` |
+| 39 | QA, trazabilidad ISO, dashboard y cierre | Dashboard RH, reporte de trazabilidad ISO 15189, auditoria, tests, documentacion | `completada` |
 
 ## Dependencias sugeridas
 
@@ -64,3 +64,4 @@ El modulo se considera logrado cuando:
 | Fecha | Hito | Estado | Comentario |
 | --- | --- | --- | --- |
 | 2026-06-17 | Se define el roadmap del modulo de Evaluaciones y Constancias | `pendiente` | 9 sprints (31-39). Decisiones de diseno confirmadas con el usuario. Arranca despues de cerrar la V3. |
+| 2026-06-17 | Modulo completo (sprints 31-39 ejecutados) | `completada` | Flujo de punta a punta: disenar capacitacion/evaluacion/banco -> disenar constancia con preliminar -> asignar (correo+SMS+aviso in-app, 72h) -> responder (UI responsiva motion) -> auto-calificacion + calificacion manual de abiertas -> constancia automatica archivada en el expediente con vigencia -> recordatorio/vencimiento/extemporaneo (scheduler node-cron) -> panel de cumplimiento + trazabilidad ISO (CSV) + bitacora de notificaciones. Backend 91 tests / frontend 26, builds+lint verdes, ningun archivo > 1000 LOC. 13 migraciones `sql/20260617_*` versionadas para `npm run migrate` en produccion. Pendiente: pruebas de funcionalidad en navegador/dispositivos y configurar credenciales LabsMobile en produccion. |

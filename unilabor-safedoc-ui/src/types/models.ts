@@ -697,6 +697,49 @@ export interface EvaluationSubmitResult {
   certificate_document_id?: number | null;
 }
 
+export interface CourseEvaluationSummary {
+  course_id: number;
+  course_title: string;
+  total: number;
+  passed: number;
+  failed: number;
+  pending: number;
+  in_progress: number;
+  grading: number;
+  expired: number;
+  authorized_late: number;
+  compliance_pct: number;
+}
+
+export interface EvaluationDashboard {
+  totals: {
+    total: number;
+    passed: number;
+    failed: number;
+    in_progress: number;
+    pending: number;
+    grading: number;
+    expired: number;
+    compliance_pct: number;
+  };
+  courses: CourseEvaluationSummary[];
+}
+
+export interface TraceabilityRow {
+  assignment_id: number;
+  employee_name: string;
+  employee_code: string;
+  course_title: string;
+  template_title: string;
+  status: EvaluationAssignmentStatus;
+  percentage: number | null;
+  passing_score: number;
+  submitted_at: string | null;
+  graded_at: string | null;
+  certificate_issue_date: string | null;
+  certificate_expiry_date: string | null;
+}
+
 export interface NotificationLogEntry {
   id: number;
   channel: 'email' | 'sms';

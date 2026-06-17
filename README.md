@@ -28,7 +28,8 @@ Repositorio de trabajo con dos proyectos relacionados:
 ### Backend: `unilabor-safedoc`
 
 - Stack: Node.js, Express, TypeScript, PostgreSQL.
-- Modulos principales: autenticacion, usuarios, categorias, documentos y auditoria.
+- Modulos principales: autenticacion, usuarios, categorias, documentos, auditoria, RH (incluye Evaluaciones de capacitacion y constancias) y Helpdesk.
+- Evaluaciones de capacitacion (ISO 15189): ver `MANUAL_OPERACION_EVALUACIONES_Y_CONSTANCIAS.md`. Requiere `npm run migrate`; SMS opcional via LabsMobile (`LABSMOBILE_*`) y scheduler in-process (`SCHEDULER_ENABLED`).
 - Contrato API: `unilabor-safedoc/API_CONTRACT.md`
 - Utilidad local: `npm run hash-password -- <password> <email>`
 - Recursos de apoyo:
