@@ -208,6 +208,25 @@ const sendCredentialEmail = async (input: CredentialEmailInput) => {
   });
 };
 
+/**
+ * Envio de correo generico (texto/HTML simple). Reusa el transporter SMTP y el
+ * logo de marca. Usado por las notificaciones del modulo de evaluaciones.
+ */
+export const sendGenericEmail = async (to: string, subject: string, bodyHtml: string): Promise<void> => {
+  const brand = resolveLogoAsset();
+  const logoHtml = brand.hasLogo
+    ? '<div style="text-align:center;margin-bottom:16px"><img src="cid:unilabor-logo" alt="Unilabor" style="height:48px"/></div>'
+    : '';
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2d3d">${logoHtml}${bodyHtml}<p style="margin-top:24px;font-size:12px;color:#7b8794">SafeDoc - Unilabor</p></div>`;
+  await transporter.sendMail({
+    from: '"SafeDoc" <noreply@safedoc.io>',
+    to,
+    subject,
+    html,
+    attachments: brand.attachments,
+  });
+};
+
 export const sendWelcomeEmail = async (email: string, name: string, tempPass: string) => {
   await sendCredentialEmail({
     email,

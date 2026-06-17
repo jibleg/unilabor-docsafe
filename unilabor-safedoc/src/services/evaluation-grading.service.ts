@@ -13,6 +13,7 @@ import {
   resolvePagination,
 } from '../utils/pagination';
 import { tryIssueCertificate } from './evaluation-attempt.service';
+import { tryNotifyNotAccredited } from './notification.service';
 
 /**
  * Calificacion manual (RH) de las evaluaciones que quedaron en 'grading' por
@@ -224,6 +225,7 @@ export const gradeOpenAnswers = async (
     await client.query('COMMIT');
 
     const certificateDocumentId = await tryIssueCertificate(assignmentId, passed);
+    await tryNotifyNotAccredited(assignmentId, !passed);
 
     return {
       assignment_id: assignmentId,

@@ -26,6 +26,7 @@ import type {
   EvaluationTakingView,
   EvaluationTemplate,
   EvaluationTemplateStatus,
+  NotificationLogEntry,
   OpenAnswerToGrade,
   TrainingCourse,
 } from '../types/models';
@@ -416,6 +417,28 @@ const normalizeSubmitResult = (raw: unknown, fallbackId: number): EvaluationSubm
 export const getEmployeeDocumentUrl = async (documentId: number): Promise<string> => {
   const response = await api.get(`/rh/documents/${documentId}/view`, { responseType: 'blob' });
   return URL.createObjectURL(response.data as Blob);
+};
+
+export const listNotificationLog = async (limit = 100): Promise<NotificationLogEntry[]> => {
+  const response = await api.get('/rh/evaluations/notifications', { params: { limit } });
+  return getArrayFromPayload(response.data, ['data', 'items'])
+    .map((raw): NotificationLogEntry | null => {
+      const r = asRecord(raw);
+      if (!r) return null;
+      return {
+        id: getNumber(r, ['id']) ?? 0,
+        channel: (getString(r, ['channel']) as 'email' | 'sms') || 'email',
+        recipient: getString(r, ['recipient']),
+        template: getString(r, ['template']),
+        assignment_id: getNumber(r, ['assignment_id']) ?? null,
+        status: (getString(r, ['status']) as 'sent' | 'failed' | 'skipped') || 'sent',
+        error: getString(r, ['error']) || null,
+        sent_at: getString(r, ['sent_at']),
+        employee_name: getString(r, ['employee_name']) || null,
+        course_title: getString(r, ['course_title']) || null,
+      };
+    })
+    .filter((entry): entry is NotificationLogEntry => entry !== null);
 };
 
 // --- Calificacion manual (RH) ---

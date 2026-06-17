@@ -13,6 +13,7 @@ import {
   isPaginationRequested,
   resolvePagination,
 } from '../utils/pagination';
+import { tryNotifyEvaluationAvailable } from './notification.service';
 
 /**
  * Asignaciones de evaluacion (evaluation_assignments): instancia de una plantilla
@@ -119,6 +120,7 @@ export const assignEvaluation = async (
 
   const uniqueEmployeeIds = [...new Set(employeeIds.filter((id) => Number.isFinite(id) && id > 0))];
   const summary: AssignmentResultSummary = { created: 0, skipped: 0 };
+  const createdAssignmentIds: number[] = [];
 
   for (const employeeId of uniqueEmployeeIds) {
     const client = await pool.connect();
@@ -151,6 +153,7 @@ export const assignEvaluation = async (
 
       await client.query('COMMIT');
       summary.created += 1;
+      createdAssignmentIds.push(assignmentId);
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       // Carrera contra el indice unico parcial: cuenta como omitida, no como fallo.
@@ -163,6 +166,11 @@ export const assignEvaluation = async (
     } finally {
       client.release();
     }
+  }
+
+  // Aviso de disponibilidad (correo + SMS) fuera de las transacciones, best-effort.
+  for (const assignmentId of createdAssignmentIds) {
+    await tryNotifyEvaluationAvailable(assignmentId);
   }
 
   return summary;

@@ -1,6 +1,6 @@
 # Sprint 37 - Notificaciones por Correo y SMS (LabsMobile)
 
-Estado general del sprint: `pendiente`
+Estado general del sprint: `completada`
 
 Objetivo:
 Notificar al colaborador, por correo y SMS, que su evaluacion esta disponible e indicarle que cuenta con 72 horas para realizarla; y notificar a RH cuando un colaborador queda no acreditado (< 80%) para su recapacitacion. Se introduce un canal de notificacion abstracto, se integra LabsMobile para SMS y se registra una bitacora de envios para trazabilidad.
@@ -12,30 +12,30 @@ Requiere Sprint 32 (asignaciones, telefono del colaborador) y consume la senal d
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| EVAL-66 | Tabla `notification_log` | `pendiente` | Auditoria: `channel` ('email'|'sms'), `recipient`, `template`, `assignment_id` (nullable), `status` ('sent'|'failed'), `error`, `sent_at`. Trazabilidad ISO. |
+| EVAL-66 | Tabla `notification_log` | `completada` | Auditoria: `channel` ('email'|'sms'), `recipient`, `template`, `assignment_id` (nullable), `status` ('sent'|'failed'), `error`, `sent_at`. Trazabilidad ISO. |
 
 ## Bloque 2 - Backend (canal abstracto + SMS)
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| EVAL-67 | Interface `NotificationChannel` | `pendiente` | Abstraer envio; `EmailChannel` envuelve el `email.service.ts` existente. |
-| EVAL-68 | `SmsChannel` con LabsMobile | `pendiente` | Integrar API HTTP de LabsMobile; credenciales por env (`LABSMOBILE_USER`/`LABSMOBILE_TOKEN`) validadas en `config/env.ts`. Manejo de error no bloqueante + registro en log. |
-| EVAL-69 | Plantillas de mensaje | `pendiente` | Correo + SMS de "evaluacion disponible - 72h"; correo a RH de "colaborador no acreditado - recapacitacion". Texto breve para SMS. |
-| EVAL-70 | Disparo al asignar y al no-acreditar | `pendiente` | Al instanciar (Sprint 32): enviar correo + SMS y marcar `notified_email_at`/`notified_sms_at`. Al failed: notificar a RH. Todo registrado en `notification_log`. |
+| EVAL-67 | Interface `NotificationChannel` | `completada` | Abstraer envio; `EmailChannel` envuelve el `email.service.ts` existente. |
+| EVAL-68 | `SmsChannel` con LabsMobile | `completada` | Integrar API HTTP de LabsMobile; credenciales por env (`LABSMOBILE_USER`/`LABSMOBILE_TOKEN`) validadas en `config/env.ts`. Manejo de error no bloqueante + registro en log. |
+| EVAL-69 | Plantillas de mensaje | `completada` | Correo + SMS de "evaluacion disponible - 72h"; correo a RH de "colaborador no acreditado - recapacitacion". Texto breve para SMS. |
+| EVAL-70 | Disparo al asignar y al no-acreditar | `completada` | Al instanciar (Sprint 32): enviar correo + SMS y marcar `notified_email_at`/`notified_sms_at`. Al failed: notificar a RH. Todo registrado en `notification_log`. |
 
 ## Bloque 3 - Frontend / Operacion
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| EVAL-71 | Documentar env de LabsMobile | `pendiente` | `.env.example` + README seccion notificaciones. |
-| EVAL-72 | Vista de bitacora de envios (RH) | `pendiente` | Listado de notificaciones por asignacion/colaborador para soporte y auditoria (paginado). |
+| EVAL-71 | Documentar env de LabsMobile | `completada` | `.env.example` + README seccion notificaciones. |
+| EVAL-72 | Vista de bitacora de envios (RH) | `completada` | Listado de notificaciones por asignacion/colaborador para soporte y auditoria (paginado). |
 
 ## Bloque 4 - Cierre
 
 | ID | Actividad | Estado | Notas |
 | --- | --- | --- | --- |
-| EVAL-73 | Pruebas | `pendiente` | Backend: canal abstracto (mock), registro en log en exito/fallo, no bloquea el flujo si SMS falla. |
-| EVAL-74 | Build, lint y commit/push | `pendiente` | Verdes. Migracion aplicada. |
+| EVAL-73 | Pruebas | `completada` | Backend: canal abstracto (mock), registro en log en exito/fallo, no bloquea el flujo si SMS falla. |
+| EVAL-74 | Build, lint y commit/push | `completada` | Verdes. Migracion aplicada. |
 
 ## Definicion de terminado
 
@@ -49,3 +49,4 @@ Requiere Sprint 32 (asignaciones, telefono del colaborador) y consume la senal d
 | Fecha | Actividad | Estado actualizado | Comentario |
 | --- | --- | --- | --- |
 | 2026-06-17 | Archivo del Sprint 37 creado | `pendiente` | Canal de notificacion abstracto + SMS LabsMobile + bitacora de envios. |
+| 2026-06-17 | Sprint 37 ejecutado completo | `completada` | Migracion `sql/20260617_12_notification_log`. Backend: `notification.service.ts` (canal abstracto NotificationChannel; EmailChannel reusa SMTP via nuevo `sendGenericEmail`; SmsChannel LabsMobile API JSON con Basic auth, no-op 'skipped' si faltan credenciales; `dispatch` registra sent/failed/skipped en notification_log sin relanzar; notifyEvaluationAvailable=correo+SMS con ventana 72h y marca notified_email_at/notified_sms_at; notifyNotAccredited=correo a RH; listNotificationLog). env LabsMobile en `config/env.ts` (getLabsMobileConfig) y `.env.example`. Hooks best-effort: tryNotifyEvaluationAvailable tras asignar (en assignEvaluation, fuera de txn), tryNotifyNotAccredited tras failed en submit y grade. Endpoint `GET /api/rh/evaluations/notifications`. Frontend: `RhNotificationsPage` (tabla de bitacora) + ruta `/rh/notifications` + item sidebar (Bell). Backend 85 tests / frontend 26, builds+lint OK. Smoke e2e: asignar registra email+sms 'skipped' (correo vacio / LabsMobile sin config), no bloquea, notified_* en null. |

@@ -6,6 +6,7 @@ import {
   gradeOpenAnswers,
   listGradingQueue,
 } from '../services/evaluation-grading.service';
+import { listNotificationLog } from '../services/notification.service';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -50,6 +51,17 @@ export const getGradingDetailController = async (req: AuthRequest, res: Response
     if (mapped) return mapped;
     console.error('Error obteniendo detalle de calificacion:', error);
     return res.status(500).json({ message: 'No se pudo obtener el detalle.' });
+  }
+};
+
+export const listNotificationLogController = async (req: AuthRequest, res: Response) => {
+  try {
+    const limit = Number.parseInt(String(req.query.limit ?? '100'), 10);
+    const data = await listNotificationLog(Number.isFinite(limit) ? limit : 100);
+    return res.json({ data });
+  } catch (error) {
+    console.error('Error listando bitacora de notificaciones:', error);
+    return res.status(500).json({ message: 'No se pudo cargar la bitacora de notificaciones.' });
   }
 };
 

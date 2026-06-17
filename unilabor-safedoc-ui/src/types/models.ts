@@ -697,6 +697,19 @@ export interface EvaluationSubmitResult {
   certificate_document_id?: number | null;
 }
 
+export interface NotificationLogEntry {
+  id: number;
+  channel: 'email' | 'sms';
+  recipient: string;
+  template: string;
+  assignment_id: number | null;
+  status: 'sent' | 'failed' | 'skipped';
+  error: string | null;
+  sent_at: string;
+  employee_name: string | null;
+  course_title: string | null;
+}
+
 export interface CertificateSignature {
   id?: number;
   signatory_name: string;

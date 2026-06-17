@@ -16,6 +16,20 @@ export const getJwtExpiresIn = (): NonNullable<SignOptions['expiresIn']> =>
   (process.env.JWT_EXPIRES_IN || '8h') as NonNullable<SignOptions['expiresIn']>;
 
 /**
+ * Credenciales de LabsMobile (SMS). Opcionales: si faltan, el canal SMS queda
+ * deshabilitado (se registra 'skipped') sin afectar el resto del flujo.
+ */
+export const getLabsMobileConfig = (): { username: string; token: string; sender?: string } | null => {
+  const username = process.env.LABSMOBILE_USER?.trim();
+  const token = process.env.LABSMOBILE_TOKEN?.trim();
+  if (!username || !token) {
+    return null;
+  }
+  const sender = process.env.LABSMOBILE_SENDER?.trim();
+  return sender ? { username, token, sender } : { username, token };
+};
+
+/**
  * Valida la configuracion critica al arranque. Lanza si falta `JWT_SECRET` o si
  * conserva el valor por defecto inseguro. Llamar antes de `app.listen`.
  */

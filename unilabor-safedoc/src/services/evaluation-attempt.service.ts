@@ -7,6 +7,7 @@ import type {
   EvaluationTakingView,
 } from '../types';
 import { issueCertificateForAssignment } from './certificate-issuance.service';
+import { tryNotifyNotAccredited } from './notification.service';
 
 /**
  * Emite la constancia (best-effort) cuando la evaluacion quedo acreditada.
@@ -307,6 +308,7 @@ export const submitEvaluation = async (
     await client.query('COMMIT');
 
     const certificateDocumentId = await tryIssueCertificate(assignmentId, status === 'passed');
+    await tryNotifyNotAccredited(assignmentId, status === 'failed');
 
     return {
       assignment_id: assignmentId,
