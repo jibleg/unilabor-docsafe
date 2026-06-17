@@ -4,6 +4,7 @@ import {
   createEvaluationTemplateSchema,
   createTrainingCourseSchema,
   replaceQuestionsSchema,
+  submitEvaluationSchema,
 } from './training.schema';
 
 describe('createTrainingCourseSchema', () => {
@@ -134,6 +135,28 @@ describe('assignEvaluationSchema', () => {
 
   it('rechaza lista vacia', () => {
     const result = assignEvaluationSchema.safeParse({ employee_ids: [] });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('submitEvaluationSchema', () => {
+  it('acepta respuestas de opcion y abiertas', () => {
+    const result = submitEvaluationSchema.safeParse({
+      answers: [
+        { question_id: 1, selected_option_ids: [10, 11] },
+        { question_id: 2, text_answer: 'respuesta' },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('acepta un envio sin respuestas (queda en blanco)', () => {
+    const result = submitEvaluationSchema.safeParse({ answers: [] });
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza question_id no numerico', () => {
+    const result = submitEvaluationSchema.safeParse({ answers: [{ question_id: 'x' }] });
     expect(result.success).toBe(false);
   });
 });

@@ -18,6 +18,9 @@ import type {
   EvaluationQuestionOption,
   EvaluationQuestionType,
   EvaluationSelectionMode,
+  EvaluationSubmitResult,
+  EvaluationTakingQuestion,
+  EvaluationTakingView,
   EvaluationTemplate,
   EvaluationTemplateStatus,
   TrainingCourse,
@@ -306,4 +309,92 @@ export const listMyEvaluations = async (query: PageQuery = {}): Promise<PageResu
 export const getMyPendingEvaluationsCount = async (): Promise<number> => {
   const response = await api.get('/rh/me/evaluations/pending-count');
   return Number(asRecord(unwrapPayload(response.data))?.count ?? 0);
+};
+
+// --- Realizar evaluacion (colaborador) ---
+
+const normalizeTakingView = (input: unknown): EvaluationTakingView | null => {
+  const source = asRecord(input);
+  const assignment = asRecord(source?.assignment);
+  if (!assignment) {
+    return null;
+  }
+  const questions = Array.isArray(source?.questions)
+    ? (source!.questions as unknown[])
+        .map((raw): EvaluationTakingQuestion | null => {
+          const q = asRecord(raw);
+          if (!q) return null;
+          const id = getNumber(q, ['id']);
+          const type = getString(q, ['type']) as EvaluationQuestionType;
+          if (!id || !type) return null;
+          const options = Array.isArray(q.options)
+            ? q.options
+                .map((rawOption) => {
+                  const o = asRecord(rawOption);
+                  const oid = o ? getNumber(o, ['id']) : null;
+                  if (!o || !oid) return null;
+                  return { id: oid, text: getString(o, ['text']), sort_order: getNumber(o, ['sort_order']) ?? 0 };
+                })
+                .filter((o): o is { id: number; text: string; sort_order: number } => o !== null)
+            : [];
+          return {
+            id,
+            type,
+            text: getString(q, ['text']),
+            points: getNumber(q, ['points']) ?? 1,
+            sort_order: getNumber(q, ['sort_order']) ?? 0,
+            options,
+          };
+        })
+        .filter((q): q is EvaluationTakingQuestion => q !== null)
+    : [];
+
+  return {
+    assignment: {
+      id: getNumber(assignment, ['id']) ?? 0,
+      status: (getString(assignment, ['status']) as EvaluationAssignmentStatus) || 'pending',
+      deadline_at: getString(assignment, ['deadline_at']),
+      started_at: getString(assignment, ['started_at']) || null,
+      template_title: getString(assignment, ['template_title']),
+      course_title: getString(assignment, ['course_title']),
+      instructions: getString(assignment, ['instructions']) || null,
+      passing_score: getNumber(assignment, ['passing_score']) ?? 80,
+      window_hours: getNumber(assignment, ['window_hours']) ?? 72,
+    },
+    questions,
+  };
+};
+
+export interface SubmitAnswerPayload {
+  question_id: number;
+  selected_option_ids?: number[];
+  text_answer?: string | null;
+}
+
+export const getMyEvaluation = async (assignmentId: number): Promise<EvaluationTakingView | null> => {
+  const response = await api.get(`/rh/me/evaluations/${assignmentId}`);
+  return normalizeTakingView(unwrapPayload(response.data));
+};
+
+export const startMyEvaluation = async (assignmentId: number): Promise<EvaluationTakingView | null> => {
+  const response = await api.post(`/rh/me/evaluations/${assignmentId}/start`);
+  return normalizeTakingView(unwrapPayload(response.data));
+};
+
+export const submitMyEvaluation = async (
+  assignmentId: number,
+  answers: SubmitAnswerPayload[],
+): Promise<EvaluationSubmitResult> => {
+  const response = await api.post(`/rh/me/evaluations/${assignmentId}/submit`, { answers });
+  const result = asRecord(asRecord(unwrapPayload(response.data))?.result);
+  return {
+    assignment_id: Number(result?.assignment_id ?? assignmentId),
+    status: (String(result?.status ?? 'submitted')) as EvaluationAssignmentStatus,
+    score: Number(result?.score ?? 0),
+    max_score: Number(result?.max_score ?? 0),
+    percentage: result?.percentage !== null && result?.percentage !== undefined ? Number(result.percentage) : null,
+    passing_score: Number(result?.passing_score ?? 80),
+    passed: Boolean(result?.passed),
+    requires_manual_grading: Boolean(result?.requires_manual_grading),
+  };
 };

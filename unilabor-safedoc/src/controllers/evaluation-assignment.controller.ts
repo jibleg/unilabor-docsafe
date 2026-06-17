@@ -8,6 +8,12 @@ import {
   listAssignmentsByTemplate,
   listEmployeeAssignments,
 } from '../services/evaluation-assignment.service';
+import {
+  getTakingView,
+  startEvaluation,
+  submitEvaluation,
+  type SubmitAnswerInput,
+} from '../services/evaluation-attempt.service';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -30,6 +36,16 @@ const mapAssignmentError = (res: Response, error: any): Response | null => {
       return res.status(400).json({
         message: 'La cantidad de preguntas aleatorias supera el total del banco.',
       });
+    case 'EVAL_ASSIGNMENT_NOT_FOUND':
+      return res.status(404).json({ message: 'La evaluacion asignada no existe.' });
+    case 'EVAL_NOT_OWNER':
+      return res.status(403).json({ message: 'Esta evaluacion no esta asignada a tu cuenta.' });
+    case 'EVAL_WINDOW_EXPIRED':
+      return res.status(409).json({
+        message: 'La ventana de 72 horas vencio. Solicita a RH una autorizacion extemporanea.',
+      });
+    case 'EVAL_NOT_ACTIONABLE':
+      return res.status(409).json({ message: 'Esta evaluacion ya no se puede responder.' });
     default:
       return null;
   }
@@ -126,5 +142,79 @@ export const myPendingEvaluationsCountController = async (req: AuthRequest, res:
     console.error('Error obteniendo conteo de evaluaciones pendientes:', error);
     // No bloquea la UI: devolver 0 ante error.
     return res.json({ count: 0 });
+  }
+};
+
+const requireOwnEmployee = async (req: AuthRequest, res: Response): Promise<number | null> => {
+  const employeeId = await resolveOwnEmployeeId(req);
+  if (!employeeId) {
+    res.status(403).json({ message: 'Tu cuenta no esta vinculada a un colaborador.' });
+    return null;
+  }
+  return employeeId;
+};
+
+export const getMyEvaluationDetailController = async (req: AuthRequest, res: Response) => {
+  const assignmentId = parseId(req.params.id);
+  if (!assignmentId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const employeeId = await requireOwnEmployee(req, res);
+    if (employeeId === null) return res;
+    const view = await getTakingView(assignmentId, employeeId);
+    return res.json(view);
+  } catch (error: any) {
+    const mapped = mapAssignmentError(res, error);
+    if (mapped) return mapped;
+    console.error('Error obteniendo evaluacion:', error);
+    return res.status(500).json({ message: 'No se pudo cargar la evaluacion.' });
+  }
+};
+
+export const startMyEvaluationController = async (req: AuthRequest, res: Response) => {
+  const assignmentId = parseId(req.params.id);
+  if (!assignmentId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const employeeId = await requireOwnEmployee(req, res);
+    if (employeeId === null) return res;
+    const view = await startEvaluation(assignmentId, employeeId);
+    return res.json(view);
+  } catch (error: any) {
+    const mapped = mapAssignmentError(res, error);
+    if (mapped) return mapped;
+    console.error('Error iniciando evaluacion:', error);
+    return res.status(500).json({ message: 'No se pudo iniciar la evaluacion.' });
+  }
+};
+
+export const submitMyEvaluationController = async (req: AuthRequest, res: Response) => {
+  const assignmentId = parseId(req.params.id);
+  if (!assignmentId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const employeeId = await requireOwnEmployee(req, res);
+    if (employeeId === null) return res;
+    const result = await submitEvaluation(assignmentId, employeeId, req.body.answers as SubmitAnswerInput[]);
+    if (req.user?.id) {
+      await registerAuditEvent({
+        user_id: req.user.id,
+        action: `RH_EVAL_SUBMIT:${assignmentId}`,
+        ip_address: req.ip ?? null,
+        module_code: 'RH',
+        entity_type: 'evaluation_assignment',
+        entity_id: assignmentId,
+        metadata: { status: result.status, percentage: result.percentage },
+      });
+    }
+    return res.json({ message: 'Evaluacion enviada.', result });
+  } catch (error: any) {
+    const mapped = mapAssignmentError(res, error);
+    if (mapped) return mapped;
+    console.error('Error enviando evaluacion:', error);
+    return res.status(500).json({ message: 'No se pudo enviar la evaluacion.' });
   }
 };

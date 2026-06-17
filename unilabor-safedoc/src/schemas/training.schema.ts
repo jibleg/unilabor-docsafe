@@ -163,3 +163,17 @@ export const assignEvaluationSchema = z
       .min(1, 'Debes seleccionar al menos un colaborador'),
   })
   .passthrough();
+
+// --- Envio de respuestas del colaborador ---
+
+const answerSchema = z.object({
+  question_id: z.coerce.number().int().positive(),
+  selected_option_ids: z.array(z.coerce.number().int().positive()).optional(),
+  text_answer: z.string().optional().nullable(),
+});
+
+export const submitEvaluationSchema = z
+  .object({
+    answers: z.array(answerSchema),
+  })
+  .passthrough();

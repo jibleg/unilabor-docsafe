@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { CalendarClock, ClipboardCheck, GraduationCap, Loader2 } from 'lucide-react';
 import { getApiErrorMessage, listMyEvaluations } from '../api/service';
 import type { EvaluationAssignment } from '../types/models';
-import { notifyError, notifyInfo } from '../utils/notify';
+import { notifyError } from '../utils/notify';
 import {
   EVALUATION_STATUS_META,
   formatTimeRemaining,
@@ -11,6 +12,7 @@ import {
 } from '../utils/evaluations';
 
 export const MyEvaluationsPage = () => {
+  const navigate = useNavigate();
   const [assignments, setAssignments] = useState<EvaluationAssignment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,12 +98,10 @@ export const MyEvaluationsPage = () => {
                   <button
                     type="button"
                     disabled={!actionable}
-                    onClick={() =>
-                      notifyInfo('La realizacion de la evaluacion estara disponible muy pronto.')
-                    }
+                    onClick={() => navigate(`/rh/my-evaluations/${assignment.id}`)}
                     className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Realizar evaluacion
+                    {actionable ? 'Realizar evaluacion' : 'No disponible'}
                   </button>
                 </div>
               </motion.div>

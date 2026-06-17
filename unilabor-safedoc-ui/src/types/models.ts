@@ -655,6 +655,47 @@ export type EvaluationAssignmentStatus =
   | 'expired'
   | 'authorized_late';
 
+export interface EvaluationTakingOption {
+  id: number;
+  text: string;
+  sort_order: number;
+}
+
+export interface EvaluationTakingQuestion {
+  id: number;
+  type: EvaluationQuestionType;
+  text: string;
+  points: number;
+  sort_order: number;
+  options: EvaluationTakingOption[];
+}
+
+export interface EvaluationTakingView {
+  assignment: {
+    id: number;
+    status: EvaluationAssignmentStatus;
+    deadline_at: string;
+    started_at: string | null;
+    template_title: string;
+    course_title: string;
+    instructions: string | null;
+    passing_score: number;
+    window_hours: number;
+  };
+  questions: EvaluationTakingQuestion[];
+}
+
+export interface EvaluationSubmitResult {
+  assignment_id: number;
+  status: EvaluationAssignmentStatus;
+  score: number;
+  max_score: number;
+  percentage: number | null;
+  passing_score: number;
+  passed: boolean;
+  requires_manual_grading: boolean;
+}
+
 export interface EvaluationAssignment {
   id: number;
   template_id: number;
