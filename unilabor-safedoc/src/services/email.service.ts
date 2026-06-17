@@ -5,12 +5,20 @@ import nodemailer from 'nodemailer';
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || '587', 10),
-  secure: false,
+  // secure=true solo para el puerto 465; SparkPost/STARTTLS usan 587 con secure=false.
+  secure: process.env.SMTP_SECURE === 'true' || parseInt(process.env.SMTP_PORT || '587', 10) === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
 });
+
+/**
+ * Remitente de los correos. Configurable por `EMAIL_FROM` porque el proveedor
+ * (SparkPost) exige que el dominio remitente este verificado. Acepta tanto
+ * "Nombre <correo@dominio>" como solo "correo@dominio".
+ */
+const resolveFrom = (): string => process.env.EMAIL_FROM?.trim() || 'SafeDoc <noreply@safedoc.io>';
 
 type CredentialEmailVariant = 'welcome' | 'reset' | 'recovery';
 
@@ -200,7 +208,7 @@ const sendCredentialEmail = async (input: CredentialEmailInput) => {
   const { subject, html, attachments } = buildEmailTemplate(input);
 
   await transporter.sendMail({
-    from: '"SafeDoc Admin" <noreply@safedoc.io>',
+    from: resolveFrom(),
     to: input.email,
     subject,
     html,
@@ -219,7 +227,7 @@ export const sendGenericEmail = async (to: string, subject: string, bodyHtml: st
     : '';
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2d3d">${logoHtml}${bodyHtml}<p style="margin-top:24px;font-size:12px;color:#7b8794">SafeDoc - Unilabor</p></div>`;
   await transporter.sendMail({
-    from: '"SafeDoc" <noreply@safedoc.io>',
+    from: resolveFrom(),
     to,
     subject,
     html,

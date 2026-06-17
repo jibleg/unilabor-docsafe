@@ -73,6 +73,10 @@ visible al instante ("Ver constancia" en resultados y en Mis evaluaciones).
 
 ## Configuracion (operaciones)
 
+- **Correo (SparkPost)**: SMTP relay. `SMTP_HOST=smtp.sparkpostmail.com`
+  (EU: `smtp.eu.sparkpostmail.com`), `SMTP_PORT=587`, `SMTP_SECURE=false`,
+  `SMTP_USER=SMTP_Injection`, `SMTP_PASS=<API key de SparkPost>`. El remitente
+  `EMAIL_FROM` debe usar un **dominio verificado en SparkPost** (SPF/DKIM).
 - **SMS (LabsMobile)**: `LABSMOBILE_USER`, `LABSMOBILE_TOKEN`, `LABSMOBILE_SENDER`
   (opcional). Sin estas variables el SMS se registra como "omitido" y el resto del
   flujo sigue funcionando (el correo usa el SMTP ya configurado).
