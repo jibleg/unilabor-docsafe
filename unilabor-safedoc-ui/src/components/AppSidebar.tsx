@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 import {
   AlertTriangle,
   BarChart3,
-  Building2,
   CalendarClock,
   ChevronDown,
   ChevronLeft,
@@ -16,7 +15,6 @@ import {
   Laptop,
   LifeBuoy,
   LayoutDashboard,
-  LogOut,
   ShieldCheck,
   Tags,
   UserCircle2,
@@ -26,7 +24,6 @@ import {
 import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
 import { getModuleRole } from '../utils/modules';
-import { useUserAvatar } from '../hooks/useUserAvatar';
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
@@ -51,16 +48,8 @@ interface AppSidebarProps {
 }
 
 export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSidebarProps) => {
-  const logout = useAuthStore((state) => state.logout);
-  const handleLogout = () => {
-    if (window.confirm('¿Seguro que deseas cerrar sesión?')) {
-      logout();
-    }
-  };
   const user = useAuthStore((state) => state.user);
-  const activeModule = useAuthStore((state) => state.activeModule);
   const availableModules = useAuthStore((state) => state.availableModules);
-  const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const moduleRole = getModuleRole(availableModules, moduleCode) ?? user?.role ?? 'VIEWER';
   const { count: pendingEvaluations } = usePendingEvaluations(moduleCode === 'RH');
 
@@ -90,10 +79,6 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
       return next;
     });
 
-  const displayName = user?.full_name ?? user?.name ?? 'Usuario';
-  const { avatarUrl } = useUserAvatar();
-  const avatarInitial =
-    displayName.trim().length > 0 ? displayName.trim().charAt(0).toUpperCase() : 'U';
 
   const menuSections: SidebarSection[] =
     moduleCode === 'RH'
@@ -279,48 +264,6 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
         })}
       </nav>
 
-      <div className="border-t border-[rgba(0,65,106,0.08)] p-4">
-        {availableModules.length > 1 && (
-          <NavLink
-            to="/select-module"
-            onClick={() => setActiveModule(null)}
-            className="mb-4 flex items-center gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] px-4 py-3 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.34)]"
-          >
-            <Building2 size={18} />
-            Cambiar módulo
-          </NavLink>
-        )}
-        <div className="mb-4 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 overflow-hidden rounded-xl border border-[rgba(0,65,106,0.1)] bg-[rgba(124,173,211,0.28)]">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={`Avatar de ${displayName}`}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-black text-[var(--color-brand-700)]">
-                  {avatarInitial}
-                </div>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-[var(--unilabor-ink)]">{displayName}</p>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--color-brand-500)]">
-                {user?.role} {activeModule ? `| ${activeModule}` : ''}
-              </p>
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-medium text-[var(--color-brand-700)] transition-colors hover:border-[rgba(0,65,106,0.1)] hover:bg-[rgba(191,212,230,0.28)]"
-        >
-          <LogOut size={20} />
-          Cerrar sesión
-        </button>
-      </div>
     </aside>
   );
 };

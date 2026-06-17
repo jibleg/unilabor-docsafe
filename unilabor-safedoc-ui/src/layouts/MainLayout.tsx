@@ -3,6 +3,7 @@ import { Outlet, Navigate } from 'react-router-dom';
 import { AppNavbar } from '../components/AppNavbar';
 import { AppSidebar } from '../components/AppSidebar';
 import { PendingEvaluationsBanner } from '../components/PendingEvaluationsBanner';
+import { UserMenu } from '../components/UserMenu';
 import { useAuthStore } from '../store/useAuthStore';
 import { getCurrentUserProfile } from '../api/service';
 import { tokenRequiresPasswordChange } from '../utils/auth';
@@ -74,13 +75,18 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
         </button>
       )}
       <main
-        className={`px-4 py-5 transition-[margin] duration-300 ease-in-out md:px-6 md:py-6 lg:px-8 lg:py-8 ${
+        className={`transition-[margin] duration-300 ease-in-out ${
           isDesktopSidebarVisible ? 'lg:ml-64' : 'lg:ml-0'
         }`}
       >
-        <div className="mx-auto max-w-7xl">
-          {moduleCode === 'RH' && <PendingEvaluationsBanner />}
-          <Outlet />
+        <header className="sticky top-0 z-30 hidden items-center justify-end border-b border-[rgba(0,65,106,0.08)] bg-white/80 px-6 py-2.5 backdrop-blur-xl lg:flex">
+          <UserMenu moduleCode={moduleCode} />
+        </header>
+        <div className="px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-8">
+          <div className="mx-auto max-w-7xl">
+            {moduleCode === 'RH' && <PendingEvaluationsBanner />}
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
