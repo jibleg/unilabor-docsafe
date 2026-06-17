@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   AlertTriangle,
   BarChart3,
   Building2,
   CalendarClock,
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   Clock,
   FileText,
@@ -60,6 +63,33 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const moduleRole = getModuleRole(availableModules, moduleCode) ?? user?.role ?? 'VIEWER';
   const { count: pendingEvaluations } = usePendingEvaluations(moduleCode === 'RH');
+
+  // Secciones colapsadas (persistidas por usuario). Clave: `${modulo}:${titulo}`.
+  const COLLAPSE_KEY = 'safedoc.sidebar.collapsed';
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(COLLAPSE_KEY);
+      return stored ? new Set<string>(JSON.parse(stored) as string[]) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const toggleSection = (key: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      try {
+        localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]));
+      } catch {
+        // localStorage no disponible: el colapso solo dura la sesion de vista.
+      }
+      return next;
+    });
+
   const displayName = user?.full_name ?? user?.name ?? 'Usuario';
   const { avatarUrl } = useUserAvatar();
   const avatarInitial =
@@ -228,14 +258,22 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           if (visibleItems.length === 0) {
             return null;
           }
+          const sectionKey = `${moduleCode}:${section.title ?? `section-${sectionIndex}`}`;
+          const isCollapsed = Boolean(section.title) && collapsed.has(sectionKey);
           return (
-            <div key={section.title ?? `section-${sectionIndex}`} className="space-y-1">
+            <div key={sectionKey} className="space-y-1">
               {section.title && (
-                <p className="px-4 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--unilabor-neutral)]">
-                  {section.title}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(sectionKey)}
+                  className="flex w-full items-center justify-between rounded-lg px-4 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--unilabor-neutral)] transition hover:text-[var(--color-brand-700)]"
+                  aria-expanded={!isCollapsed}
+                >
+                  <span>{section.title}</span>
+                  {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                </button>
               )}
-              {visibleItems.map(renderItem)}
+              {!isCollapsed && visibleItems.map(renderItem)}
             </div>
           );
         })}
