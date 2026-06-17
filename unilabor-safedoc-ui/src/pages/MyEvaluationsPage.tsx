@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Award, CalendarClock, ClipboardCheck, GraduationCap, Loader2 } from 'lucide-react';
-import { getApiErrorMessage, getEmployeeDocumentUrl, listMyEvaluations } from '../api/service';
+import { Award, CalendarClock, ClipboardCheck, Clock, GraduationCap, Loader2 } from 'lucide-react';
+import {
+  getApiErrorMessage,
+  getEmployeeDocumentUrl,
+  listMyEvaluations,
+  requestLateAuthorization,
+} from '../api/service';
 import type { EvaluationAssignment } from '../types/models';
-import { notifyError } from '../utils/notify';
+import { notifyError, notifySuccess } from '../utils/notify';
 import {
   EVALUATION_STATUS_META,
   formatTimeRemaining,
@@ -38,6 +43,16 @@ export const MyEvaluationsPage = () => {
       window.open(url, '_blank', 'noopener');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo abrir la constancia.'));
+    }
+  };
+
+  const requestLate = async (assignmentId: number) => {
+    try {
+      await requestLateAuthorization(assignmentId);
+      notifySuccess('Solicitud enviada a RH para autorizacion extemporanea.');
+      void load();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo enviar la solicitud.'));
     }
   };
 
@@ -113,6 +128,20 @@ export const MyEvaluationsPage = () => {
                       <Award size={15} /> Ver constancia
                     </button>
                   )}
+                  {assignment.status === 'expired' &&
+                    (assignment.late_requested_at ? (
+                      <span className="inline-flex items-center gap-1 rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-xs font-semibold text-[var(--unilabor-neutral)]">
+                        <Clock size={14} /> Solicitud enviada a RH
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void requestLate(assignment.id)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+                      >
+                        <Clock size={15} /> Solicitar autorizacion
+                      </button>
+                    ))}
                   {actionable && (
                     <button
                       type="button"

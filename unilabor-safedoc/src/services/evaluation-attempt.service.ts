@@ -176,7 +176,7 @@ export const startEvaluation = async (
   employeeId: number,
 ): Promise<EvaluationTakingView> => {
   const ctx = await loadAssignmentContext(assignmentId, employeeId);
-  if (!['pending', 'in_progress'].includes(ctx.status)) {
+  if (!['pending', 'in_progress', 'authorized_late'].includes(ctx.status)) {
     throwCoded('EVAL_NOT_ACTIONABLE');
   }
   if (isExpired(ctx.deadline_at)) {
@@ -235,7 +235,7 @@ export const submitEvaluation = async (
     await client.query('BEGIN');
 
     const ctx = await loadAssignmentContext(assignmentId, employeeId, client);
-    if (!['pending', 'in_progress'].includes(ctx.status)) {
+    if (!['pending', 'in_progress', 'authorized_late'].includes(ctx.status)) {
       throwCoded('EVAL_NOT_ACTIONABLE');
     }
     if (isExpired(ctx.deadline_at)) {

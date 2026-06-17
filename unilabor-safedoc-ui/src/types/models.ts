@@ -774,6 +774,7 @@ export interface EvaluationAssignment {
   employee_name?: string;
   employee_code?: string;
   certificate_document_id?: number | null;
+  late_requested_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }

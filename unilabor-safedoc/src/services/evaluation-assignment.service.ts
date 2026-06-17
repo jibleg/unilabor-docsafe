@@ -66,6 +66,9 @@ const mapAssignmentRow = (row: any): EvaluationAssignmentRecord => {
   if (row.certificate_document_id !== undefined && row.certificate_document_id !== null) {
     record.certificate_document_id = Number(row.certificate_document_id);
   }
+  if (row.late_requested_at !== undefined && row.late_requested_at !== null) {
+    record.late_requested_at = String(row.late_requested_at);
+  }
   if (row.created_at) record.created_at = String(row.created_at);
   if (row.updated_at) record.updated_at = String(row.updated_at);
   return record;
@@ -75,7 +78,7 @@ const ASSIGNMENT_BASE_QUERY = `
   SELECT
     a.id, a.template_id, a.employee_id, a.status, a.available_at, a.deadline_at,
     a.started_at, a.submitted_at, a.graded_at, a.score, a.max_score, a.percentage,
-    a.attempt_no, a.certificate_document_id, a.created_at, a.updated_at,
+    a.attempt_no, a.certificate_document_id, a.late_requested_at, a.created_at, a.updated_at,
     t.title AS template_title, t.passing_score, t.window_hours,
     c.id AS course_id, c.title AS course_title,
     e.full_name AS employee_name, e.employee_code,
@@ -287,8 +290,88 @@ export const countPendingForEmployee = async (employeeId: number): Promise<numbe
   }
   const result = await pool.query(
     `SELECT COUNT(*)::int AS total FROM public.evaluation_assignments
-      WHERE employee_id = $1 AND status IN ('pending', 'in_progress') AND deadline_at > NOW();`,
+      WHERE employee_id = $1 AND status IN ('pending', 'in_progress', 'authorized_late') AND deadline_at > NOW();`,
     [employeeId],
   );
   return Number(result.rows[0]?.total ?? 0);
+};
+
+const throwAssignmentCoded = (code: string): never => {
+  const error = new Error(code);
+  (error as any).code = code;
+  throw error;
+};
+
+/** El colaborador (o RH a su nombre) solicita autorizacion extemporanea de una vencida. */
+export const requestLateAuthorization = async (assignmentId: number, employeeId: number): Promise<void> => {
+  const result = await pool.query(
+    `SELECT employee_id, status FROM public.evaluation_assignments WHERE id = $1 LIMIT 1;`,
+    [assignmentId],
+  );
+  if (result.rows.length === 0) {
+    throwAssignmentCoded('EVAL_ASSIGNMENT_NOT_FOUND');
+  }
+  const row = result.rows[0];
+  if (Number(row.employee_id) !== employeeId) {
+    throwAssignmentCoded('EVAL_NOT_OWNER');
+  }
+  if (String(row.status) !== 'expired') {
+    throwAssignmentCoded('EVAL_NOT_EXPIRED');
+  }
+  await pool.query(
+    `UPDATE public.evaluation_assignments SET late_requested_at = NOW(), updated_at = NOW() WHERE id = $1;`,
+    [assignmentId],
+  );
+};
+
+/** RH autoriza la realizacion extemporanea: reabre la ventana (mismo intento). */
+export const authorizeLateAttempt = async (assignmentId: number): Promise<EvaluationAssignmentRecord | null> => {
+  const result = await pool.query(
+    `SELECT a.status, t.window_hours
+       FROM public.evaluation_assignments a
+       JOIN public.evaluation_templates t ON t.id = a.template_id
+      WHERE a.id = $1 LIMIT 1;`,
+    [assignmentId],
+  );
+  if (result.rows.length === 0) {
+    throwAssignmentCoded('EVAL_ASSIGNMENT_NOT_FOUND');
+  }
+  if (String(result.rows[0].status) !== 'expired') {
+    throwAssignmentCoded('EVAL_NOT_EXPIRED');
+  }
+  const windowHours = Number(result.rows[0].window_hours);
+  await pool.query(
+    `UPDATE public.evaluation_assignments
+        SET status = 'authorized_late', available_at = NOW(),
+            deadline_at = NOW() + ($2 || ' hours')::interval,
+            reminder_sent_at = NULL, late_requested_at = NULL, updated_at = NOW()
+      WHERE id = $1;`,
+    [assignmentId, windowHours],
+  );
+  const refreshed = await pool.query(`${ASSIGNMENT_BASE_QUERY} WHERE a.id = $1 LIMIT 1;`, [assignmentId]);
+  return refreshed.rows.length > 0 ? mapAssignmentRow(refreshed.rows[0]) : null;
+};
+
+/** Listado de evaluaciones vencidas (vista RH para autorizar extemporaneo). */
+export const listExpiredAssignments = async (
+  options: AssignmentListOptions = {},
+): Promise<PaginatedResult<EvaluationAssignmentRecord>> => {
+  await assertTable();
+  const paginate = isPaginationRequested(options);
+  const { page, limit, offset } = resolvePagination(options);
+  const whereClause = `WHERE a.status = 'expired'`;
+  const limitSql = paginate ? 'LIMIT $1 OFFSET $2' : '';
+  const dataResult = await pool.query(
+    `${ASSIGNMENT_BASE_QUERY} ${whereClause}
+      ORDER BY a.late_requested_at DESC NULLS LAST, a.deadline_at DESC ${limitSql};`,
+    paginate ? [limit, offset] : [],
+  );
+  const data = dataResult.rows.map(mapAssignmentRow);
+  if (!paginate) {
+    return buildPaginatedResult(data, data.length, 1, data.length || 1);
+  }
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM public.evaluation_assignments a WHERE a.status = 'expired';`,
+  );
+  return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };

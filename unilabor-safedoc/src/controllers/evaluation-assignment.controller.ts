@@ -7,6 +7,7 @@ import {
   countPendingForEmployee,
   listAssignmentsByTemplate,
   listEmployeeAssignments,
+  requestLateAuthorization,
 } from '../services/evaluation-assignment.service';
 import {
   getTakingView,
@@ -46,6 +47,8 @@ const mapAssignmentError = (res: Response, error: any): Response | null => {
       });
     case 'EVAL_NOT_ACTIONABLE':
       return res.status(409).json({ message: 'Esta evaluacion ya no se puede responder.' });
+    case 'EVAL_NOT_EXPIRED':
+      return res.status(409).json({ message: 'Esta evaluacion no esta vencida.' });
     default:
       return null;
   }
@@ -187,6 +190,24 @@ export const startMyEvaluationController = async (req: AuthRequest, res: Respons
     if (mapped) return mapped;
     console.error('Error iniciando evaluacion:', error);
     return res.status(500).json({ message: 'No se pudo iniciar la evaluacion.' });
+  }
+};
+
+export const requestLateAuthorizationController = async (req: AuthRequest, res: Response) => {
+  const assignmentId = parseId(req.params.id);
+  if (!assignmentId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const employeeId = await requireOwnEmployee(req, res);
+    if (employeeId === null) return res;
+    await requestLateAuthorization(assignmentId, employeeId);
+    return res.json({ message: 'Solicitud enviada a RH para autorizacion extemporanea.' });
+  } catch (error: any) {
+    const mapped = mapAssignmentError(res, error);
+    if (mapped) return mapped;
+    console.error('Error solicitando autorizacion extemporanea:', error);
+    return res.status(500).json({ message: 'No se pudo enviar la solicitud.' });
   }
 };
 

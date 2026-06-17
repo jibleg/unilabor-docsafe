@@ -44,4 +44,5 @@ export const formatTimeRemaining = (deadlineIso: string): string => {
 
 /** Indica si la asignacion sigue accionable por el colaborador (vigente). */
 export const isAssignmentActionable = (status: EvaluationAssignmentStatus, deadlineIso: string): boolean =>
-  (status === 'pending' || status === 'in_progress') && new Date(deadlineIso).getTime() > Date.now();
+  (status === 'pending' || status === 'in_progress' || status === 'authorized_late') &&
+  new Date(deadlineIso).getTime() > Date.now();

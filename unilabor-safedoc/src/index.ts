@@ -15,6 +15,7 @@ import evaluationAssignmentRoutes from './routes/evaluation-assignment.routes';
 import evaluationGradingRoutes from './routes/evaluation-grading.routes';
 import helpdeskRoutes from './routes/helpdesk.routes';
 import { assertRequiredEnv } from './config/env';
+import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
 
 dotenv.config();
 
@@ -84,4 +85,6 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 app.listen(PORT, () => {
   console.log(`Servidor SafeDoc corriendo en puerto ${PORT}`);
+  // Scheduler de evaluaciones (recordatorios + vencimientos). Guardado por env.
+  startEvaluationScheduler();
 });

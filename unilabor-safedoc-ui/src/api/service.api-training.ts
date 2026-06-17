@@ -269,6 +269,7 @@ const normalizeAssignment = (input: unknown): EvaluationAssignment | null => {
     employee_name: getString(source, ['employee_name']) || undefined,
     employee_code: getString(source, ['employee_code']) || undefined,
     certificate_document_id: getNumber(source, ['certificate_document_id']) ?? null,
+    late_requested_at: getString(source, ['late_requested_at']) || null,
   };
 };
 
@@ -417,6 +418,22 @@ const normalizeSubmitResult = (raw: unknown, fallbackId: number): EvaluationSubm
 export const getEmployeeDocumentUrl = async (documentId: number): Promise<string> => {
   const response = await api.get(`/rh/documents/${documentId}/view`, { responseType: 'blob' });
   return URL.createObjectURL(response.data as Blob);
+};
+
+export const requestLateAuthorization = async (assignmentId: number): Promise<void> => {
+  await api.post(`/rh/me/evaluations/${assignmentId}/request-late`);
+};
+
+export const listExpiredAssignments = async (query: PageQuery = {}): Promise<PageResult<EvaluationAssignment>> => {
+  const response = await api.get('/rh/evaluations/expired', { params: buildPageParams(query) });
+  const data = getArrayFromPayload(response.data, ['data', 'assignments', 'items'])
+    .map(normalizeAssignment)
+    .filter((assignment): assignment is EvaluationAssignment => assignment !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
+export const authorizeLateAttempt = async (assignmentId: number): Promise<void> => {
+  await api.post(`/rh/evaluations/${assignmentId}/authorize-late`);
 };
 
 export const listNotificationLog = async (limit = 100): Promise<NotificationLogEntry[]> => {

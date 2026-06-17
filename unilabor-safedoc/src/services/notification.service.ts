@@ -180,6 +180,57 @@ export const notifyEvaluationAvailable = async (assignmentId: number): Promise<v
   }
 };
 
+/** Recordatorio (correo + SMS) cuando la ventana esta por vencer (<= 24h). */
+export const notifyEvaluationReminder = async (assignmentId: number): Promise<void> => {
+  const result = await pool.query(
+    `SELECT e.full_name, e.email, e.phone, c.title AS course_title, a.deadline_at
+       FROM public.evaluation_assignments a
+       JOIN public.evaluation_templates t ON t.id = a.template_id
+       JOIN public.training_courses c ON c.id = t.training_course_id
+       JOIN public.employees e ON e.id = a.employee_id
+      WHERE a.id = $1 LIMIT 1;`,
+    [assignmentId],
+  );
+  if (result.rows.length === 0) {
+    return;
+  }
+  const row = result.rows[0];
+  const deadline = formatDeadline(String(row.deadline_at));
+  const subject = `Recordatorio: tu evaluacion "${row.course_title}" esta por vencer`;
+  const emailBody =
+    `Hola ${row.full_name},\n` +
+    `Te recordamos que tu evaluacion de "${row.course_title}" vence pronto (${deadline}).\n` +
+    `Ingresa a SafeDoc para realizarla antes de que se cierre la ventana.`;
+  const smsBody = `SafeDoc: tu evaluacion de "${row.course_title}" vence el ${deadline}. Realizala pronto.`;
+
+  await dispatch(emailChannel, row.email ? String(row.email) : null, subject, emailBody, 'evaluation_reminder', assignmentId);
+  await dispatch(smsChannel, row.phone ? String(row.phone) : null, subject, smsBody, 'evaluation_reminder', assignmentId);
+};
+
+/** Aviso a RH (correo) de que una evaluacion vencio sin realizarse. */
+export const notifyEvaluationExpiredToRh = async (assignmentId: number): Promise<void> => {
+  const result = await pool.query(
+    `SELECT e.full_name AS employee_name, c.title AS course_title, u.email AS creator_email
+       FROM public.evaluation_assignments a
+       JOIN public.evaluation_templates t ON t.id = a.template_id
+       JOIN public.training_courses c ON c.id = t.training_course_id
+       JOIN public.employees e ON e.id = a.employee_id
+       LEFT JOIN public.users u ON u.id = a.created_by_user_id
+      WHERE a.id = $1 LIMIT 1;`,
+    [assignmentId],
+  );
+  if (result.rows.length === 0) {
+    return;
+  }
+  const row = result.rows[0];
+  const rhEmail = await resolveRhEmail(row.creator_email ? String(row.creator_email) : null);
+  const subject = `Evaluacion vencida: ${row.course_title}`;
+  const body =
+    `El colaborador ${row.employee_name} no realizo la evaluacion de "${row.course_title}" dentro de las 72 horas.\n` +
+    `La evaluacion quedo vencida. Puedes autorizar una realizacion extemporanea desde SafeDoc.`;
+  await dispatch(emailChannel, rhEmail, subject, body, 'evaluation_expired_rh', assignmentId);
+};
+
 /** Aviso a RH (correo) de que un colaborador no acredito y requiere recapacitacion. */
 export const notifyNotAccredited = async (assignmentId: number): Promise<void> => {
   const result = await pool.query(

@@ -3,6 +3,7 @@ import {
   getMyEvaluationDetailController,
   listMyEvaluationsController,
   myPendingEvaluationsCountController,
+  requestLateAuthorizationController,
   startMyEvaluationController,
   submitMyEvaluationController,
 } from '../controllers/evaluation-assignment.controller';
@@ -25,5 +26,6 @@ router.get('/me/evaluations', listMyEvaluationsController);
 router.get('/me/evaluations/:id', getMyEvaluationDetailController);
 router.post('/me/evaluations/:id/start', startMyEvaluationController);
 router.post('/me/evaluations/:id/submit', validate(submitEvaluationSchema), submitMyEvaluationController);
+router.post('/me/evaluations/:id/request-late', requestLateAuthorizationController);
 
 export default router;

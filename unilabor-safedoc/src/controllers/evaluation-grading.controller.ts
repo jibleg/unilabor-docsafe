@@ -7,6 +7,7 @@ import {
   listGradingQueue,
 } from '../services/evaluation-grading.service';
 import { listNotificationLog } from '../services/notification.service';
+import { authorizeLateAttempt, listExpiredAssignments } from '../services/evaluation-assignment.service';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -62,6 +63,44 @@ export const listNotificationLogController = async (req: AuthRequest, res: Respo
   } catch (error) {
     console.error('Error listando bitacora de notificaciones:', error);
     return res.status(500).json({ message: 'No se pudo cargar la bitacora de notificaciones.' });
+  }
+};
+
+export const listExpiredAssignmentsController = async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await listExpiredAssignments({ page: req.query.page, limit: req.query.limit });
+    return res.json(result);
+  } catch (error) {
+    console.error('Error listando evaluaciones vencidas:', error);
+    return res.status(500).json({ message: 'No se pudieron cargar las evaluaciones vencidas.' });
+  }
+};
+
+export const authorizeLateController = async (req: AuthRequest, res: Response) => {
+  const assignmentId = parseId(req.params.id);
+  if (!assignmentId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const assignment = await authorizeLateAttempt(assignmentId);
+    await registerAuditEvent({
+      user_id: req.user?.id ?? null,
+      action: `RH_EVAL_AUTHORIZE_LATE:${assignmentId}`,
+      ip_address: req.ip ?? null,
+      module_code: 'RH',
+      entity_type: 'evaluation_assignment',
+      entity_id: assignmentId,
+    });
+    return res.json({ message: 'Autorizacion extemporanea otorgada. Se reabrio la ventana.', assignment });
+  } catch (error: any) {
+    if (error?.code === 'EVAL_ASSIGNMENT_NOT_FOUND') {
+      return res.status(404).json({ message: 'La evaluacion no existe.' });
+    }
+    if (error?.code === 'EVAL_NOT_EXPIRED') {
+      return res.status(409).json({ message: 'Solo se pueden autorizar evaluaciones vencidas.' });
+    }
+    console.error('Error autorizando extemporaneo:', error);
+    return res.status(500).json({ message: 'No se pudo autorizar la evaluacion.' });
   }
 };
 

@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import {
+  authorizeLateController,
   getGradingDetailController,
   gradeEvaluationController,
+  listExpiredAssignmentsController,
   listGradingQueueController,
   listNotificationLogController,
 } from '../controllers/evaluation-grading.controller';
@@ -19,7 +21,9 @@ router.use(verifyToken, authorizeModuleAccess('RH'), authorizeModuleRole('RH', [
 
 router.get('/grading', listGradingQueueController);
 router.get('/notifications', listNotificationLogController);
+router.get('/expired', listExpiredAssignmentsController);
 router.get('/:id/grading', getGradingDetailController);
 router.post('/:id/grade', validate(gradeEvaluationSchema), gradeEvaluationController);
+router.post('/:id/authorize-late', authorizeLateController);
 
 export default router;
