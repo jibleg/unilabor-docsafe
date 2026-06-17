@@ -12,6 +12,7 @@ import employeeDocumentRoutes from './routes/employee-document.routes';
 import employeeAlertRoutes from './routes/employee-alert.routes';
 import trainingRoutes from './routes/training.routes';
 import evaluationAssignmentRoutes from './routes/evaluation-assignment.routes';
+import evaluationGradingRoutes from './routes/evaluation-grading.routes';
 import helpdeskRoutes from './routes/helpdesk.routes';
 import { assertRequiredEnv } from './config/env';
 
@@ -48,6 +49,7 @@ app.use('/api/rh/document-structure', documentStructureRoutes);
 app.use('/api/rh', employeeDocumentRoutes);
 app.use('/api/rh', employeeAlertRoutes);
 app.use('/api/rh/trainings', trainingRoutes);
+app.use('/api/rh/evaluations', evaluationGradingRoutes);
 app.use('/api/rh', evaluationAssignmentRoutes);
 app.use('/api/helpdesk', helpdeskRoutes);
 

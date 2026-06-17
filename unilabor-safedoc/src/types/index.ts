@@ -175,6 +175,34 @@ export interface EvaluationSubmitResult {
   requires_manual_grading: boolean;
 }
 
+export interface OpenAnswerToGrade {
+  question_id: number;
+  text: string;
+  points: number;
+  text_answer: string | null;
+  points_awarded: number;
+}
+
+export interface EvaluationGradingDetail {
+  assignment: {
+    id: number;
+    status: EvaluationAssignmentStatus;
+    employee_name: string;
+    employee_code: string;
+    course_title: string;
+    template_title: string;
+    passing_score: number;
+    objective_score: number;
+    max_score: number;
+  };
+  open_answers: OpenAnswerToGrade[];
+}
+
+export interface OpenAnswerGradeInput {
+  question_id: number;
+  points_awarded: number;
+}
+
 export interface EmployeeSummary {
   total: number;
   active: number;

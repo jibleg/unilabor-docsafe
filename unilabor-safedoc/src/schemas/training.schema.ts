@@ -177,3 +177,18 @@ export const submitEvaluationSchema = z
     answers: z.array(answerSchema),
   })
   .passthrough();
+
+// --- Calificacion manual de respuestas abiertas (RH) ---
+
+export const gradeEvaluationSchema = z
+  .object({
+    grades: z
+      .array(
+        z.object({
+          question_id: z.coerce.number().int().positive(),
+          points_awarded: z.coerce.number().int().min(0, 'Los puntos no pueden ser negativos'),
+        }),
+      )
+      .min(1, 'Debes calificar al menos una respuesta'),
+  })
+  .passthrough();

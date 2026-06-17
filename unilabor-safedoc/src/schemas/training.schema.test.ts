@@ -3,6 +3,7 @@ import {
   assignEvaluationSchema,
   createEvaluationTemplateSchema,
   createTrainingCourseSchema,
+  gradeEvaluationSchema,
   replaceQuestionsSchema,
   submitEvaluationSchema,
 } from './training.schema';
@@ -157,6 +158,27 @@ describe('submitEvaluationSchema', () => {
 
   it('rechaza question_id no numerico', () => {
     const result = submitEvaluationSchema.safeParse({ answers: [{ question_id: 'x' }] });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('gradeEvaluationSchema', () => {
+  it('acepta calificaciones de preguntas abiertas', () => {
+    const result = gradeEvaluationSchema.safeParse({
+      grades: [{ question_id: 1, points_awarded: 3 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza puntos negativos', () => {
+    const result = gradeEvaluationSchema.safeParse({
+      grades: [{ question_id: 1, points_awarded: -1 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rechaza lista vacia', () => {
+    const result = gradeEvaluationSchema.safeParse({ grades: [] });
     expect(result.success).toBe(false);
   });
 });

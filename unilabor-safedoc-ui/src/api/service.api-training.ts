@@ -14,6 +14,7 @@ import {
 import type {
   EvaluationAssignment,
   EvaluationAssignmentStatus,
+  EvaluationGradingDetail,
   EvaluationQuestion,
   EvaluationQuestionOption,
   EvaluationQuestionType,
@@ -23,6 +24,7 @@ import type {
   EvaluationTakingView,
   EvaluationTemplate,
   EvaluationTemplateStatus,
+  OpenAnswerToGrade,
   TrainingCourse,
 } from '../types/models';
 
@@ -386,9 +388,13 @@ export const submitMyEvaluation = async (
   answers: SubmitAnswerPayload[],
 ): Promise<EvaluationSubmitResult> => {
   const response = await api.post(`/rh/me/evaluations/${assignmentId}/submit`, { answers });
-  const result = asRecord(asRecord(unwrapPayload(response.data))?.result);
+  return normalizeSubmitResult(asRecord(unwrapPayload(response.data))?.result, assignmentId);
+};
+
+const normalizeSubmitResult = (raw: unknown, fallbackId: number): EvaluationSubmitResult => {
+  const result = asRecord(raw);
   return {
-    assignment_id: Number(result?.assignment_id ?? assignmentId),
+    assignment_id: Number(result?.assignment_id ?? fallbackId),
     status: (String(result?.status ?? 'submitted')) as EvaluationAssignmentStatus,
     score: Number(result?.score ?? 0),
     max_score: Number(result?.max_score ?? 0),
@@ -397,4 +403,61 @@ export const submitMyEvaluation = async (
     passed: Boolean(result?.passed),
     requires_manual_grading: Boolean(result?.requires_manual_grading),
   };
+};
+
+// --- Calificacion manual (RH) ---
+
+export const listGradingQueue = async (query: PageQuery = {}): Promise<PageResult<EvaluationAssignment>> => {
+  const response = await api.get('/rh/evaluations/grading', { params: buildPageParams(query) });
+  const data = getArrayFromPayload(response.data, ['data', 'assignments', 'items'])
+    .map(normalizeAssignment)
+    .filter((assignment): assignment is EvaluationAssignment => assignment !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
+export const getGradingDetail = async (assignmentId: number): Promise<EvaluationGradingDetail | null> => {
+  const response = await api.get(`/rh/evaluations/${assignmentId}/grading`);
+  const payload = asRecord(unwrapPayload(response.data));
+  const assignment = asRecord(payload?.assignment);
+  if (!assignment) {
+    return null;
+  }
+  const openAnswers: OpenAnswerToGrade[] = Array.isArray(payload?.open_answers)
+    ? (payload!.open_answers as unknown[])
+        .map((raw): OpenAnswerToGrade | null => {
+          const o = asRecord(raw);
+          const questionId = o ? getNumber(o, ['question_id']) : null;
+          if (!o || !questionId) return null;
+          return {
+            question_id: questionId,
+            text: getString(o, ['text']),
+            points: getNumber(o, ['points']) ?? 0,
+            text_answer: getString(o, ['text_answer']) || null,
+            points_awarded: getNumber(o, ['points_awarded']) ?? 0,
+          };
+        })
+        .filter((o): o is OpenAnswerToGrade => o !== null)
+    : [];
+  return {
+    assignment: {
+      id: getNumber(assignment, ['id']) ?? assignmentId,
+      status: (getString(assignment, ['status']) as EvaluationAssignmentStatus) || 'grading',
+      employee_name: getString(assignment, ['employee_name']),
+      employee_code: getString(assignment, ['employee_code']),
+      course_title: getString(assignment, ['course_title']),
+      template_title: getString(assignment, ['template_title']),
+      passing_score: getNumber(assignment, ['passing_score']) ?? 80,
+      objective_score: getNumber(assignment, ['objective_score']) ?? 0,
+      max_score: getNumber(assignment, ['max_score']) ?? 0,
+    },
+    open_answers: openAnswers,
+  };
+};
+
+export const gradeEvaluation = async (
+  assignmentId: number,
+  grades: { question_id: number; points_awarded: number }[],
+): Promise<EvaluationSubmitResult> => {
+  const response = await api.post(`/rh/evaluations/${assignmentId}/grade`, { grades });
+  return normalizeSubmitResult(asRecord(unwrapPayload(response.data))?.result, assignmentId);
 };
