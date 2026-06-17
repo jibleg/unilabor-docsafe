@@ -694,6 +694,7 @@ export interface EvaluationSubmitResult {
   passing_score: number;
   passed: boolean;
   requires_manual_grading: boolean;
+  certificate_document_id?: number | null;
 }
 
 export interface CertificateSignature {
@@ -759,6 +760,7 @@ export interface EvaluationAssignment {
   question_count?: number;
   employee_name?: string;
   employee_code?: string;
+  certificate_document_id?: number | null;
   created_at?: string;
   updated_at?: string;
 }

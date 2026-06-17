@@ -267,6 +267,7 @@ const normalizeAssignment = (input: unknown): EvaluationAssignment | null => {
     question_count: getNumber(source, ['question_count']) ?? undefined,
     employee_name: getString(source, ['employee_name']) || undefined,
     employee_code: getString(source, ['employee_code']) || undefined,
+    certificate_document_id: getNumber(source, ['certificate_document_id']) ?? null,
   };
 };
 
@@ -404,7 +405,17 @@ const normalizeSubmitResult = (raw: unknown, fallbackId: number): EvaluationSubm
     passing_score: Number(result?.passing_score ?? 80),
     passed: Boolean(result?.passed),
     requires_manual_grading: Boolean(result?.requires_manual_grading),
+    certificate_document_id:
+      result?.certificate_document_id !== null && result?.certificate_document_id !== undefined
+        ? Number(result.certificate_document_id)
+        : null,
   };
+};
+
+/** Descarga un documento del expediente (constancia) como blob y devuelve object URL. */
+export const getEmployeeDocumentUrl = async (documentId: number): Promise<string> => {
+  const response = await api.get(`/rh/documents/${documentId}/view`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
 };
 
 // --- Calificacion manual (RH) ---

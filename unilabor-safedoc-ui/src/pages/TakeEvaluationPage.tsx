@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Loader2, Send } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Award, CheckCircle2, Loader2, Send } from 'lucide-react';
 import {
   getApiErrorMessage,
+  getEmployeeDocumentUrl,
   startMyEvaluation,
   submitMyEvaluation,
   type SubmitAnswerPayload,
@@ -140,6 +141,15 @@ export const TakeEvaluationPage = () => {
     setIndex(Math.max(0, Math.min(total - 1, next)));
   };
 
+  const openCertificate = async (documentId: number) => {
+    try {
+      const url = await getEmployeeDocumentUrl(documentId);
+      window.open(url, '_blank', 'noopener');
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo abrir la constancia.'));
+    }
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
@@ -219,11 +229,19 @@ export const TakeEvaluationPage = () => {
             )}
             <p className="max-w-sm text-sm text-[var(--unilabor-neutral)]">{message.subtitle}</p>
 
-            {celebratory && (
+            {celebratory && result.certificate_document_id ? (
+              <button
+                type="button"
+                onClick={() => void openCertificate(result.certificate_document_id!)}
+                className="mt-1 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+              >
+                <Award size={16} /> Ver mi constancia
+              </button>
+            ) : celebratory ? (
               <div className="mt-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-                <CheckCircle2 size={15} /> Tu constancia se generara y aparecera en tus constancias muy pronto.
+                <CheckCircle2 size={15} /> Tu constancia se archivara en tus constancias en breve.
               </div>
-            )}
+            ) : null}
 
             <button
               type="button"

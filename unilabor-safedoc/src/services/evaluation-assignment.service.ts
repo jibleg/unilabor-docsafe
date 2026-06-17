@@ -62,6 +62,9 @@ const mapAssignmentRow = (row: any): EvaluationAssignmentRecord => {
   if (row.question_count !== undefined) record.question_count = Number(row.question_count);
   if (row.employee_name !== undefined) record.employee_name = String(row.employee_name);
   if (row.employee_code !== undefined) record.employee_code = String(row.employee_code);
+  if (row.certificate_document_id !== undefined && row.certificate_document_id !== null) {
+    record.certificate_document_id = Number(row.certificate_document_id);
+  }
   if (row.created_at) record.created_at = String(row.created_at);
   if (row.updated_at) record.updated_at = String(row.updated_at);
   return record;
@@ -71,7 +74,7 @@ const ASSIGNMENT_BASE_QUERY = `
   SELECT
     a.id, a.template_id, a.employee_id, a.status, a.available_at, a.deadline_at,
     a.started_at, a.submitted_at, a.graded_at, a.score, a.max_score, a.percentage,
-    a.attempt_no, a.created_at, a.updated_at,
+    a.attempt_no, a.certificate_document_id, a.created_at, a.updated_at,
     t.title AS template_title, t.passing_score, t.window_hours,
     c.id AS course_id, c.title AS course_title,
     e.full_name AS employee_name, e.employee_code,

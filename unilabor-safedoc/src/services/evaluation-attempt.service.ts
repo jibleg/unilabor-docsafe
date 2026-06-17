@@ -6,6 +6,27 @@ import type {
   EvaluationTakingQuestion,
   EvaluationTakingView,
 } from '../types';
+import { issueCertificateForAssignment } from './certificate-issuance.service';
+
+/**
+ * Emite la constancia (best-effort) cuando la evaluacion quedo acreditada.
+ * Se ejecuta FUERA de la transaccion de calificacion: un fallo al generar el PDF
+ * no revierte el resultado de la evaluacion.
+ */
+export const tryIssueCertificate = async (
+  assignmentId: number,
+  passed: boolean,
+): Promise<number | null> => {
+  if (!passed) {
+    return null;
+  }
+  try {
+    return await issueCertificateForAssignment(assignmentId);
+  } catch (error) {
+    console.error('No se pudo emitir la constancia (se reintentara al consultar):', error);
+    return null;
+  }
+};
 
 /**
  * Realizacion y auto-calificacion de una evaluacion por el colaborador.
@@ -285,6 +306,8 @@ export const submitEvaluation = async (
 
     await client.query('COMMIT');
 
+    const certificateDocumentId = await tryIssueCertificate(assignmentId, status === 'passed');
+
     return {
       assignment_id: assignmentId,
       status: status as EvaluationSubmitResult['status'],
@@ -294,6 +317,7 @@ export const submitEvaluation = async (
       passing_score: ctx.passing_score,
       passed,
       requires_manual_grading: hasOpen,
+      certificate_document_id: certificateDocumentId,
     };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

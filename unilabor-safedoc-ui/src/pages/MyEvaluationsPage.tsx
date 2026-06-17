@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { CalendarClock, ClipboardCheck, GraduationCap, Loader2 } from 'lucide-react';
-import { getApiErrorMessage, listMyEvaluations } from '../api/service';
+import { Award, CalendarClock, ClipboardCheck, GraduationCap, Loader2 } from 'lucide-react';
+import { getApiErrorMessage, getEmployeeDocumentUrl, listMyEvaluations } from '../api/service';
 import type { EvaluationAssignment } from '../types/models';
 import { notifyError } from '../utils/notify';
 import {
@@ -31,6 +31,15 @@ export const MyEvaluationsPage = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const openCertificate = async (documentId: number) => {
+    try {
+      const url = await getEmployeeDocumentUrl(documentId);
+      window.open(url, '_blank', 'noopener');
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo abrir la constancia.'));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -94,15 +103,25 @@ export const MyEvaluationsPage = () => {
                   )}
                 </div>
 
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    disabled={!actionable}
-                    onClick={() => navigate(`/rh/my-evaluations/${assignment.id}`)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {actionable ? 'Realizar evaluacion' : 'No disponible'}
-                  </button>
+                <div className="flex justify-end gap-2">
+                  {assignment.certificate_document_id && (
+                    <button
+                      type="button"
+                      onClick={() => void openCertificate(assignment.certificate_document_id!)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                    >
+                      <Award size={15} /> Ver constancia
+                    </button>
+                  )}
+                  {actionable && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/rh/my-evaluations/${assignment.id}`)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+                    >
+                      Realizar evaluacion
+                    </button>
+                  )}
                 </div>
               </motion.div>
             );
