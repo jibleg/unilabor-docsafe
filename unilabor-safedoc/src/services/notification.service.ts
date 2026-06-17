@@ -59,7 +59,7 @@ const smsChannel: NotificationChannel = {
     }
     const msisdn = recipient.replace(/[^\d]/g, '');
     const auth = Buffer.from(`${config.username}:${config.token}`).toString('base64');
-    const response = await fetch('https://api.labsmobile.com/json/send', {
+    const response = await fetch(config.apiBase, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${auth}`,

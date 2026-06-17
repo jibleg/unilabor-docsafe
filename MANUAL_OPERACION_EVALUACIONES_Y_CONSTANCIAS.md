@@ -73,13 +73,14 @@ visible al instante ("Ver constancia" en resultados y en Mis evaluaciones).
 
 ## Configuracion (operaciones)
 
-- **Correo (SparkPost)**: SMTP relay. `SMTP_HOST=smtp.sparkpostmail.com`
-  (EU: `smtp.eu.sparkpostmail.com`), `SMTP_PORT=587`, `SMTP_SECURE=false`,
-  `SMTP_USER=SMTP_Injection`, `SMTP_PASS=<API key de SparkPost>`. El remitente
-  `EMAIL_FROM` debe usar un **dominio verificado en SparkPost** (SPF/DKIM).
-- **SMS (LabsMobile)**: `LABSMOBILE_USER`, `LABSMOBILE_TOKEN`, `LABSMOBILE_SENDER`
-  (opcional). Sin estas variables el SMS se registra como "omitido" y el resto del
-  flujo sigue funcionando (el correo usa el SMTP ya configurado).
+- **Correo (SparkPost, API HTTP)**: `SPARKPOST_API_KEY` y `SPARKPOST_API_BASE`
+  (`https://api.sparkpost.com/api/v1`; cuenta EU: `https://api.eu.sparkpost.com/api/v1`).
+  Remitente `EMAIL_FROM` + `EMAIL_FROM_NAME`; el **dominio debe estar verificado en
+  SparkPost** (SPF/DKIM). Si no hay API key, el envio cae al SMTP de respaldo
+  (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`).
+- **SMS (LabsMobile)**: `LABSMOBILE_USERNAME`, `LABSMOBILE_API_TOKEN`,
+  `LABSMOBILE_SENDER`, `LABSMOBILE_API_BASE`. Si faltan, el SMS se registra como
+  "omitido" y el resto del flujo sigue.
 - **Aviso a RH**: `NOTIFY_RH_EMAIL` (opcional; por defecto el correo de quien asigno
   o un administrador activo).
 - **Scheduler**: activo por defecto cada 15 min; `SCHEDULER_ENABLED=false` lo apaga

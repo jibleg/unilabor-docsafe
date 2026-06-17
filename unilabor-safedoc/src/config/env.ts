@@ -19,14 +19,39 @@ export const getJwtExpiresIn = (): NonNullable<SignOptions['expiresIn']> =>
  * Credenciales de LabsMobile (SMS). Opcionales: si faltan, el canal SMS queda
  * deshabilitado (se registra 'skipped') sin afectar el resto del flujo.
  */
-export const getLabsMobileConfig = (): { username: string; token: string; sender?: string } | null => {
-  const username = process.env.LABSMOBILE_USER?.trim();
-  const token = process.env.LABSMOBILE_TOKEN?.trim();
+export const getLabsMobileConfig = ():
+  | { username: string; token: string; sender?: string; apiBase: string }
+  | null => {
+  const username = (process.env.LABSMOBILE_USERNAME || process.env.LABSMOBILE_USER)?.trim();
+  const token = (process.env.LABSMOBILE_API_TOKEN || process.env.LABSMOBILE_TOKEN)?.trim();
   if (!username || !token) {
     return null;
   }
   const sender = process.env.LABSMOBILE_SENDER?.trim();
-  return sender ? { username, token, sender } : { username, token };
+  const apiBase = process.env.LABSMOBILE_API_BASE?.trim() || 'https://api.labsmobile.com/json/send';
+  return sender ? { username, token, sender, apiBase } : { username, token, apiBase };
+};
+
+/**
+ * Credenciales de SparkPost (correo via API HTTP). Opcionales: si faltan, el
+ * envio cae al SMTP configurado (Nodemailer) como respaldo.
+ */
+export const getSparkpostConfig = (): { apiKey: string; apiBase: string } | null => {
+  const apiKey = process.env.SPARKPOST_API_KEY?.trim();
+  if (!apiKey) {
+    return null;
+  }
+  const apiBase = process.env.SPARKPOST_API_BASE?.trim() || 'https://api.sparkpost.com/api/v1';
+  return { apiKey, apiBase };
+};
+
+/** Remitente de correo (dominio debe estar verificado en SparkPost). */
+export const getEmailFrom = (): { email: string; name: string } => {
+  const raw = process.env.EMAIL_FROM?.trim() || 'noreply@safedoc.io';
+  const match = raw.match(/<([^>]+)>/);
+  const email = match ? match[1]!.trim() : raw;
+  const name = process.env.EMAIL_FROM_NAME?.trim() || (match ? raw.replace(/<[^>]+>/, '').trim().replace(/"/g, '') : 'SafeDoc');
+  return { email, name };
 };
 
 /**

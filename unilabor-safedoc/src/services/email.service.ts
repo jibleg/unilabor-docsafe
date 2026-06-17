@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import nodemailer from 'nodemailer';
+import { getEmailFrom, getSparkpostConfig } from '../config/env';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -13,12 +14,71 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+interface EmailAttachment {
+  filename: string;
+  path: string;
+  cid?: string;
+}
+
+const mimeByExtension = (filePath: string): string => {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.png') return 'image/png';
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.webp') return 'image/webp';
+  return 'application/octet-stream';
+};
+
 /**
- * Remitente de los correos. Configurable por `EMAIL_FROM` porque el proveedor
- * (SparkPost) exige que el dominio remitente este verificado. Acepta tanto
- * "Nombre <correo@dominio>" como solo "correo@dominio".
+ * Entrega un correo por SparkPost (API HTTP) si hay credenciales; en su defecto
+ * usa el SMTP configurado (Nodemailer) como respaldo. Las imagenes con `cid`
+ * (p. ej. el logo) se mandan como inline_images en la API de SparkPost.
  */
-const resolveFrom = (): string => process.env.EMAIL_FROM?.trim() || 'SafeDoc <noreply@safedoc.io>';
+const deliverEmail = async (
+  to: string,
+  subject: string,
+  html: string,
+  attachments: EmailAttachment[] = [],
+): Promise<void> => {
+  const sparkpost = getSparkpostConfig();
+  const from = getEmailFrom();
+
+  if (sparkpost) {
+    const inlineImages: Array<{ type: string; name: string; data: string }> = [];
+    const apiAttachments: Array<{ type: string; name: string; data: string }> = [];
+    for (const attachment of attachments) {
+      const data = fs.readFileSync(attachment.path).toString('base64');
+      const item = { type: mimeByExtension(attachment.path), name: attachment.cid || attachment.filename, data };
+      (attachment.cid ? inlineImages : apiAttachments).push(item);
+    }
+    const response = await fetch(`${sparkpost.apiBase}/transmissions`, {
+      method: 'POST',
+      headers: { Authorization: sparkpost.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: {
+          from: { email: from.email, name: from.name },
+          subject,
+          html,
+          ...(inlineImages.length > 0 ? { inline_images: inlineImages } : {}),
+          ...(apiAttachments.length > 0 ? { attachments: apiAttachments } : {}),
+        },
+        recipients: [{ address: { email: to } }],
+      }),
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(`SparkPost HTTP ${response.status}: ${detail.slice(0, 200)}`);
+    }
+    return;
+  }
+
+  await transporter.sendMail({
+    from: from.name ? `"${from.name}" <${from.email}>` : from.email,
+    to,
+    subject,
+    html,
+    attachments,
+  });
+};
 
 type CredentialEmailVariant = 'welcome' | 'reset' | 'recovery';
 
@@ -206,14 +266,7 @@ const buildEmailTemplate = ({ email, name, tempPass, variant }: CredentialEmailI
 
 const sendCredentialEmail = async (input: CredentialEmailInput) => {
   const { subject, html, attachments } = buildEmailTemplate(input);
-
-  await transporter.sendMail({
-    from: resolveFrom(),
-    to: input.email,
-    subject,
-    html,
-    attachments,
-  });
+  await deliverEmail(input.email, subject, html, attachments);
 };
 
 /**
@@ -226,13 +279,7 @@ export const sendGenericEmail = async (to: string, subject: string, bodyHtml: st
     ? '<div style="text-align:center;margin-bottom:16px"><img src="cid:unilabor-logo" alt="Unilabor" style="height:48px"/></div>'
     : '';
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2d3d">${logoHtml}${bodyHtml}<p style="margin-top:24px;font-size:12px;color:#7b8794">SafeDoc - Unilabor</p></div>`;
-  await transporter.sendMail({
-    from: resolveFrom(),
-    to,
-    subject,
-    html,
-    attachments: brand.attachments,
-  });
+  await deliverEmail(to, subject, html, brand.attachments);
 };
 
 export const sendWelcomeEmail = async (email: string, name: string, tempPass: string) => {
