@@ -20,6 +20,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
 import { getModuleRole } from '../utils/modules';
 import { useUserAvatar } from '../hooks/useUserAvatar';
+import { usePendingEvaluations } from '../hooks/usePendingEvaluations';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
 
@@ -28,6 +29,7 @@ interface SidebarMenuItem {
   label: string;
   path: string;
   roles?: string[];
+  badgeCount?: number;
 }
 
 interface AppSidebarProps {
@@ -48,6 +50,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
   const availableModules = useAuthStore((state) => state.availableModules);
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const moduleRole = getModuleRole(availableModules, moduleCode) ?? user?.role ?? 'VIEWER';
+  const { count: pendingEvaluations } = usePendingEvaluations(moduleCode === 'RH');
   const displayName = user?.full_name ?? user?.name ?? 'Usuario';
   const { avatarUrl } = useUserAvatar();
   const avatarInitial =
@@ -63,6 +66,12 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
           { icon: AlertTriangle, label: 'Alertas', path: '/rh/alerts', roles: ['ADMIN', 'EDITOR'] },
           { icon: ShieldCheck, label: 'Auditoría RH', path: '/rh/audit', roles: ['ADMIN', 'EDITOR'] },
           { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', roles: ['VIEWER'] },
+          {
+            icon: GraduationCap,
+            label: 'Mis evaluaciones',
+            path: '/rh/my-evaluations',
+            badgeCount: pendingEvaluations,
+          },
           { icon: Tags, label: 'Secciones', path: '/rh/document-sections', roles: ['ADMIN', 'EDITOR'] },
           { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },
           { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
@@ -145,7 +154,12 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
               `}
             >
               <item.icon size={20} />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.badgeCount !== undefined && item.badgeCount > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-brand-500)] px-1.5 text-[10px] font-bold text-white">
+                  {item.badgeCount}
+                </span>
+              )}
             </NavLink>
           );
         })}

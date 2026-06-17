@@ -9,6 +9,7 @@ import {
   Plus,
   Search,
   Trash2,
+  UserPlus,
 } from 'lucide-react';
 import {
   createEvaluationTemplate,
@@ -26,6 +27,7 @@ import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
 import { EvaluationTemplateEditorModal } from '../components/rh/EvaluationTemplateEditorModal';
+import { AssignEvaluationModal } from '../components/rh/AssignEvaluationModal';
 
 interface CourseFormState {
   title: string;
@@ -70,6 +72,7 @@ export const RhTrainingsPage = () => {
   const [templates, setTemplates] = useState<EvaluationTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
+  const [assigningTemplate, setAssigningTemplate] = useState<EvaluationTemplate | null>(null);
 
   const loadTemplates = useCallback(async (courseId: number) => {
     setLoadingTemplates(true);
@@ -323,9 +326,19 @@ export const RhTrainingsPage = () => {
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
+                                onClick={() => setAssigningTemplate(template)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                                aria-label="Asignar evaluacion"
+                                title="Asignar a colaboradores"
+                              >
+                                <UserPlus size={14} />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => setEditingTemplateId(template.id)}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
                                 aria-label="Disenar evaluacion"
+                                title="Disenar evaluacion"
                               >
                                 <Pencil size={14} />
                               </button>
@@ -436,6 +449,18 @@ export const RhTrainingsPage = () => {
               void loadTemplates(expandedCourseId);
             }
             reload();
+          }}
+        />
+      )}
+
+      {assigningTemplate !== null && (
+        <AssignEvaluationModal
+          template={assigningTemplate}
+          onClose={() => setAssigningTemplate(null)}
+          onAssigned={() => {
+            if (expandedCourseId !== null) {
+              void loadTemplates(expandedCourseId);
+            }
           }}
         />
       )}

@@ -12,6 +12,8 @@ import {
   type PageResult,
 } from './service.shared';
 import type {
+  EvaluationAssignment,
+  EvaluationAssignmentStatus,
   EvaluationQuestion,
   EvaluationQuestionOption,
   EvaluationQuestionType,
@@ -223,4 +225,85 @@ export const replaceTemplateQuestions = async (
 ): Promise<EvaluationTemplate | null> => {
   const response = await api.put(`/rh/trainings/templates/${templateId}/questions`, { questions });
   return normalizeTemplate(asRecord(unwrapPayload(response.data))?.template);
+};
+
+// --- Asignaciones ---
+
+const normalizeAssignment = (input: unknown): EvaluationAssignment | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+  const id = getNumber(source, ['id']);
+  if (!id) {
+    return null;
+  }
+  return {
+    id,
+    template_id: getNumber(source, ['template_id']) ?? 0,
+    employee_id: getNumber(source, ['employee_id']) ?? 0,
+    status: (getString(source, ['status']) as EvaluationAssignmentStatus) || 'pending',
+    available_at: getString(source, ['available_at']),
+    deadline_at: getString(source, ['deadline_at']),
+    started_at: getString(source, ['started_at']) || null,
+    submitted_at: getString(source, ['submitted_at']) || null,
+    graded_at: getString(source, ['graded_at']) || null,
+    score: getNumber(source, ['score']) ?? null,
+    max_score: getNumber(source, ['max_score']) ?? null,
+    percentage: getNumber(source, ['percentage']) ?? null,
+    attempt_no: getNumber(source, ['attempt_no']) ?? 1,
+    template_title: getString(source, ['template_title']) || undefined,
+    course_id: getNumber(source, ['course_id']) ?? undefined,
+    course_title: getString(source, ['course_title']) || undefined,
+    passing_score: getNumber(source, ['passing_score']) ?? undefined,
+    window_hours: getNumber(source, ['window_hours']) ?? undefined,
+    question_count: getNumber(source, ['question_count']) ?? undefined,
+    employee_name: getString(source, ['employee_name']) || undefined,
+    employee_code: getString(source, ['employee_code']) || undefined,
+  };
+};
+
+export interface AssignmentSummary {
+  created: number;
+  skipped: number;
+}
+
+export const assignEvaluation = async (
+  templateId: number,
+  employeeIds: number[],
+): Promise<AssignmentSummary> => {
+  const response = await api.post(`/rh/trainings/templates/${templateId}/assign`, {
+    employee_ids: employeeIds,
+  });
+  const summary = asRecord(asRecord(unwrapPayload(response.data))?.summary);
+  return {
+    created: Number(summary?.created ?? 0),
+    skipped: Number(summary?.skipped ?? 0),
+  };
+};
+
+export const listTemplateAssignments = async (
+  templateId: number,
+  query: PageQuery = {},
+): Promise<PageResult<EvaluationAssignment>> => {
+  const response = await api.get(`/rh/trainings/templates/${templateId}/assignments`, {
+    params: buildPageParams(query),
+  });
+  const data = getArrayFromPayload(response.data, ['data', 'assignments', 'items'])
+    .map(normalizeAssignment)
+    .filter((assignment): assignment is EvaluationAssignment => assignment !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
+export const listMyEvaluations = async (query: PageQuery = {}): Promise<PageResult<EvaluationAssignment>> => {
+  const response = await api.get('/rh/me/evaluations', { params: buildPageParams(query) });
+  const data = getArrayFromPayload(response.data, ['data', 'assignments', 'items'])
+    .map(normalizeAssignment)
+    .filter((assignment): assignment is EvaluationAssignment => assignment !== null);
+  return { data, pagination: extractPagination(response.data, data.length) };
+};
+
+export const getMyPendingEvaluationsCount = async (): Promise<number> => {
+  const response = await api.get('/rh/me/evaluations/pending-count');
+  return Number(asRecord(unwrapPayload(response.data))?.count ?? 0);
 };

@@ -91,6 +91,48 @@ export interface EvaluationTemplateRecord {
   updated_at?: string;
 }
 
+export type EvaluationAssignmentStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'submitted'
+  | 'grading'
+  | 'passed'
+  | 'failed'
+  | 'expired'
+  | 'authorized_late';
+
+export interface EvaluationAssignmentRecord {
+  id: number;
+  template_id: number;
+  employee_id: number;
+  status: EvaluationAssignmentStatus;
+  available_at: string;
+  deadline_at: string;
+  started_at: string | null;
+  submitted_at: string | null;
+  graded_at: string | null;
+  score: number | null;
+  max_score: number | null;
+  percentage: number | null;
+  attempt_no: number;
+  // Datos unidos (lectura)
+  template_title?: string;
+  course_id?: number;
+  course_title?: string;
+  passing_score?: number;
+  window_hours?: number;
+  question_count?: number;
+  employee_name?: string;
+  employee_code?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AssignmentResultSummary {
+  created: number;
+  skipped: number;
+}
+
 export interface EmployeeSummary {
   total: number;
   active: number;

@@ -11,9 +11,14 @@ import {
   updateEvaluationTemplateController,
   updateTrainingCourseController,
 } from '../controllers/training.controller';
+import {
+  assignEvaluationController,
+  listTemplateAssignmentsController,
+} from '../controllers/evaluation-assignment.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
+  assignEvaluationSchema,
   createEvaluationTemplateSchema,
   createTrainingCourseSchema,
   replaceQuestionsSchema,
@@ -54,5 +59,13 @@ router.put(
   validate(replaceQuestionsSchema),
   replaceTemplateQuestionsController,
 );
+
+// Asignacion de evaluaciones a colaboradores + seguimiento
+router.post(
+  '/templates/:templateId/assign',
+  validate(assignEvaluationSchema),
+  assignEvaluationController,
+);
+router.get('/templates/:templateId/assignments', listTemplateAssignmentsController);
 
 export default router;

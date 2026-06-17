@@ -59,6 +59,9 @@ const ModuleSelectorPage = lazy(() =>
 const MyExpedientPage = lazy(() =>
   import('./pages/MyExpedientPage').then((module) => ({ default: module.MyExpedientPage })),
 );
+const MyEvaluationsPage = lazy(() =>
+  import('./pages/MyEvaluationsPage').then((module) => ({ default: module.MyEvaluationsPage })),
+);
 const ProfilePage = lazy(() =>
   import('./pages/ProfilePage').then((module) => ({ default: module.ProfilePage })),
 );
@@ -195,6 +198,14 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR', 'VIEWER']} redirectTo="/rh">
               <MyExpedientPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="my-evaluations"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR', 'VIEWER']} redirectTo="/rh">
+              <MyEvaluationsPage />
             </RoleGate>
           }
         />

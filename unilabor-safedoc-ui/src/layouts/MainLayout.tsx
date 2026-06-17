@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { AppNavbar } from '../components/AppNavbar';
 import { AppSidebar } from '../components/AppSidebar';
+import { PendingEvaluationsBanner } from '../components/PendingEvaluationsBanner';
 import { useAuthStore } from '../store/useAuthStore';
 import { getCurrentUserProfile } from '../api/service';
 import { tokenRequiresPasswordChange } from '../utils/auth';
@@ -78,6 +79,7 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
         }`}
       >
         <div className="mx-auto max-w-7xl">
+          {moduleCode === 'RH' && <PendingEvaluationsBanner />}
           <Outlet />
         </div>
       </main>

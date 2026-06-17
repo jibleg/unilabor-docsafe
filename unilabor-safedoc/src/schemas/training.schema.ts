@@ -153,3 +153,13 @@ export const replaceQuestionsSchema = z
     questions: z.array(questionSchema).min(1, 'La evaluacion debe tener al menos una pregunta'),
   })
   .passthrough();
+
+// --- Asignacion de evaluaciones a colaboradores ---
+
+export const assignEvaluationSchema = z
+  .object({
+    employee_ids: z
+      .array(z.coerce.number().int().positive())
+      .min(1, 'Debes seleccionar al menos un colaborador'),
+  })
+  .passthrough();

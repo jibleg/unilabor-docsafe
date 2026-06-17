@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assignEvaluationSchema,
   createEvaluationTemplateSchema,
   createTrainingCourseSchema,
   replaceQuestionsSchema,
@@ -116,6 +117,23 @@ describe('replaceQuestionsSchema', () => {
 
   it('rechaza un banco vacio', () => {
     const result = replaceQuestionsSchema.safeParse({ questions: [] });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('assignEvaluationSchema', () => {
+  it('acepta una lista de colaboradores', () => {
+    const result = assignEvaluationSchema.safeParse({ employee_ids: [1, 2, 3] });
+    expect(result.success).toBe(true);
+  });
+
+  it('coacciona strings numericos', () => {
+    const result = assignEvaluationSchema.safeParse({ employee_ids: ['4', '5'] });
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza lista vacia', () => {
+    const result = assignEvaluationSchema.safeParse({ employee_ids: [] });
     expect(result.success).toBe(false);
   });
 });
