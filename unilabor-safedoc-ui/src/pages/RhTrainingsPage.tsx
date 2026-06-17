@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Award,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -28,6 +29,7 @@ import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
 import { EvaluationTemplateEditorModal } from '../components/rh/EvaluationTemplateEditorModal';
 import { AssignEvaluationModal } from '../components/rh/AssignEvaluationModal';
+import { CertificateDesignerModal } from '../components/rh/CertificateDesignerModal';
 
 interface CourseFormState {
   title: string;
@@ -73,6 +75,7 @@ export const RhTrainingsPage = () => {
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
   const [assigningTemplate, setAssigningTemplate] = useState<EvaluationTemplate | null>(null);
+  const [certificateCourse, setCertificateCourse] = useState<TrainingCourse | null>(null);
 
   const loadTemplates = useCallback(async (courseId: number) => {
     setLoadingTemplates(true);
@@ -253,9 +256,19 @@ export const RhTrainingsPage = () => {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
+                      onClick={() => setCertificateCourse(course)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                      aria-label="Disenar constancia"
+                      title="Disenar constancia"
+                    >
+                      <Award size={15} />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openEditCourse(course)}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
                       aria-label="Editar capacitacion"
+                      title="Editar capacitacion"
                     >
                       <Pencil size={15} />
                     </button>
@@ -462,6 +475,14 @@ export const RhTrainingsPage = () => {
               void loadTemplates(expandedCourseId);
             }
           }}
+        />
+      )}
+
+      {certificateCourse !== null && (
+        <CertificateDesignerModal
+          courseId={certificateCourse.id}
+          courseTitle={certificateCourse.title}
+          onClose={() => setCertificateCourse(null)}
         />
       )}
     </div>

@@ -15,7 +15,14 @@ import {
   assignEvaluationController,
   listTemplateAssignmentsController,
 } from '../controllers/evaluation-assignment.controller';
+import {
+  getCertificateTemplateController,
+  previewCertificateController,
+  uploadCertificateImageController,
+  upsertCertificateTemplateController,
+} from '../controllers/certificate.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
+import { uploadCertificateImage } from '../middlewares/upload.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   assignEvaluationSchema,
@@ -24,6 +31,7 @@ import {
   replaceQuestionsSchema,
   updateEvaluationTemplateSchema,
   updateTrainingCourseSchema,
+  upsertCertificateTemplateSchema,
 } from '../schemas/training.schema';
 
 /**
@@ -67,5 +75,19 @@ router.post(
   assignEvaluationController,
 );
 router.get('/templates/:templateId/assignments', listTemplateAssignmentsController);
+
+// Plantilla de constancia + vista preliminar
+router.get('/:courseId/certificate', getCertificateTemplateController);
+router.put(
+  '/:courseId/certificate',
+  validate(upsertCertificateTemplateSchema),
+  upsertCertificateTemplateController,
+);
+router.post(
+  '/:courseId/certificate/image',
+  uploadCertificateImage.single('file'),
+  uploadCertificateImageController,
+);
+router.get('/:courseId/certificate/preview', previewCertificateController);
 
 export default router;

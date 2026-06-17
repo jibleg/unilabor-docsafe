@@ -203,6 +203,24 @@ export interface OpenAnswerGradeInput {
   points_awarded: number;
 }
 
+export interface CertificateSignatureRecord {
+  id?: number;
+  signatory_name: string;
+  role: string | null;
+  signature_image_path: string | null;
+  sort_order: number;
+}
+
+export interface CertificateTemplateRecord {
+  id: number | null;
+  training_course_id: number;
+  title_text: string;
+  body_text: string;
+  logo_path: string | null;
+  orientation: 'landscape' | 'portrait';
+  signatures: CertificateSignatureRecord[];
+}
+
 export interface EmployeeSummary {
   total: number;
   active: number;

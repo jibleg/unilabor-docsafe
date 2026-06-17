@@ -696,6 +696,24 @@ export interface EvaluationSubmitResult {
   requires_manual_grading: boolean;
 }
 
+export interface CertificateSignature {
+  id?: number;
+  signatory_name: string;
+  role: string | null;
+  signature_image_path: string | null;
+  sort_order?: number;
+}
+
+export interface CertificateTemplate {
+  id: number | null;
+  training_course_id: number;
+  title_text: string;
+  body_text: string;
+  logo_path: string | null;
+  orientation: 'landscape' | 'portrait';
+  signatures: CertificateSignature[];
+}
+
 export interface OpenAnswerToGrade {
   question_id: number;
   text: string;

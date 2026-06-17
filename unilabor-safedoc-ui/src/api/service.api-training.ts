@@ -12,6 +12,8 @@ import {
   type PageResult,
 } from './service.shared';
 import type {
+  CertificateSignature,
+  CertificateTemplate,
   EvaluationAssignment,
   EvaluationAssignmentStatus,
   EvaluationGradingDetail,
@@ -460,4 +462,70 @@ export const gradeEvaluation = async (
 ): Promise<EvaluationSubmitResult> => {
   const response = await api.post(`/rh/evaluations/${assignmentId}/grade`, { grades });
   return normalizeSubmitResult(asRecord(unwrapPayload(response.data))?.result, assignmentId);
+};
+
+// --- Plantilla de constancia ---
+
+const normalizeCertificateTemplate = (input: unknown, courseId: number): CertificateTemplate => {
+  const source = asRecord(input);
+  const signatures: CertificateSignature[] = Array.isArray(source?.signatures)
+    ? (source!.signatures as unknown[])
+        .map((raw): CertificateSignature | null => {
+          const s = asRecord(raw);
+          if (!s) return null;
+          return {
+            id: getNumber(s, ['id']) ?? undefined,
+            signatory_name: getString(s, ['signatory_name']),
+            role: getString(s, ['role']) || null,
+            signature_image_path: getString(s, ['signature_image_path']) || null,
+            sort_order: getNumber(s, ['sort_order']) ?? undefined,
+          };
+        })
+        .filter((s): s is CertificateSignature => s !== null)
+    : [];
+  return {
+    id: source ? getNumber(source, ['id']) ?? null : null,
+    training_course_id: source ? getNumber(source, ['training_course_id']) ?? courseId : courseId,
+    title_text: getString(source ?? {}, ['title_text']) || 'Constancia de capacitacion',
+    body_text: getString(source ?? {}, ['body_text']),
+    logo_path: getString(source ?? {}, ['logo_path']) || null,
+    orientation: (getString(source ?? {}, ['orientation']) as 'landscape' | 'portrait') || 'landscape',
+    signatures,
+  };
+};
+
+export interface CertificateTemplatePayload {
+  title_text?: string;
+  body_text?: string;
+  logo_path?: string | null;
+  orientation?: 'landscape' | 'portrait';
+  signatures?: Array<{ signatory_name: string; role?: string | null; signature_image_path?: string | null }>;
+}
+
+export const getCertificateTemplate = async (courseId: number): Promise<CertificateTemplate> => {
+  const response = await api.get(`/rh/trainings/${courseId}/certificate`);
+  return normalizeCertificateTemplate(asRecord(unwrapPayload(response.data))?.template, courseId);
+};
+
+export const saveCertificateTemplate = async (
+  courseId: number,
+  payload: CertificateTemplatePayload,
+): Promise<CertificateTemplate> => {
+  const response = await api.put(`/rh/trainings/${courseId}/certificate`, payload);
+  return normalizeCertificateTemplate(asRecord(unwrapPayload(response.data))?.template, courseId);
+};
+
+export const uploadCertificateImage = async (courseId: number, file: File): Promise<string> => {
+  const form = new FormData();
+  form.append('file', file);
+  const response = await api.post(`/rh/trainings/${courseId}/certificate/image`, form);
+  return getString(asRecord(unwrapPayload(response.data)) ?? {}, ['path']);
+};
+
+/** Descarga el preliminar como blob y devuelve un object URL para el visor. */
+export const getCertificatePreviewUrl = async (courseId: number): Promise<string> => {
+  const response = await api.get(`/rh/trainings/${courseId}/certificate/preview`, {
+    responseType: 'blob',
+  });
+  return URL.createObjectURL(response.data as Blob);
 };

@@ -192,3 +192,21 @@ export const gradeEvaluationSchema = z
       .min(1, 'Debes calificar al menos una respuesta'),
   })
   .passthrough();
+
+// --- Plantilla de constancia ---
+
+const certificateSignatureSchema = z.object({
+  signatory_name: requiredText('El nombre del firmante es obligatorio'),
+  role: optionalText,
+  signature_image_path: optionalText,
+});
+
+export const upsertCertificateTemplateSchema = z
+  .object({
+    title_text: optionalText,
+    body_text: optionalText,
+    logo_path: optionalText,
+    orientation: z.enum(['landscape', 'portrait']).optional(),
+    signatures: z.array(certificateSignatureSchema).max(4, 'Maximo 4 firmas').optional(),
+  })
+  .passthrough();

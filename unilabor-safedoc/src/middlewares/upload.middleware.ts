@@ -62,3 +62,29 @@ export const uploadAvatar = multer({
     cb(new Error('Solo se permiten imagenes JPG, PNG o WEBP para el avatar'));
   },
 });
+
+// Imagenes (logo / firmas) de las constancias de capacitacion.
+const certificateImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const uploadDir = process.env.DIRECTORY_UPLOAD_CERTIFICATE || 'uploads/certificates';
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `CERT-${uniqueSuffix}${path.extname(file.originalname).toLowerCase()}`);
+  },
+});
+
+export const uploadCertificateImage = multer({
+  storage: certificateImageStorage,
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (allowedAvatarMimeTypes.has(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new Error('Solo se permiten imagenes JPG, PNG o WEBP'));
+  },
+});
