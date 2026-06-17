@@ -36,6 +36,11 @@ interface SidebarMenuItem {
   badgeCount?: number;
 }
 
+interface SidebarSection {
+  title?: string;
+  items: SidebarMenuItem[];
+}
+
 interface AppSidebarProps {
   moduleCode: ModuleCode;
   isVisible: boolean;
@@ -60,48 +65,121 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
   const avatarInitial =
     displayName.trim().length > 0 ? displayName.trim().charAt(0).toUpperCase() : 'U';
 
-  const menuItems: SidebarMenuItem[] =
+  const menuSections: SidebarSection[] =
     moduleCode === 'RH'
       ? [
-          { icon: LayoutDashboard, label: 'Dashboard RH', path: '/rh/dashboard', roles: ['ADMIN', 'EDITOR'] },
-          { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
-          { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
-          { icon: GraduationCap, label: 'Capacitaciones', path: '/rh/trainings', roles: ['ADMIN', 'EDITOR'] },
-          { icon: BarChart3, label: 'Panel capacitacion', path: '/rh/training-dashboard', roles: ['ADMIN', 'EDITOR'] },
-          { icon: ClipboardCheck, label: 'Calificacion', path: '/rh/grading', roles: ['ADMIN', 'EDITOR'] },
-          { icon: Inbox, label: 'Bandeja de salida', path: '/rh/notifications', roles: ['ADMIN', 'EDITOR'] },
-          { icon: Clock, label: 'Extemporaneos', path: '/rh/late-requests', roles: ['ADMIN', 'EDITOR'] },
-          { icon: AlertTriangle, label: 'Alertas', path: '/rh/alerts', roles: ['ADMIN', 'EDITOR'] },
-          { icon: ShieldCheck, label: 'Auditoría RH', path: '/rh/audit', roles: ['ADMIN', 'EDITOR'] },
-          { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', roles: ['VIEWER'] },
           {
-            icon: GraduationCap,
-            label: 'Mis evaluaciones',
-            path: '/rh/my-evaluations',
-            badgeCount: pendingEvaluations,
+            items: [
+              { icon: LayoutDashboard, label: 'Dashboard RH', path: '/rh/dashboard', roles: ['ADMIN', 'EDITOR'] },
+            ],
           },
-          { icon: Tags, label: 'Secciones', path: '/rh/document-sections', roles: ['ADMIN', 'EDITOR'] },
-          { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },
-          { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
+          {
+            title: 'Expedientes',
+            items: [
+              { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
+              { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
+              { icon: AlertTriangle, label: 'Alertas', path: '/rh/alerts', roles: ['ADMIN', 'EDITOR'] },
+            ],
+          },
+          {
+            title: 'Capacitación',
+            items: [
+              { icon: GraduationCap, label: 'Capacitaciones', path: '/rh/trainings', roles: ['ADMIN', 'EDITOR'] },
+              { icon: BarChart3, label: 'Panel capacitación', path: '/rh/training-dashboard', roles: ['ADMIN', 'EDITOR'] },
+              { icon: ClipboardCheck, label: 'Calificación', path: '/rh/grading', roles: ['ADMIN', 'EDITOR'] },
+              { icon: Clock, label: 'Extemporáneos', path: '/rh/late-requests', roles: ['ADMIN', 'EDITOR'] },
+              { icon: Inbox, label: 'Bandeja de salida', path: '/rh/notifications', roles: ['ADMIN', 'EDITOR'] },
+            ],
+          },
+          {
+            title: 'Configuración',
+            items: [
+              { icon: Tags, label: 'Secciones', path: '/rh/document-sections', roles: ['ADMIN', 'EDITOR'] },
+              { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },
+              { icon: ShieldCheck, label: 'Auditoría RH', path: '/rh/audit', roles: ['ADMIN', 'EDITOR'] },
+            ],
+          },
+          {
+            title: 'Mi espacio',
+            items: [
+              { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', roles: ['VIEWER'] },
+              {
+                icon: GraduationCap,
+                label: 'Mis evaluaciones',
+                path: '/rh/my-evaluations',
+                badgeCount: pendingEvaluations,
+              },
+              { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
+            ],
+          },
         ]
       : moduleCode === 'HELPDESK'
         ? [
-            { icon: LayoutDashboard, label: 'Dashboard', path: '/helpdesk/dashboard' },
-            { icon: UserCircle2, label: 'Mi portal', path: '/helpdesk/my-portal' },
-            { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', roles: ['ADMIN', 'EDITOR'] },
-            { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets', roles: ['ADMIN', 'EDITOR'] },
-            { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
-            { icon: Wrench, label: 'Catalogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
-            { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
+            {
+              items: [
+                { icon: LayoutDashboard, label: 'Dashboard', path: '/helpdesk/dashboard' },
+                { icon: UserCircle2, label: 'Mi portal', path: '/helpdesk/my-portal' },
+              ],
+            },
+            {
+              title: 'Gestión',
+              items: [
+                { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', roles: ['ADMIN', 'EDITOR'] },
+                { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets', roles: ['ADMIN', 'EDITOR'] },
+                { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
+              ],
+            },
+            {
+              title: 'Configuración',
+              items: [
+                { icon: Wrench, label: 'Catálogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
+                { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
+              ],
+            },
           ]
         : [
-          { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
-          { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
-          { icon: FileText, label: 'Documentos', path: '/quality/documents' },
-          { icon: Tags, label: 'Categorías', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
-          { icon: Users, label: 'Personal', path: '/quality/users', roles: ['ADMIN'] },
-          { icon: ShieldCheck, label: 'Auditoría', path: '/quality/audit', roles: ['ADMIN'] },
-        ];
+            {
+              items: [
+                { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
+                { icon: FileText, label: 'Documentos', path: '/quality/documents' },
+              ],
+            },
+            {
+              title: 'Administración',
+              items: [
+                { icon: Tags, label: 'Categorías', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
+                { icon: Users, label: 'Personal', path: '/quality/users', roles: ['ADMIN'] },
+                { icon: ShieldCheck, label: 'Auditoría', path: '/quality/audit', roles: ['ADMIN'] },
+              ],
+            },
+            {
+              title: 'Mi espacio',
+              items: [{ icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' }],
+            },
+          ];
+
+  const renderItem = (item: SidebarMenuItem) => (
+    <NavLink
+      key={item.path}
+      to={item.path}
+      className={({ isActive }) => `
+        flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all
+        ${
+          isActive
+            ? 'border-[rgba(0,65,106,0.14)] bg-[linear-gradient(135deg,rgba(191,212,230,0.45),rgba(124,173,211,0.2))] text-[var(--color-brand-700)] shadow-lg shadow-[rgba(0,65,106,0.08)]'
+            : 'border-transparent text-[var(--unilabor-ink)] hover:bg-[rgba(191,212,230,0.34)] hover:text-[var(--color-brand-700)]'
+        }
+      `}
+    >
+      <item.icon size={19} />
+      <span className="flex-1">{item.label}</span>
+      {item.badgeCount !== undefined && item.badgeCount > 0 && (
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-brand-500)] px-1.5 text-[10px] font-bold text-white">
+          {item.badgeCount}
+        </span>
+      )}
+    </NavLink>
+  );
 
   return (
     <aside
@@ -142,33 +220,23 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
         </div>
       </div>
 
-      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
-        {menuItems.map((item) => {
-          if (item.roles && !hasAnyRole(moduleRole, item.roles)) {
+      <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        {menuSections.map((section, sectionIndex) => {
+          const visibleItems = section.items.filter(
+            (item) => !item.roles || hasAnyRole(moduleRole, item.roles),
+          );
+          if (visibleItems.length === 0) {
             return null;
           }
-
           return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) => `
-                flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition-all
-                ${
-                  isActive
-                    ? 'border-[rgba(0,65,106,0.14)] bg-[linear-gradient(135deg,rgba(191,212,230,0.45),rgba(124,173,211,0.2))] text-[var(--color-brand-700)] shadow-lg shadow-[rgba(0,65,106,0.08)]'
-                    : 'border-transparent text-[var(--unilabor-ink)] hover:bg-[rgba(191,212,230,0.34)] hover:text-[var(--color-brand-700)]'
-                }
-              `}
-            >
-              <item.icon size={20} />
-              <span className="flex-1">{item.label}</span>
-              {item.badgeCount !== undefined && item.badgeCount > 0 && (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-brand-500)] px-1.5 text-[10px] font-bold text-white">
-                  {item.badgeCount}
-                </span>
+            <div key={section.title ?? `section-${sectionIndex}`} className="space-y-1">
+              {section.title && (
+                <p className="px-4 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--unilabor-neutral)]">
+                  {section.title}
+                </p>
               )}
-            </NavLink>
+              {visibleItems.map(renderItem)}
+            </div>
           );
         })}
       </nav>
