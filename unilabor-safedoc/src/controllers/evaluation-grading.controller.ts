@@ -6,7 +6,7 @@ import {
   gradeOpenAnswers,
   listGradingQueue,
 } from '../services/evaluation-grading.service';
-import { listNotificationLog } from '../services/notification.service';
+import { listOutbox, type OutboxChannel, type OutboxStatus } from '../services/outbox.service';
 import { authorizeLateAttempt, listExpiredAssignments } from '../services/evaluation-assignment.service';
 import { getEvaluationDashboard, getTraceabilityReport } from '../services/evaluation-report.service';
 
@@ -58,12 +58,20 @@ export const getGradingDetailController = async (req: AuthRequest, res: Response
 
 export const listNotificationLogController = async (req: AuthRequest, res: Response) => {
   try {
-    const limit = Number.parseInt(String(req.query.limit ?? '100'), 10);
-    const data = await listNotificationLog(Number.isFinite(limit) ? limit : 100);
+    const limit = Number.parseInt(String(req.query.limit ?? '200'), 10);
+    const channel = req.query.channel === 'email' || req.query.channel === 'sms' ? (req.query.channel as OutboxChannel) : undefined;
+    const status =
+      req.query.status === 'sent' || req.query.status === 'failed' || req.query.status === 'skipped'
+        ? (req.query.status as OutboxStatus)
+        : undefined;
+    const filters: Parameters<typeof listOutbox>[0] = { limit: Number.isFinite(limit) ? limit : 200 };
+    if (channel) filters.channel = channel;
+    if (status) filters.status = status;
+    const data = await listOutbox(filters);
     return res.json({ data });
   } catch (error) {
-    console.error('Error listando bitacora de notificaciones:', error);
-    return res.status(500).json({ message: 'No se pudo cargar la bitacora de notificaciones.' });
+    console.error('Error listando la bandeja de salida:', error);
+    return res.status(500).json({ message: 'No se pudo cargar la bandeja de salida.' });
   }
 };
 

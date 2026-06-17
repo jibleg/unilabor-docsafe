@@ -744,6 +744,8 @@ export interface NotificationLogEntry {
   id: number;
   channel: 'email' | 'sms';
   recipient: string;
+  subject: string | null;
+  body: string | null;
   template: string;
   assignment_id: number | null;
   status: 'sent' | 'failed' | 'skipped';

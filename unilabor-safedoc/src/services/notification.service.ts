@@ -1,88 +1,104 @@
 import pool from '../config/db';
 import { getLabsMobileConfig } from '../config/env';
 import { sendGenericEmail } from './email.service';
+import { recordOutbound } from './outbox.service';
 
 /**
- * Notificaciones del modulo de evaluaciones por canales abstractos (correo y SMS).
- * - EmailChannel: reusa el SMTP existente.
- * - SmsChannel: LabsMobile (API JSON). Si no hay credenciales, queda deshabilitado
- *   y se registra 'skipped' (no rompe el flujo).
- * Todo envio queda en `notification_log` para trazabilidad ISO.
+ * Notificaciones del modulo de evaluaciones por canales (correo y SMS). Cada
+ * canal registra su propio envio en la bandeja de salida (correo en email.service;
+ * SMS aqui). `dispatch` solo registra el caso "sin destino" y devuelve si se envio.
  */
 
-type ChannelName = 'email' | 'sms';
-type NotificationStatus = 'sent' | 'failed' | 'skipped';
-
-const recordNotification = async (
-  channel: ChannelName,
-  recipient: string,
-  template: string,
-  assignmentId: number | null,
-  status: NotificationStatus,
-  error: string | null,
-): Promise<void> => {
-  try {
-    await pool.query(
-      `INSERT INTO public.notification_log (channel, recipient, template, assignment_id, status, error)
-       VALUES ($1, $2, $3, $4, $5, $6);`,
-      [channel, recipient, template, assignmentId, status, error],
-    );
-  } catch (logError) {
-    console.error('No se pudo registrar la notificacion en la bitacora:', logError);
-  }
-};
+interface SendContext {
+  subject: string;
+  message: string;
+  template: string;
+  assignmentId: number | null;
+}
 
 interface NotificationChannel {
-  readonly name: ChannelName;
-  send(recipient: string, subject: string, message: string): Promise<void>;
+  readonly name: 'email' | 'sms';
+  send(recipient: string, context: SendContext): Promise<void>;
 }
 
 const emailChannel: NotificationChannel = {
   name: 'email',
-  async send(recipient, subject, message) {
-    const html = message
+  async send(recipient, context) {
+    const html = context.message
       .split('\n')
       .map((line) => `<p style="margin:0 0 8px">${line}</p>`)
       .join('');
-    await sendGenericEmail(recipient, subject, html);
+    // email.service registra el envio (sent/failed) en la bandeja de salida.
+    await sendGenericEmail(recipient, context.subject, html, {
+      template: context.template,
+      assignmentId: context.assignmentId,
+      bodyText: context.message,
+    });
   },
 };
 
 const smsChannel: NotificationChannel = {
   name: 'sms',
-  async send(recipient, _subject, message) {
+  async send(recipient, context) {
     const config = getLabsMobileConfig();
     if (!config) {
+      await recordOutbound({
+        channel: 'sms',
+        recipient,
+        body: context.message,
+        template: context.template,
+        assignmentId: context.assignmentId,
+        status: 'skipped',
+        error: 'SMS_NOT_CONFIGURED',
+      });
       const error = new Error('SMS_NOT_CONFIGURED');
       (error as any).code = 'SMS_NOT_CONFIGURED';
       throw error;
     }
     const msisdn = recipient.replace(/[^\d]/g, '');
     const auth = Buffer.from(`${config.username}:${config.token}`).toString('base64');
-    const response = await fetch(config.apiBase, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${auth}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message,
-        tac: 1,
-        recipient: [{ msisdn }],
-        ...(config.sender ? { sender: config.sender } : {}),
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(`LabsMobile HTTP ${response.status}`);
-    }
-    const data = (await response.json().catch(() => ({}))) as { code?: string | number; message?: string };
-    if (data.code !== undefined && String(data.code) !== '0') {
-      throw new Error(`LabsMobile code ${data.code}: ${data.message ?? 'error'}`);
+    try {
+      const response = await fetch(config.apiBase, {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: context.message,
+          tac: 1,
+          recipient: [{ msisdn }],
+          ...(config.sender ? { sender: config.sender } : {}),
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`LabsMobile HTTP ${response.status}`);
+      }
+      const data = (await response.json().catch(() => ({}))) as { code?: string | number; message?: string };
+      if (data.code !== undefined && String(data.code) !== '0') {
+        throw new Error(`LabsMobile code ${data.code}: ${data.message ?? 'error'}`);
+      }
+      await recordOutbound({
+        channel: 'sms',
+        recipient,
+        body: context.message,
+        template: context.template,
+        assignmentId: context.assignmentId,
+        status: 'sent',
+      });
+    } catch (error) {
+      await recordOutbound({
+        channel: 'sms',
+        recipient,
+        body: context.message,
+        template: context.template,
+        assignmentId: context.assignmentId,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
     }
   },
 };
 
-/** Envia por un canal y registra el resultado (sent/failed/skipped). No relanza. */
+/** Envia por un canal; el canal registra su envio. No relanza. */
 const dispatch = async (
   channel: NotificationChannel,
   recipient: string | null,
@@ -92,23 +108,22 @@ const dispatch = async (
   assignmentId: number | null,
 ): Promise<boolean> => {
   if (!recipient || recipient.trim().length === 0) {
-    await recordNotification(channel.name, '(sin destino)', template, assignmentId, 'skipped', 'recipient_missing');
+    await recordOutbound({
+      channel: channel.name,
+      recipient: '(sin destino)',
+      subject,
+      body: message,
+      template,
+      assignmentId,
+      status: 'skipped',
+      error: 'recipient_missing',
+    });
     return false;
   }
   try {
-    await channel.send(recipient, subject, message);
-    await recordNotification(channel.name, recipient, template, assignmentId, 'sent', null);
+    await channel.send(recipient, { subject, message, template, assignmentId });
     return true;
-  } catch (error: any) {
-    const status: NotificationStatus = error?.code === 'SMS_NOT_CONFIGURED' ? 'skipped' : 'failed';
-    await recordNotification(
-      channel.name,
-      recipient,
-      template,
-      assignmentId,
-      status,
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
     return false;
   }
 };
@@ -272,34 +287,6 @@ const resolveRhEmail = async (creatorEmail: string | null): Promise<string | nul
     `SELECT email FROM public.users WHERE is_active = TRUE ORDER BY (role = 'ADMIN') DESC, created_at ASC LIMIT 1;`,
   );
   return admin.rows.length > 0 ? String(admin.rows[0].email) : null;
-};
-
-/** Listado de la bitacora de notificaciones (vista RH). */
-export const listNotificationLog = async (limit = 100): Promise<Array<Record<string, unknown>>> => {
-  const result = await pool.query(
-    `SELECT n.id, n.channel, n.recipient, n.template, n.assignment_id, n.status, n.error, n.sent_at,
-            e.full_name AS employee_name, c.title AS course_title
-       FROM public.notification_log n
-       LEFT JOIN public.evaluation_assignments a ON a.id = n.assignment_id
-       LEFT JOIN public.employees e ON e.id = a.employee_id
-       LEFT JOIN public.evaluation_templates t ON t.id = a.template_id
-       LEFT JOIN public.training_courses c ON c.id = t.training_course_id
-      ORDER BY n.sent_at DESC
-      LIMIT $1;`,
-    [Math.min(Math.max(limit, 1), 500)],
-  );
-  return result.rows.map((row) => ({
-    id: Number(row.id),
-    channel: String(row.channel),
-    recipient: String(row.recipient),
-    template: String(row.template),
-    assignment_id: row.assignment_id !== null ? Number(row.assignment_id) : null,
-    status: String(row.status),
-    error: row.error ? String(row.error) : null,
-    sent_at: String(row.sent_at),
-    employee_name: row.employee_name ? String(row.employee_name) : null,
-    course_title: row.course_title ? String(row.course_title) : null,
-  }));
 };
 
 /** Hook best-effort: notifica a RH cuando una evaluacion queda no acreditada. */

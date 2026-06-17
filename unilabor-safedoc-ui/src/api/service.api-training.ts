@@ -507,8 +507,13 @@ export const authorizeLateAttempt = async (assignmentId: number): Promise<void> 
   await api.post(`/rh/evaluations/${assignmentId}/authorize-late`);
 };
 
-export const listNotificationLog = async (limit = 100): Promise<NotificationLogEntry[]> => {
-  const response = await api.get('/rh/evaluations/notifications', { params: { limit } });
+export const listNotificationLog = async (
+  filters: { limit?: number; channel?: 'email' | 'sms'; status?: 'sent' | 'failed' | 'skipped' } = {},
+): Promise<NotificationLogEntry[]> => {
+  const params: Record<string, string | number> = { limit: filters.limit ?? 200 };
+  if (filters.channel) params.channel = filters.channel;
+  if (filters.status) params.status = filters.status;
+  const response = await api.get('/rh/evaluations/notifications', { params });
   return getArrayFromPayload(response.data, ['data', 'items'])
     .map((raw): NotificationLogEntry | null => {
       const r = asRecord(raw);
@@ -517,6 +522,8 @@ export const listNotificationLog = async (limit = 100): Promise<NotificationLogE
         id: getNumber(r, ['id']) ?? 0,
         channel: (getString(r, ['channel']) as 'email' | 'sms') || 'email',
         recipient: getString(r, ['recipient']),
+        subject: getString(r, ['subject']) || null,
+        body: getString(r, ['body']) || null,
         template: getString(r, ['template']),
         assignment_id: getNumber(r, ['assignment_id']) ?? null,
         status: (getString(r, ['status']) as 'sent' | 'failed' | 'skipped') || 'sent',

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import nodemailer from 'nodemailer';
 import { getEmailFrom, getSparkpostConfig } from '../config/env';
+import { recordOutbound } from './outbox.service';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -28,12 +29,56 @@ const mimeByExtension = (filePath: string): string => {
   return 'application/octet-stream';
 };
 
+interface EmailMeta {
+  template?: string;
+  assignmentId?: number | null;
+  bodyText?: string;
+}
+
+const stripHtml = (html: string): string =>
+  html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
 /**
  * Entrega un correo por SparkPost (API HTTP) si hay credenciales; en su defecto
  * usa el SMTP configurado (Nodemailer) como respaldo. Las imagenes con `cid`
  * (p. ej. el logo) se mandan como inline_images en la API de SparkPost.
+ * Cada intento (exito o fallo) queda registrado en la bandeja de salida.
  */
 const deliverEmail = async (
+  to: string,
+  subject: string,
+  html: string,
+  attachments: EmailAttachment[] = [],
+  meta: EmailMeta = {},
+): Promise<void> => {
+  try {
+    await sendEmailTransport(to, subject, html, attachments);
+    await recordOutbound({
+      channel: 'email',
+      recipient: to,
+      subject,
+      body: meta.bodyText ?? stripHtml(html).slice(0, 2000),
+      template: meta.template ?? 'email',
+      assignmentId: meta.assignmentId ?? null,
+      status: 'sent',
+    });
+  } catch (error) {
+    await recordOutbound({
+      channel: 'email',
+      recipient: to,
+      subject,
+      body: meta.bodyText ?? stripHtml(html).slice(0, 2000),
+      template: meta.template ?? 'email',
+      assignmentId: meta.assignmentId ?? null,
+      status: 'failed',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+};
+
+/** Envio crudo: SparkPost API si hay credenciales; si no, SMTP de respaldo. */
+const sendEmailTransport = async (
   to: string,
   subject: string,
   html: string,
@@ -266,20 +311,39 @@ const buildEmailTemplate = ({ email, name, tempPass, variant }: CredentialEmailI
 
 const sendCredentialEmail = async (input: CredentialEmailInput) => {
   const { subject, html, attachments } = buildEmailTemplate(input);
-  await deliverEmail(input.email, subject, html, attachments);
+  await deliverEmail(input.email, subject, html, attachments, {
+    template: `credential_${input.variant}`,
+    bodyText: `Correo de credenciales (${input.variant}) para ${input.name}.`,
+  });
 };
+
+export interface GenericEmailMeta {
+  template?: string;
+  assignmentId?: number | null;
+  bodyText?: string;
+}
 
 /**
  * Envio de correo generico (texto/HTML simple). Reusa el transporter SMTP y el
  * logo de marca. Usado por las notificaciones del modulo de evaluaciones.
+ * `meta` alimenta la bandeja de salida (tipo, asignacion y texto plano).
  */
-export const sendGenericEmail = async (to: string, subject: string, bodyHtml: string): Promise<void> => {
+export const sendGenericEmail = async (
+  to: string,
+  subject: string,
+  bodyHtml: string,
+  meta: GenericEmailMeta = {},
+): Promise<void> => {
   const brand = resolveLogoAsset();
   const logoHtml = brand.hasLogo
     ? '<div style="text-align:center;margin-bottom:16px"><img src="cid:unilabor-logo" alt="Unilabor" style="height:48px"/></div>'
     : '';
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2d3d">${logoHtml}${bodyHtml}<p style="margin-top:24px;font-size:12px;color:#7b8794">SafeDoc - Unilabor</p></div>`;
-  await deliverEmail(to, subject, html, brand.attachments);
+  await deliverEmail(to, subject, html, brand.attachments, {
+    template: meta.template ?? 'generic',
+    assignmentId: meta.assignmentId ?? null,
+    bodyText: meta.bodyText ?? stripHtml(bodyHtml).slice(0, 2000),
+  });
 };
 
 export const sendWelcomeEmail = async (email: string, name: string, tempPass: string) => {
