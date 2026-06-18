@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AppNavbar } from '../components/AppNavbar';
 import { AppSidebar } from '../components/AppSidebar';
 import { PendingEvaluationsBanner } from '../components/PendingEvaluationsBanner';
 import { UserMenu } from '../components/UserMenu';
 import { useAuthStore } from '../store/useAuthStore';
+import { usePendingEvaluationsStore } from '../store/usePendingEvaluationsStore';
 import { getCurrentUserProfile } from '../api/service';
 import { tokenRequiresPasswordChange } from '../utils/auth';
 import { ChevronRight } from 'lucide-react';
@@ -15,6 +16,9 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
+  const refreshPendingEvaluations = usePendingEvaluationsStore((state) => state.refresh);
+  const resetPendingEvaluations = usePendingEvaluationsStore((state) => state.reset);
+  const { pathname } = useLocation();
   const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(true);
 
   const mustChangePassword =
@@ -23,6 +27,19 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   useEffect(() => {
     setActiveModule(moduleCode);
   }, [moduleCode, setActiveModule]);
+
+  // Recalcula los pendientes de capacitacion en cada navegacion del modulo RH,
+  // para que el badge y el banner reflejen las evaluaciones ya realizadas.
+  useEffect(() => {
+    if (!token || mustChangePassword) {
+      return;
+    }
+    if (moduleCode === 'RH') {
+      void refreshPendingEvaluations();
+    } else {
+      resetPendingEvaluations();
+    }
+  }, [token, mustChangePassword, moduleCode, pathname, refreshPendingEvaluations, resetPendingEvaluations]);
 
   useEffect(() => {
     if (!token || mustChangePassword) {

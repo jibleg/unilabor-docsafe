@@ -1,40 +1,17 @@
-import { useEffect, useState } from 'react';
-import { getMyPendingEvaluationsCount } from '../api/service';
+import { usePendingEvaluationsStore } from '../store/usePendingEvaluationsStore';
 
 /**
  * Conteo de evaluaciones de capacitacion pendientes (vigentes) del colaborador.
- * Calculo on-demand al ingresar; alimenta el badge del menu y el banner de aviso.
+ * Lee del store compartido; el refresco lo dispara MainLayout en cada navegacion
+ * de RH y TakeEvaluationPage al enviar. Asi el badge y el banner se mantienen
+ * sincronizados sin recargar la pagina.
  */
 export const usePendingEvaluations = (enabled = true): { count: number; loading: boolean } => {
-  const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(enabled);
+  const count = usePendingEvaluationsStore((state) => state.count);
+  const loading = usePendingEvaluationsStore((state) => state.loading);
 
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-    let active = true;
-    const run = async () => {
-      try {
-        const value = await getMyPendingEvaluationsCount();
-        if (active) {
-          setCount(value);
-        }
-      } catch {
-        if (active) {
-          setCount(0);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-    void run();
-    return () => {
-      active = false;
-    };
-  }, [enabled]);
-
-  return { count, loading };
+  return {
+    count: enabled ? count : 0,
+    loading: enabled ? loading : false,
+  };
 };

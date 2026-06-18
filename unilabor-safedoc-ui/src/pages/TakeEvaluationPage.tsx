@@ -15,6 +15,7 @@ import type {
   EvaluationTakingView,
 } from '../types/models';
 import { notifyError } from '../utils/notify';
+import { usePendingEvaluationsStore } from '../store/usePendingEvaluationsStore';
 
 type AnswerState = Record<number, { selected: number[]; text: string }>;
 
@@ -28,8 +29,8 @@ const buildResultMessage = (result: EvaluationSubmitResult): CongratsMessage => 
   if (result.requires_manual_grading || result.status === 'grading') {
     return {
       emoji: '📝',
-      title: 'Evaluacion enviada',
-      subtitle: 'Tu evaluacion incluye preguntas abiertas y sera revisada por RH. Te avisaremos el resultado.',
+      title: 'Evaluación enviada',
+      subtitle: 'Tu evaluación incluye preguntas abiertas y será revisada por RH. Te avisaremos el resultado.',
     };
   }
   if (result.passed) {
@@ -40,12 +41,12 @@ const buildResultMessage = (result: EvaluationSubmitResult): CongratsMessage => 
     if (pct >= 90) {
       return { emoji: '🎉', title: '¡Excelente trabajo!', subtitle: 'Un resultado sobresaliente. ¡Felicidades!' };
     }
-    return { emoji: '✅', title: '¡Felicidades, acreditaste!', subtitle: 'Alcanzaste la calificacion requerida.' };
+    return { emoji: '✅', title: '¡Felicidades, acreditaste!', subtitle: 'Alcanzaste la calificación requerida.' };
   }
   return {
     emoji: '💪',
-    title: 'No alcanzaste el minimo esta vez',
-    subtitle: 'No te preocupes: RH fue notificado y te contactara para recapacitacion.',
+    title: 'No alcanzaste el mínimo esta vez',
+    subtitle: 'No te preocupes: RH fue notificado y te contactará para recapacitación.',
   };
 };
 
@@ -56,6 +57,7 @@ export const TakeEvaluationPage = () => {
   const { id } = useParams();
   const assignmentId = Number(id);
   const navigate = useNavigate();
+  const refreshPendingEvaluations = usePendingEvaluationsStore((state) => state.refresh);
 
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<EvaluationTakingView | null>(null);
@@ -76,7 +78,7 @@ export const TakeEvaluationPage = () => {
         }
       } catch (error) {
         if (active) {
-          setLoadError(getApiErrorMessage(error, 'No se pudo abrir la evaluacion.'));
+          setLoadError(getApiErrorMessage(error, 'No se pudo abrir la evaluación.'));
         }
       } finally {
         if (active) {
@@ -87,7 +89,7 @@ export const TakeEvaluationPage = () => {
     if (Number.isFinite(assignmentId) && assignmentId > 0) {
       void run();
     } else {
-      setLoadError('Evaluacion invalida.');
+      setLoadError('Evaluación inválida.');
       setLoading(false);
     }
     return () => {
@@ -161,8 +163,10 @@ export const TakeEvaluationPage = () => {
       });
       const submitResult = await submitMyEvaluation(assignmentId, payload);
       setResult(submitResult);
+      // Actualiza el conteo de pendientes (badge + banner) sin esperar a navegar.
+      void refreshPendingEvaluations();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo enviar la evaluacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo enviar la evaluación.'));
     } finally {
       setSubmitting(false);
     }
@@ -172,7 +176,7 @@ export const TakeEvaluationPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-sm text-[var(--unilabor-neutral)]">
-        <Loader2 className="mr-2 animate-spin" size={18} /> Abriendo tu evaluacion...
+        <Loader2 className="mr-2 animate-spin" size={18} /> Abriendo tu evaluación...
       </div>
     );
   }
@@ -185,7 +189,7 @@ export const TakeEvaluationPage = () => {
             <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-600">
               <AlertTriangle size={26} />
             </span>
-            <h1 className="text-xl font-bold text-[var(--color-brand-700)]">No se puede abrir la evaluacion</h1>
+            <h1 className="text-xl font-bold text-[var(--color-brand-700)]">No se puede abrir la evaluación</h1>
             <p className="text-sm text-[var(--unilabor-neutral)]">{loadError}</p>
             <button
               type="button"
@@ -239,7 +243,7 @@ export const TakeEvaluationPage = () => {
               </button>
             ) : celebratory ? (
               <div className="mt-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
-                <CheckCircle2 size={15} /> Tu constancia se archivara en tus constancias en breve.
+                <CheckCircle2 size={15} /> Tu constancia se archivará en tus constancias en breve.
               </div>
             ) : null}
 
@@ -260,7 +264,7 @@ export const TakeEvaluationPage = () => {
     return (
       <div className="mx-auto max-w-xl">
         <div className={cardClass}>
-          <p className="text-center text-sm text-[var(--unilabor-neutral)]">Esta evaluacion no tiene preguntas.</p>
+          <p className="text-center text-sm text-[var(--unilabor-neutral)]">Esta evaluación no tiene preguntas.</p>
         </div>
       </div>
     );
@@ -378,7 +382,7 @@ export const TakeEvaluationPage = () => {
             className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[var(--color-brand-500)] px-5 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-            Enviar evaluacion
+            Enviar evaluación
           </button>
         ) : (
           <button
