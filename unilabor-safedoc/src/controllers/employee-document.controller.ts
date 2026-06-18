@@ -353,7 +353,8 @@ export const getEmployeeDocumentHistoryController = async (req: AuthRequest, res
       return res.status(403).json({ message: 'No tienes acceso al historial solicitado.' });
     }
 
-    const documents = await listEmployeeDocumentHistory(employeeId, documentTypeId);
+    const referenceKey = typeof req.query.reference_key === 'string' ? req.query.reference_key : undefined;
+    const documents = await listEmployeeDocumentHistory(employeeId, documentTypeId, referenceKey);
     return res.json({ documents });
   } catch (error: any) {
     const mappedError = mapEmployeeDocumentError(res, error);

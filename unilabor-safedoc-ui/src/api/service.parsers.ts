@@ -130,6 +130,7 @@ export const normalizeEmployeeDocument = (input: unknown): EmployeeDocument | nu
       getNumber(source, ['replaces_document_id', 'replacesDocumentId'], 0) > 0
         ? getNumber(source, ['replaces_document_id', 'replacesDocumentId'], 0)
         : null,
+    reference_key: getString(source, ['reference_key', 'referenceKey']) || null,
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),
     uploaded_by_name: getString(source, ['uploaded_by_name', 'uploadedByName']) || null,

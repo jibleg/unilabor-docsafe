@@ -133,10 +133,11 @@ export const EmployeeExpedientPage = () => {
     }
   }, []);
 
-  const loadDocumentHistory = useCallback(async (employeeId: number, documentTypeId: number) => {
+  const loadDocumentHistory = useCallback(
+    async (employeeId: number, documentTypeId: number, referenceKey?: string | null) => {
     setLoadingHistory(true);
     try {
-      const documents = await listEmployeeDocumentHistoryByEmployeeId(employeeId, documentTypeId);
+      const documents = await listEmployeeDocumentHistoryByEmployeeId(employeeId, documentTypeId, referenceKey);
       setHistoryDocuments(documents);
     } catch (error) {
       setHistoryDocuments([]);
@@ -413,7 +414,11 @@ export const EmployeeExpedientPage = () => {
                     onUpload={(item) => setSelectedItem(item)}
                     onHistory={(item) => {
                       setHistoryItem(item);
-                      void loadDocumentHistory(currentEmployee.id, item.document_type.id);
+                      void loadDocumentHistory(
+                        currentEmployee.id,
+                        item.document_type.id,
+                        item.current_document?.reference_key,
+                      );
                     }}
                     onView={(documentId) =>
                       setSelectedPdfUrl(`${API_BASE_URL}/rh/documents/${documentId}/view`)

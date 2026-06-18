@@ -802,8 +802,11 @@ export const listRhAuditLogs = async (
 export const listEmployeeDocumentHistoryByEmployeeId = async (
   employeeId: number,
   documentTypeId: number,
+  referenceKey?: string | null,
 ): Promise<EmployeeDocument[]> => {
-  const response = await api.get(`/rh/employees/${employeeId}/document-types/${documentTypeId}/history`);
+  const response = await api.get(`/rh/employees/${employeeId}/document-types/${documentTypeId}/history`, {
+    params: referenceKey ? { reference_key: referenceKey } : undefined,
+  });
   return getArrayFromPayload(response.data, ['documents', 'items', 'results'])
     .map(normalizeEmployeeDocument)
     .filter((document): document is EmployeeDocument => document !== null);

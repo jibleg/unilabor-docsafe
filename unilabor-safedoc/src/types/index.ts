@@ -276,6 +276,7 @@ export interface EmployeeDocumentRecord {
   version: number;
   is_current: boolean;
   replaces_document_id: number | null;
+  reference_key?: string | null;
   created_at?: string;
   updated_at?: string;
   document_type?: DocumentTypeRecord | null;

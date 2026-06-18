@@ -17,6 +17,7 @@ interface IssuanceContext {
   assignmentId: number;
   employeeId: number;
   employeeName: string;
+  courseId: number;
   courseTitle: string;
   validityMonths: number;
   percentage: number;
@@ -38,7 +39,7 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
     `SELECT a.id, a.employee_id, a.status, a.percentage, a.certificate_document_id,
             a.created_by_user_id,
             e.full_name AS employee_name,
-            c.title AS course_title, c.certificate_validity_months
+            c.id AS course_id, c.title AS course_title, c.certificate_validity_months
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
        JOIN public.training_courses c ON c.id = t.training_course_id
@@ -80,6 +81,7 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
     assignmentId,
     employeeId: Number(row.employee_id),
     employeeName: String(row.employee_name),
+    courseId: Number(row.course_id),
     courseTitle: String(row.course_title),
     validityMonths,
     percentage: row.percentage !== null ? Number(row.percentage) : 0,
@@ -117,6 +119,8 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
     bodyText: template.body_text,
     logoPath: template.logo_path,
     orientation: template.orientation,
+    styleSeed: context.courseId,
+    referenceCode: `CP-${issueDate.getFullYear()}-${String(context.assignmentId).padStart(4, '0')}`,
     signatures: template.signatures,
   });
 
@@ -146,12 +150,16 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
       return Number(existing);
     }
 
-    // Versionado: supersede la constancia vigente previa de este tipo.
+    // Versionado POR CAPACITACION: cada curso mantiene su propia constancia
+    // vigente (discriminada por reference_key). Solo se supersede la constancia
+    // previa del MISMO curso, no las de otras capacitaciones.
+    const referenceKey = `training_course:${context.courseId}`;
     const currentResult = await client.query(
       `SELECT id, version FROM public.employee_documents
-        WHERE employee_id = $1 AND document_type_id = $2 AND is_current = TRUE
+        WHERE employee_id = $1 AND document_type_id = $2 AND is_current = TRUE AND reference_key = $3
+        ORDER BY version DESC
         LIMIT 1 FOR UPDATE;`,
-      [context.employeeId, documentTypeId],
+      [context.employeeId, documentTypeId, referenceKey],
     );
     const currentDocument = currentResult.rows[0] ?? null;
     const nextVersion = currentDocument ? Number(currentDocument.version) + 1 : 1;
@@ -165,8 +173,8 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
     const insertResult = await client.query(
       `INSERT INTO public.employee_documents
          (employee_id, document_type_id, title, description, file_path, file_size, mime_type,
-          uploaded_by_user_id, issue_date, expiry_date, status, version, is_current, replaces_document_id)
-       VALUES ($1, $2, $3, $4, $5, $6, 'application/pdf', $7, $8, $9, 'active', $10, TRUE, $11)
+          uploaded_by_user_id, issue_date, expiry_date, status, version, is_current, replaces_document_id, reference_key)
+       VALUES ($1, $2, $3, $4, $5, $6, 'application/pdf', $7, $8, $9, 'active', $10, TRUE, $11, $12)
        RETURNING id;`,
       [
         context.employeeId,
@@ -180,6 +188,7 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
         isoExpiry,
         nextVersion,
         currentDocument ? Number(currentDocument.id) : null,
+        referenceKey,
       ],
     );
     const documentId = Number(insertResult.rows[0]?.id);

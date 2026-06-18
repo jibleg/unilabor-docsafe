@@ -8,8 +8,9 @@ import type { CertificateRenderInput } from './certificate-render.service';
  */
 
 const DEFAULT_TITLE = 'Constancia de capacitacion';
+// El nombre se renderiza como elemento principal (no va en el cuerpo).
 const DEFAULT_BODY =
-  'Se otorga la presente constancia a {{nombre}} por acreditar la capacitacion "{{capacitacion}}" con una calificacion de {{calificacion}} el {{fecha}}.';
+  'Por haber acreditado satisfactoriamente la capacitacion "{{capacitacion}}" con una calificacion de {{calificacion}}.';
 
 const throwCoded = (code: string): never => {
   const error = new Error(code);
@@ -184,6 +185,8 @@ export const buildPreviewRenderInput = async (courseId: number): Promise<Certifi
     bodyText: template.body_text,
     logoPath: template.logo_path,
     orientation: template.orientation,
+    styleSeed: course.id,
+    referenceCode: `CP-${new Date().getFullYear()}-${String(course.id).padStart(4, '0')}`,
     signatures: template.signatures.map((signature) => ({
       name: signature.signatory_name,
       role: signature.role,

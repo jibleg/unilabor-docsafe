@@ -27,6 +27,8 @@ export interface EmployeeDocumentFilters {
   document_type_id?: number;
   current_only?: boolean;
   expiry_status?: 'valid' | 'expiring' | 'expired';
+  /** Filtra por la linea/lineage del documento (p. ej. constancia de un curso). */
+  reference_key?: string;
 }
 
 const EXPIRING_WINDOW_DAYS = 30;
@@ -198,6 +200,7 @@ const mapEmployeeDocumentRow = (row: any): EmployeeDocumentRecord => {
     version: Number(row.version ?? 1),
     is_current: Boolean(row.is_current),
     replaces_document_id: row.replaces_document_id ? Number(row.replaces_document_id) : null,
+    reference_key: row.reference_key ? String(row.reference_key) : null,
     uploaded_by_name: row.uploaded_by_name ? String(row.uploaded_by_name) : null,
     is_sensitive: Boolean(row.document_type_is_sensitive ?? row.is_sensitive),
     has_expiry: hasExpiry,
@@ -360,6 +363,11 @@ export const listEmployeeDocuments = async (
     whereClauses.push(`ed.document_type_id = $${values.length}`);
   }
 
+  if (filters.reference_key) {
+    values.push(filters.reference_key);
+    whereClauses.push(`ed.reference_key = $${values.length}`);
+  }
+
   if (filters.current_only !== false) {
     whereClauses.push(`ed.is_current = TRUE`);
   }
@@ -382,6 +390,7 @@ export const listEmployeeDocuments = async (
         ed.version,
         ed.is_current,
         ed.replaces_document_id,
+        ed.reference_key,
         ed.created_at AS document_created_at,
         ed.updated_at AS document_updated_at,
         u.full_name AS uploaded_by_name,
@@ -435,6 +444,7 @@ export const getEmployeeDocumentById = async (
         ed.version,
         ed.is_current,
         ed.replaces_document_id,
+        ed.reference_key,
         ed.created_at AS document_created_at,
         ed.updated_at AS document_updated_at,
         u.full_name AS uploaded_by_name,
@@ -459,13 +469,20 @@ export const getEmployeeDocumentById = async (
 export const listEmployeeDocumentHistory = async (
   employeeId: number,
   documentTypeId: number,
+  referenceKey?: string,
 ): Promise<EmployeeDocumentRecord[]> => {
   await ensureEmployeeExists(employeeId);
   await ensureDocumentTypeAssignedToEmployee(employeeId, documentTypeId);
-  return listEmployeeDocuments(employeeId, {
+  const filters: EmployeeDocumentFilters = {
     document_type_id: documentTypeId,
     current_only: false,
-  });
+  };
+  // Constancias: el historial se acota a la linea del documento (p.ej. el curso),
+  // para no mezclar constancias de distintas capacitaciones del mismo tipo.
+  if (referenceKey) {
+    filters.reference_key = referenceKey;
+  }
+  return listEmployeeDocuments(employeeId, filters);
 };
 
 export const buildEmployeeExpedient = async (employeeId: number): Promise<{
@@ -517,6 +534,7 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
         ed.version,
         ed.is_current,
         ed.replaces_document_id,
+        ed.reference_key,
         ed.created_at AS document_created_at,
         ed.updated_at AS document_updated_at,
         u.full_name AS uploaded_by_name
