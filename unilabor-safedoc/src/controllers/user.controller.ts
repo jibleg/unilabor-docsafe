@@ -258,7 +258,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
   }
 };
 
-const USER_SEARCH_COLUMNS = ['u.email', 'u.full_name', 'u.role'];
+const USER_SEARCH_COLUMNS = ['u.email', 'u.full_name', 'u.role::text'];
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {

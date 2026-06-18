@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
-import { Edit3, KeyRound, Loader2, Plus, RefreshCw, Trash2, UserPlus } from 'lucide-react';
+import { Edit3, KeyRound, Plus, RefreshCw, Trash2, UserPlus } from 'lucide-react';
 import {
   createUser,
   deleteUserById,
@@ -19,9 +19,9 @@ import type { Category, ManagedUser, ModuleAccess, ModuleCode } from '../types/m
 import { useAuthStore } from '../store/useAuthStore';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 
+import { UserFormModal } from '../components/admin/UserFormModal';
 import {
   PAGE_SIZE_OPTIONS,
-  ROLE_OPTIONS,
   EMAIL_REGEX,
   EMPTY_FORM,
   FALLBACK_MODULE_OPTIONS,
@@ -88,7 +88,7 @@ export const UsersPage = () => {
         [...categoriesData].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
       );
     } catch (requestError) {
-      notifyError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorias'));
+      notifyError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorías'));
     } finally {
       setLoadingCategories(false);
     }
@@ -102,7 +102,7 @@ export const UsersPage = () => {
         setModuleOptions(modules);
       }
     } catch (requestError) {
-      notifyWarning(getApiErrorMessage(requestError, 'No se pudo cargar el catalogo de modulos. Se usara la configuracion base.'));
+      notifyWarning(getApiErrorMessage(requestError, 'No se pudo cargar el catálogo de módulos. Se usará la configuración base.'));
       setModuleOptions(FALLBACK_MODULE_OPTIONS);
     } finally {
       setLoadingModules(false);
@@ -215,12 +215,12 @@ export const UsersPage = () => {
     }
 
     if (!EMAIL_REGEX.test(form.email.trim())) {
-      notifyWarning('El correo no tiene un formato valido');
+      notifyWarning('El correo no tiene un formato válido');
       return false;
     }
 
     if (form.role === 'VIEWER' && form.moduleCodes.includes('QUALITY') && form.categoryIds.length === 0) {
-      notifyWarning('Un usuario VIEWER debe tener al menos una categoria asignada');
+      notifyWarning('Un usuario VIEWER debe tener al menos una categoría asignada');
       return false;
     }
 
@@ -286,7 +286,7 @@ export const UsersPage = () => {
         categoryIds: userCategories.map((category) => category.id),
       }));
     } catch (requestError) {
-      notifyError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorias del usuario'));
+      notifyError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorías del usuario'));
     } finally {
       setLoadingUserCategories(false);
     }
@@ -340,13 +340,13 @@ export const UsersPage = () => {
       (currentUserEmail.length > 0 && currentUserEmail === user.email.trim().toLowerCase());
 
     if (isCurrentUser) {
-      notifyWarning('No puedes eliminar tu propia cuenta desde este modulo');
+      notifyWarning('No puedes eliminar tu propia cuenta desde este módulo');
       return;
     }
 
     const confirmed = await confirmAction(
-      `Se eliminara al usuario "${user.full_name}".`,
-      'La cuenta sera desactivada y no podra iniciar sesion.',
+      `Se eliminará al usuario "${user.full_name}".`,
+      'La cuenta será desactivada y no podrá iniciar sesión.',
       'Eliminar',
     );
 
@@ -370,8 +370,8 @@ export const UsersPage = () => {
 
   const triggerPasswordReset = async (user: ManagedUser) => {
     const confirmed = await confirmAction(
-      `Se reseteara la contrasena de "${user.full_name}".`,
-      'Se enviara una clave temporal por correo y el usuario debera cambiarla al iniciar sesion.',
+      `Se reseteará la contraseña de "${user.full_name}".`,
+      'Se enviará una clave temporal por correo y el usuario deberá cambiarla al iniciar sesión.',
       'Resetear',
     );
 
@@ -382,10 +382,10 @@ export const UsersPage = () => {
     setResettingId(user.id);
     try {
       await resetUserPassword(user.id);
-      notifySuccess('Contrasena temporal enviada por correo. El cambio sera obligatorio al iniciar sesion.');
+      notifySuccess('Contraseña temporal enviada por correo. El cambio será obligatorio al iniciar sesión.');
       await loadUsers();
     } catch (requestError) {
-      notifyError(getApiErrorMessage(requestError, 'No se pudo resetear la contrasena del usuario'));
+      notifyError(getApiErrorMessage(requestError, 'No se pudo resetear la contraseña del usuario'));
     } finally {
       setResettingId(null);
     }
@@ -397,7 +397,7 @@ export const UsersPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Personal del laboratorio</h1>
           <p className="text-sm text-[var(--unilabor-neutral)]">
-            Administra usuarios, roles y reseteo de contrasenas temporales.
+            Administra usuarios, roles y reseteo de contraseñas temporales.
           </p>
         </div>
 
@@ -434,7 +434,7 @@ export const UsersPage = () => {
           />
 
           <div className="flex items-center gap-2 text-xs text-[var(--unilabor-neutral)]">
-            <span>Filas por pagina</span>
+            <span>Filas por página</span>
             <select
               value={pageSize}
               onChange={(event) => { setPageSize(Number(event.target.value)); setCurrentPage(1); }}
@@ -457,7 +457,7 @@ export const UsersPage = () => {
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Nombre</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Email</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Rol</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Modulos</th>
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Módulos</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Estado</th>
               <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                 Acciones
@@ -511,7 +511,7 @@ export const UsersPage = () => {
                             </span>
                           ))
                         ) : (
-                          <span className="text-xs text-[var(--unilabor-neutral)]">Sin modulos</span>
+                          <span className="text-xs text-[var(--unilabor-neutral)]">Sin módulos</span>
                         )}
                       </div>
                     </td>
@@ -543,7 +543,7 @@ export const UsersPage = () => {
                           onClick={() => void triggerPasswordReset(user)}
                           disabled={isCurrentUser || isDeleting || isResetting}
                           className="inline-flex items-center gap-1 rounded-lg border border-[rgba(124,173,211,0.28)] bg-[rgba(191,212,230,0.34)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
-                          title={isCurrentUser ? 'No puedes resetear tu propia clave desde aqui' : ''}
+                          title={isCurrentUser ? 'No puedes resetear tu propia clave desde aquí' : ''}
                         >
                           <KeyRound size={14} />
                           {isResetting ? 'Reseteando...' : 'Reset clave'}
@@ -583,7 +583,7 @@ export const UsersPage = () => {
             Anterior
           </button>
           <span className="text-xs font-semibold text-[var(--color-brand-700)]">
-            Pagina {currentPage} de {totalPages}
+            Página {currentPage} de {totalPages}
           </span>
           <button
             type="button"
@@ -597,343 +597,48 @@ export const UsersPage = () => {
       </div>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
-            <div className="border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
-              <h2 className="text-base font-bold text-[var(--color-brand-700)]">Nuevo usuario</h2>
-            </div>
-
-            <div className="space-y-4 px-4 py-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Nombre completo
-                  </label>
-                  <input
-                    value={createForm.full_name}
-                    onChange={(event) =>
-                      setCreateForm((currentForm) => ({
-                        ...currentForm,
-                        full_name: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                    placeholder="Nombre Apellido"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Correo
-                  </label>
-                  <input
-                    type="email"
-                    value={createForm.email}
-                    onChange={(event) =>
-                      setCreateForm((currentForm) => ({
-                        ...currentForm,
-                        email: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                    placeholder="usuario@unilabor.mx"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Rol
-                </label>
-                <select
-                  value={createForm.role}
-                  onChange={(event) => updateCreateRole(normalizeRoleValue(event.target.value))}
-                  className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                >
-                  {ROLE_OPTIONS.map((roleOption) => (
-                    <option key={roleOption.value} value={roleOption.value}>
-                      {roleOption.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Modulos habilitados
-                </p>
-                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
-                  El rol global sigue activo por compatibilidad. En la siguiente iteracion cada modulo podra tener su propio rol.
-                </p>
-
-                {loadingModules ? (
-                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando modulos...</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {moduleOptions.map((moduleOption) => {
-                      const selected = createForm.moduleCodes.includes(moduleOption.code);
-                      return (
-                        <label
-                          key={moduleOption.code}
-                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleCreateModule(moduleOption.code)}
-                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
-                          />
-                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
-                            {moduleOption.name}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Categorias asignadas
-                </p>
-                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
-                  {createForm.role === 'VIEWER' && createForm.moduleCodes.includes('QUALITY')
-                    ? 'El usuario VIEWER debe tener al menos una categoria para visualizar documentos.'
-                    : 'La asignacion de categorias es opcional para este rol.'}
-                </p>
-
-                {loadingCategories ? (
-                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando categorias...</p>
-                ) : categories.length === 0 ? (
-                  <p className="text-xs text-[var(--unilabor-neutral)]">No hay categorias disponibles.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {categories.map((category) => {
-                      const selected = createForm.categoryIds.includes(category.id);
-                      return (
-                        <label
-                          key={category.id}
-                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleCreateCategory(category.id)}
-                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
-                          />
-                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
-                            {category.name}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2 text-xs text-[var(--color-brand-700)]">
-                Al crear el usuario, el sistema envia por correo una contrasena temporal y se fuerza el cambio en el primer inicio de sesion.
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={closeCreateModal}
-                  disabled={creating}
-                  className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void submitCreateUser()}
-                  disabled={creating}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {creating ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={14} />
-                      Guardar usuario
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <UserFormModal
+          title="Nuevo usuario"
+          form={createForm}
+          setForm={setCreateForm}
+          onUpdateRole={updateCreateRole}
+          onToggleModule={toggleCreateModule}
+          onToggleCategory={toggleCreateCategory}
+          moduleOptions={moduleOptions}
+          categories={categories}
+          loadingModules={loadingModules}
+          loadingCategories={loadingCategories}
+          modulesHelpText="El rol global sigue activo por compatibilidad. En la siguiente iteración cada módulo podrá tener su propio rol."
+          showCredentialsNote
+          submitting={creating}
+          submitLabel="Guardar usuario"
+          submittingLabel="Guardando..."
+          submitIcon={<Plus size={14} />}
+          onSubmit={() => void submitCreateUser()}
+          onClose={closeCreateModal}
+        />
       )}
 
       {isEditModalOpen && editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
-            <div className="border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
-              <h2 className="text-base font-bold text-[var(--color-brand-700)]">Editar usuario</h2>
-            </div>
-
-            <div className="space-y-4 px-4 py-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Nombre completo
-                  </label>
-                  <input
-                    value={editForm.full_name}
-                    onChange={(event) =>
-                      setEditForm((currentForm) => ({
-                        ...currentForm,
-                        full_name: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Correo
-                  </label>
-                  <input
-                    type="email"
-                    value={editForm.email}
-                    onChange={(event) =>
-                      setEditForm((currentForm) => ({
-                        ...currentForm,
-                        email: event.target.value,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Rol
-                </label>
-                <select
-                  value={editForm.role}
-                  onChange={(event) => updateEditRole(normalizeRoleValue(event.target.value))}
-                  className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                >
-                  {ROLE_OPTIONS.map((roleOption) => (
-                    <option key={roleOption.value} value={roleOption.value}>
-                      {roleOption.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Modulos habilitados
-                </p>
-                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
-                  Desde aqui ya puedes activar o retirar acceso a `QUALITY`, `RH` y `HELPDESK` sin tocar la base manualmente.
-                </p>
-
-                {loadingModules ? (
-                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando modulos...</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {moduleOptions.map((moduleOption) => {
-                      const selected = editForm.moduleCodes.includes(moduleOption.code);
-                      return (
-                        <label
-                          key={moduleOption.code}
-                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleEditModule(moduleOption.code)}
-                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
-                          />
-                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
-                            {moduleOption.name}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Categorias asignadas
-                </p>
-                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">
-                  {editForm.role === 'VIEWER' && editForm.moduleCodes.includes('QUALITY')
-                    ? 'El usuario VIEWER debe tener al menos una categoria para visualizar documentos.'
-                    : 'La asignacion de categorias es opcional para este rol.'}
-                </p>
-
-                {loadingCategories || loadingUserCategories ? (
-                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando categorias...</p>
-                ) : categories.length === 0 ? (
-                  <p className="text-xs text-[var(--unilabor-neutral)]">No hay categorias disponibles.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {categories.map((category) => {
-                      const selected = editForm.categoryIds.includes(category.id);
-                      return (
-                        <label
-                          key={category.id}
-                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-2 text-xs text-[var(--unilabor-ink)] transition hover:border-[rgba(124,173,211,0.35)] hover:bg-[rgba(191,212,230,0.2)]"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleEditCategory(category.id)}
-                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
-                          />
-                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
-                            {category.name}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  disabled={savingEdit}
-                  className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void submitEditUser()}
-                  disabled={savingEdit}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {savingEdit ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Edit3 size={14} />
-                      Guardar cambios
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <UserFormModal
+          title="Editar usuario"
+          form={editForm}
+          setForm={setEditForm}
+          onUpdateRole={updateEditRole}
+          onToggleModule={toggleEditModule}
+          onToggleCategory={toggleEditCategory}
+          moduleOptions={moduleOptions}
+          categories={categories}
+          loadingModules={loadingModules}
+          loadingCategories={loadingCategories || loadingUserCategories}
+          modulesHelpText="Desde aquí ya puedes activar o retirar acceso a QUALITY, RH y HELPDESK sin tocar la base manualmente."
+          submitting={savingEdit}
+          submitLabel="Guardar cambios"
+          submittingLabel="Guardando..."
+          submitIcon={<Edit3 size={14} />}
+          onSubmit={() => void submitEditUser()}
+          onClose={closeEditModal}
+        />
       )}
     </div>
   );
