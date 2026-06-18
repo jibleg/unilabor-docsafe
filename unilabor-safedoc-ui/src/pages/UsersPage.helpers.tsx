@@ -1,6 +1,8 @@
-import { toast } from 'react-toastify';
 import type { ManagedUser, ModuleAccess, ModuleCode } from '../types/models';
 import { normalizeRole } from '../utils/roles';
+
+// Re-export para compatibilidad: el confirm basado en toast vive en utils/confirm.
+export { confirmAction } from '../utils/confirm';
 
 export const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
@@ -88,53 +90,3 @@ export const normalizeRoleValue = (role: string): RoleValue => {
 export const sortUsers = (users: ManagedUser[]): ManagedUser[] =>
   [...users].sort((a, b) => a.full_name.localeCompare(b.full_name, 'es', { sensitivity: 'base' }));
 
-export const confirmAction = (title: string, description: string, confirmLabel: string): Promise<boolean> =>
-  new Promise((resolve) => {
-    let settled = false;
-
-    const settle = (value: boolean) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      resolve(value);
-    };
-
-    toast.warning(
-      ({ closeToast }) => (
-        <div className="space-y-3">
-          <p className="text-sm text-[var(--color-brand-700)]">{title}</p>
-          <p className="text-xs text-[var(--unilabor-neutral)]">{description}</p>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-lg border border-[rgba(0,65,106,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-              onClick={() => {
-                settle(false);
-                closeToast();
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className="rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
-              onClick={() => {
-                settle(true);
-                closeToast();
-              }}
-            >
-              {confirmLabel}
-            </button>
-          </div>
-        </div>
-      ),
-      {
-        autoClose: false,
-        closeOnClick: false,
-        closeButton: false,
-        draggable: false,
-        onClose: () => settle(false),
-      },
-    );
-  });

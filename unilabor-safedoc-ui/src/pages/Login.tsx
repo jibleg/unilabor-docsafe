@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Lock, Mail } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage, login } from '../api/service';
 import { FormFieldError } from '../components/FormFieldError';
@@ -26,6 +26,7 @@ export const LoginPage = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const validation = useNativeFormValidation();
@@ -237,7 +238,7 @@ export const LoginPage = () => {
                       size={18}
                     />
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       required
                       autoComplete="current-password"
                       value={password}
@@ -245,12 +246,21 @@ export const LoginPage = () => {
                       placeholder="************"
                       data-value-missing="Ingresa tu contraseña."
                       {...validation.getFieldProps('password')}
-                      className={`w-full rounded-2xl border py-3.5 pl-11 pr-4 text-sm text-[var(--unilabor-ink)] outline-none transition ${
+                      className={`w-full rounded-2xl border py-3.5 pl-11 pr-11 text-sm text-[var(--unilabor-ink)] outline-none transition ${
                         passwordError
                           ? 'border-rose-300 bg-rose-50 placeholder:text-rose-300 focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20'
                           : 'border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]'
                       }`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-lg p-1 text-slate-500 transition hover:text-[var(--color-brand-700)]"
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
                   <FormFieldError id="password-error" message={passwordError} />
                 </div>

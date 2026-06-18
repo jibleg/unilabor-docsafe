@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Plus, Save, Trash2, X } from 'lucide-react';
 import {
   getApiErrorMessage,
@@ -21,8 +21,8 @@ interface EvaluationTemplateEditorModalProps {
 }
 
 const QUESTION_TYPE_LABELS: Record<EvaluationQuestionType, string> = {
-  single: 'Opcion unica',
-  multiple: 'Opcion multiple',
+  single: 'Opción única',
+  multiple: 'Opción múltiple',
   boolean: 'Verdadero / Falso',
   open: 'Abierta (califica RH)',
 };
@@ -52,7 +52,7 @@ const emptyQuestion = (type: EvaluationQuestionType = 'single'): EvaluationQuest
 /** Valida el banco con las mismas reglas del backend (evita un 400). */
 const validateQuestions = (questions: EvaluationQuestion[]): string | null => {
   if (questions.length === 0) {
-    return 'La evaluacion debe tener al menos una pregunta.';
+    return 'La evaluación debe tener al menos una pregunta.';
   }
   for (const [index, question] of questions.entries()) {
     const position = index + 1;
@@ -70,10 +70,10 @@ const validateQuestions = (questions: EvaluationQuestion[]): string | null => {
     }
     const correct = question.options.filter((option) => option.is_correct).length;
     if ((question.type === 'single' || question.type === 'boolean') && correct !== 1) {
-      return `La pregunta ${position} debe tener exactamente una opcion correcta.`;
+      return `La pregunta ${position} debe tener exactamente una opción correcta.`;
     }
     if (question.type === 'multiple' && correct < 1) {
-      return `La pregunta ${position} debe tener al menos una opcion correcta.`;
+      return `La pregunta ${position} debe tener al menos una opción correcta.`;
     }
   }
   return null;
@@ -102,7 +102,7 @@ export const EvaluationTemplateEditorModal = ({
         setQuestions(detail?.questions ?? []);
       } catch (error) {
         if (active) {
-          notifyError(getApiErrorMessage(error, 'No se pudo cargar la evaluacion.'));
+          notifyError(getApiErrorMessage(error, 'No se pudo cargar la evaluación.'));
         }
       } finally {
         if (active) {
@@ -170,7 +170,18 @@ export const EvaluationTemplateEditorModal = ({
       ),
     );
 
-  const addQuestion = () => setQuestions((current) => [...current, emptyQuestion()]);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const addQuestion = () => {
+    setQuestions((current) => [...current, emptyQuestion()]);
+    // La pregunta nueva se agrega al final; desplaza para que quede visible.
+    requestAnimationFrame(() => {
+      const container = contentRef.current;
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      }
+    });
+  };
   const removeQuestion = (index: number) =>
     setQuestions((current) => current.filter((_, i) => i !== index));
 
@@ -181,7 +192,7 @@ export const EvaluationTemplateEditorModal = ({
       return;
     }
     if (!template.title.trim()) {
-      notifyWarning('El titulo de la evaluacion es obligatorio.');
+      notifyWarning('El título de la evaluación es obligatorio.');
       return;
     }
     if (
@@ -209,11 +220,11 @@ export const EvaluationTemplateEditorModal = ({
         status: template.status,
       });
       await replaceTemplateQuestions(template.id, questions);
-      notifySuccess('Evaluacion guardada correctamente.');
+      notifySuccess('Evaluación guardada correctamente.');
       onSaved();
       onClose();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo guardar la evaluacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo guardar la evaluación.'));
     } finally {
       setSaving(false);
     }
@@ -225,32 +236,43 @@ export const EvaluationTemplateEditorModal = ({
         <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-              Diseno de evaluacion
+              Diseño de evaluación
             </p>
             <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">
-              {template?.title || 'Evaluacion'}
+              {template?.title || 'Evaluación'}
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-            aria-label="Cerrar"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {!loading && template && (
+              <button
+                type="button"
+                onClick={addQuestion}
+                className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+              >
+                <Plus size={14} /> Agregar pregunta
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+              aria-label="Cerrar"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {loading || !template ? (
           <div className="flex flex-1 items-center justify-center py-16 text-sm text-[var(--unilabor-neutral)]">
-            <Loader2 className="mr-2 animate-spin" size={18} /> Cargando evaluacion...
+            <Loader2 className="mr-2 animate-spin" size={18} /> Cargando evaluación...
           </div>
         ) : (
-          <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+          <div ref={contentRef} className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
             {/* Configuracion de la evaluacion */}
             <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
-                <label className={labelClass}>Titulo</label>
+                <label className={labelClass}>Título</label>
                 <input
                   value={template.title}
                   onChange={(event) => patchTemplate({ title: event.target.value })}
@@ -267,7 +289,7 @@ export const EvaluationTemplateEditorModal = ({
                 />
               </div>
               <div>
-                <label className={labelClass}>Calificacion minima (%)</label>
+                <label className={labelClass}>Calificación mínima (%)</label>
                 <input
                   type="number"
                   min={0}
@@ -330,7 +352,7 @@ export const EvaluationTemplateEditorModal = ({
 
             {hasOpenQuestions && (
               <div className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2 text-xs text-[var(--color-brand-700)]">
-                Esta evaluacion incluye preguntas abiertas: la calificacion final requerira la revision de RH.
+                Esta evaluación incluye preguntas abiertas: la calificación final requerirá la revisión de RH.
               </div>
             )}
 
@@ -340,13 +362,6 @@ export const EvaluationTemplateEditorModal = ({
                 <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
                   Banco de preguntas ({questions.length})
                 </h3>
-                <button
-                  type="button"
-                  onClick={addQuestion}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
-                >
-                  <Plus size={14} /> Agregar pregunta
-                </button>
               </div>
 
               {questions.map((question, qIndex) => (
@@ -417,7 +432,7 @@ export const EvaluationTemplateEditorModal = ({
                           <input
                             value={option.text}
                             onChange={(event) => updateOption(qIndex, oIndex, { text: event.target.value })}
-                            placeholder={`Opcion ${oIndex + 1}`}
+                            placeholder={`Opción ${oIndex + 1}`}
                             className={inputClass}
                             disabled={question.type === 'boolean'}
                           />
@@ -439,7 +454,7 @@ export const EvaluationTemplateEditorModal = ({
                           onClick={() => addOption(qIndex)}
                           className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-500)] transition hover:text-[var(--color-brand-700)]"
                         >
-                          <Plus size={13} /> Agregar opcion
+                          <Plus size={13} /> Agregar opción
                         </button>
                       )}
                     </div>
@@ -466,7 +481,7 @@ export const EvaluationTemplateEditorModal = ({
             className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            Guardar evaluacion
+            Guardar evaluación
           </button>
         </div>
       </div>

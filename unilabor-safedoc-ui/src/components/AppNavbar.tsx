@@ -20,6 +20,7 @@ import {
 import { useAuthStore } from '../store/useAuthStore';
 import { hasAnyRole } from '../utils/roles';
 import { getModuleRole } from '../utils/modules';
+import { confirmAction } from '../utils/confirm';
 import { useUserAvatar } from '../hooks/useUserAvatar';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
@@ -34,8 +35,9 @@ interface NavbarItem {
 export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const location = useLocation();
   const logout = useAuthStore((state) => state.logout);
-  const handleLogout = () => {
-    if (window.confirm('¿Seguro que deseas cerrar sesión?')) {
+  const handleLogout = async () => {
+    const confirmed = await confirmAction('Cerrar sesión', '¿Seguro que deseas cerrar sesión?', 'Cerrar sesión');
+    if (confirmed) {
       logout();
     }
   };
@@ -59,7 +61,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
             { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
             { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
             { icon: AlertTriangle, label: 'Alertas', path: '/rh/alerts', roles: ['ADMIN', 'EDITOR'] },
-            { icon: ShieldCheck, label: 'Auditoria RH', path: '/rh/audit', roles: ['ADMIN', 'EDITOR'] },
+            { icon: ShieldCheck, label: 'Auditoría RH', path: '/rh/audit', roles: ['ADMIN', 'EDITOR'] },
             { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', roles: ['VIEWER'] },
             { icon: Tags, label: 'Secciones', path: '/rh/document-sections', roles: ['ADMIN', 'EDITOR'] },
             { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },
@@ -71,16 +73,16 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
               { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', roles: ['ADMIN', 'EDITOR'] },
               { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets' },
               { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
-              { icon: Wrench, label: 'Catalogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
+              { icon: Wrench, label: 'Catálogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
               { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
             ]
           : [
             { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
             { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
             { icon: FileText, label: 'Documentos', path: '/quality/documents' },
-            { icon: Tags, label: 'Categorias', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
+            { icon: Tags, label: 'Categorías', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
             { icon: Users, label: 'Personal', path: '/quality/users', roles: ['ADMIN'] },
-            { icon: ShieldCheck, label: 'Auditoria', path: '/quality/audit', roles: ['ADMIN'] },
+            { icon: ShieldCheck, label: 'Auditoría', path: '/quality/audit', roles: ['ADMIN'] },
           ],
     [moduleCode],
   );
@@ -134,7 +136,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
             type="button"
             onClick={() => setIsMobileMenuOpen((open) => !open)}
             className="btn btn-sm btn-ghost btn-circle"
-            aria-label="Alternar menu"
+            aria-label="Alternar menú"
             aria-expanded={isMobileMenuOpen}
           >
             {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -193,17 +195,17 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
               className="flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.1)] bg-[rgba(239,245,250,0.95)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.34)]"
             >
               <Building2 size={15} />
-              Cambiar modulo
+              Cambiar módulo
             </NavLink>
           )}
 
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => void handleLogout()}
             className="btn btn-sm w-full border-[rgba(0,65,106,0.1)] bg-[rgba(191,212,230,0.32)] text-[var(--color-brand-700)] hover:border-[rgba(0,65,106,0.14)] hover:bg-[rgba(124,173,211,0.34)]"
           >
             <LogOut size={14} />
-            Cerrar sesion
+            Cerrar sesión
           </button>
         </div>
       </div>

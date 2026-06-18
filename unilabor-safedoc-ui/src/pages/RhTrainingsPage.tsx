@@ -25,6 +25,7 @@ import {
 } from '../api/service';
 import type { EvaluationTemplate, TrainingCourse } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+import { confirmAction } from '../utils/confirm';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
 import { EvaluationTemplateEditorModal } from '../components/rh/EvaluationTemplateEditorModal';
@@ -117,7 +118,7 @@ export const RhTrainingsPage = () => {
 
   const handleSaveCourse = async () => {
     if (!courseForm.title.trim()) {
-      notifyWarning('El titulo de la capacitacion es obligatorio.');
+      notifyWarning('El título de la capacitación es obligatorio.');
       return;
     }
     const payload: TrainingCoursePayload = {
@@ -129,56 +130,62 @@ export const RhTrainingsPage = () => {
     try {
       if (editingCourse) {
         await updateTrainingCourse(editingCourse.id, payload);
-        notifySuccess('Capacitacion actualizada correctamente.');
+        notifySuccess('Capacitación actualizada correctamente.');
       } else {
         await createTrainingCourse(payload);
-        notifySuccess('Capacitacion creada correctamente.');
+        notifySuccess('Capacitación creada correctamente.');
       }
       setIsCourseModalOpen(false);
       reload();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo guardar la capacitacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo guardar la capacitación.'));
     } finally {
       setSavingCourse(false);
     }
   };
 
   const handleDeleteCourse = async (course: TrainingCourse) => {
-    if (!window.confirm(`Inactivar la capacitacion "${course.title}"?`)) {
+    const confirmed = await confirmAction(
+      'Inactivar capacitación',
+      `Inactivar la capacitación "${course.title}"?`,
+      'Inactivar',
+    );
+    if (!confirmed) {
       return;
     }
     try {
       await deleteTrainingCourse(course.id);
-      notifySuccess('Capacitacion inactivada correctamente.');
+      notifySuccess('Capacitación inactivada correctamente.');
       reload();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo inactivar la capacitacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo inactivar la capacitación.'));
     }
   };
 
   const handleCreateTemplate = async (courseId: number) => {
     try {
-      const created = await createEvaluationTemplate(courseId, { title: 'Nueva evaluacion' });
-      notifySuccess('Evaluacion creada. Disenala a continuacion.');
+      const created = await createEvaluationTemplate(courseId, { title: 'Nueva evaluación' });
+      notifySuccess('Evaluación creada. Diséñala a continuación.');
       await loadTemplates(courseId);
       if (created) {
         setEditingTemplateId(created.id);
       }
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo crear la evaluacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo crear la evaluación.'));
     }
   };
 
   const handleDeleteTemplate = async (templateId: number, courseId: number) => {
-    if (!window.confirm('Inactivar esta evaluacion?')) {
+    const confirmed = await confirmAction('Inactivar evaluación', 'Inactivar esta evaluación?', 'Inactivar');
+    if (!confirmed) {
       return;
     }
     try {
       await deleteEvaluationTemplate(templateId);
-      notifySuccess('Evaluacion inactivada correctamente.');
+      notifySuccess('Evaluación inactivada correctamente.');
       await loadTemplates(courseId);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo inactivar la evaluacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo inactivar la evaluación.'));
     }
   };
 
@@ -187,13 +194,13 @@ export const RhTrainingsPage = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-            Capacitacion y competencia
+            Capacitación y competencia
           </p>
           <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-[var(--color-brand-700)]">
             <GraduationCap size={24} /> Capacitaciones
           </h1>
           <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-            Disena las capacitaciones, sus evaluaciones y el banco de preguntas (ISO 15189).
+            Diseña las capacitaciones, sus evaluaciones y el banco de preguntas (ISO 15189).
           </p>
         </div>
         <button
@@ -201,7 +208,7 @@ export const RhTrainingsPage = () => {
           onClick={openCreateCourse}
           className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
         >
-          <Plus size={16} /> Nueva capacitacion
+          <Plus size={16} /> Nueva capacitación
         </button>
       </div>
 
@@ -213,7 +220,7 @@ export const RhTrainingsPage = () => {
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por codigo, titulo o descripcion..."
+          placeholder="Buscar por código, título o descripción..."
           className={`${inputClass} pl-9`}
         />
       </div>
@@ -225,7 +232,7 @@ export const RhTrainingsPage = () => {
           </div>
         ) : courses.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[rgba(0,65,106,0.18)] bg-[rgba(248,251,253,0.7)] py-16 text-center text-sm text-[var(--unilabor-neutral)]">
-            Aun no hay capacitaciones. Crea la primera para empezar a disenar evaluaciones.
+            Aun no hay capacitaciones. Crea la primera para empezar a diseñar evaluaciones.
           </div>
         ) : (
           courses.map((course) => {
@@ -249,7 +256,7 @@ export const RhTrainingsPage = () => {
                         {course.certificate_validity_months === 0
                           ? 'sin vencimiento'
                           : `${course.certificate_validity_months} meses`}{' '}
-                        | {course.template_count ?? 0} evaluacion(es)
+                        | {course.template_count ?? 0} evaluación(es)
                       </p>
                     </div>
                   </button>
@@ -258,8 +265,8 @@ export const RhTrainingsPage = () => {
                       type="button"
                       onClick={() => setCertificateCourse(course)}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                      aria-label="Disenar constancia"
-                      title="Disenar constancia"
+                      aria-label="Diseñar constancia"
+                      title="Diseñar constancia"
                     >
                       <Award size={15} />
                     </button>
@@ -267,8 +274,8 @@ export const RhTrainingsPage = () => {
                       type="button"
                       onClick={() => openEditCourse(course)}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                      aria-label="Editar capacitacion"
-                      title="Editar capacitacion"
+                      aria-label="Editar capacitación"
+                      title="Editar capacitación"
                     >
                       <Pencil size={15} />
                     </button>
@@ -276,7 +283,7 @@ export const RhTrainingsPage = () => {
                       type="button"
                       onClick={() => void handleDeleteCourse(course)}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(220,38,38,0.2)] text-red-600 transition hover:bg-red-50"
-                      aria-label="Inactivar capacitacion"
+                      aria-label="Inactivar capacitación"
                     >
                       <Trash2 size={15} />
                     </button>
@@ -294,7 +301,7 @@ export const RhTrainingsPage = () => {
                         onClick={() => void handleCreateTemplate(course.id)}
                         className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
                       >
-                        <Plus size={13} /> Nueva evaluacion
+                        <Plus size={13} /> Nueva evaluación
                       </button>
                     </div>
                     {loadingTemplates ? (
@@ -303,7 +310,7 @@ export const RhTrainingsPage = () => {
                       </div>
                     ) : templates.length === 0 ? (
                       <p className="py-3 text-xs text-[var(--unilabor-neutral)]">
-                        Esta capacitacion aun no tiene evaluaciones.
+                        Esta capacitación aun no tiene evaluaciones.
                       </p>
                     ) : (
                       <ul className="space-y-2">
@@ -341,7 +348,7 @@ export const RhTrainingsPage = () => {
                                 type="button"
                                 onClick={() => setAssigningTemplate(template)}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                                aria-label="Asignar evaluacion"
+                                aria-label="Asignar evaluación"
                                 title="Asignar a colaboradores"
                               >
                                 <UserPlus size={14} />
@@ -350,8 +357,8 @@ export const RhTrainingsPage = () => {
                                 type="button"
                                 onClick={() => setEditingTemplateId(template.id)}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                                aria-label="Disenar evaluacion"
-                                title="Disenar evaluacion"
+                                aria-label="Diseñar evaluación"
+                                title="Diseñar evaluación"
                               >
                                 <Pencil size={14} />
                               </button>
@@ -359,7 +366,7 @@ export const RhTrainingsPage = () => {
                                 type="button"
                                 onClick={() => void handleDeleteTemplate(template.id, course.id)}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(220,38,38,0.2)] text-red-600 transition hover:bg-red-50"
-                                aria-label="Inactivar evaluacion"
+                                aria-label="Inactivar evaluación"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -385,16 +392,16 @@ export const RhTrainingsPage = () => {
         loading={loading}
       />
 
-      {/* Modal capacitacion */}
+      {/* Modal capacitación */}
       {isCourseModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/96 p-5 shadow-2xl shadow-[rgba(0,65,106,0.18)]">
             <h2 className="mb-4 text-lg font-bold text-[var(--color-brand-700)]">
-              {editingCourse ? 'Editar capacitacion' : 'Nueva capacitacion'}
+              {editingCourse ? 'Editar capacitación' : 'Nueva capacitación'}
             </h2>
             <div className="space-y-4">
               <div>
-                <label className={labelClass}>Titulo</label>
+                <label className={labelClass}>Título</label>
                 <input
                   value={courseForm.title}
                   onChange={(event) => setCourseForm((current) => ({ ...current, title: event.target.value }))}
@@ -403,7 +410,7 @@ export const RhTrainingsPage = () => {
                 />
               </div>
               <div>
-                <label className={labelClass}>Descripcion (opcional)</label>
+                <label className={labelClass}>Descripción (opcional)</label>
                 <textarea
                   value={courseForm.description}
                   onChange={(event) =>
@@ -445,14 +452,14 @@ export const RhTrainingsPage = () => {
                 className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
               >
                 {savingCourse ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                {editingCourse ? 'Guardar cambios' : 'Crear capacitacion'}
+                {editingCourse ? 'Guardar cambios' : 'Crear capacitación'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Editor de evaluacion + banco de preguntas */}
+      {/* Editor de evaluación + banco de preguntas */}
       {editingTemplateId !== null && (
         <EvaluationTemplateEditorModal
           templateId={editingTemplateId}

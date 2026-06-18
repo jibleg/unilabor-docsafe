@@ -4,6 +4,7 @@ import { Building2, ChevronDown, LogOut, UserCircle2 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useUserAvatar } from '../hooks/useUserAvatar';
 import { getModuleRole } from '../utils/modules';
+import { confirmAction } from '../utils/confirm';
 import type { ModuleCode } from '../types/models';
 
 const profilePath = (moduleCode: ModuleCode): string =>
@@ -49,9 +50,10 @@ export const UserMenu = ({ moduleCode }: { moduleCode: ModuleCode }) => {
     };
   }, [open]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setOpen(false);
-    if (window.confirm('¿Seguro que deseas cerrar sesión?')) {
+    const confirmed = await confirmAction('Cerrar sesión', '¿Seguro que deseas cerrar sesión?', 'Cerrar sesión');
+    if (confirmed) {
       logout();
     }
   };
@@ -112,7 +114,7 @@ export const UserMenu = ({ moduleCode }: { moduleCode: ModuleCode }) => {
               </NavLink>
             )}
 
-            <button type="button" onClick={handleLogout} className={`${itemClass} text-red-600 hover:text-red-700`}>
+            <button type="button" onClick={() => void handleLogout()} className={`${itemClass} text-red-600 hover:text-red-700`}>
               <LogOut size={16} /> Cerrar sesión
             </button>
           </div>
