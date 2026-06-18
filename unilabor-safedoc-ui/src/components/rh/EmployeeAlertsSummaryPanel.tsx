@@ -117,8 +117,8 @@ export const EmployeeAlertsSummaryPanel = ({
                     <p>Vence: {formatDisplayDate(alert.expiry_date)}</p>
                     <p>
                       {alert.state === 'expiring'
-                        ? `Dias restantes: ${alert.days_remaining ?? 0}`
-                        : `Dias vencido: ${Math.abs(alert.days_remaining ?? 0)}`}
+                        ? `Días restantes: ${alert.days_remaining ?? 0}`
+                        : `Días vencido: ${Math.abs(alert.days_remaining ?? 0)}`}
                     </p>
                   </>
                 )}

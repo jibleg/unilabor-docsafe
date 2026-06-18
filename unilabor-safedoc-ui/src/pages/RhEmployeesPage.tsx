@@ -221,7 +221,7 @@ export const RhEmployeesPage = () => {
       setSelectedSectionIds(response.access.enabled_section_ids);
       setSelectedDocumentTypeIds(response.access.enabled_document_type_ids);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo cargar la configuracion documental.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar la configuración documental.'));
       setAccessEmployee(null);
     } finally {
       setLoadingAccess(false);
@@ -314,19 +314,19 @@ export const RhEmployeesPage = () => {
       });
 
       if (!response) {
-        throw new Error('No se pudo interpretar la configuracion guardada.');
+        throw new Error('No se pudo interpretar la configuración guardada.');
       }
 
       setDocumentAccess(response.access);
       setSelectedSectionIds(response.access.enabled_section_ids);
       setSelectedDocumentTypeIds(response.access.enabled_document_type_ids);
-      notifySuccess('Configuracion documental actualizada correctamente.');
+      notifySuccess('Configuración documental actualizada correctamente.');
       setAccessEmployee(null);
       setDocumentAccess(null);
       setSelectedSectionIds([]);
       setSelectedDocumentTypeIds([]);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo guardar la configuracion documental.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo guardar la configuración documental.'));
     } finally {
       setSavingAccess(false);
     }
@@ -398,7 +398,7 @@ export const RhEmployeesPage = () => {
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Colaboradores</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--unilabor-neutral)]">
-            Crea, vincula y administra la base de colaboradores que despues alimentara el expediente digital.
+            Crea, vincula y administra la base de colaboradores que después alimentará el expediente digital.
           </p>
         </div>
 
@@ -431,7 +431,7 @@ export const RhEmployeesPage = () => {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por codigo, nombre, correo, area o puesto..."
+              placeholder="Buscar por código, nombre, correo, área o puesto..."
               className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
             />
           </div>
@@ -440,9 +440,9 @@ export const RhEmployeesPage = () => {
             <table className="w-full text-left">
               <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
                 <tr>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Codigo</th>
+                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Código</th>
                   <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Colaborador</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Area / Puesto</th>
+                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Área / Puesto</th>
                   <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acciones</th>
                 </tr>
               </thead>
@@ -468,7 +468,7 @@ export const RhEmployeesPage = () => {
                         <p className="text-xs text-[var(--unilabor-neutral)]">{employee.email}</p>
                       </td>
                       <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">
-                        <p>{employee.area || 'Sin area'}</p>
+                        <p>{employee.area || 'Sin área'}</p>
                         <p className="text-xs text-[var(--unilabor-neutral)]">{employee.position || 'Sin puesto'}</p>
                       </td>
                       <td className="px-5 py-4">
@@ -547,7 +547,7 @@ export const RhEmployeesPage = () => {
           ) : detailEmployee ? (
             <div className="mt-6 space-y-4">
               <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Codigo</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Código</p>
                 <p className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{detailEmployee.employee_code}</p>
               </div>
 
@@ -561,8 +561,8 @@ export const RhEmployeesPage = () => {
                   <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.email}</p>
                 </div>
                 <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Area</p>
-                  <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.area || 'Sin area'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Área</p>
+                  <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.area || 'Sin área'}</p>
                 </div>
                 <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Puesto</p>
@@ -590,7 +590,7 @@ export const RhEmployeesPage = () => {
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">Aun no tiene usuario del sistema asociado.</p>
+                  <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">Aún no tiene usuario del sistema asociado.</p>
                 )}
               </div>
 
@@ -605,7 +605,7 @@ export const RhEmployeesPage = () => {
             </div>
           ) : (
             <div className="mt-6 rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-white/80 p-6 text-sm text-[var(--unilabor-neutral)]">
-              Selecciona un colaborador para revisar su informacion base y el usuario vinculado.
+              Selecciona un colaborador para revisar su información base y el usuario vinculado.
             </div>
           )}
         </div>
@@ -629,7 +629,7 @@ export const RhEmployeesPage = () => {
                   <input
                     value={form.employee_code}
                     onChange={(event) => setForm((current) => ({ ...current, employee_code: event.target.value }))}
-                    placeholder="Automatico si lo dejas vacio"
+                    placeholder="Automático si lo dejas vacío"
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                   />
                 </div>
@@ -653,7 +653,7 @@ export const RhEmployeesPage = () => {
                     <p className="text-[11px] text-[var(--unilabor-neutral)]">
                       {form.user_id
                         ? 'Usuario vinculado seleccionado.'
-                        : 'Puedes dejarlo vacio si el colaborador aun no tiene cuenta.'}
+                        : 'Puedes dejarlo vacío si el colaborador aún no tiene cuenta.'}
                     </p>
                     {form.user_id ? (
                       <button
@@ -695,7 +695,7 @@ export const RhEmployeesPage = () => {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Telefono / celular
+                    Teléfono / celular
                   </label>
                   <input
                     type="tel"
@@ -705,12 +705,12 @@ export const RhEmployeesPage = () => {
                     placeholder="+5215512345678"
                   />
                   <p className="mt-1 text-[10px] text-[var(--unilabor-neutral)]">
-                    Formato internacional (E.164). Se usara para avisar por SMS las evaluaciones de capacitacion.
+                    Formato internacional (E.164). Se usará para avisar por SMS las evaluaciones de capacitación.
                   </p>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Area
+                    Área
                   </label>
                   <input
                     value={form.area}
@@ -733,7 +733,7 @@ export const RhEmployeesPage = () => {
               </div>
 
               <div className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2 text-xs text-[var(--color-brand-700)]">
-                Esta ficha servira como base del expediente digital y del futuro portal del colaborador.
+                Esta ficha servirá como base del expediente digital y del futuro portal del colaborador.
               </div>
 
               <div className="flex justify-end gap-2">
@@ -785,7 +785,7 @@ export const RhEmployeesPage = () => {
                   {accessEmployee.full_name}
                 </h2>
                 <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
-                  {accessEmployee.employee_code} | {accessEmployee.area || 'Sin area'} | {accessEmployee.position || 'Sin puesto'}
+                  {accessEmployee.employee_code} | {accessEmployee.area || 'Sin área'} | {accessEmployee.position || 'Sin puesto'}
                 </p>
               </div>
 
@@ -800,11 +800,11 @@ export const RhEmployeesPage = () => {
                 </div>
                 <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
                   <p className="font-bold text-[var(--color-brand-700)]">{accessSummary.totalSections}</p>
-                  <p className="text-[var(--unilabor-neutral)]">Catalogo sec.</p>
+                  <p className="text-[var(--unilabor-neutral)]">Catálogo sec.</p>
                 </div>
                 <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
                   <p className="font-bold text-[var(--color-brand-700)]">{accessSummary.totalTypes}</p>
-                  <p className="text-[var(--unilabor-neutral)]">Catalogo doc.</p>
+                  <p className="text-[var(--unilabor-neutral)]">Catálogo doc.</p>
                 </div>
               </div>
             </div>
@@ -840,7 +840,7 @@ export const RhEmployeesPage = () => {
               {loadingAccess ? (
                 <div className="flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.95)] p-5 text-sm text-[var(--unilabor-neutral)]">
                   <Loader2 size={16} className="animate-spin" />
-                  Cargando configuracion documental...
+                  Cargando configuración documental...
                 </div>
               ) : documentAccess ? (
                 <div className="space-y-4">
@@ -870,7 +870,7 @@ export const RhEmployeesPage = () => {
                                 {sectionEntry.section.name}
                               </span>
                               <span className="mt-1 block text-xs leading-5 text-[var(--unilabor-neutral)]">
-                                {sectionEntry.section.description || 'Seccion documental RH'}
+                                {sectionEntry.section.description || 'Sección documental RH'}
                               </span>
                             </span>
                           </label>
@@ -932,7 +932,7 @@ export const RhEmployeesPage = () => {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-white/80 p-6 text-sm text-[var(--unilabor-neutral)]">
-                  No se encontro configuracion documental para este colaborador.
+                  No se encontró configuración documental para este colaborador.
                 </div>
               )}
             </div>
@@ -960,7 +960,7 @@ export const RhEmployeesPage = () => {
                 ) : (
                   <>
                     <FileCog size={14} />
-                    Guardar configuracion
+                    Guardar configuración
                   </>
                 )}
               </button>

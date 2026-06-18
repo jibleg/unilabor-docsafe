@@ -59,7 +59,7 @@ export const UploadDocumentModal = ({
       .then(setCategories)
       .catch((requestError) => {
         setCategories([]);
-        setError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorias'));
+        setError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorías'));
       })
       .finally(() => {
         setLoadingCategories(false);
@@ -70,7 +70,7 @@ export const UploadDocumentModal = ({
     event.preventDefault();
 
     if (!formData.file || !formData.category_id) {
-      setError('Archivo y categoria son obligatorios');
+      setError('Archivo y categoría son obligatorios');
       return;
     }
 
@@ -137,7 +137,7 @@ export const UploadDocumentModal = ({
       onClose={onClose}
       onSubmit={handleSubmit}
       fileSectionTitle="Documento a publicar"
-      fileSectionDescription="Adjunta el PDF oficial que se registrara con esta version del documento."
+      fileSectionDescription="Adjunta el PDF oficial que se registrará con esta versión del documento."
       emptyFileStateLabel="Pendiente de adjuntar PDF"
       fileInputPlaceholder="Haz clic para seleccionar el PDF"
       fileHint="Arrastre y suelte el documento PDF o haz clic para seleccionarlo. Obligatorio. Solo PDF."

@@ -48,7 +48,7 @@ export const TicketFormModal = ({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label className="block md:col-span-2">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                Titulo
+                Título
               </span>
               <input
                 value={form.title}
@@ -141,7 +141,7 @@ export const TicketFormModal = ({
 
             <label className="block md:col-span-2">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                Descripcion
+                Descripción
               </span>
               <textarea
                 value={form.description}

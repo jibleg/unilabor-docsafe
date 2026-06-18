@@ -53,10 +53,10 @@ const getRoleLabel = (role?: string | null): string => {
 
 const getPasswordStrengthLabel = (score: number): string => {
   if (score <= 1) {
-    return 'Muy debil';
+    return 'Muy débil';
   }
   if (score === 2) {
-    return 'Debil';
+    return 'Débil';
   }
   if (score === 3) {
     return 'Aceptable';
@@ -218,12 +218,12 @@ export const ProfilePage = () => {
   const passwordRules = useMemo<PasswordRule[]>(() => {
     const emailLocalPart = displayEmail.split('@')[0]?.toLowerCase() ?? '';
     return [
-      { label: 'Minimo 12 caracteres', valid: newPassword.length >= 12 },
-      { label: 'Al menos una mayuscula', valid: /[A-Z]/.test(newPassword) },
-      { label: 'Al menos una minuscula', valid: /[a-z]/.test(newPassword) },
-      { label: 'Al menos un numero', valid: /\d/.test(newPassword) },
+      { label: 'Mínimo 12 caracteres', valid: newPassword.length >= 12 },
+      { label: 'Al menos una mayúscula', valid: /[A-Z]/.test(newPassword) },
+      { label: 'Al menos una minúscula', valid: /[a-z]/.test(newPassword) },
+      { label: 'Al menos un número', valid: /\d/.test(newPassword) },
       {
-        label: 'Al menos un simbolo (@$!%*?&._-)',
+        label: 'Al menos un símbolo (@$!%*?&._-)',
         valid: /[^A-Za-z0-9]/.test(newPassword),
       },
       { label: 'Sin espacios en blanco', valid: !/\s/.test(newPassword) },
@@ -255,7 +255,7 @@ export const ProfilePage = () => {
     }
 
     if ('size' in blob && blob.size > 5 * 1024 * 1024) {
-      notifyWarning('La imagen no debe superar 5MB');
+      notifyWarning('La imagen no debe superar 5 MB');
       return;
     }
 
@@ -291,7 +291,7 @@ export const ProfilePage = () => {
 
   const openCameraModal = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      notifyWarning('La camara en vivo no esta disponible en este navegador');
+      notifyWarning('La cámara en vivo no está disponible en este navegador');
       return;
     }
 
@@ -309,7 +309,7 @@ export const ProfilePage = () => {
       streamRef.current = stream;
       setIsCameraModalOpen(true);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo abrir la camara'));
+      notifyError(getApiErrorMessage(error, 'No se pudo abrir la cámara'));
     } finally {
       setCameraLoading(false);
     }
@@ -324,7 +324,7 @@ export const ProfilePage = () => {
   const captureCameraPhoto = async () => {
     const videoElement = videoRef.current;
     if (!videoElement || videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
-      notifyWarning('La camara aun no esta lista');
+      notifyWarning('La cámara aún no está lista');
       return;
     }
 
@@ -394,12 +394,12 @@ export const ProfilePage = () => {
     event.preventDefault();
 
     if (!allRulesValid) {
-      notifyWarning('La nueva contrasena no cumple con la politica de seguridad');
+      notifyWarning('La nueva contraseña no cumple con la política de seguridad');
       return;
     }
 
     if (!passwordsMatch) {
-      notifyWarning('La confirmacion de contrasena no coincide');
+      notifyWarning('La confirmación de contraseña no coincide');
       return;
     }
 
@@ -410,9 +410,9 @@ export const ProfilePage = () => {
       setConfirmPassword('');
       setShowNewPassword(false);
       setShowConfirmPassword(false);
-      notifySuccess('Contrasena actualizada correctamente');
+      notifySuccess('Contraseña actualizada correctamente');
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo actualizar la contrasena'));
+      notifyError(getApiErrorMessage(error, 'No se pudo actualizar la contraseña'));
     } finally {
       setSubmitting(false);
     }
@@ -500,7 +500,7 @@ export const ProfilePage = () => {
                   className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/92 px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {cameraLoading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
-                  Camara en vivo
+                  Cámara en vivo
                 </button>
                 <button
                   type="button"
@@ -522,7 +522,7 @@ export const ProfilePage = () => {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <section className="rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-6 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl xl:col-span-1">
             <h2 className="text-base font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
-              Informacion de cuenta
+              Información de cuenta
             </h2>
             <div className="mt-5 space-y-4">
               <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.92)] p-4">
@@ -546,10 +546,10 @@ export const ProfilePage = () => {
               <div className="rounded-2xl border border-[rgba(124,173,211,0.2)] bg-[rgba(191,212,230,0.24)] p-4">
                 <p className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-brand-700)]">
                   <AlertTriangle size={14} />
-                  Recomendacion de seguridad
+                  Recomendación de seguridad
                 </p>
                 <p className="mt-2 text-xs leading-5 text-[var(--unilabor-ink)]">
-                  Actualiza tu contrasena periodicamente y evita reutilizar claves de otros sistemas.
+                  Actualiza tu contraseña periódicamente y evita reutilizar claves de otros sistemas.
                 </p>
               </div>
             </div>
@@ -558,17 +558,17 @@ export const ProfilePage = () => {
           <section className="rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-6 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl xl:col-span-2">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-base font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
-                Seguridad y contrasena
+                Seguridad y contraseña
               </h2>
               <span className="text-xs text-[var(--unilabor-neutral)]">
-                La clave debe cumplir politica corporativa de complejidad
+                La clave debe cumplir política corporativa de complejidad
               </span>
             </div>
 
             <form onSubmit={handleChangePassword} className="mt-6 space-y-5">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">Nueva contrasena</label>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">Nueva contraseña</label>
                   <div className="relative">
                     <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" size={16} />
                     <input
@@ -583,7 +583,7 @@ export const ProfilePage = () => {
                       type="button"
                       onClick={() => setShowNewPassword((value) => !value)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)] transition hover:text-[var(--color-brand-700)]"
-                      aria-label={showNewPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+                      aria-label={showNewPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                     >
                       {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -591,7 +591,7 @@ export const ProfilePage = () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">Confirmar contrasena</label>
+                  <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">Confirmar contraseña</label>
                   <div className="relative">
                     <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" size={16} />
                     <input
@@ -599,14 +599,14 @@ export const ProfilePage = () => {
                       autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
-                      placeholder="Repite la nueva contrasena"
+                      placeholder="Repite la nueva contraseña"
                       className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] py-2.5 pl-10 pr-11 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword((value) => !value)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)] transition hover:text-[var(--color-brand-700)]"
-                      aria-label={showConfirmPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}
+                      aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                     >
                       {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -617,7 +617,7 @@ export const ProfilePage = () => {
               <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Fortaleza de contrasena
+                    Fortaleza de contraseña
                   </p>
                   <p className="text-xs font-bold text-[var(--color-brand-700)]">
                     {getPasswordStrengthLabel(passwordScore)}
@@ -647,7 +647,7 @@ export const ProfilePage = () => {
                     }`}
                   >
                     <CheckCircle2 size={14} />
-                    Confirmacion coincide
+                    Confirmación coincide
                   </p>
                 </div>
               </div>
@@ -664,7 +664,7 @@ export const ProfilePage = () => {
                       Actualizando...
                     </>
                   ) : (
-                    'Actualizar contrasena'
+                    'Actualizar contraseña'
                   )}
                 </button>
               </div>
@@ -685,7 +685,7 @@ export const ProfilePage = () => {
                 type="button"
                 onClick={closeCameraModal}
                 className="rounded-lg p-2 text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)] hover:text-[var(--color-brand-700)]"
-                aria-label="Cerrar camara"
+                aria-label="Cerrar cámara"
               >
                 <X size={16} />
               </button>

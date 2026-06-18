@@ -93,7 +93,7 @@ export const EditDocumentModal = ({
       })
       .catch((requestError) => {
         setCategories([]);
-        setError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorias'));
+        setError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorías'));
       })
       .finally(() => {
         setLoadingCategories(false);
@@ -123,7 +123,7 @@ export const EditDocumentModal = ({
     }
 
     if (formData.file && !canReplaceDocument) {
-      setError('Solo los documentos vigentes pueden reemplazarse por una nueva version.');
+      setError('Solo los documentos vigentes pueden reemplazarse por una nueva versión.');
       return;
     }
 
@@ -152,8 +152,8 @@ export const EditDocumentModal = ({
       title={canReplaceDocument ? 'Editar documento vigente' : 'Editar documento'}
       subtitle={
         canReplaceDocument
-          ? 'Actualiza propiedades del documento y, si corresponde, reemplaza el PDF vigente con una nueva version.'
-          : 'Actualiza las propiedades del documento. El reemplazo del archivo solo esta disponible cuando el documento esta vigente.'
+          ? 'Actualiza propiedades del documento y, si corresponde, reemplaza el PDF vigente con una nueva versión.'
+          : 'Actualiza las propiedades del documento. El reemplazo del archivo solo está disponible cuando el documento está vigente.'
       }
       error={error}
       categories={categories}
@@ -173,15 +173,15 @@ export const EditDocumentModal = ({
       fileSectionTitle="Documento vinculado"
       fileSectionDescription={
         canReplaceDocument
-          ? 'Si adjuntas un nuevo PDF, el sistema publicara la nueva version y mantendra la anterior en historial.'
-          : 'Este documento no esta vigente. Puedes editar sus propiedades, pero no reemplazar el archivo desde este flujo.'
+          ? 'Si adjuntas un nuevo PDF, el sistema publicará la nueva versión y mantendrá la anterior en historial.'
+          : 'Este documento no está vigente. Puedes editar sus propiedades, pero no reemplazar el archivo desde este flujo.'
       }
       existingFileName={document.filename}
       fileInputPlaceholder="Haz clic para seleccionar el nuevo PDF"
       fileHint={
         canReplaceDocument
           ? 'Arrastre y suelte el documento PDF o haz clic para seleccionarlo. Opcional. Solo PDF.'
-          : 'Reactiva el documento desde la pagina principal si necesitas devolverlo a estado vigente antes de reemplazarlo.'
+          : 'Reactiva el documento desde la página principal si necesitas devolverlo a estado vigente antes de reemplazarlo.'
       }
       allowFileSelection={canReplaceDocument}
       allowRemoveSelectedFile={canReplaceDocument}

@@ -201,7 +201,7 @@ export const HelpdeskAssetsPage = () => {
     {
       pageSize: 20,
       onError: (error) =>
-        notifyError(getApiErrorMessage(error, 'No se pudo cargar el inventario tecnico.')),
+        notifyError(getApiErrorMessage(error, 'No se pudo cargar el inventario técnico.')),
     },
   );
   const [catalogs, setCatalogs] = useState<HelpdeskCatalogs>(EMPTY_CATALOGS);
@@ -223,7 +223,7 @@ export const HelpdeskAssetsPage = () => {
       setCatalogs(catalogData);
       setEmployees(employeeData);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catalogos del inventario.'));
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catálogos del inventario.'));
     }
   }, []);
 
@@ -270,7 +270,7 @@ export const HelpdeskAssetsPage = () => {
 
   const validateForm = () => {
     if (!form.asset_code.trim()) {
-      notifyWarning('El codigo interno del activo es obligatorio.');
+      notifyWarning('El código interno del activo es obligatorio.');
       return false;
     }
 
@@ -340,11 +340,11 @@ export const HelpdeskAssetsPage = () => {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-brand-500)]">
-            Gestion tecnica
+            Gestión técnica
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Inventario de activos</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--unilabor-neutral)]">
-            Controla equipos, instrumentos, computadoras y bienes del laboratorio con identificacion unica, estado operativo, ubicacion y responsable.
+            Controla equipos, instrumentos, computadoras y bienes del laboratorio con identificación única, estado operativo, ubicación y responsable.
           </p>
         </div>
 
@@ -374,7 +374,7 @@ export const HelpdeskAssetsPage = () => {
         {[
           { label: 'Activos', value: summary.total },
           { label: 'Asignados', value: summary.assigned },
-          { label: 'Criticos', value: summary.critical },
+          { label: 'Críticos', value: summary.critical },
           { label: 'Fuera de servicio', value: summary.outOfService },
         ].map((item) => (
           <div key={item.label} className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)]">
@@ -391,7 +391,7 @@ export const HelpdeskAssetsPage = () => {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por codigo, nombre, marca, modelo, serie, categoria o responsable..."
+              placeholder="Buscar por código, nombre, marca, modelo, serie, categoría o responsable..."
               className="w-full bg-transparent text-sm text-[var(--unilabor-ink)] outline-none"
             />
           </div>
@@ -401,8 +401,8 @@ export const HelpdeskAssetsPage = () => {
               <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
                 <tr>
                   <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Activo</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Clasificacion</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Asignacion</th>
+                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Clasificación</th>
+                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Asignación</th>
                   <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acciones</th>
                 </tr>
               </thead>
@@ -503,7 +503,7 @@ export const HelpdeskAssetsPage = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-500)]">
-                    Ficha tecnica
+                    Ficha técnica
                   </p>
                   <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{selectedAsset.name}</h2>
                   <p className="text-xs text-[var(--unilabor-neutral)]">{selectedAsset.asset_code}</p>
@@ -512,16 +512,16 @@ export const HelpdeskAssetsPage = () => {
 
               <div className="grid gap-3 text-sm">
                 {[
-                  ['Categoria', catalogName(selectedAsset.category)],
+                  ['Categoría', catalogName(selectedAsset.category)],
                   ['Estado operativo', catalogName(selectedAsset.operational_status)],
                   ['Criticidad', catalogName(selectedAsset.criticality)],
                   ['Unidad', catalogName(selectedAsset.unit)],
-                  ['Area', catalogName(selectedAsset.area)],
-                  ['Ubicacion', catalogName(selectedAsset.location)],
+                  ['Área', catalogName(selectedAsset.area)],
+                  ['Ubicación', catalogName(selectedAsset.location)],
                   ['Marca', selectedAsset.brand?.name ?? selectedAsset.brand_name ?? 'Sin marca'],
                   ['Modelo', selectedAsset.model ?? 'Sin modelo'],
                   ['Serie', selectedAsset.serial_number ?? 'Sin serie'],
-                  ['Asignado a', selectedAsset.assigned_employee?.full_name ?? 'Sin asignacion'],
+                  ['Asignado a', selectedAsset.assigned_employee?.full_name ?? 'Sin asignación'],
                   ['Responsable', selectedAsset.responsible_employee?.full_name ?? 'Sin responsable'],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
@@ -533,7 +533,7 @@ export const HelpdeskAssetsPage = () => {
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-[rgba(248,251,253,0.8)] p-6 text-sm leading-6 text-[var(--unilabor-neutral)]">
-              Selecciona un activo para revisar su ficha tecnica, asignacion, estado operativo e informacion de trazabilidad.
+              Selecciona un activo para revisar su ficha técnica, asignación, estado operativo e información de trazabilidad.
             </div>
           )}
         </aside>
@@ -544,7 +544,7 @@ export const HelpdeskAssetsPage = () => {
           <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/96 shadow-2xl shadow-[rgba(0,65,106,0.18)]">
             <div className="border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-                Inventario tecnico
+                Inventario técnico
               </p>
               <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">
                 {editingAsset ? 'Editar activo' : 'Nuevo activo'}
@@ -555,7 +555,7 @@ export const HelpdeskAssetsPage = () => {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Codigo interno
+                    Código interno
                   </span>
                   <input
                     value={form.asset_code}
@@ -575,12 +575,12 @@ export const HelpdeskAssetsPage = () => {
                   />
                 </label>
 
-                <CatalogSelect label="Categoria" value={form.category_id} options={catalogs.categories} onChange={(value) => setField('category_id', value)} />
+                <CatalogSelect label="Categoría" value={form.category_id} options={catalogs.categories} onChange={(value) => setField('category_id', value)} />
                 <CatalogSelect label="Estado operativo" value={form.operational_status_id} options={catalogs.operational_statuses} onChange={(value) => setField('operational_status_id', value)} />
                 <CatalogSelect label="Criticidad" value={form.criticality_id} options={catalogs.criticalities} onChange={(value) => setField('criticality_id', value)} />
                 <CatalogSelect label="Unidad" value={form.unit_id} options={catalogs.units} onChange={(value) => setField('unit_id', value)} />
-                <CatalogSelect label="Area" value={form.area_id} options={catalogs.areas} onChange={(value) => setField('area_id', value)} />
-                <CatalogSelect label="Ubicacion" value={form.location_id} options={catalogs.locations} onChange={(value) => setField('location_id', value)} />
+                <CatalogSelect label="Área" value={form.area_id} options={catalogs.areas} onChange={(value) => setField('area_id', value)} />
+                <CatalogSelect label="Ubicación" value={form.location_id} options={catalogs.locations} onChange={(value) => setField('location_id', value)} />
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
@@ -612,7 +612,7 @@ export const HelpdeskAssetsPage = () => {
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Numero de serie
+                    Número de serie
                   </span>
                   <input
                     value={form.serial_number}
@@ -641,7 +641,7 @@ export const HelpdeskAssetsPage = () => {
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Responsable tecnico
+                    Responsable técnico
                   </span>
                   <select
                     value={form.responsible_employee_id}
@@ -658,11 +658,11 @@ export const HelpdeskAssetsPage = () => {
                 </label>
 
                 <CatalogSelect label="Modalidad de compra" value={form.purchase_modality_id} options={catalogs.purchase_modalities} onChange={(value) => setField('purchase_modality_id', value)} />
-                <CatalogSelect label="Condicion de compra" value={form.purchase_condition_id} options={catalogs.purchase_conditions} onChange={(value) => setField('purchase_condition_id', value)} />
+                <CatalogSelect label="Condición de compra" value={form.purchase_condition_id} options={catalogs.purchase_conditions} onChange={(value) => setField('purchase_condition_id', value)} />
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Fecha de adquisicion
+                    Fecha de adquisición
                   </span>
                   <input
                     type="date"
@@ -674,7 +674,7 @@ export const HelpdeskAssetsPage = () => {
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Garantia hasta
+                    Garantía hasta
                   </span>
                   <input
                     type="date"
@@ -686,7 +686,7 @@ export const HelpdeskAssetsPage = () => {
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Codigo inventario previo
+                    Código inventario previo
                   </span>
                   <input
                     value={form.inventory_legacy_code}
@@ -708,7 +708,7 @@ export const HelpdeskAssetsPage = () => {
 
                 <label className="block md:col-span-2">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Descripcion
+                    Descripción
                   </span>
                   <textarea
                     value={form.description}
@@ -720,7 +720,7 @@ export const HelpdeskAssetsPage = () => {
 
                 <label className="block md:col-span-2">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Informacion complementaria y observaciones
+                    Información complementaria y observaciones
                   </span>
                   <textarea
                     value={form.complementary_info}

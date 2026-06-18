@@ -40,28 +40,28 @@ export const ChangePasswordPage = () => {
     setSuccessMessage('');
 
     if (newPassword.length < 8) {
-      setError('La nueva contrasena debe tener al menos 8 caracteres');
+      setError('La nueva contraseña debe tener al menos 8 caracteres');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Las contrasenas no coinciden');
+      setError('Las contraseñas no coinciden');
       return;
     }
 
     setLoading(true);
     try {
       await changePassword(newPassword);
-      setSuccessMessage('Contrasena actualizada. Redirigiendo al inicio de sesion...');
+      setSuccessMessage('Contraseña actualizada. Redirigiendo al inicio de sesión...');
       logout();
       navigate('/login', {
         replace: true,
         state: {
-          message: 'Contrasena actualizada correctamente. Inicia sesion con tu nueva clave.',
+          message: 'Contraseña actualizada correctamente. Inicia sesión con tu nueva clave.',
         },
       });
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'No se pudo actualizar la contrasena'));
+      setError(getApiErrorMessage(err, 'No se pudo actualizar la contraseña'));
     } finally {
       setLoading(false);
     }
@@ -74,9 +74,9 @@ export const ChangePasswordPage = () => {
           <ShieldCheck size={14} /> Cambio obligatorio
         </div>
 
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-[var(--color-brand-700)]">Actualiza tu contrasena</h1>
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-[var(--color-brand-700)]">Actualiza tu contraseña</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--unilabor-neutral)]">
-          Tu cuenta usa una contrasena temporal. Debes crear una nueva para continuar.
+          Tu cuenta usa una contraseña temporal. Debes crear una nueva para continuar.
         </p>
 
         <form
@@ -99,7 +99,7 @@ export const ChangePasswordPage = () => {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">
-              Nueva contrasena <span className="text-rose-300">*</span>
+              Nueva contraseña <span className="text-rose-300">*</span>
             </label>
             <div className="relative">
               <Lock
@@ -115,7 +115,7 @@ export const ChangePasswordPage = () => {
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
                 placeholder="NuevaClaveSegura123*"
-                data-value-missing="Ingresa tu nueva contrasena."
+                data-value-missing="Ingresa tu nueva contraseña."
                 {...validation.getFieldProps('newPassword')}
                 className={`w-full rounded-2xl border pl-11 pr-4 py-3.5 text-sm outline-none transition ${
                   newPasswordError
@@ -129,7 +129,7 @@ export const ChangePasswordPage = () => {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-[var(--color-brand-700)]">
-              Confirmar contrasena <span className="text-rose-300">*</span>
+              Confirmar contraseña <span className="text-rose-300">*</span>
             </label>
             <div className="relative">
               <Lock
@@ -144,8 +144,8 @@ export const ChangePasswordPage = () => {
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
-                placeholder="Repite la nueva contrasena"
-                data-value-missing="Confirma tu nueva contrasena."
+                placeholder="Repite la nueva contraseña"
+                data-value-missing="Confirma tu nueva contraseña."
                 {...validation.getFieldProps('confirmPassword')}
                 className={`w-full rounded-2xl border pl-11 pr-4 py-3.5 text-sm outline-none transition ${
                   confirmPasswordError
@@ -167,7 +167,7 @@ export const ChangePasswordPage = () => {
                 <Loader2 size={18} className="animate-spin" /> Actualizando...
               </span>
             ) : (
-              'Guardar nueva contrasena'
+              'Guardar nueva contraseña'
             )}
           </button>
         </form>

@@ -27,7 +27,7 @@ export const ModuleGuard = ({ moduleCode, children }: ModuleGuardProps) => {
         <Navigate
           to="/login"
           replace
-          state={{ message: 'Tu cuenta no tiene modulos habilitados.' }}
+          state={{ message: 'Tu cuenta no tiene módulos habilitados.' }}
         />
       );
     }

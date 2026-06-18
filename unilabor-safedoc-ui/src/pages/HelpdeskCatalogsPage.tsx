@@ -91,20 +91,20 @@ const EMPTY_FORM: CatalogFormState = {
 };
 
 const tabOptions: Array<{ id: CatalogTab; label: string; helper: string }> = [
-  { id: 'assets', label: 'Activos', helper: 'Base maestra de inventario tecnico' },
+  { id: 'assets', label: 'Activos', helper: 'Base maestra de inventario técnico' },
   { id: 'tickets', label: 'Tickets', helper: 'Clasificaciones operativas de solicitudes' },
   { id: 'maintenance', label: 'Mantenimiento', helper: 'Frecuencias y soporte preventivo' },
 ];
 
 const catalogGroups: CatalogGroupConfig[] = [
-  { key: 'categories', tab: 'assets', title: 'Categorias', helper: 'Clasifica familias tecnicas de equipos.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
-  { key: 'units', tab: 'assets', title: 'Unidades', helper: 'Define unidades o areas institucionales.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
-  { key: 'areas', tab: 'assets', title: 'Areas', helper: 'Relaciona responsables operativos del inventario.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
-  { key: 'locations', tab: 'assets', title: 'Ubicaciones', helper: 'Identifica donde se encuentra cada activo.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
+  { key: 'categories', tab: 'assets', title: 'Categorías', helper: 'Clasifica familias técnicas de equipos.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
+  { key: 'units', tab: 'assets', title: 'Unidades', helper: 'Define unidades o áreas institucionales.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
+  { key: 'areas', tab: 'assets', title: 'Áreas', helper: 'Relaciona responsables operativos del inventario.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
+  { key: 'locations', tab: 'assets', title: 'Ubicaciones', helper: 'Identifica dónde se encuentra cada activo.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'brands', tab: 'assets', title: 'Marcas', helper: 'Normaliza fabricantes y proveedores de equipo.' },
-  { key: 'purchase_modalities', tab: 'assets', title: 'Modalidades de compra', helper: 'Describe el origen o esquema de adquisicion.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
+  { key: 'purchase_modalities', tab: 'assets', title: 'Modalidades de compra', helper: 'Describe el origen o esquema de adquisición.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'purchase_conditions', tab: 'assets', title: 'Condiciones de compra', helper: 'Distingue estatus comerciales o contractuales.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
-  { key: 'criticalities', tab: 'assets', title: 'Criticidades', helper: 'Mide impacto tecnico y operativo del activo.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
+  { key: 'criticalities', tab: 'assets', title: 'Criticidades', helper: 'Mide impacto técnico y operativo del activo.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'operational_statuses', tab: 'assets', title: 'Estados operativos', helper: 'Controla disponibilidad y uso institucional del equipo.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'request_types', tab: 'tickets', title: 'Tipos de solicitud', helper: 'Clasifica el motivo de cada ticket.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'ticket_statuses', tab: 'tickets', title: 'Estados de ticket', helper: 'Modela el flujo operativo de soporte.', supportsCode: true, supportsDescription: true, supportsSortOrder: true, supportsIsClosed: true },
@@ -163,7 +163,7 @@ const getSecondaryLine = (item: HelpdeskCatalogAdminItem, group: CatalogGroupCon
     return item.is_closed ? 'Cierra la solicitud' : 'Mantiene la solicitud abierta';
   }
 
-  return item.description?.trim() ? item.description : 'Sin descripcion operativa registrada.';
+  return item.description?.trim() ? item.description : 'Sin descripción operativa registrada.';
 };
 
 const getCatalogIdentifier = (item: HelpdeskCatalogAdminItem, group: CatalogGroupConfig): string | null => {
@@ -220,7 +220,7 @@ const ModalShell = ({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-            Catalogos Helpdesk
+            Catálogos Helpdesk
           </p>
           <h2 className="mt-2 text-2xl font-bold text-[var(--color-brand-700)]">{title}</h2>
         </div>
@@ -259,7 +259,7 @@ export const HelpdeskCatalogsPage = () => {
       const data = await listHelpdeskCatalogAdminData();
       setCatalogs(data);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catalogos de Helpdesk.'));
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catálogos de Helpdesk.'));
     } finally {
       setLoading(false);
     }
@@ -357,17 +357,17 @@ export const HelpdeskCatalogsPage = () => {
 
   const validateForm = (group: CatalogGroupConfig): boolean => {
     if (!form.name.trim()) {
-      notifyWarning('El nombre del catalogo es obligatorio.');
+      notifyWarning('El nombre del catálogo es obligatorio.');
       return false;
     }
 
     if (group.supportsCode && !form.code.trim()) {
-      notifyWarning('El codigo del catalogo es obligatorio.');
+      notifyWarning('El código del catálogo es obligatorio.');
       return false;
     }
 
     if (group.supportsSortOrder && (form.sort_order.trim() === '' || Number(form.sort_order) < 0)) {
-      notifyWarning('El orden debe ser un numero igual o mayor a cero.');
+      notifyWarning('El orden debe ser un número igual o mayor a cero.');
       return false;
     }
 
@@ -408,7 +408,7 @@ export const HelpdeskCatalogsPage = () => {
       closeModal();
       await loadCatalogs();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo guardar el registro del catalogo.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo guardar el registro del catálogo.'));
     } finally {
       setSaving(false);
     }
@@ -426,7 +426,7 @@ export const HelpdeskCatalogsPage = () => {
       closeModal();
       await loadCatalogs();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo desactivar el registro del catalogo.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo desactivar el registro del catálogo.'));
     } finally {
       setSaving(false);
     }
@@ -439,9 +439,9 @@ export const HelpdeskCatalogsPage = () => {
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-brand-500)]">
             Mesa de ayuda
           </p>
-          <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Catalogos</h1>
+          <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Catálogos</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--unilabor-neutral)]">
-            Administra en un solo modulo los catalogos base de activos, tickets y mantenimiento, sin alterar la navegacion principal del sistema.
+            Administra en un solo módulo los catálogos base de activos, tickets y mantenimiento, sin alterar la navegación principal del sistema.
           </p>
         </div>
 
@@ -508,7 +508,7 @@ export const HelpdeskCatalogsPage = () => {
         <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-6 shadow-xl shadow-[rgba(0,65,106,0.08)]">
           <div className="flex items-center gap-3 text-sm font-semibold text-[var(--color-brand-700)]">
             <Loader2 size={18} className="animate-spin" />
-            Cargando catalogos de Helpdesk...
+            Cargando catálogos de Helpdesk...
           </div>
         </div>
       ) : (
@@ -516,14 +516,14 @@ export const HelpdeskCatalogsPage = () => {
           <section className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/92 p-5 shadow-xl shadow-[rgba(0,65,106,0.08)]">
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
               <div>
-                <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Catalogo seleccionado</h2>
+                <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Catálogo seleccionado</h2>
                 <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-                  Selecciona un catalogo puntual dentro de {tabOptions.find((tab) => tab.id === activeTab)?.label ?? activeTab} para trabajar sin saturar la pantalla.
+                  Selecciona un catálogo puntual dentro de {tabOptions.find((tab) => tab.id === activeTab)?.label ?? activeTab} para trabajar sin saturar la pantalla.
                 </p>
               </div>
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Catalogo
+                  Catálogo
                 </span>
                 <select
                   value={selectedGroup.key}
@@ -582,12 +582,12 @@ export const HelpdeskCatalogsPage = () => {
                         {selectedItems.length} registro(s) en total
                       </p>
                       <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
-                        Pagina {normalizedPage} de {totalPages}
+                        Página {normalizedPage} de {totalPages}
                       </p>
                     </div>
                     <label className="block">
                       <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                        Registros por pagina
+                        Registros por página
                       </span>
                       <select
                         value={pageSize}
@@ -610,7 +610,7 @@ export const HelpdeskCatalogsPage = () => {
                   <div className="mt-4 space-y-3">
                     {selectedItems.length === 0 ? (
                       <p className="rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] p-4 text-sm text-[var(--unilabor-neutral)]">
-                        No hay registros disponibles en este catalogo.
+                        No hay registros disponibles en este catálogo.
                       </p>
                     ) : (
                       paginatedItems.map((item) => (
@@ -683,7 +683,7 @@ export const HelpdeskCatalogsPage = () => {
                           onClick={() => updateCurrentPage(1)}
                           disabled={normalizedPage === 1}
                           className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[rgba(0,65,106,0.12)] bg-white text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-40"
-                          aria-label="Primera pagina"
+                          aria-label="Primera página"
                         >
                           <ChevronsLeft size={16} />
                         </button>
@@ -692,7 +692,7 @@ export const HelpdeskCatalogsPage = () => {
                           onClick={() => updateCurrentPage(normalizedPage - 1)}
                           disabled={normalizedPage === 1}
                           className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[rgba(0,65,106,0.12)] bg-white text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-40"
-                          aria-label="Pagina anterior"
+                          aria-label="Página anterior"
                         >
                           <ChevronLeft size={16} />
                         </button>
@@ -704,7 +704,7 @@ export const HelpdeskCatalogsPage = () => {
                           onClick={() => updateCurrentPage(normalizedPage + 1)}
                           disabled={normalizedPage === totalPages}
                           className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[rgba(0,65,106,0.12)] bg-white text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-40"
-                          aria-label="Pagina siguiente"
+                          aria-label="Página siguiente"
                         >
                           <ChevronRight size={16} />
                         </button>
@@ -713,7 +713,7 @@ export const HelpdeskCatalogsPage = () => {
                           onClick={() => updateCurrentPage(totalPages)}
                           disabled={normalizedPage === totalPages}
                           className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[rgba(0,65,106,0.12)] bg-white text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-40"
-                          aria-label="Ultima pagina"
+                          aria-label="Última página"
                         >
                           <ChevronsRight size={16} />
                         </button>
@@ -736,7 +736,7 @@ export const HelpdeskCatalogsPage = () => {
             {modalState.group.supportsCode ? (
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Codigo
+                  Código
                 </span>
                 <input
                   value={form.code}
@@ -817,7 +817,7 @@ export const HelpdeskCatalogsPage = () => {
             {modalState.group.supportsDescription ? (
               <label className="block md:col-span-2">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Descripcion
+                  Descripción
                 </span>
                 <textarea
                   value={form.description}
@@ -856,8 +856,8 @@ export const HelpdeskCatalogsPage = () => {
           onClose={closeModal}
         >
           <p className="text-sm leading-7 text-[var(--unilabor-neutral)]">
-            Vas a desactivar este registro del catalogo <span className="font-semibold text-[var(--color-brand-700)]">{modalState.group.title}</span>.
-            Seguira visible en esta pantalla para auditoria administrativa, pero dejara de estar disponible en los catalogos activos del modulo.
+            Vas a desactivar este registro del catálogo <span className="font-semibold text-[var(--color-brand-700)]">{modalState.group.title}</span>.
+            Seguirá visible en esta pantalla para auditoría administrativa, pero dejará de estar disponible en los catálogos activos del módulo.
           </p>
 
           <div className="mt-6 flex justify-end gap-3">

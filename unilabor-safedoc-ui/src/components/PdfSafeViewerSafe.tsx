@@ -111,11 +111,11 @@ export const PdfSafeViewer = ({ fileUrl }: { fileUrl: string }) => {
       <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] bg-white/92 px-4 py-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-brand-700)]">
-            Visualizacion protegida
+            Visualización protegida
           </p>
           <p className="mt-1 inline-flex items-center gap-2 text-xs text-[var(--unilabor-neutral)]">
             <ShieldAlert size={14} className="text-[var(--color-brand-500)]" />
-            Marca de agua por usuario, sin impresion ni descarga desde la interfaz
+            Marca de agua por usuario, sin impresión ni descarga desde la interfaz
           </p>
         </div>
 
@@ -144,19 +144,19 @@ export const PdfSafeViewer = ({ fileUrl }: { fileUrl: string }) => {
             onClick={() => setPageNumber((current) => Math.max(1, current - 1))}
             disabled={!canGoBack}
             className="rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/92 px-3 py-2 text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
-            title="Pagina anterior"
+            title="Página anterior"
           >
             <ChevronLeft size={16} />
           </button>
           <span className="min-w-24 text-center text-xs font-semibold text-[var(--color-brand-700)]">
-            {numPages > 0 ? `Pagina ${pageNumber} de ${numPages}` : 'Cargando...'}
+            {numPages > 0 ? `Página ${pageNumber} de ${numPages}` : 'Cargando...'}
           </span>
           <button
             type="button"
             onClick={() => setPageNumber((current) => Math.min(numPages, current + 1))}
             disabled={!canGoForward}
             className="rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/92 px-3 py-2 text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
-            title="Pagina siguiente"
+            title="Página siguiente"
           >
             <ChevronRight size={16} />
           </button>

@@ -24,7 +24,7 @@ export const RhAuditPage = () => {
       setLogs(auditLogs);
       setEmployees(employeeList);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo cargar la auditoria RH.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar la auditoría RH.'));
     } finally {
       setLoading(false);
     }
@@ -43,7 +43,7 @@ export const RhAuditPage = () => {
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-brand-500)]">
                 Recursos Humanos
               </p>
-              <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Auditoria RH</h1>
+              <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Auditoría RH</h1>
               <p className="mt-2 max-w-3xl text-sm text-[var(--unilabor-neutral)]">
                 Consulta trazabilidad de cargas, visualizaciones y movimientos documentales del expediente RH.
               </p>
@@ -55,7 +55,7 @@ export const RhAuditPage = () => {
               className="inline-flex items-center gap-2 rounded-2xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              Recargar auditoria
+              Recargar auditoría
             </button>
           </div>
         </div>
@@ -90,7 +90,7 @@ export const RhAuditPage = () => {
                 Cobertura institucional
               </p>
               <p className="text-sm text-[var(--unilabor-ink)]">
-                Esta vista distingue movimientos RH sobre expedientes, documentos y visualizacion segura.
+                Esta vista distingue movimientos RH sobre expedientes, documentos y visualización segura.
               </p>
             </div>
           </div>
@@ -100,13 +100,13 @@ export const RhAuditPage = () => {
       <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)]">
         <div className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)] px-5 py-4">
           <p className="text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-            Registros de auditoria RH
+            Registros de auditoría RH
           </p>
         </div>
 
         <div className="divide-y divide-[rgba(0,65,106,0.08)]">
           {loading ? (
-            <div className="px-5 py-10 text-sm text-[var(--unilabor-neutral)]">Consultando auditoria RH...</div>
+            <div className="px-5 py-10 text-sm text-[var(--unilabor-neutral)]">Consultando auditoría RH...</div>
           ) : logs.length === 0 ? (
             <div className="px-5 py-10 text-sm text-[var(--unilabor-neutral)]">
               No hay registros para los filtros seleccionados.
@@ -124,7 +124,7 @@ export const RhAuditPage = () => {
                     </p>
                   </div>
                   <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
-                    {log.employee_code || 'Sin codigo'} | {log.employee_name || 'Sin colaborador'}
+                    {log.employee_code || 'Sin código'} | {log.employee_name || 'Sin colaborador'}
                   </p>
                   <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
                     {log.full_name} | {log.email}

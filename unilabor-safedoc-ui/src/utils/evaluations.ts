@@ -8,11 +8,11 @@ export const EVALUATION_STATUS_META: Record<
   pending: { label: 'Pendiente', className: 'bg-amber-100 text-amber-700' },
   in_progress: { label: 'En progreso', className: 'bg-sky-100 text-sky-700' },
   submitted: { label: 'Enviada', className: 'bg-indigo-100 text-indigo-700' },
-  grading: { label: 'En revision', className: 'bg-violet-100 text-violet-700' },
+  grading: { label: 'En revisión', className: 'bg-violet-100 text-violet-700' },
   passed: { label: 'Acreditada', className: 'bg-emerald-100 text-emerald-700' },
   failed: { label: 'No acreditada', className: 'bg-red-100 text-red-700' },
   expired: { label: 'Vencida', className: 'bg-slate-200 text-slate-600' },
-  authorized_late: { label: 'Extemporanea', className: 'bg-teal-100 text-teal-700' },
+  authorized_late: { label: 'Extemporánea', className: 'bg-teal-100 text-teal-700' },
 };
 
 /**

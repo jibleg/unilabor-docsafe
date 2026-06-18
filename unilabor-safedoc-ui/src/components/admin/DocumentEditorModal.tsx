@@ -131,13 +131,13 @@ export const DocumentEditorModal = ({
           <div className="grid gap-5 md:grid-cols-2">
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-bold uppercase text-[var(--unilabor-neutral)]">
-                Titulo del documento <span className="text-rose-300">*</span>
+                Título del documento <span className="text-rose-300">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={formData.title}
-                data-value-missing="Ingresa el titulo del documento."
+                data-value-missing="Ingresa el título del documento."
                 {...getFieldProps('title')}
                 className={`w-full rounded-xl border px-4 py-2.5 text-[var(--unilabor-ink)] outline-none transition-all ${
                   titleError
@@ -156,12 +156,12 @@ export const DocumentEditorModal = ({
 
             <div>
               <label className="mb-1 block text-xs font-bold uppercase text-[var(--unilabor-neutral)]">
-                Area / Categoria <span className="text-rose-300">*</span>
+                Área / Categoría <span className="text-rose-300">*</span>
               </label>
               <select
                 required
                 value={formData.category_id}
-                data-value-missing="Selecciona el area o categoria del documento."
+                data-value-missing="Selecciona el área o categoría del documento."
                 {...getFieldProps('category_id')}
                 disabled={loadingCategories}
                 className={`w-full appearance-none rounded-xl border px-4 py-2.5 text-[var(--unilabor-ink)] outline-none transition-all ${
@@ -176,7 +176,7 @@ export const DocumentEditorModal = ({
                   }))
                 }
               >
-                <option value="">{loadingCategories ? 'Cargando categorias...' : 'Seleccionar area...'}</option>
+                <option value="">{loadingCategories ? 'Cargando categorías...' : 'Seleccionar área...'}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
@@ -198,7 +198,7 @@ export const DocumentEditorModal = ({
 
             <div>
               <label className="mb-1 block text-xs font-bold uppercase text-[var(--unilabor-neutral)]">
-                Fecha de publicacion
+                Fecha de publicación
               </label>
               <div className="relative">
                 <CalendarDays
@@ -244,7 +244,7 @@ export const DocumentEditorModal = ({
 
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-bold uppercase text-[var(--unilabor-neutral)]">
-                Descripcion y metadatos de busqueda
+                Descripción y metadatos de búsqueda
               </label>
               <textarea
                 rows={3}
@@ -308,7 +308,7 @@ export const DocumentEditorModal = ({
                       )}
                     </p>
                     <p className="text-xs text-[var(--unilabor-neutral)]">
-                      {isDragActive ? 'Suelta el archivo aqui para cargarlo.' : fileHint}
+                      {isDragActive ? 'Suelta el archivo aquí para cargarlo.' : fileHint}
                     </p>
                   </div>
                   <input

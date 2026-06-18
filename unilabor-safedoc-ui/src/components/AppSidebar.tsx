@@ -227,8 +227,8 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
             type="button"
             onClick={onToggleVisibility}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.18)]"
-            title="Ocultar menu"
-            aria-label="Ocultar menu lateral"
+            title="Ocultar menú"
+            aria-label="Ocultar menú lateral"
           >
             <ChevronLeft size={16} />
           </button>

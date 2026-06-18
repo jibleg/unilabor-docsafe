@@ -56,7 +56,7 @@ export const ExpedientSectionCard = ({
             </p>
             <h3 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{section.section.name}</h3>
             <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-              {section.section.description || 'Seccion documental del expediente RH.'}
+              {section.section.description || 'Sección documental del expediente RH.'}
             </p>
           </div>
           <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.34)] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
@@ -87,7 +87,7 @@ export const ExpedientSectionCard = ({
                 )}
               </div>
               <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-                {item.document_type.description || 'Sin descripcion adicional.'}
+                {item.document_type.description || 'Sin descripción adicional.'}
               </p>
             </div>
 
@@ -95,7 +95,7 @@ export const ExpedientSectionCard = ({
               {item.current_document ? (
                 <div className="space-y-1.5">
                   <p className="font-semibold text-[var(--color-brand-700)]">{item.current_document.title}</p>
-                  <p>Version {item.current_document.version}</p>
+                  <p>Versión {item.current_document.version}</p>
                   <p>Emitido: {item.current_document.issue_date || 'Sin fecha'}</p>
                   <p>Vence: {item.current_document.expiry_date || 'No aplica'}</p>
                   <p>Cargado por: {item.current_document.uploaded_by_name || 'Sistema'}</p>
@@ -103,7 +103,7 @@ export const ExpedientSectionCard = ({
               ) : (
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={14} className="mt-0.5 text-[var(--color-brand-500)]" />
-                  <p>Todavia no existe un PDF vigente para este tipo documental.</p>
+                  <p>Todavía no existe un PDF vigente para este tipo documental.</p>
                 </div>
               )}
             </div>
@@ -144,7 +144,7 @@ export const ExpedientSectionCard = ({
                 <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/80 px-4 py-3 text-xs text-[var(--unilabor-neutral)]">
                   <div className="mb-1 flex items-center gap-2 font-semibold text-[var(--color-brand-700)]">
                     <FileText size={13} />
-                    Descripcion del documento
+                    Descripción del documento
                   </div>
                   <p>{item.current_document.description}</p>
                 </div>

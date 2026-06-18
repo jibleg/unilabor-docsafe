@@ -23,7 +23,7 @@ export const EmployeeRecentMovementsPanel = ({
     <div className="rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/92 shadow-xl shadow-[rgba(0,65,106,0.08)]">
       <div className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)] px-5 py-4">
         <p className="text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-          Ultimos movimientos del expediente
+          Últimos movimientos del expediente
         </p>
         <h3 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">Trazabilidad reciente</h3>
       </div>
@@ -33,7 +33,7 @@ export const EmployeeRecentMovementsPanel = ({
           <div className="px-5 py-8 text-sm text-[var(--unilabor-neutral)]">Cargando movimientos recientes...</div>
         ) : logs.length === 0 ? (
           <div className="px-5 py-8 text-sm text-[var(--unilabor-neutral)]">
-            Aun no hay movimientos recientes para este expediente.
+            Aún no hay movimientos recientes para este expediente.
           </div>
         ) : (
           logs.map((log, index) => (

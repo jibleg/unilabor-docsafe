@@ -71,7 +71,7 @@ export const DocumentTypesPage = () => {
       setSections(sectionsData.filter((section) => section.is_active));
       setTypes(typesData);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo cargar la configuracion documental RH.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar la configuración documental RH.'));
     } finally {
       setLoading(false);
     }
@@ -107,7 +107,7 @@ export const DocumentTypesPage = () => {
 
   const validateForm = (): boolean => {
     if (!form.section_id) {
-      notifyWarning('Debes seleccionar una seccion documental.');
+      notifyWarning('Debes seleccionar una sección documental.');
       return false;
     }
     if (!form.name.trim()) {
@@ -198,7 +198,7 @@ export const DocumentTypesPage = () => {
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Tipos documentales</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--unilabor-neutral)]">
-            Gestiona el catalogo mixto del expediente: tipos base del sistema y tipos personalizados por necesidad operativa.
+            Gestiona el catálogo mixto del expediente: tipos base del sistema y tipos personalizados por necesidad operativa.
           </p>
         </div>
 
@@ -226,7 +226,7 @@ export const DocumentTypesPage = () => {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar por nombre, codigo, descripcion o seccion..."
+          placeholder="Buscar por nombre, código, descripción o sección..."
           className="rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
         />
         <select
@@ -247,7 +247,7 @@ export const DocumentTypesPage = () => {
         <table className="w-full text-left">
           <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
             <tr>
-              <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Seccion</th>
+              <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Sección</th>
               <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Tipo</th>
               <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Propiedades</th>
               <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acciones</th>
@@ -270,12 +270,12 @@ export const DocumentTypesPage = () => {
               filteredTypes.map((documentType) => (
                 <tr key={documentType.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
                   <td className="px-5 py-4 text-sm font-semibold text-[var(--color-brand-700)]">
-                    {documentType.section?.name ?? `Seccion ${documentType.section_id}`}
+                    {documentType.section?.name ?? `Sección ${documentType.section_id}`}
                   </td>
                   <td className="px-5 py-4">
                     <p className="text-sm font-semibold text-[var(--color-brand-700)]">{documentType.name}</p>
                     <p className="text-xs text-[var(--unilabor-neutral)]">
-                      {documentType.code || 'Sin codigo'} · Orden {documentType.sort_order}
+                      {documentType.code || 'Sin código'} · Orden {documentType.sort_order}
                     </p>
                   </td>
                   <td className="px-5 py-4">
@@ -346,14 +346,14 @@ export const DocumentTypesPage = () => {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Seccion
+                    Sección
                   </label>
                   <select
                     value={form.section_id}
                     onChange={(event) => setForm((current) => ({ ...current, section_id: event.target.value }))}
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                   >
-                    <option value="">Selecciona una seccion</option>
+                    <option value="">Selecciona una sección</option>
                     {sections.map((section) => (
                       <option key={section.id} value={section.id}>
                         {section.name}
@@ -378,7 +378,7 @@ export const DocumentTypesPage = () => {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Codigo
+                    Código
                   </label>
                   <input
                     value={form.code}
@@ -400,7 +400,7 @@ export const DocumentTypesPage = () => {
 
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Descripcion
+                  Descripción
                 </label>
                 <textarea
                   value={form.description}

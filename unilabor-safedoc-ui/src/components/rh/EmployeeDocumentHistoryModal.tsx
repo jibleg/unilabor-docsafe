@@ -68,14 +68,14 @@ export const EmployeeDocumentHistoryModal = ({
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-bold text-[var(--color-brand-700)]">{document.title}</p>
                       <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
-                        Version {document.version}
+                        Versión {document.version}
                       </span>
                       <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
                         document.is_current
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                           : 'border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.12)] text-[var(--color-brand-700)]'
                       }`}>
-                        {document.is_current ? 'Vigente' : 'Historico'}
+                        {document.is_current ? 'Vigente' : 'Histórico'}
                       </span>
                     </div>
                     <p className="mt-2 text-xs text-[var(--unilabor-neutral)]">
@@ -92,14 +92,14 @@ export const EmployeeDocumentHistoryModal = ({
                   <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.82)] px-4 py-3 text-xs text-[var(--unilabor-neutral)]">
                     <div className="flex items-center gap-2 font-semibold text-[var(--color-brand-700)]">
                       <Clock3 size={14} />
-                      Trazabilidad de version
+                      Trazabilidad de versión
                     </div>
                     <p className="mt-2">Estado: {document.status}</p>
                     <p>Documento ID: {document.id}</p>
                     <p>
                       {document.replaces_document_id
                         ? `Sustituye a ${document.replaces_document_id}`
-                        : 'Primera version registrada'}
+                        : 'Primera versión registrada'}
                     </p>
                   </div>
                 </div>

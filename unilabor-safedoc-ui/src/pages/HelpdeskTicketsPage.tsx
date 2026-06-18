@@ -125,7 +125,7 @@ export const HelpdeskTicketsPage = () => {
       setAssets(assetData);
       setEmployees(employeeData);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catalogos de solicitudes.'));
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catálogos de solicitudes.'));
     }
   }, []);
 
@@ -193,12 +193,12 @@ export const HelpdeskTicketsPage = () => {
 
   const validateForm = () => {
     if (!form.title.trim()) {
-      notifyWarning('El titulo de la solicitud es obligatorio.');
+      notifyWarning('El título de la solicitud es obligatorio.');
       return false;
     }
 
     if (!form.description.trim()) {
-      notifyWarning('La descripcion de la solicitud es obligatoria.');
+      notifyWarning('La descripción de la solicitud es obligatoria.');
       return false;
     }
 
@@ -258,7 +258,7 @@ export const HelpdeskTicketsPage = () => {
     }
 
     if (!solutionForm.solved_at || !solutionForm.solution_summary.trim()) {
-      notifyWarning('Captura la fecha de solucion y el resumen tecnico.');
+      notifyWarning('Captura la fecha de solución y el resumen técnico.');
       return;
     }
 
@@ -271,10 +271,10 @@ export const HelpdeskTicketsPage = () => {
       });
       setSelectedTicket(updated ?? selectedTicket);
       setSolutionForm(EMPTY_SOLUTION_FORM);
-      notifySuccess('Solucion tecnica registrada correctamente.');
+      notifySuccess('Solución técnica registrada correctamente.');
       refreshTickets();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo registrar la solucion tecnica.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo registrar la solución técnica.'));
     } finally {
       setSavingSolution(false);
     }
@@ -286,7 +286,7 @@ export const HelpdeskTicketsPage = () => {
     }
 
     if (!returnForm.return_to_operation_at) {
-      notifyWarning('Captura la fecha de retorno a operacion.');
+      notifyWarning('Captura la fecha de retorno a operación.');
       return;
     }
 
@@ -298,10 +298,10 @@ export const HelpdeskTicketsPage = () => {
       });
       setSelectedTicket(updated ?? selectedTicket);
       setReturnForm(EMPTY_RETURN_FORM);
-      notifySuccess('Retorno a operacion validado correctamente.');
+      notifySuccess('Retorno a operación validado correctamente.');
       refreshTickets();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo validar el retorno a operacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo validar el retorno a operación.'));
     } finally {
       setSavingReturn(false);
     }
@@ -312,7 +312,7 @@ export const HelpdeskTicketsPage = () => {
       return;
     }
     if (!isoRiskForm.impact_evaluation.trim()) {
-      notifyWarning('Captura la evaluacion de impacto ISO/riesgo.');
+      notifyWarning('Captura la evaluación de impacto ISO/riesgo.');
       return;
     }
 
@@ -332,10 +332,10 @@ export const HelpdeskTicketsPage = () => {
     try {
       const updated = await evaluateHelpdeskTicketIsoRisk(selectedTicket.id, payload);
       setSelectedTicket(updated ?? selectedTicket);
-      notifySuccess('Evaluacion ISO/riesgo registrada correctamente.');
+      notifySuccess('Evaluación ISO/riesgo registrada correctamente.');
       refreshTickets();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo registrar la evaluacion ISO/riesgo.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo registrar la evaluación ISO/riesgo.'));
     } finally {
       setSavingIsoRisk(false);
     }
@@ -346,7 +346,7 @@ export const HelpdeskTicketsPage = () => {
       return;
     }
     if (!technicalReleaseForm.technical_release_summary.trim()) {
-      notifyWarning('Captura el resumen de liberacion tecnica.');
+      notifyWarning('Captura el resumen de liberación técnica.');
       return;
     }
 
@@ -360,10 +360,10 @@ export const HelpdeskTicketsPage = () => {
       const updated = await releaseHelpdeskTicketTechnically(selectedTicket.id, payload);
       setSelectedTicket(updated ?? selectedTicket);
       setTechnicalReleaseForm(EMPTY_TECHNICAL_RELEASE_FORM);
-      notifySuccess('Liberacion tecnica documentada correctamente.');
+      notifySuccess('Liberación técnica documentada correctamente.');
       refreshTickets();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo documentar la liberacion tecnica.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo documentar la liberación técnica.'));
     } finally {
       setSavingTechnicalRelease(false);
     }
@@ -410,7 +410,7 @@ export const HelpdeskTicketsPage = () => {
         {[
           { label: 'Solicitudes', value: summary.total },
           { label: 'Abiertas', value: summary.open },
-          { label: 'Criticas', value: summary.critical },
+          { label: 'Críticas', value: summary.critical },
           { label: 'Impacto resultados', value: summary.affectsResults },
         ].map((item) => (
           <div key={item.label} className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)]">
@@ -427,7 +427,7 @@ export const HelpdeskTicketsPage = () => {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por folio, activo, colaborador, estado, prioridad o descripcion..."
+              placeholder="Buscar por folio, activo, colaborador, estado, prioridad o descripción..."
               className="w-full bg-transparent text-sm text-[var(--unilabor-ink)] outline-none"
             />
           </div>
@@ -539,13 +539,13 @@ export const HelpdeskTicketsPage = () => {
                   ['Activo', selectedTicket.asset ? `${selectedTicket.asset.asset_code} | ${selectedTicket.asset.name}` : 'Sin activo'],
                   ['Solicita', selectedTicket.requester_employee?.full_name ?? 'Sin solicitante'],
                   ['Responsable', selectedTicket.assigned_employee?.full_name ?? 'Sin responsable'],
-                  ['Solucion', selectedTicket.solved_at ? formatDateTime(selectedTicket.solved_at) : 'Pendiente'],
-                  ['Retorno operacion', selectedTicket.return_to_operation_at ? formatDateTime(selectedTicket.return_to_operation_at) : 'Pendiente'],
+                  ['Solución', selectedTicket.solved_at ? formatDateTime(selectedTicket.solved_at) : 'Pendiente'],
+                  ['Retorno operación', selectedTicket.return_to_operation_at ? formatDateTime(selectedTicket.return_to_operation_at) : 'Pendiente'],
                   ['Tiempo fuera', formatDowntime(selectedTicket.downtime_minutes)],
                   ['Estado posterior', catalogName(selectedTicket.equipment_status_after_solution)],
                   ['Riesgo ISO', riskLabel(selectedTicket.risk_level)],
                   ['Bloqueo operativo', selectedTicket.operational_lock ? 'Activo' : 'No activo'],
-                  ['Liberacion tecnica', selectedTicket.technical_released_at ? formatDateTime(selectedTicket.technical_released_at) : 'Pendiente'],
+                  ['Liberación técnica', selectedTicket.technical_released_at ? formatDateTime(selectedTicket.technical_released_at) : 'Pendiente'],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">{label}</p>
@@ -555,7 +555,7 @@ export const HelpdeskTicketsPage = () => {
               </div>
 
               <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Descripcion</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Descripción</p>
                 <p className="mt-1 leading-6 text-[var(--unilabor-ink)]">{selectedTicket.description}</p>
               </div>
 
@@ -568,11 +568,11 @@ export const HelpdeskTicketsPage = () => {
 
               {selectedTicket.impact_evaluation ? (
                 <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Evaluacion ISO/riesgo</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Evaluación ISO/riesgo</p>
                   <p className="mt-1 leading-6 text-[var(--unilabor-ink)]">{selectedTicket.impact_evaluation}</p>
                   {selectedTicket.recent_analysis_usage ? (
                     <p className="mt-2 text-xs leading-5 text-[var(--unilabor-neutral)]">
-                      Uso en analisis recientes: {selectedTicket.recent_analysis_usage}
+                      Uso en análisis recientes: {selectedTicket.recent_analysis_usage}
                     </p>
                   ) : null}
                   {selectedTicket.alternate_equipment_used ? (
@@ -582,7 +582,7 @@ export const HelpdeskTicketsPage = () => {
                   ) : null}
                   {selectedTicket.corrective_action_required ? (
                     <p className="mt-2 text-xs leading-5 text-[var(--unilabor-neutral)]">
-                      Accion correctiva requerida: {selectedTicket.corrective_action_notes ?? 'Pendiente de documentar'}
+                      Acción correctiva requerida: {selectedTicket.corrective_action_notes ?? 'Pendiente de documentar'}
                     </p>
                   ) : null}
                 </div>
@@ -590,14 +590,14 @@ export const HelpdeskTicketsPage = () => {
 
               {selectedTicket.solution_summary ? (
                 <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Solucion tecnica</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Solución técnica</p>
                   <p className="mt-1 leading-6 text-[var(--unilabor-ink)]">{selectedTicket.solution_summary}</p>
                 </div>
               ) : null}
 
               {selectedTicket.technical_release_summary ? (
                 <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Liberacion tecnica</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Liberación técnica</p>
                   <p className="mt-1 leading-6 text-[var(--unilabor-ink)]">{selectedTicket.technical_release_summary}</p>
                 </div>
               ) : null}
@@ -605,7 +605,7 @@ export const HelpdeskTicketsPage = () => {
               {canManage ? (
                 <div className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.72)] p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Evaluacion ISO 15189
+                    Evaluación ISO 15189
                   </p>
 
                   <div className="grid gap-2">
@@ -617,20 +617,20 @@ export const HelpdeskTicketsPage = () => {
                       <option value="LOW">Riesgo bajo</option>
                       <option value="MEDIUM">Riesgo medio</option>
                       <option value="HIGH">Riesgo alto</option>
-                      <option value="CRITICAL">Riesgo critico</option>
+                      <option value="CRITICAL">Riesgo crítico</option>
                     </select>
                     <textarea
                       value={isoRiskForm.impact_evaluation}
                       onChange={(event) => setIsoRiskForm((current) => ({ ...current, impact_evaluation: event.target.value }))}
                       rows={3}
-                      placeholder="Evaluacion de impacto sobre operacion, resultados y continuidad..."
+                      placeholder="Evaluación de impacto sobre operación, resultados y continuidad..."
                       className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/95 px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     />
                     <textarea
                       value={isoRiskForm.recent_analysis_usage}
                       onChange={(event) => setIsoRiskForm((current) => ({ ...current, recent_analysis_usage: event.target.value }))}
                       rows={2}
-                      placeholder="Uso en analisis recientes o lotes potencialmente afectados..."
+                      placeholder="Uso en análisis recientes o lotes potencialmente afectados..."
                       className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/95 px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     />
                     <label className="flex items-center gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/80 px-3 py-2">
@@ -640,7 +640,7 @@ export const HelpdeskTicketsPage = () => {
                         onChange={(event) => setIsoRiskForm((current) => ({ ...current, alternate_equipment_used: event.target.checked }))}
                         className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] text-[var(--color-brand-500)]"
                       />
-                      <span className="text-sm font-semibold text-[var(--color-brand-700)]">Se uso equipo alterno</span>
+                      <span className="text-sm font-semibold text-[var(--color-brand-700)]">Se usó equipo alterno</span>
                     </label>
                     {isoRiskForm.alternate_equipment_used ? (
                       <input
@@ -657,13 +657,13 @@ export const HelpdeskTicketsPage = () => {
                         onChange={(event) => setIsoRiskForm((current) => ({ ...current, corrective_action_required: event.target.checked }))}
                         className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] text-[var(--color-brand-500)]"
                       />
-                      <span className="text-sm font-semibold text-[var(--color-brand-700)]">Requiere accion correctiva</span>
+                      <span className="text-sm font-semibold text-[var(--color-brand-700)]">Requiere acción correctiva</span>
                     </label>
                     {isoRiskForm.corrective_action_required ? (
                       <input
                         value={isoRiskForm.corrective_action_notes}
                         onChange={(event) => setIsoRiskForm((current) => ({ ...current, corrective_action_notes: event.target.value }))}
-                        placeholder="Motivo o referencia de accion correctiva"
+                        placeholder="Motivo o referencia de acción correctiva"
                         className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/95 px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                       />
                     ) : null}
@@ -675,7 +675,7 @@ export const HelpdeskTicketsPage = () => {
                           onChange={(event) => setIsoRiskForm((current) => ({ ...current, technical_release_required: event.target.checked }))}
                           className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] text-[var(--color-brand-500)]"
                         />
-                        <span className="text-sm font-semibold text-[var(--color-brand-700)]">Requiere liberacion</span>
+                        <span className="text-sm font-semibold text-[var(--color-brand-700)]">Requiere liberación</span>
                       </label>
                       <label className="flex items-center gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/80 px-3 py-2">
                         <input
@@ -694,7 +694,7 @@ export const HelpdeskTicketsPage = () => {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
                     >
                       {savingIsoRisk ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                      Guardar evaluacion ISO
+                      Guardar evaluación ISO
                     </button>
                   </div>
                 </div>
@@ -703,7 +703,7 @@ export const HelpdeskTicketsPage = () => {
               {canManage ? (
                 <div className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.72)] p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Solucion y retorno
+                    Solución y retorno
                   </p>
 
                   <div className="grid gap-2">
@@ -717,7 +717,7 @@ export const HelpdeskTicketsPage = () => {
                       value={solutionForm.solution_summary}
                       onChange={(event) => setSolutionForm((current) => ({ ...current, solution_summary: event.target.value }))}
                       rows={3}
-                      placeholder="Resumen tecnico de la solucion..."
+                      placeholder="Resumen técnico de la solución..."
                       className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/95 px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     />
                     <select
@@ -739,7 +739,7 @@ export const HelpdeskTicketsPage = () => {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
                     >
                       {savingSolution ? <Loader2 size={14} className="animate-spin" /> : <LifeBuoy size={14} />}
-                      Registrar solucion
+                      Registrar solución
                     </button>
                   </div>
 
@@ -748,7 +748,7 @@ export const HelpdeskTicketsPage = () => {
                       value={technicalReleaseForm.technical_release_summary}
                       onChange={(event) => setTechnicalReleaseForm((current) => ({ ...current, technical_release_summary: event.target.value }))}
                       rows={3}
-                      placeholder="Liberacion tecnica: verificacion, criterios cumplidos y decision..."
+                      placeholder="Liberación técnica: verificación, criterios cumplidos y decisión..."
                       className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/95 px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     />
                     <select
@@ -770,7 +770,7 @@ export const HelpdeskTicketsPage = () => {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
                     >
                       {savingTechnicalRelease ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                      Documentar liberacion
+                      Documentar liberación
                     </button>
                   </div>
 

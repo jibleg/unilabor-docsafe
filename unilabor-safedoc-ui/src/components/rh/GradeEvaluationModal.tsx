@@ -31,7 +31,7 @@ export const GradeEvaluationModal = ({ assignmentId, onClose, onGraded }: GradeE
         }
       } catch (error) {
         if (active) {
-          notifyError(getApiErrorMessage(error, 'No se pudo cargar el detalle de calificacion.'));
+          notifyError(getApiErrorMessage(error, 'No se pudo cargar el detalle de calificación.'));
         }
       } finally {
         if (active) {
@@ -79,13 +79,13 @@ export const GradeEvaluationModal = ({ assignmentId, onClose, onGraded }: GradeE
       const result = await gradeEvaluation(assignmentId, grades);
       notifySuccess(
         result.passed
-          ? `Evaluacion calificada: ACREDITADA (${result.percentage}%).`
-          : `Evaluacion calificada: no acreditada (${result.percentage}%). RH sera notificado para recapacitacion.`,
+          ? `Evaluación calificada: ACREDITADA (${result.percentage}%).`
+          : `Evaluación calificada: no acreditada (${result.percentage}%). RH será notificado para recapacitación.`,
       );
       onGraded();
       onClose();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo calificar la evaluacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo calificar la evaluación.'));
     } finally {
       setSaving(false);
     }
@@ -97,7 +97,7 @@ export const GradeEvaluationModal = ({ assignmentId, onClose, onGraded }: GradeE
         <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-              Calificar evaluacion
+              Calificar evaluación
             </p>
             <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">
               {detail?.assignment.employee_name ?? 'Colaborador'}

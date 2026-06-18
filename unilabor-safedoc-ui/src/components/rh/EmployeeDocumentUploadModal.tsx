@@ -78,13 +78,13 @@ export const EmployeeDocumentUploadModal = ({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                Titulo
+                Título
               </label>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className="w-full rounded-2xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                placeholder="Titulo visible en el expediente"
+                placeholder="Título visible en el expediente"
               />
             </div>
             <div>
@@ -108,7 +108,7 @@ export const EmployeeDocumentUploadModal = ({
 
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-              Descripcion
+              Descripción
             </label>
             <textarea
               value={description}
@@ -122,7 +122,7 @@ export const EmployeeDocumentUploadModal = ({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Fecha de emision {documentType.has_expiry ? '*' : ''}
+                    Fecha de emisión {documentType.has_expiry ? '*' : ''}
                   </label>
               <input
                 type="date"
@@ -147,8 +147,8 @@ export const EmployeeDocumentUploadModal = ({
 
           <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.88)] px-4 py-3 text-xs text-[var(--unilabor-neutral)]">
             {documentType.has_expiry
-              ? 'Este tipo documental controla vigencia. Debes capturar fecha de emision y fecha de vencimiento. Si cargas una nueva version, la anterior quedara marcada como derogada dentro del expediente.'
-              : 'La nueva carga sustituye la version vigente anterior y conserva el historial dentro del expediente RH.'}
+              ? 'Este tipo documental controla vigencia. Debes capturar fecha de emisión y fecha de vencimiento. Si cargas una nueva versión, la anterior quedará marcada como derogada dentro del expediente.'
+              : 'La nueva carga sustituye la versión vigente anterior y conserva el historial dentro del expediente RH.'}
           </div>
         </div>
 

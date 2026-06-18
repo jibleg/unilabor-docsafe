@@ -13,8 +13,8 @@ export const AuditPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Auditoria de acceso</h1>
-          <p className="text-sm text-[var(--unilabor-neutral)]">Trazabilidad total segun normativa ISO 15189</p>
+          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Auditoría de acceso</h1>
+          <p className="text-sm text-[var(--unilabor-neutral)]">Trazabilidad total según normativa ISO 15189</p>
         </div>
         <div className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.1)] bg-[rgba(191,212,230,0.32)] px-4 py-2 text-xs font-bold text-[var(--color-brand-700)]">
           <ShieldCheck size={16} /> SISTEMA MONITOREADO
@@ -27,7 +27,7 @@ export const AuditPage = () => {
             <tr>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Fecha/Hora</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Usuario</th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Accion</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acción</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Documento</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">IP</th>
             </tr>

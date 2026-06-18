@@ -43,7 +43,7 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
         }
       } catch (error) {
         if (active) {
-          notifyError(getApiErrorMessage(error, 'No se pudieron cargar los datos de asignacion.'));
+          notifyError(getApiErrorMessage(error, 'No se pudieron cargar los datos de asignación.'));
         }
       } finally {
         if (active) {
@@ -110,7 +110,7 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
 
   const handleAssign = async () => {
     if (template.status !== 'published') {
-      notifyWarning('Publica la evaluacion antes de asignarla.');
+      notifyWarning('Publica la evaluación antes de asignarla.');
       return;
     }
     if (selected.size === 0) {
@@ -121,14 +121,14 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
     try {
       const summary = await assignEvaluation(template.id, [...selected]);
       notifySuccess(
-        `Asignadas ${summary.created} evaluacion(es)${summary.skipped > 0 ? `; ${summary.skipped} ya vigente(s)` : ''}.`,
+        `Asignadas ${summary.created} evaluación(es)${summary.skipped > 0 ? `; ${summary.skipped} ya vigente(s)` : ''}.`,
       );
       setSelected(new Set());
       await loadAssignments();
       onAssigned();
       setTab('assigned');
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo asignar la evaluacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo asignar la evaluación.'));
     } finally {
       setAssigning(false);
     }
@@ -140,11 +140,11 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
         <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-              Asignar evaluacion
+              Asignar evaluación
             </p>
             <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{template.title}</h2>
             <p className="mt-0.5 text-xs text-[var(--unilabor-neutral)]">
-              Ventana de {template.window_hours}h | minimo {template.passing_score}%
+              Ventana de {template.window_hours}h | mínimo {template.passing_score}%
             </p>
           </div>
           <button
@@ -182,7 +182,7 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
           <div className="flex flex-1 flex-col overflow-hidden">
             {template.status !== 'published' && (
               <div className="mx-5 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                Esta evaluacion esta en borrador. Publicala para poder asignarla.
+                Esta evaluación está en borrador. Publícala para poder asignarla.
               </div>
             )}
             <div className="px-5 py-3">
@@ -201,7 +201,7 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
                   onClick={toggleAll}
                   className="mt-2 text-xs font-semibold text-[var(--color-brand-500)] transition hover:text-[var(--color-brand-700)]"
                 >
-                  {allSelected ? 'Quitar seleccion' : 'Seleccionar todos los visibles'}
+                  {allSelected ? 'Quitar selección' : 'Seleccionar todos los visibles'}
                 </button>
               )}
             </div>
@@ -246,7 +246,7 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
                 className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
               >
                 {assigning ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                Asignar evaluacion
+                Asignar evaluación
               </button>
             </div>
           </div>
@@ -254,7 +254,7 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
           <div className="flex-1 overflow-y-auto px-5 py-4">
             {assignments.length === 0 ? (
               <p className="py-10 text-center text-sm text-[var(--unilabor-neutral)]">
-                <Users className="mx-auto mb-2" size={22} /> Aun no hay colaboradores asignados.
+                <Users className="mx-auto mb-2" size={22} /> Aún no hay colaboradores asignados.
               </p>
             ) : (
               <ul className="space-y-2">

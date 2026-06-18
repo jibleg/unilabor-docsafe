@@ -81,7 +81,7 @@ export const DocumentSectionsPage = () => {
 
   const validateForm = (): boolean => {
     if (!form.name.trim()) {
-      notifyWarning('El nombre de la seccion es obligatorio.');
+      notifyWarning('El nombre de la sección es obligatorio.');
       return false;
     }
     return true;
@@ -112,12 +112,12 @@ export const DocumentSectionsPage = () => {
     setSaving(true);
     try {
       await createDocumentSection(buildPayload(form));
-      notifySuccess('Seccion documental creada correctamente.');
+      notifySuccess('Sección documental creada correctamente.');
       setIsCreateOpen(false);
       resetForm();
       await loadSections();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo crear la seccion documental.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo crear la sección documental.'));
     } finally {
       setSaving(false);
     }
@@ -131,12 +131,12 @@ export const DocumentSectionsPage = () => {
     setSaving(true);
     try {
       await updateDocumentSectionById(selectedSection.id, buildPayload(form));
-      notifySuccess('Seccion documental actualizada correctamente.');
+      notifySuccess('Sección documental actualizada correctamente.');
       setIsEditOpen(false);
       resetForm();
       await loadSections();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo actualizar la seccion documental.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo actualizar la sección documental.'));
     } finally {
       setSaving(false);
     }
@@ -146,10 +146,10 @@ export const DocumentSectionsPage = () => {
     setDeletingId(section.id);
     try {
       await deleteDocumentSectionById(section.id);
-      notifySuccess('Seccion documental inactivada correctamente.');
+      notifySuccess('Sección documental inactivada correctamente.');
       await loadSections();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo inactivar la seccion documental.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo inactivar la sección documental.'));
     } finally {
       setDeletingId(null);
     }
@@ -164,7 +164,7 @@ export const DocumentSectionsPage = () => {
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Secciones documentales</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--unilabor-neutral)]">
-            Define los grandes bloques del expediente digital del colaborador y su orden dentro del modulo RH.
+            Define los grandes bloques del expediente digital del colaborador y su orden dentro del módulo RH.
           </p>
         </div>
 
@@ -183,7 +183,7 @@ export const DocumentSectionsPage = () => {
             className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
           >
             <Plus size={16} />
-            Nueva seccion
+            Nueva sección
           </button>
         </div>
       </div>
@@ -192,7 +192,7 @@ export const DocumentSectionsPage = () => {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar por codigo, nombre o descripcion..."
+          placeholder="Buscar por código, nombre o descripción..."
           className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
         />
       </div>
@@ -202,7 +202,7 @@ export const DocumentSectionsPage = () => {
           <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
             <tr>
               <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Orden</th>
-              <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Codigo</th>
+              <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Código</th>
               <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Nombre</th>
               <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Estado</th>
               <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acciones</th>
@@ -228,7 +228,7 @@ export const DocumentSectionsPage = () => {
                   <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">{section.code}</td>
                   <td className="px-5 py-4">
                     <p className="text-sm font-semibold text-[var(--color-brand-700)]">{section.name}</p>
-                    <p className="text-xs text-[var(--unilabor-neutral)]">{section.description || 'Sin descripcion'}</p>
+                    <p className="text-xs text-[var(--unilabor-neutral)]">{section.description || 'Sin descripción'}</p>
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex flex-wrap gap-2">
@@ -275,14 +275,14 @@ export const DocumentSectionsPage = () => {
           <div className="w-full max-w-2xl rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
             <div className="border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
               <h2 className="text-base font-bold text-[var(--color-brand-700)]">
-                {isCreateOpen ? 'Nueva seccion documental' : 'Editar seccion documental'}
+                {isCreateOpen ? 'Nueva sección documental' : 'Editar sección documental'}
               </h2>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Codigo
+                    Código
                   </label>
                   <input
                     value={form.code}
@@ -318,7 +318,7 @@ export const DocumentSectionsPage = () => {
 
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Descripcion
+                  Descripción
                 </label>
                 <textarea
                   value={form.description}
@@ -365,7 +365,7 @@ export const DocumentSectionsPage = () => {
                   ) : (
                     <>
                       <Plus size={14} />
-                      {isCreateOpen ? 'Guardar seccion' : 'Guardar cambios'}
+                      {isCreateOpen ? 'Guardar sección' : 'Guardar cambios'}
                     </>
                   )}
                 </button>

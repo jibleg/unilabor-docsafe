@@ -45,7 +45,7 @@ export const Pagination = ({
           Anterior
         </button>
         <span className="px-2 font-semibold">
-          Pagina {page} de {totalPages}
+          Página {page} de {totalPages}
         </span>
         <button
           type="button"

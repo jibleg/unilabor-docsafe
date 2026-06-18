@@ -49,7 +49,7 @@ export const MyEvaluationsPage = () => {
   const requestLate = async (assignmentId: number) => {
     try {
       await requestLateAuthorization(assignmentId);
-      notifySuccess('Solicitud enviada a RH para autorizacion extemporanea.');
+      notifySuccess('Solicitud enviada a RH para autorización extemporánea.');
       void load();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo enviar la solicitud.'));
@@ -60,13 +60,13 @@ export const MyEvaluationsPage = () => {
     <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-          Capacitacion
+          Capacitación
         </p>
         <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-[var(--color-brand-700)]">
           <GraduationCap size={24} /> Mis evaluaciones
         </h1>
         <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-          Evaluaciones de capacitacion asignadas. Cuentas con 72 horas desde su disponibilidad para realizarlas.
+          Evaluaciones de capacitación asignadas. Cuentas con 72 horas desde su disponibilidad para realizarlas.
         </p>
       </div>
 
@@ -95,7 +95,7 @@ export const MyEvaluationsPage = () => {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-[var(--color-brand-700)]">
-                      {assignment.course_title ?? 'Capacitacion'}
+                      {assignment.course_title ?? 'Capacitación'}
                     </p>
                     <p className="text-xs text-[var(--unilabor-neutral)]">{assignment.template_title}</p>
                   </div>
@@ -139,7 +139,7 @@ export const MyEvaluationsPage = () => {
                         onClick={() => void requestLate(assignment.id)}
                         className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
                       >
-                        <Clock size={15} /> Solicitar autorizacion
+                        <Clock size={15} /> Solicitar autorización
                       </button>
                     ))}
                   {actionable && (
@@ -148,7 +148,7 @@ export const MyEvaluationsPage = () => {
                       onClick={() => navigate(`/rh/my-evaluations/${assignment.id}`)}
                       className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
                     >
-                      Realizar evaluacion
+                      Realizar evaluación
                     </button>
                   )}
                 </div>

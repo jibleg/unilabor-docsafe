@@ -108,7 +108,7 @@ export const DocumentsPage = () => {
         }
 
         setFilterCategories([]);
-        notifyError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorias de filtro'));
+        notifyError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorías de filtro'));
       });
 
     return () => {
@@ -278,7 +278,7 @@ export const DocumentsPage = () => {
     void fetchStats();
     notifySuccess(
       replacedFile
-        ? 'Documento vigente publicado correctamente. La version anterior quedo derogada.'
+        ? 'Documento vigente publicado correctamente. La versión anterior quedó derogada.'
         : 'Metadata del documento actualizada correctamente.',
     );
   };
@@ -298,8 +298,8 @@ export const DocumentsPage = () => {
           : `Reactivar "${document.title}"`,
       description:
         nextStatus === 'inactive'
-          ? 'El documento dejara de estar vigente para los usuarios finales, pero se conservara en el historial.'
-          : 'El documento volvera a mostrarse como vigente si las reglas del backend lo permiten.',
+          ? 'El documento dejará de estar vigente para los usuarios finales, pero se conservará en el historial.'
+          : 'El documento volverá a mostrarse como vigente si las reglas del backend lo permiten.',
       confirmLabel: nextStatus === 'inactive' ? 'Inactivar' : 'Reactivar',
     });
 
@@ -334,7 +334,7 @@ export const DocumentsPage = () => {
           </h1>
           <p className="text-sm text-[var(--unilabor-neutral)]">
             {isViewer
-              ? 'Acceso de solo lectura a los documentos vigentes de las categorias asignadas.'
+              ? 'Acceso de solo lectura a los documentos vigentes de las categorías asignadas.'
               : 'Administra documentos vigentes, historial derogado y estados operativos.'}
           </p>
           {canManageDocuments && (
@@ -395,10 +395,10 @@ export const DocumentsPage = () => {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[var(--color-brand-700)]">
-              Filtros de busqueda
+              Filtros de búsqueda
             </h2>
             <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-              Filtra por categoria, nombre o descripcion, titulo y fecha de publicacion.
+              Filtra por categoría, nombre o descripción, título y fecha de publicación.
             </p>
           </div>
 
@@ -420,7 +420,7 @@ export const DocumentsPage = () => {
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div>
                 <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-              Categoria
+              Categoría
             </label>
             <select
               value={filterForm.category_id}
@@ -432,7 +432,7 @@ export const DocumentsPage = () => {
               }
               className="w-full appearance-none rounded-2xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
             >
-              <option value="">Todas las categorias</option>
+              <option value="">Todas las categorías</option>
               {filterCategories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -443,7 +443,7 @@ export const DocumentsPage = () => {
 
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-              Nombre / descripcion
+              Nombre / descripción
             </label>
             <input
               type="text"
@@ -461,7 +461,7 @@ export const DocumentsPage = () => {
 
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-              Titulo
+              Título
             </label>
             <input
               type="text"
@@ -479,7 +479,7 @@ export const DocumentsPage = () => {
 
           <div>
             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-              Fecha de publicacion
+              Fecha de publicación
             </label>
             <input
               type="date"
@@ -553,10 +553,10 @@ export const DocumentsPage = () => {
           </p>
           <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">
             {hasAppliedFilters
-              ? 'Prueba ajustando la categoria, el texto de busqueda o la fecha de publicacion.'
+              ? 'Prueba ajustando la categoría, el texto de búsqueda o la fecha de publicación.'
               : canManageDocuments
                 ? 'Publica un nuevo documento o cambia el filtro para revisar documentos inactivos y derogados.'
-                : 'Consulta mas tarde o verifica que tengas categorias asignadas.'}
+                : 'Consulta más tarde o verifica que tengas categorías asignadas.'}
           </p>
         </div>
       ) : (
@@ -573,7 +573,7 @@ export const DocumentsPage = () => {
               >
                 <div className="mb-4 flex flex-wrap items-start gap-2">
                   <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
-                    {doc.category_name || 'Sin area'}
+                    {doc.category_name || 'Sin área'}
                   </span>
                   <span
                     className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getStatusBadgeClassName(doc.status)}`}
@@ -589,15 +589,15 @@ export const DocumentsPage = () => {
 
                 <h3 className="truncate text-base font-bold text-[var(--color-brand-700)]">{doc.title}</h3>
                 <p className="mt-2 line-clamp-2 text-sm text-[var(--unilabor-neutral)]">
-                  {doc.description || 'Sin descripcion'}
+                  {doc.description || 'Sin descripción'}
                 </p>
 
                 {(doc.replaced_by_document_id || doc.replaces_document_id) && (
                   <div className="mt-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.9)] px-3 py-2 text-xs text-[var(--unilabor-ink)]">
                     {doc.status === 'superseded' && doc.replaced_by_document_id
-                      ? `Derogado por la version ${doc.replaced_by_document_id}.`
+                      ? `Derogado por la versión ${doc.replaced_by_document_id}.`
                       : doc.replaces_document_id
-                        ? `Esta version sustituye al documento ${doc.replaces_document_id}.`
+                        ? `Esta versión sustituye al documento ${doc.replaces_document_id}.`
                         : ''}
                   </div>
                 )}

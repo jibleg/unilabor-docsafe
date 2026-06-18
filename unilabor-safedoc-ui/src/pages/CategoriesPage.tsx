@@ -33,7 +33,7 @@ export const CategoriesPage = () => {
       const data = await fetchCategories();
       setCategories(data);
     } catch (requestError) {
-      notifyError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorias'));
+      notifyError(getApiErrorMessage(requestError, 'No se pudieron cargar las categorías'));
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ export const CategoriesPage = () => {
   const saveEdition = async (categoryId: number) => {
     const nextName = editingName.trim();
     if (!nextName) {
-      notifyWarning('El nombre de la categoria es obligatorio');
+      notifyWarning('El nombre de la categoría es obligatorio');
       return;
     }
 
@@ -100,7 +100,7 @@ export const CategoriesPage = () => {
       );
       cancelEdit();
     } catch (requestError) {
-      notifyError(getApiErrorMessage(requestError, 'No se pudo actualizar la categoria'));
+      notifyError(getApiErrorMessage(requestError, 'No se pudo actualizar la categoría'));
     } finally {
       setSavingId(null);
     }
@@ -122,9 +122,9 @@ export const CategoriesPage = () => {
         ({ closeToast }) => (
           <div className="space-y-3">
             <p className="text-sm text-[var(--color-brand-700)]">
-              Se eliminara la categoria <span className="font-bold">"{categoryName}"</span>.
+              Se eliminará la categoría <span className="font-bold">"{categoryName}"</span>.
             </p>
-            <p className="text-xs text-[var(--unilabor-neutral)]">Esta accion no se puede deshacer.</p>
+            <p className="text-xs text-[var(--unilabor-neutral)]">Esta acción no se puede deshacer.</p>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -174,9 +174,9 @@ export const CategoriesPage = () => {
       if (editingId === category.id) {
         cancelEdit();
       }
-      notifySuccess('Categoria eliminada correctamente');
+      notifySuccess('Categoría eliminada correctamente');
     } catch (requestError) {
-      notifyError(getApiErrorMessage(requestError, 'No se pudo eliminar la categoria'));
+      notifyError(getApiErrorMessage(requestError, 'No se pudo eliminar la categoría'));
     } finally {
       setDeletingId(null);
     }
@@ -198,7 +198,7 @@ export const CategoriesPage = () => {
   const submitNewCategory = async () => {
     const normalizedName = newCategoryName.trim();
     if (!normalizedName) {
-      notifyWarning('El nombre de la categoria es obligatorio');
+      notifyWarning('El nombre de la categoría es obligatorio');
       return;
     }
 
@@ -209,7 +209,7 @@ export const CategoriesPage = () => {
       setNewCategoryName('');
       await loadCategories();
     } catch (requestError) {
-      notifyError(getApiErrorMessage(requestError, 'No se pudo crear la categoria'));
+      notifyError(getApiErrorMessage(requestError, 'No se pudo crear la categoría'));
     } finally {
       setCreating(false);
     }
@@ -219,9 +219,9 @@ export const CategoriesPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Categorias</h1>
+          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Categorías</h1>
           <p className="text-sm text-[var(--unilabor-neutral)]">
-            Gestiona las categorias disponibles para clasificar documentos.
+            Gestiona las categorías disponibles para clasificar documentos.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -231,7 +231,7 @@ export const CategoriesPage = () => {
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
           >
             <Plus size={16} />
-            Nueva categoria
+            Nueva categoría
           </button>
           <button
             type="button"
@@ -251,12 +251,12 @@ export const CategoriesPage = () => {
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar categoria..."
+            placeholder="Buscar categoría..."
             className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)] lg:max-w-md"
           />
 
           <div className="flex items-center gap-2 text-xs text-[var(--unilabor-neutral)]">
-            <span>Filas por pagina</span>
+            <span>Filas por página</span>
             <select
               value={pageSize}
               onChange={(event) => setPageSize(Number(event.target.value))}
@@ -288,13 +288,13 @@ export const CategoriesPage = () => {
             {loading ? (
               <tr>
                 <td colSpan={2} className="p-10 text-center text-[var(--unilabor-neutral)]">
-                  Cargando categorias...
+                  Cargando categorías...
                 </td>
               </tr>
             ) : visibleCategories.length === 0 ? (
               <tr>
                 <td colSpan={2} className="p-10 text-center text-[var(--unilabor-neutral)]">
-                  No hay categorias para mostrar.
+                  No hay categorías para mostrar.
                 </td>
               </tr>
             ) : (
@@ -384,7 +384,7 @@ export const CategoriesPage = () => {
             Anterior
           </button>
           <span className="text-xs font-semibold text-[var(--color-brand-700)]">
-            Pagina {currentPage} de {totalPages}
+            Página {currentPage} de {totalPages}
           </span>
           <button
             type="button"
@@ -401,7 +401,7 @@ export const CategoriesPage = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
             <div className="border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
-              <h2 className="text-base font-bold text-[var(--color-brand-700)]">Nueva categoria</h2>
+              <h2 className="text-base font-bold text-[var(--color-brand-700)]">Nueva categoría</h2>
             </div>
 
             <div className="space-y-4 px-4 py-4">
@@ -439,7 +439,7 @@ export const CategoriesPage = () => {
                   disabled={creating}
                   className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {creating ? 'Creando...' : 'Guardar categoria'}
+                  {creating ? 'Creando...' : 'Guardar categoría'}
                 </button>
               </div>
             </div>

@@ -29,7 +29,7 @@ export const RhLateRequestsPage = () => {
     setAuthorizingId(assignmentId);
     try {
       await authorizeLateAttempt(assignmentId);
-      notifySuccess('Autorizacion extemporanea otorgada. Se reabrio la ventana de 72h.');
+      notifySuccess('Autorización extemporánea otorgada. Se reabrió la ventana de 72h.');
       await load();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo autorizar la evaluacion.'));
@@ -42,13 +42,13 @@ export const RhLateRequestsPage = () => {
     <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-          Capacitacion
+          Capacitación
         </p>
         <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-[var(--color-brand-700)]">
           <Clock size={24} /> Evaluaciones vencidas
         </h1>
         <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-          Evaluaciones que vencieron sin realizarse. Autoriza una realizacion extemporanea para reabrir la ventana.
+          Evaluaciones que vencieron sin realizarse. Autoriza una realización extemporánea para reabrir la ventana.
         </p>
       </div>
 
@@ -74,7 +74,7 @@ export const RhLateRequestsPage = () => {
                 </p>
                 {item.late_requested_at && (
                   <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
-                    <Clock size={12} /> El colaborador solicito autorizacion
+                    <Clock size={12} /> El colaborador solicitó autorización
                   </span>
                 )}
               </div>
@@ -85,7 +85,7 @@ export const RhLateRequestsPage = () => {
                 className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
               >
                 {authorizingId === item.id ? <Loader2 size={15} className="animate-spin" /> : <UnlockKeyhole size={15} />}
-                Autorizar extemporaneo
+                Autorizar extemporáneo
               </button>
             </li>
           ))}

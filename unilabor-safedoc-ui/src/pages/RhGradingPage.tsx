@@ -16,7 +16,7 @@ export const RhGradingPage = () => {
       const result = await listGradingQueue({ page: 1, limit: 100 });
       setItems(result.data);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo cargar la bandeja de calificacion.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar la bandeja de calificación.'));
     } finally {
       setLoading(false);
     }
@@ -30,14 +30,14 @@ export const RhGradingPage = () => {
     <div className="space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-          Capacitacion
+          Capacitación
         </p>
         <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-[var(--color-brand-700)]">
-          <ClipboardCheck size={24} /> Calificacion de evaluaciones
+          <ClipboardCheck size={24} /> Calificación de evaluaciones
         </h1>
         <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-          Evaluaciones con preguntas abiertas pendientes de revision. Al cerrar la calificacion se resuelve
-          automaticamente si el colaborador acredita.
+          Evaluaciones con preguntas abiertas pendientes de revisión. Al cerrar la calificación se resuelve
+          automáticamente si el colaborador acredita.
         </p>
       </div>
 

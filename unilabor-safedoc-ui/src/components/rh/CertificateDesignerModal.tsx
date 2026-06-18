@@ -109,7 +109,7 @@ export const CertificateDesignerModal = ({ courseId, courseTitle, onClose }: Cer
   const persist = async (): Promise<boolean> => {
     if (!template) return false;
     if (!template.title_text.trim() || !template.body_text.trim()) {
-      notifyWarning('El titulo y el cuerpo de la constancia son obligatorios.');
+      notifyWarning('El título y el cuerpo de la constancia son obligatorios.');
       return false;
     }
     if (template.signatures.some((s) => !s.signatory_name.trim())) {
@@ -171,7 +171,7 @@ export const CertificateDesignerModal = ({ courseId, courseTitle, onClose }: Cer
         <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-              Disenador de constancia
+              Diseñador de constancia
             </p>
             <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{courseTitle}</h2>
           </div>
@@ -194,7 +194,7 @@ export const CertificateDesignerModal = ({ courseId, courseTitle, onClose }: Cer
             {/* Editor */}
             <div className="space-y-4 overflow-y-auto border-b border-[rgba(0,65,106,0.08)] p-5 lg:border-b-0 lg:border-r">
               <div>
-                <label className={labelClass}>Titulo</label>
+                <label className={labelClass}>Título</label>
                 <input value={template.title_text} onChange={(e) => patch({ title_text: e.target.value })} className={inputClass} />
               </div>
               <div>
@@ -211,7 +211,7 @@ export const CertificateDesignerModal = ({ courseId, courseTitle, onClose }: Cer
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelClass}>Orientacion</label>
+                  <label className={labelClass}>Orientación</label>
                   <select
                     value={template.orientation}
                     onChange={(e) => patch({ orientation: e.target.value as 'landscape' | 'portrait' })}

@@ -141,7 +141,7 @@ export const HelpdeskMyPortalPage = () => {
 
   const handleCreateTicket = async () => {
     if (!form.title.trim() || !form.description.trim()) {
-      notifyWarning('Captura titulo y descripcion de la solicitud.');
+      notifyWarning('Captura título y descripción de la solicitud.');
       return;
     }
 
@@ -225,7 +225,7 @@ export const HelpdeskMyPortalPage = () => {
           ['Equipos', summary.assets],
           ['Solicitudes', summary.tickets],
           ['Abiertas', summary.open],
-          ['Con solucion', summary.solved],
+          ['Con solución', summary.solved],
         ].map(([label, value]) => (
           <div key={label} className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)]">
             <p className="text-2xl font-black text-[var(--color-brand-700)]">{value}</p>
@@ -260,7 +260,7 @@ export const HelpdeskMyPortalPage = () => {
                   <p className="font-bold text-[var(--color-brand-700)]">{asset.asset_code}</p>
                   <p className="text-sm text-[var(--unilabor-ink)]">{asset.name}</p>
                   <p className="text-xs text-[var(--unilabor-neutral)]">
-                    {asset.operational_status?.name ?? 'Sin estado'} | {asset.location?.name ?? 'Sin ubicacion'}
+                    {asset.operational_status?.name ?? 'Sin estado'} | {asset.location?.name ?? 'Sin ubicación'}
                   </p>
                 </button>
               ))}
@@ -306,14 +306,14 @@ export const HelpdeskMyPortalPage = () => {
               <input
                 value={form.title}
                 onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Titulo"
+                placeholder="Título"
                 className="rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none"
               />
               <textarea
                 value={form.description}
                 onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
                 rows={3}
-                placeholder="Descripcion de la falla o solicitud"
+                placeholder="Descripción de la falla o solicitud"
                 className="rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none md:col-span-2"
               />
               <textarea
@@ -384,7 +384,7 @@ export const HelpdeskMyPortalPage = () => {
               <p className="mt-2 text-sm leading-6 text-[var(--unilabor-neutral)]">{selectedTicket.description}</p>
               {selectedTicket.solution_summary ? (
                 <div className="mt-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] p-3 text-sm">
-                  <p className="font-bold text-[var(--color-brand-700)]">Solucion registrada</p>
+                  <p className="font-bold text-[var(--color-brand-700)]">Solución registrada</p>
                   <p className="mt-1 leading-6 text-[var(--unilabor-ink)]">{selectedTicket.solution_summary}</p>
                 </div>
               ) : null}

@@ -118,13 +118,13 @@ export const HelpdeskMaintenancePage = () => {
           return refreshed ?? current;
         });
       } else {
-        notifyError(getApiErrorMessage(orderResult.reason, 'No se pudieron cargar las ordenes de mantenimiento.'));
+        notifyError(getApiErrorMessage(orderResult.reason, 'No se pudieron cargar las órdenes de mantenimiento.'));
       }
 
       if (catalogResult.status === 'fulfilled') {
         setCatalogs(catalogResult.value);
       } else {
-        notifyError(getApiErrorMessage(catalogResult.reason, 'No se pudieron cargar los catalogos de mantenimiento.'));
+        notifyError(getApiErrorMessage(catalogResult.reason, 'No se pudieron cargar los catálogos de mantenimiento.'));
       }
 
       if (assetResult.status === 'fulfilled') {
@@ -195,11 +195,11 @@ export const HelpdeskMaintenancePage = () => {
       return false;
     }
     if (!form.title.trim()) {
-      notifyWarning('El titulo del plan es obligatorio.');
+      notifyWarning('El título del plan es obligatorio.');
       return false;
     }
     if (!form.starts_on || !form.next_due_on) {
-      notifyWarning('Captura fecha de inicio y proxima ejecucion.');
+      notifyWarning('Captura fecha de inicio y próxima ejecución.');
       return false;
     }
     return true;
@@ -284,7 +284,7 @@ export const HelpdeskMaintenancePage = () => {
       return;
     }
     if (!rescheduleForm.scheduled_for || !rescheduleForm.reschedule_reason.trim()) {
-      notifyWarning('Captura la nueva fecha y la justificacion de reprogramacion.');
+      notifyWarning('Captura la nueva fecha y la justificación de reprogramación.');
       return;
     }
 
@@ -369,7 +369,7 @@ export const HelpdeskMaintenancePage = () => {
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Planes y calendario</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--unilabor-neutral)]">
-            Programa mantenimientos por activo, frecuencia, responsable, ventana de ejecucion y checklist requerido.
+            Programa mantenimientos por activo, frecuencia, responsable, ventana de ejecución y checklist requerido.
           </p>
         </div>
 
@@ -399,8 +399,8 @@ export const HelpdeskMaintenancePage = () => {
         {[
           { label: 'Planes', value: summary.total },
           { label: 'Vencidos', value: summary.overdue },
-          { label: 'Proximos 30 dias', value: summary.soon },
-          { label: 'Ordenes en proceso', value: summary.inProgress },
+          { label: 'Próximos 30 días', value: summary.soon },
+          { label: 'Órdenes en proceso', value: summary.inProgress },
         ].map((item) => (
           <div key={item.label} className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)]">
             <p className="text-2xl font-black text-[var(--color-brand-700)]">{item.value}</p>
@@ -427,7 +427,7 @@ export const HelpdeskMaintenancePage = () => {
                 <tr>
                   <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Plan</th>
                   <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Activo</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Proxima ejecucion</th>
+                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Próxima ejecución</th>
                   <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acciones</th>
                 </tr>
               </thead>
@@ -515,8 +515,8 @@ export const HelpdeskMaintenancePage = () => {
                   ['Responsable', selectedPlan.responsible_employee?.full_name ?? 'Sin responsable'],
                   ['Proveedor', selectedPlan.provider_name ?? 'Interno / sin proveedor'],
                   ['Inicio', formatDate(selectedPlan.starts_on)],
-                  ['Proxima ejecucion', formatDate(selectedPlan.next_due_on)],
-                  ['Ventana', `${selectedPlan.tolerance_before_days} dias antes / ${selectedPlan.tolerance_after_days} dias despues`],
+                  ['Próxima ejecución', formatDate(selectedPlan.next_due_on)],
+                  ['Ventana', `${selectedPlan.tolerance_before_days} días antes / ${selectedPlan.tolerance_after_days} días después`],
                   ['Evidencia', selectedPlan.evidence_required ? 'Requerida' : 'No requerida'],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
@@ -543,7 +543,7 @@ export const HelpdeskMaintenancePage = () => {
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Ordenes programadas</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Órdenes programadas</p>
                 {selectedPlan.orders.map((order) => (
                   <div key={order.id} className="space-y-2 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-sm">
                     <div>
@@ -619,7 +619,7 @@ export const HelpdeskMaintenancePage = () => {
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block md:col-span-2">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Titulo</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Título</span>
                   <input
                     value={form.title}
                     onChange={(event) => setField('title', event.target.value)}
@@ -689,7 +689,7 @@ export const HelpdeskMaintenancePage = () => {
                 </label>
 
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Proxima ejecucion</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Próxima ejecución</span>
                   <input
                     type="date"
                     value={form.next_due_on}
@@ -710,7 +710,7 @@ export const HelpdeskMaintenancePage = () => {
                 </label>
 
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Tolerancia despues</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Tolerancia después</span>
                   <input
                     type="number"
                     min="0"
@@ -721,7 +721,7 @@ export const HelpdeskMaintenancePage = () => {
                 </label>
 
                 <label className="block md:col-span-2">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Descripcion</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Descripción</span>
                   <textarea
                     rows={3}
                     value={form.description}
@@ -736,7 +736,7 @@ export const HelpdeskMaintenancePage = () => {
                     rows={5}
                     value={form.tasks_text}
                     onChange={(event) => setField('tasks_text', event.target.value)}
-                    placeholder="Una actividad por linea"
+                    placeholder="Una actividad por línea"
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                   />
                 </label>
