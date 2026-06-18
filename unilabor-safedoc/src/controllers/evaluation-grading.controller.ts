@@ -8,7 +8,11 @@ import {
 } from '../services/evaluation-grading.service';
 import { listOutbox, type OutboxChannel, type OutboxStatus } from '../services/outbox.service';
 import { authorizeLateAttempt, listExpiredAssignments } from '../services/evaluation-assignment.service';
-import { getEvaluationDashboard, getTraceabilityReport } from '../services/evaluation-report.service';
+import {
+  getEvaluationDashboard,
+  getEvaluationResponsesDetail,
+  getTraceabilityReport,
+} from '../services/evaluation-report.service';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -67,6 +71,9 @@ export const listNotificationLogController = async (req: AuthRequest, res: Respo
     const filters: Parameters<typeof listOutbox>[0] = { limit: Number.isFinite(limit) ? limit : 200 };
     if (channel) filters.channel = channel;
     if (status) filters.status = status;
+    const isDate = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+    if (isDate(req.query.from)) filters.from = req.query.from;
+    if (isDate(req.query.to)) filters.to = req.query.to;
     const data = await listOutbox(filters);
     return res.json({ data });
   } catch (error) {
@@ -99,11 +106,52 @@ export const traceabilityReportController = async (req: AuthRequest, res: Respon
     if (Number.isFinite(employeeId) && employeeId > 0) {
       filters.employee_id = employeeId;
     }
+    const validStatuses = [
+      'pending',
+      'in_progress',
+      'submitted',
+      'grading',
+      'passed',
+      'failed',
+      'expired',
+      'authorized_late',
+    ];
+    if (typeof req.query.status === 'string' && validStatuses.includes(req.query.status)) {
+      filters.status = req.query.status;
+    }
     const result = await getTraceabilityReport(filters);
     return res.json(result);
   } catch (error) {
     console.error('Error obteniendo reporte de trazabilidad:', error);
     return res.status(500).json({ message: 'No se pudo cargar el reporte de trazabilidad.' });
+  }
+};
+
+export const evaluationResponsesController = async (req: AuthRequest, res: Response) => {
+  const assignmentId = parseId(req.params.id);
+  if (!assignmentId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const detail = await getEvaluationResponsesDetail(assignmentId);
+    // Acceso a evidencia ISO: queda registrado en auditoria.
+    if (req.user?.id) {
+      await registerAuditEvent({
+        user_id: req.user.id,
+        action: `RH_EVAL_VIEW_RESPONSES:${assignmentId}`,
+        ip_address: req.ip ?? null,
+        module_code: 'RH',
+        entity_type: 'evaluation_assignment',
+        entity_id: assignmentId,
+      });
+    }
+    return res.json(detail);
+  } catch (error: any) {
+    if (error?.code === 'EVAL_ASSIGNMENT_NOT_FOUND') {
+      return res.status(404).json({ message: 'La evaluacion no existe.' });
+    }
+    console.error('Error obteniendo respuestas de la evaluacion:', error);
+    return res.status(500).json({ message: 'No se pudieron obtener las respuestas de la evaluacion.' });
   }
 };
 

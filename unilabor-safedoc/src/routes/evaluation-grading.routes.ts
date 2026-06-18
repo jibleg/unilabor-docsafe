@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   authorizeLateController,
   evaluationDashboardController,
+  evaluationResponsesController,
   getGradingDetailController,
   gradeEvaluationController,
   listExpiredAssignmentsController,
@@ -27,6 +28,7 @@ router.get('/expired', listExpiredAssignmentsController);
 router.get('/dashboard', evaluationDashboardController);
 router.get('/report', traceabilityReportController);
 router.get('/:id/grading', getGradingDetailController);
+router.get('/:id/responses', evaluationResponsesController);
 router.post('/:id/grade', validate(gradeEvaluationSchema), gradeEvaluationController);
 router.post('/:id/authorize-late', authorizeLateController);
 

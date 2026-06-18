@@ -127,6 +127,7 @@ export interface TraceabilityRow {
 export interface TraceabilityFilters extends PaginationInput {
   course_id?: number;
   employee_id?: number;
+  status?: string;
 }
 
 export const getTraceabilityReport = async (
@@ -144,6 +145,10 @@ export const getTraceabilityReport = async (
   if (filters.employee_id) {
     values.push(filters.employee_id);
     conditions.push(`a.employee_id = $${values.length}`);
+  }
+  if (filters.status) {
+    values.push(filters.status);
+    conditions.push(`a.status = $${values.length}`);
   }
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -193,4 +198,143 @@ export const getTraceabilityReport = async (
     values,
   );
   return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
+};
+
+// --- Detalle de respuestas de una evaluacion realizada (evidencia ISO) ---
+
+export interface ResponseOptionDetail {
+  id: number;
+  text: string;
+  is_correct: boolean;
+  selected: boolean;
+}
+
+export interface QuestionResponseDetail {
+  question_id: number;
+  type: 'single' | 'multiple' | 'boolean' | 'open';
+  text: string;
+  points: number;
+  points_awarded: number;
+  is_correct: boolean;
+  answered: boolean;
+  text_answer: string | null;
+  options: ResponseOptionDetail[];
+}
+
+export interface EvaluationResponsesDetail {
+  assignment: {
+    id: number;
+    employee_name: string;
+    employee_code: string;
+    course_title: string;
+    template_title: string;
+    status: string;
+    score: number | null;
+    max_score: number | null;
+    percentage: number | null;
+    passing_score: number;
+    submitted_at: string | null;
+    graded_at: string | null;
+  };
+  questions: QuestionResponseDetail[];
+}
+
+/**
+ * Detalle completo de lo contestado por un colaborador en una evaluacion: cada
+ * pregunta con sus opciones (correctas y marcadas), respuesta abierta y puntaje.
+ * Permite a RH revisar la evidencia exacta de cada evaluacion realizada.
+ */
+export const getEvaluationResponsesDetail = async (
+  assignmentId: number,
+): Promise<EvaluationResponsesDetail> => {
+  const aRes = await pool.query(
+    `SELECT a.id, a.status, a.score, a.max_score, a.percentage, a.submitted_at, a.graded_at,
+            t.title AS template_title, t.passing_score,
+            c.title AS course_title,
+            e.full_name AS employee_name, e.employee_code
+       FROM public.evaluation_assignments a
+       JOIN public.evaluation_templates t ON t.id = a.template_id
+       JOIN public.training_courses c ON c.id = t.training_course_id
+       JOIN public.employees e ON e.id = a.employee_id
+      WHERE a.id = $1 LIMIT 1;`,
+    [assignmentId],
+  );
+  if (aRes.rows.length === 0) {
+    const error = new Error('EVAL_ASSIGNMENT_NOT_FOUND');
+    (error as any).code = 'EVAL_ASSIGNMENT_NOT_FOUND';
+    throw error;
+  }
+  const a = aRes.rows[0];
+
+  const rRes = await pool.query(
+    `SELECT q.id AS question_id, q.type, q.text, q.points,
+            r.selected_option_ids, r.text_answer, r.is_correct, r.points_awarded,
+            COALESCE(aq.sort_order, q.sort_order, q.id) AS ord
+       FROM public.evaluation_responses r
+       JOIN public.evaluation_questions q ON q.id = r.question_id
+       LEFT JOIN public.evaluation_assignment_questions aq
+              ON aq.assignment_id = r.assignment_id AND aq.question_id = r.question_id
+      WHERE r.assignment_id = $1
+      ORDER BY ord ASC, q.id ASC;`,
+    [assignmentId],
+  );
+
+  const questionIds = rRes.rows.map((row) => Number(row.question_id));
+  const optionsByQuestion = new Map<number, Array<{ id: number; text: string; is_correct: boolean }>>();
+  if (questionIds.length > 0) {
+    const oRes = await pool.query(
+      `SELECT question_id, id, text, is_correct
+         FROM public.evaluation_question_options
+        WHERE question_id = ANY($1::int[])
+        ORDER BY question_id ASC, sort_order ASC, id ASC;`,
+      [questionIds],
+    );
+    for (const row of oRes.rows) {
+      const qid = Number(row.question_id);
+      const list = optionsByQuestion.get(qid) ?? [];
+      list.push({ id: Number(row.id), text: String(row.text), is_correct: Boolean(row.is_correct) });
+      optionsByQuestion.set(qid, list);
+    }
+  }
+
+  const questions: QuestionResponseDetail[] = rRes.rows.map((row) => {
+    const selectedIds: number[] = Array.isArray(row.selected_option_ids)
+      ? row.selected_option_ids.map((value: unknown) => Number(value))
+      : [];
+    const options = (optionsByQuestion.get(Number(row.question_id)) ?? []).map((option) => ({
+      ...option,
+      selected: selectedIds.includes(option.id),
+    }));
+    const textAnswer = row.text_answer ? String(row.text_answer) : null;
+    const answered = row.type === 'open' ? Boolean(textAnswer && textAnswer.trim().length > 0) : selectedIds.length > 0;
+    return {
+      question_id: Number(row.question_id),
+      type: row.type,
+      text: String(row.text),
+      points: Number(row.points),
+      points_awarded: Number(row.points_awarded),
+      is_correct: Boolean(row.is_correct),
+      answered,
+      text_answer: textAnswer,
+      options,
+    };
+  });
+
+  return {
+    assignment: {
+      id: Number(a.id),
+      employee_name: String(a.employee_name),
+      employee_code: String(a.employee_code),
+      course_title: String(a.course_title),
+      template_title: String(a.template_title),
+      status: String(a.status),
+      score: a.score !== null ? Number(a.score) : null,
+      max_score: a.max_score !== null ? Number(a.max_score) : null,
+      percentage: a.percentage !== null ? Number(a.percentage) : null,
+      passing_score: Number(a.passing_score),
+      submitted_at: a.submitted_at ? String(a.submitted_at) : null,
+      graded_at: a.graded_at ? String(a.graded_at) : null,
+    },
+    questions,
+  };
 };

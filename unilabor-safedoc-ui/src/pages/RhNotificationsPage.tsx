@@ -11,24 +11,30 @@ const STATUS_META: Record<NotificationLogEntry['status'], { label: string; class
 };
 
 const TEMPLATE_LABELS: Record<string, string> = {
-  evaluation_available: 'Evaluacion disponible',
+  evaluation_available: 'Evaluación disponible',
   evaluation_reminder: 'Recordatorio',
   evaluation_expired_rh: 'Vencida (RH)',
   not_accredited_rh: 'No acreditado (RH)',
   credential_welcome: 'Bienvenida',
-  credential_reset: 'Reset de contrasena',
-  credential_recovery: 'Recuperacion',
+  credential_reset: 'Reset de contraseña',
+  credential_recovery: 'Recuperación',
   generic: 'General',
 };
 
 type ChannelFilter = '' | 'email' | 'sms';
 type StatusFilter = '' | 'sent' | 'failed' | 'skipped';
 
+/** Fecha local de hoy en formato YYYY-MM-DD (compatible con <input type="date">). */
+const todayIso = (): string => new Date().toLocaleDateString('en-CA');
+
 export const RhNotificationsPage = () => {
   const [items, setItems] = useState<NotificationLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState<ChannelFilter>('');
   const [status, setStatus] = useState<StatusFilter>('');
+  // Por defecto la bandeja muestra los envios del dia actual.
+  const [from, setFrom] = useState<string>(todayIso());
+  const [to, setTo] = useState<string>(todayIso());
   const [detail, setDetail] = useState<NotificationLogEntry | null>(null);
 
   const load = useCallback(async () => {
@@ -39,6 +45,8 @@ export const RhNotificationsPage = () => {
           limit: 300,
           ...(channel ? { channel } : {}),
           ...(status ? { status } : {}),
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
         }),
       );
     } catch (error) {
@@ -46,7 +54,7 @@ export const RhNotificationsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [channel, status]);
+  }, [channel, status, from, to]);
 
   useEffect(() => {
     void load();
@@ -60,7 +68,7 @@ export const RhNotificationsPage = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-            Capacitacion
+            Capacitación
           </p>
           <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-[var(--color-brand-700)]">
             <Inbox size={24} /> Bandeja de salida
@@ -69,7 +77,37 @@ export const RhNotificationsPage = () => {
             Trazabilidad de todos los correos y SMS enviados por el sistema (con su contenido y estado).
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+            Desde
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.target.value)}
+              className={`${selectClass} mt-1`}
+            />
+          </label>
+          <label className="flex flex-col text-[10px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+            Hasta
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.target.value)}
+              className={`${selectClass} mt-1`}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              setFrom(todayIso());
+              setTo(todayIso());
+            }}
+            className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+          >
+            Hoy
+          </button>
           <select value={channel} onChange={(e) => setChannel(e.target.value as ChannelFilter)} className={selectClass}>
             <option value="">Todos los canales</option>
             <option value="email">Correo</option>
@@ -90,7 +128,7 @@ export const RhNotificationsPage = () => {
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[rgba(0,65,106,0.18)] bg-[rgba(248,251,253,0.7)] py-16 text-center text-sm text-[var(--unilabor-neutral)]">
-          No hay envios registrados.
+          No hay envíos registrados.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/90">
@@ -149,7 +187,7 @@ export const RhNotificationsPage = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/96 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
-              <h2 className="text-base font-bold text-[var(--color-brand-700)]">Detalle del envio</h2>
+              <h2 className="text-base font-bold text-[var(--color-brand-700)]">Detalle del envío</h2>
               <button
                 type="button"
                 onClick={() => setDetail(null)}

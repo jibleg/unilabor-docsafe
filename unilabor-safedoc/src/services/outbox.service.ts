@@ -62,6 +62,10 @@ export interface OutboxRow {
 export interface OutboxFilters {
   channel?: OutboxChannel;
   status?: OutboxStatus;
+  /** Fecha inicial (YYYY-MM-DD), inclusiva. */
+  from?: string;
+  /** Fecha final (YYYY-MM-DD), inclusiva (incluye todo el dia). */
+  to?: string;
   limit?: number;
 }
 
@@ -76,6 +80,14 @@ export const listOutbox = async (filters: OutboxFilters = {}): Promise<OutboxRow
   if (filters.status) {
     values.push(filters.status);
     conditions.push(`n.status = $${values.length}`);
+  }
+  if (filters.from) {
+    values.push(filters.from);
+    conditions.push(`n.sent_at >= $${values.length}::date`);
+  }
+  if (filters.to) {
+    values.push(filters.to);
+    conditions.push(`n.sent_at < ($${values.length}::date + INTERVAL '1 day')`);
   }
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const limit = Math.min(Math.max(filters.limit ?? 200, 1), 1000);

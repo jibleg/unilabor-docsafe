@@ -463,6 +463,7 @@ export interface EmployeeDocument {
   version: number;
   is_current: boolean;
   replaces_document_id?: number | null;
+  reference_key?: string | null;
   created_at?: string;
   updated_at?: string;
   uploaded_by_name?: string | null;
@@ -794,6 +795,43 @@ export interface EvaluationGradingDetail {
     max_score: number;
   };
   open_answers: OpenAnswerToGrade[];
+}
+
+export interface EvaluationResponseOption {
+  id: number;
+  text: string;
+  is_correct: boolean;
+  selected: boolean;
+}
+
+export interface EvaluationQuestionResponse {
+  question_id: number;
+  type: EvaluationQuestionType;
+  text: string;
+  points: number;
+  points_awarded: number;
+  is_correct: boolean;
+  answered: boolean;
+  text_answer: string | null;
+  options: EvaluationResponseOption[];
+}
+
+export interface EvaluationResponsesDetail {
+  assignment: {
+    id: number;
+    employee_name: string;
+    employee_code: string;
+    course_title: string;
+    template_title: string;
+    status: EvaluationAssignmentStatus;
+    score: number | null;
+    max_score: number | null;
+    percentage: number | null;
+    passing_score: number;
+    submitted_at: string | null;
+    graded_at: string | null;
+  };
+  questions: EvaluationQuestionResponse[];
 }
 
 export interface EvaluationAssignment {

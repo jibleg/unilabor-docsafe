@@ -27,6 +27,9 @@ import type {
   EvaluationTemplate,
   EvaluationDashboard,
   EvaluationTemplateStatus,
+  EvaluationResponsesDetail,
+  EvaluationResponseOption,
+  EvaluationQuestionResponse,
   NotificationLogEntry,
   OpenAnswerToGrade,
   TraceabilityRow,
@@ -461,11 +464,14 @@ export const getEvaluationDashboard = async (): Promise<EvaluationDashboard> => 
 };
 
 export const getTraceabilityReport = async (
-  query: PageQuery & { course_id?: number } = {},
+  query: PageQuery & { course_id?: number; status?: string } = {},
 ): Promise<PageResult<TraceabilityRow>> => {
   const params: Record<string, string | number> = { ...buildPageParams(query) };
   if (query.course_id) {
     params.course_id = query.course_id;
+  }
+  if (query.status) {
+    params.status = query.status;
   }
   const response = await api.get('/rh/evaluations/report', { params });
   const data = getArrayFromPayload(response.data, ['data', 'items'])
@@ -508,11 +514,19 @@ export const authorizeLateAttempt = async (assignmentId: number): Promise<void> 
 };
 
 export const listNotificationLog = async (
-  filters: { limit?: number; channel?: 'email' | 'sms'; status?: 'sent' | 'failed' | 'skipped' } = {},
+  filters: {
+    limit?: number;
+    channel?: 'email' | 'sms';
+    status?: 'sent' | 'failed' | 'skipped';
+    from?: string;
+    to?: string;
+  } = {},
 ): Promise<NotificationLogEntry[]> => {
   const params: Record<string, string | number> = { limit: filters.limit ?? 200 };
   if (filters.channel) params.channel = filters.channel;
   if (filters.status) params.status = filters.status;
+  if (filters.from) params.from = filters.from;
+  if (filters.to) params.to = filters.to;
   const response = await api.get('/rh/evaluations/notifications', { params });
   return getArrayFromPayload(response.data, ['data', 'items'])
     .map((raw): NotificationLogEntry | null => {
@@ -585,6 +599,66 @@ export const getGradingDetail = async (assignmentId: number): Promise<Evaluation
   };
 };
 
+export const getEvaluationResponses = async (
+  assignmentId: number,
+): Promise<EvaluationResponsesDetail | null> => {
+  const response = await api.get(`/rh/evaluations/${assignmentId}/responses`);
+  const payload = asRecord(unwrapPayload(response.data));
+  const assignment = asRecord(payload?.assignment);
+  if (!assignment) {
+    return null;
+  }
+  const questions: EvaluationQuestionResponse[] = getArrayFromPayload(payload, ['questions'])
+    .map((raw): EvaluationQuestionResponse | null => {
+      const q = asRecord(raw);
+      const questionId = q ? getNumber(q, ['question_id']) : null;
+      if (!q || !questionId) return null;
+      const options: EvaluationResponseOption[] = getArrayFromPayload(q, ['options'])
+        .map((rawOption): EvaluationResponseOption | null => {
+          const o = asRecord(rawOption);
+          const optionId = o ? getNumber(o, ['id']) : null;
+          if (!o || !optionId) return null;
+          return {
+            id: optionId,
+            text: getString(o, ['text']),
+            is_correct: getBoolean(o, ['is_correct']),
+            selected: getBoolean(o, ['selected']),
+          };
+        })
+        .filter((o): o is EvaluationResponseOption => o !== null);
+      return {
+        question_id: questionId,
+        type: (getString(q, ['type']) as EvaluationQuestionType) || 'single',
+        text: getString(q, ['text']),
+        points: getNumber(q, ['points']) ?? 0,
+        points_awarded: getNumber(q, ['points_awarded']) ?? 0,
+        is_correct: getBoolean(q, ['is_correct']),
+        answered: getBoolean(q, ['answered']),
+        text_answer: getString(q, ['text_answer']) || null,
+        options,
+      };
+    })
+    .filter((q): q is EvaluationQuestionResponse => q !== null);
+
+  return {
+    assignment: {
+      id: getNumber(assignment, ['id']) ?? assignmentId,
+      employee_name: getString(assignment, ['employee_name']),
+      employee_code: getString(assignment, ['employee_code']),
+      course_title: getString(assignment, ['course_title']),
+      template_title: getString(assignment, ['template_title']),
+      status: (getString(assignment, ['status']) as EvaluationAssignmentStatus) || 'submitted',
+      score: getNumber(assignment, ['score']),
+      max_score: getNumber(assignment, ['max_score']),
+      percentage: getNumber(assignment, ['percentage']),
+      passing_score: getNumber(assignment, ['passing_score']) ?? 80,
+      submitted_at: getString(assignment, ['submitted_at']) || null,
+      graded_at: getString(assignment, ['graded_at']) || null,
+    },
+    questions,
+  };
+};
+
 export const gradeEvaluation = async (
   assignmentId: number,
   grades: { question_id: number; points_awarded: number }[],
@@ -615,7 +689,7 @@ const normalizeCertificateTemplate = (input: unknown, courseId: number): Certifi
   return {
     id: source ? getNumber(source, ['id']) ?? null : null,
     training_course_id: source ? getNumber(source, ['training_course_id']) ?? courseId : courseId,
-    title_text: getString(source ?? {}, ['title_text']) || 'Constancia de capacitacion',
+    title_text: getString(source ?? {}, ['title_text']) || 'Constancia de capacitación',
     body_text: getString(source ?? {}, ['body_text']),
     logo_path: getString(source ?? {}, ['logo_path']) || null,
     orientation: (getString(source ?? {}, ['orientation']) as 'landscape' | 'portrait') || 'landscape',
