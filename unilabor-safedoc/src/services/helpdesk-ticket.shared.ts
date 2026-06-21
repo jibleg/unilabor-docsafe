@@ -1,5 +1,6 @@
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
+import type { Queryable } from '../utils/transaction';
 import { getEmployeeByUserId } from './employee.service';
 import type { HelpdeskCatalogItem } from './helpdesk-asset.service';
 
@@ -420,12 +421,13 @@ export const updateAssetStatusAndHistory = async (
   ticketId: number,
   summary: string,
   userId?: string | null,
+  executor: Queryable = pool,
 ) => {
   if (!assetId || !statusId) {
     return;
   }
 
-  await pool.query(
+  await executor.query(
     `
       UPDATE public.helpdesk_assets
       SET operational_status_id = $1, updated_by_user_id = $2, updated_at = NOW()
@@ -434,7 +436,7 @@ export const updateAssetStatusAndHistory = async (
     [statusId, userId ?? null, assetId],
   );
 
-  await pool.query(
+  await executor.query(
     `
       INSERT INTO public.helpdesk_asset_history (
         asset_id,
@@ -459,10 +461,8 @@ export const updateAssetStatusAndHistory = async (
 };
 
 export const generateTicketCode = async (): Promise<string> => {
-  const result = await pool.query(`
-    SELECT COALESCE(MAX(id), 0) + 1 AS next_id
-    FROM public.helpdesk_tickets;
-  `);
+  // nextval es atomico: no colisiona aunque dos solicitudes lleguen a la vez.
+  const result = await pool.query(`SELECT nextval('public.helpdesk_ticket_code_seq') AS next_id;`);
   const nextId = Number(result.rows[0]?.next_id ?? 0);
   return `HD-${String(nextId).padStart(6, '0')}`;
 };
@@ -474,8 +474,9 @@ export const recordTicketHistory = async (
   userId?: string | null,
   previousValues?: unknown,
   newValues?: unknown,
+  executor: Queryable = pool,
 ) => {
-  await pool.query(
+  await executor.query(
     `
       INSERT INTO public.helpdesk_ticket_history (
         ticket_id,

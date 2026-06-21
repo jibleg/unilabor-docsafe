@@ -30,6 +30,7 @@ import type {
 } from '../types/models';
 import { getModuleRole } from '../utils/modules';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+import { confirmAction } from '../utils/confirm';
 import { hasAnyRole } from '../utils/roles';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
@@ -313,6 +314,16 @@ export const HelpdeskAssetsPage = () => {
 
   const handleDelete = async (asset: HelpdeskAsset) => {
     if (!canDelete) {
+      return;
+    }
+
+    const confirmed = await confirmAction(
+      `Se dará de baja el activo "${asset.name}" (${asset.asset_code}).`,
+      'El activo quedará inactivo y dejará de aparecer en el inventario operativo.',
+      'Dar de baja',
+    );
+
+    if (!confirmed) {
       return;
     }
 

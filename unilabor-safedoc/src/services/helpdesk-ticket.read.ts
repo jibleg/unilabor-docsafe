@@ -449,7 +449,8 @@ export const getMyHelpdeskTicketById = async (
   await assertTicketsTable();
 
   const employee = await getRequiredEmployeeByUserId(userId);
-  const ticket = await getHelpdeskTicketById(ticketId);
+  // El colaborador (vía /me) NO debe ver comentarios internos del equipo de soporte.
+  const ticket = await getHelpdeskTicketById(ticketId, false);
   if (!ticket || ticket.requester_employee_id !== employee.id) {
     return null;
   }
@@ -457,7 +458,10 @@ export const getMyHelpdeskTicketById = async (
   return ticket;
 };
 
-export const listTicketComments = async (ticketId: number): Promise<HelpdeskTicketCommentRecord[]> => {
+export const listTicketComments = async (
+  ticketId: number,
+  includeInternal = true,
+): Promise<HelpdeskTicketCommentRecord[]> => {
   const result = await pool.query(
     `
       SELECT
@@ -466,6 +470,7 @@ export const listTicketComments = async (ticketId: number): Promise<HelpdeskTick
       FROM public.helpdesk_ticket_comments c
       LEFT JOIN public.users u ON u.id = c.created_by_user_id
       WHERE c.ticket_id = $1
+        ${includeInternal ? '' : 'AND c.is_internal = FALSE'}
       ORDER BY c.created_at ASC;
     `,
     [ticketId],
@@ -482,7 +487,10 @@ export const listTicketComments = async (ticketId: number): Promise<HelpdeskTick
   }));
 };
 
-export const getHelpdeskTicketById = async (ticketId: number): Promise<HelpdeskTicketRecord | null> => {
+export const getHelpdeskTicketById = async (
+  ticketId: number,
+  includeInternalComments = true,
+): Promise<HelpdeskTicketRecord | null> => {
   await assertTicketsTable();
 
   const result = await pool.query(
@@ -499,7 +507,7 @@ export const getHelpdeskTicketById = async (ticketId: number): Promise<HelpdeskT
   }
 
   const ticket = mapTicketRow(result.rows[0]);
-  ticket.comments = await listTicketComments(ticketId);
+  ticket.comments = await listTicketComments(ticketId, includeInternalComments);
   return ticket;
 };
 

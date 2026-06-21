@@ -1,5 +1,6 @@
 import pool from '../config/db';
 import { toIsoDate, toIsoDateTime } from '../utils/date-serialization';
+import { withTransaction, type Queryable } from '../utils/transaction';
 import type { HelpdeskCatalogItem } from './helpdesk-asset.service';
 import {
   PaginatedResult,
@@ -166,18 +167,14 @@ const normalizeOptionalText = (value: unknown): string | null => {
 };
 
 const generatePlanCode = async (): Promise<string> => {
-  const result = await pool.query(`
-    SELECT COALESCE(MAX(id), 0) + 1 AS next_id
-    FROM public.helpdesk_maintenance_plans;
-  `);
+  // nextval es atomico: no colisiona aunque dos solicitudes lleguen a la vez.
+  const result = await pool.query(`SELECT nextval('public.helpdesk_maintenance_plan_code_seq') AS next_id;`);
   return `MP-${String(Number(result.rows[0]?.next_id ?? 0)).padStart(6, '0')}`;
 };
 
 const generateOrderCode = async (): Promise<string> => {
-  const result = await pool.query(`
-    SELECT COALESCE(MAX(id), 0) + 1 AS next_id
-    FROM public.helpdesk_maintenance_orders;
-  `);
+  // nextval es atomico: no colisiona aunque dos solicitudes lleguen a la vez.
+  const result = await pool.query(`SELECT nextval('public.helpdesk_maintenance_order_code_seq') AS next_id;`);
   return `OM-${String(Number(result.rows[0]?.next_id ?? 0)).padStart(6, '0')}`;
 };
 
@@ -571,10 +568,11 @@ const createScheduledOrder = async (
   toleranceBeforeDays: number,
   toleranceAfterDays: number,
   userId?: string | null,
+  executor: Queryable = pool,
 ) => {
   const orderCode = await generateOrderCode();
 
-  await pool.query(
+  await executor.query(
     `
       INSERT INTO public.helpdesk_maintenance_orders (
         order_code,
@@ -607,72 +605,77 @@ export const createMaintenancePlan = async (
   await assertMaintenanceTables();
 
   const planCode = await generatePlanCode();
-  const result = await pool.query(
-    `
-      INSERT INTO public.helpdesk_maintenance_plans (
-        plan_code,
-        asset_id,
-        frequency_id,
-        responsible_employee_id,
-        provider_name,
-        quality_document_id,
-        title,
-        description,
-        starts_on,
-        next_due_on,
-        tolerance_before_days,
-        tolerance_after_days,
-        checklist_required,
-        evidence_required,
-        created_by_user_id,
-        updated_by_user_id
-      )
-      VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14, $15, $15
-      )
-      RETURNING id;
-    `,
-    [
-      planCode,
+  const planId = await withTransaction(async (client) => {
+    const result = await client.query(
+      `
+        INSERT INTO public.helpdesk_maintenance_plans (
+          plan_code,
+          asset_id,
+          frequency_id,
+          responsible_employee_id,
+          provider_name,
+          quality_document_id,
+          title,
+          description,
+          starts_on,
+          next_due_on,
+          tolerance_before_days,
+          tolerance_after_days,
+          checklist_required,
+          evidence_required,
+          created_by_user_id,
+          updated_by_user_id
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8,
+          $9, $10, $11, $12, $13, $14, $15, $15
+        )
+        RETURNING id;
+      `,
+      [
+        planCode,
+        payload.asset_id,
+        payload.frequency_id ?? null,
+        payload.responsible_employee_id ?? null,
+        normalizeOptionalText(payload.provider_name),
+        payload.quality_document_id ?? null,
+        payload.title.trim(),
+        normalizeOptionalText(payload.description),
+        payload.starts_on,
+        payload.next_due_on,
+        Math.max(Number(payload.tolerance_before_days ?? 0), 0),
+        Math.max(Number(payload.tolerance_after_days ?? 0), 0),
+        payload.checklist_required ?? true,
+        payload.evidence_required ?? true,
+        userId ?? null,
+      ],
+    );
+
+    const id = Number(result.rows[0]?.id);
+    const tasks = (payload.tasks ?? []).map((task) => task.trim()).filter(Boolean);
+
+    for (const [index, task] of tasks.entries()) {
+      await client.query(
+        `
+          INSERT INTO public.helpdesk_maintenance_plan_tasks (plan_id, task_text, sort_order)
+          VALUES ($1, $2, $3);
+        `,
+        [id, task, (index + 1) * 10],
+      );
+    }
+
+    await createScheduledOrder(
+      id,
       payload.asset_id,
-      payload.frequency_id ?? null,
-      payload.responsible_employee_id ?? null,
-      normalizeOptionalText(payload.provider_name),
-      payload.quality_document_id ?? null,
-      payload.title.trim(),
-      normalizeOptionalText(payload.description),
-      payload.starts_on,
       payload.next_due_on,
       Math.max(Number(payload.tolerance_before_days ?? 0), 0),
       Math.max(Number(payload.tolerance_after_days ?? 0), 0),
-      payload.checklist_required ?? true,
-      payload.evidence_required ?? true,
-      userId ?? null,
-    ],
-  );
-
-  const planId = Number(result.rows[0]?.id);
-  const tasks = (payload.tasks ?? []).map((task) => task.trim()).filter(Boolean);
-
-  for (const [index, task] of tasks.entries()) {
-    await pool.query(
-      `
-        INSERT INTO public.helpdesk_maintenance_plan_tasks (plan_id, task_text, sort_order)
-        VALUES ($1, $2, $3);
-      `,
-      [planId, task, (index + 1) * 10],
+      userId,
+      client,
     );
-  }
 
-  await createScheduledOrder(
-    planId,
-    payload.asset_id,
-    payload.next_due_on,
-    Math.max(Number(payload.tolerance_before_days ?? 0), 0),
-    Math.max(Number(payload.tolerance_after_days ?? 0), 0),
-    userId,
-  );
+    return id;
+  });
 
   const created = await getMaintenancePlanById(planId);
   if (!created) {
@@ -696,66 +699,69 @@ export const updateMaintenancePlan = async (
     return null;
   }
 
-  await pool.query(
-    `
-      UPDATE public.helpdesk_maintenance_plans
-      SET
-        asset_id = $1,
-        frequency_id = $2,
-        responsible_employee_id = $3,
-        provider_name = $4,
-        quality_document_id = $5,
-        title = $6,
-        description = $7,
-        starts_on = $8,
-        next_due_on = $9,
-        tolerance_before_days = $10,
-        tolerance_after_days = $11,
-        checklist_required = $12,
-        evidence_required = $13,
-        updated_by_user_id = $14,
-        updated_at = NOW()
-      WHERE id = $15;
-    `,
-    [
+  await withTransaction(async (client) => {
+    await client.query(
+      `
+        UPDATE public.helpdesk_maintenance_plans
+        SET
+          asset_id = $1,
+          frequency_id = $2,
+          responsible_employee_id = $3,
+          provider_name = $4,
+          quality_document_id = $5,
+          title = $6,
+          description = $7,
+          starts_on = $8,
+          next_due_on = $9,
+          tolerance_before_days = $10,
+          tolerance_after_days = $11,
+          checklist_required = $12,
+          evidence_required = $13,
+          updated_by_user_id = $14,
+          updated_at = NOW()
+        WHERE id = $15;
+      `,
+      [
+        payload.asset_id,
+        payload.frequency_id ?? null,
+        payload.responsible_employee_id ?? null,
+        normalizeOptionalText(payload.provider_name),
+        payload.quality_document_id ?? null,
+        payload.title.trim(),
+        normalizeOptionalText(payload.description),
+        payload.starts_on,
+        payload.next_due_on,
+        Math.max(Number(payload.tolerance_before_days ?? 0), 0),
+        Math.max(Number(payload.tolerance_after_days ?? 0), 0),
+        payload.checklist_required ?? true,
+        payload.evidence_required ?? true,
+        userId ?? null,
+        planId,
+      ],
+    );
+
+    await client.query('DELETE FROM public.helpdesk_maintenance_plan_tasks WHERE plan_id = $1;', [planId]);
+    const tasks = (payload.tasks ?? []).map((task) => task.trim()).filter(Boolean);
+    for (const [index, task] of tasks.entries()) {
+      await client.query(
+        `
+          INSERT INTO public.helpdesk_maintenance_plan_tasks (plan_id, task_text, sort_order)
+          VALUES ($1, $2, $3);
+        `,
+        [planId, task, (index + 1) * 10],
+      );
+    }
+
+    await createScheduledOrder(
+      planId,
       payload.asset_id,
-      payload.frequency_id ?? null,
-      payload.responsible_employee_id ?? null,
-      normalizeOptionalText(payload.provider_name),
-      payload.quality_document_id ?? null,
-      payload.title.trim(),
-      normalizeOptionalText(payload.description),
-      payload.starts_on,
       payload.next_due_on,
       Math.max(Number(payload.tolerance_before_days ?? 0), 0),
       Math.max(Number(payload.tolerance_after_days ?? 0), 0),
-      payload.checklist_required ?? true,
-      payload.evidence_required ?? true,
-      userId ?? null,
-      planId,
-    ],
-  );
-
-  await pool.query('DELETE FROM public.helpdesk_maintenance_plan_tasks WHERE plan_id = $1;', [planId]);
-  const tasks = (payload.tasks ?? []).map((task) => task.trim()).filter(Boolean);
-  for (const [index, task] of tasks.entries()) {
-    await pool.query(
-      `
-        INSERT INTO public.helpdesk_maintenance_plan_tasks (plan_id, task_text, sort_order)
-        VALUES ($1, $2, $3);
-      `,
-      [planId, task, (index + 1) * 10],
+      userId,
+      client,
     );
-  }
-
-  await createScheduledOrder(
-    planId,
-    payload.asset_id,
-    payload.next_due_on,
-    Math.max(Number(payload.tolerance_before_days ?? 0), 0),
-    Math.max(Number(payload.tolerance_after_days ?? 0), 0),
-    userId,
-  );
+  });
 
   return getMaintenancePlanById(planId);
 };
@@ -803,40 +809,42 @@ export const rescheduleMaintenanceOrder = async (
   const beforeDays = current.plan?.tolerance_before_days ?? 0;
   const afterDays = current.plan?.tolerance_after_days ?? 0;
 
-  await pool.query(
-    `
-      UPDATE public.helpdesk_maintenance_orders
-      SET
-        status = 'RESCHEDULED',
-        rescheduled_from = scheduled_for,
-        scheduled_for = $2,
-        window_starts_on = $3,
-        window_ends_on = $4,
-        rescheduled_at = NOW(),
-        reschedule_reason = $5,
-        updated_by_user_id = $6,
-        updated_at = NOW()
-      WHERE id = $1
-        AND status IN ('SCHEDULED', 'RESCHEDULED');
-    `,
-    [
-      orderId,
-      payload.scheduled_for,
-      addDays(payload.scheduled_for, -Math.max(beforeDays, 0)),
-      addDays(payload.scheduled_for, Math.max(afterDays, 0)),
-      payload.reschedule_reason.trim(),
-      userId ?? null,
-    ],
-  );
+  await withTransaction(async (client) => {
+    await client.query(
+      `
+        UPDATE public.helpdesk_maintenance_orders
+        SET
+          status = 'RESCHEDULED',
+          rescheduled_from = scheduled_for,
+          scheduled_for = $2,
+          window_starts_on = $3,
+          window_ends_on = $4,
+          rescheduled_at = NOW(),
+          reschedule_reason = $5,
+          updated_by_user_id = $6,
+          updated_at = NOW()
+        WHERE id = $1
+          AND status IN ('SCHEDULED', 'RESCHEDULED');
+      `,
+      [
+        orderId,
+        payload.scheduled_for,
+        addDays(payload.scheduled_for, -Math.max(beforeDays, 0)),
+        addDays(payload.scheduled_for, Math.max(afterDays, 0)),
+        payload.reschedule_reason.trim(),
+        userId ?? null,
+      ],
+    );
 
-  await pool.query(
-    `
-      UPDATE public.helpdesk_maintenance_plans
-      SET next_due_on = $2, updated_by_user_id = $3, updated_at = NOW()
-      WHERE id = $1;
-    `,
-    [current.plan_id, payload.scheduled_for, userId ?? null],
-  );
+    await client.query(
+      `
+        UPDATE public.helpdesk_maintenance_plans
+        SET next_due_on = $2, updated_by_user_id = $3, updated_at = NOW()
+        WHERE id = $1;
+      `,
+      [current.plan_id, payload.scheduled_for, userId ?? null],
+    );
+  });
 
   return getMaintenanceOrderById(orderId);
 };
@@ -853,87 +861,90 @@ export const closeMaintenanceOrder = async (
     return null;
   }
 
-  await pool.query(
-    `
-      UPDATE public.helpdesk_maintenance_orders
-      SET
-        status = 'CLOSED',
-        started_at = COALESCE(started_at, NOW()),
-        completed_at = $2,
-        completed_by_user_id = $3,
-        performed_activities = $4,
-        findings = $5,
-        provider_name = $6,
-        result = $7,
-        evidence_notes = $8,
-        updated_by_user_id = $3,
-        updated_at = NOW()
-      WHERE id = $1;
-    `,
-    [
-      orderId,
-      payload.completed_at,
-      userId ?? null,
-      payload.performed_activities.trim(),
-      normalizeOptionalText(payload.findings),
-      normalizeOptionalText(payload.provider_name),
-      payload.result.trim(),
-      normalizeOptionalText(payload.evidence_notes),
-    ],
-  );
-
-  await pool.query('DELETE FROM public.helpdesk_maintenance_order_checklist WHERE order_id = $1;', [orderId]);
-
-  const checklist = payload.checklist ?? [];
-  for (const [index, item] of checklist.entries()) {
-    const taskText = normalizeOptionalText(item.task_text);
-    if (!taskText) {
-      continue;
-    }
-
-    await pool.query(
+  await withTransaction(async (client) => {
+    await client.query(
       `
-        INSERT INTO public.helpdesk_maintenance_order_checklist (
-          order_id,
-          plan_task_id,
-          task_text,
-          result,
-          notes,
-          sort_order
-        )
-        VALUES ($1, $2, $3, $4, $5, $6);
+        UPDATE public.helpdesk_maintenance_orders
+        SET
+          status = 'CLOSED',
+          started_at = COALESCE(started_at, NOW()),
+          completed_at = $2,
+          completed_by_user_id = $3,
+          performed_activities = $4,
+          findings = $5,
+          provider_name = $6,
+          result = $7,
+          evidence_notes = $8,
+          updated_by_user_id = $3,
+          updated_at = NOW()
+        WHERE id = $1;
       `,
       [
         orderId,
-        item.plan_task_id ?? null,
-        taskText,
-        normalizeOptionalText(item.result) ?? 'PENDING',
-        normalizeOptionalText(item.notes),
-        (index + 1) * 10,
+        payload.completed_at,
+        userId ?? null,
+        payload.performed_activities.trim(),
+        normalizeOptionalText(payload.findings),
+        normalizeOptionalText(payload.provider_name),
+        payload.result.trim(),
+        normalizeOptionalText(payload.evidence_notes),
       ],
     );
-  }
 
-  if (current.plan?.interval_months && current.plan.interval_months > 0) {
-    const nextDueOn = addMonths(current.scheduled_for, current.plan.interval_months);
-    await pool.query(
-      `
-        UPDATE public.helpdesk_maintenance_plans
-        SET next_due_on = $2, updated_by_user_id = $3, updated_at = NOW()
-        WHERE id = $1;
-      `,
-      [current.plan_id, nextDueOn, userId ?? null],
-    );
+    await client.query('DELETE FROM public.helpdesk_maintenance_order_checklist WHERE order_id = $1;', [orderId]);
 
-    await createScheduledOrder(
-      current.plan_id,
-      current.asset_id,
-      nextDueOn,
-      current.plan.tolerance_before_days,
-      current.plan.tolerance_after_days,
-      userId,
-    );
-  }
+    const checklist = payload.checklist ?? [];
+    for (const [index, item] of checklist.entries()) {
+      const taskText = normalizeOptionalText(item.task_text);
+      if (!taskText) {
+        continue;
+      }
+
+      await client.query(
+        `
+          INSERT INTO public.helpdesk_maintenance_order_checklist (
+            order_id,
+            plan_task_id,
+            task_text,
+            result,
+            notes,
+            sort_order
+          )
+          VALUES ($1, $2, $3, $4, $5, $6);
+        `,
+        [
+          orderId,
+          item.plan_task_id ?? null,
+          taskText,
+          normalizeOptionalText(item.result) ?? 'PENDING',
+          normalizeOptionalText(item.notes),
+          (index + 1) * 10,
+        ],
+      );
+    }
+
+    if (current.plan?.interval_months && current.plan.interval_months > 0) {
+      const nextDueOn = addMonths(current.scheduled_for, current.plan.interval_months);
+      await client.query(
+        `
+          UPDATE public.helpdesk_maintenance_plans
+          SET next_due_on = $2, updated_by_user_id = $3, updated_at = NOW()
+          WHERE id = $1;
+        `,
+        [current.plan_id, nextDueOn, userId ?? null],
+      );
+
+      await createScheduledOrder(
+        current.plan_id,
+        current.asset_id,
+        nextDueOn,
+        current.plan.tolerance_before_days,
+        current.plan.tolerance_after_days,
+        userId,
+        client,
+      );
+    }
+  });
 
   return getMaintenanceOrderById(orderId);
 };
