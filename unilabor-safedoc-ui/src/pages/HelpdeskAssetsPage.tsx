@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
+import { ActionsMenu } from '../components/ActionsMenu';
 import {
   createHelpdeskAsset,
   deleteHelpdeskAssetById,
@@ -479,36 +480,39 @@ export const HelpdeskAssetsPage = () => {
                         </p>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAsset(asset)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                          >
-                            <Eye size={14} />
-                            Ver
-                          </button>
-                          {canWrite ? (
-                            <button
-                              type="button"
-                              onClick={() => openEdit(asset)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
-                            >
-                              <Edit3 size={14} />
-                              Editar
-                            </button>
-                          ) : null}
-                          {canDelete ? (
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(asset)}
-                              disabled={deletingId === asset.id}
-                              className="inline-flex items-center gap-1 rounded-lg border border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.16)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(151,163,172,0.24)] disabled:opacity-60"
-                            >
-                              <Trash2 size={14} />
-                              Baja
-                            </button>
-                          ) : null}
+                        <div className="flex justify-end">
+                          <ActionsMenu
+                            items={[
+                              { key: 'ver', label: 'Ver ficha', icon: <Eye size={14} />, onClick: () => setSelectedAsset(asset) },
+                              {
+                                key: 'expediente',
+                                label: 'Ver expediente',
+                                icon: <FolderOpen size={14} />,
+                                onClick: () => navigate(`/helpdesk/assets/${asset.id}/expedient`),
+                              },
+                              {
+                                key: 'etiqueta',
+                                label: 'Imprimir etiqueta',
+                                icon: <Printer size={14} />,
+                                onClick: () => setLabelAsset(asset),
+                              },
+                              ...(canWrite
+                                ? [{ key: 'editar', label: 'Editar', icon: <Edit3 size={14} />, onClick: () => openEdit(asset) }]
+                                : []),
+                              ...(canDelete
+                                ? [
+                                    {
+                                      key: 'baja',
+                                      label: 'Dar de baja',
+                                      icon: <Trash2 size={14} />,
+                                      danger: true,
+                                      disabled: deletingId === asset.id,
+                                      onClick: () => void handleDelete(asset),
+                                    },
+                                  ]
+                                : []),
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
