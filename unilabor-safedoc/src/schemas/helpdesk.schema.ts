@@ -21,7 +21,8 @@ const requiredText = (message: string) => z.string().trim().min(1, message);
 // El controller exige asset_code y name no vacios (tanto en create como update).
 export const helpdeskAssetSchema = z
   .object({
-    asset_code: requiredText('El codigo del activo es obligatorio'),
+    // asset_code opcional: si viene vacio el backend autogenera UNIDAD-AREA-CLASIFICACION-###.
+    asset_code: optionalText.optional(),
     name: requiredText('El nombre del activo es obligatorio'),
   })
   .passthrough();
@@ -37,6 +38,40 @@ export const helpdeskTicketSchema = z
 export const helpdeskTicketCommentSchema = z
   .object({
     comment: requiredText('El comentario no puede estar vacio'),
+  })
+  .passthrough();
+
+// --- Ciclo de vida (ISO 15189:2022) ---
+export const lifecycleEventSchema = z
+  .object({
+    event_type_id: z.coerce.number().int().positive('El tipo de evento es obligatorio'),
+    event_date: requiredText('La fecha del evento es obligatoria'),
+    title: requiredText('El titulo del evento es obligatorio'),
+    description: optionalText.optional(),
+    maintenance_order_id: optionalPositiveId.optional(),
+    ticket_id: optionalPositiveId.optional(),
+    supplier_id: optionalPositiveId.optional(),
+    performed_by_employee_id: optionalPositiveId.optional(),
+    performed_by_provider: optionalText.optional(),
+    cost: z.coerce.number().nonnegative().nullish(),
+    currency: optionalText.optional(),
+    calibration_certificate_no: optionalText.optional(),
+    calibration_due_on: optionalText.optional(),
+    disposal_reason_id: optionalPositiveId.optional(),
+    from_location_id: optionalPositiveId.optional(),
+    to_location_id: optionalPositiveId.optional(),
+    notes: optionalText.optional(),
+  })
+  .passthrough();
+
+// --- Evidencia documental de activos (S4) ---
+export const assetDocumentSchema = z
+  .object({
+    title: requiredText('El titulo del documento es obligatorio'),
+    document_kind_id: optionalPositiveId.optional(),
+    lifecycle_event_id: optionalPositiveId.optional(),
+    issued_on: optionalText.optional(),
+    expires_on: optionalText.optional(),
   })
   .passthrough();
 

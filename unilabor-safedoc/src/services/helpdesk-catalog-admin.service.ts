@@ -15,7 +15,12 @@ export type HelpdeskCatalogAdminKey =
   | 'request_types'
   | 'ticket_statuses'
   | 'ticket_priorities'
-  | 'frequencies';
+  | 'frequencies'
+  | 'suppliers'
+  | 'receipt_conditions'
+  | 'disposal_reasons'
+  | 'document_kinds'
+  | 'lifecycle_event_types';
 
 export interface HelpdeskCatalogAdminPayload {
   code?: string | null;
@@ -52,6 +57,13 @@ export interface HelpdeskCatalogAdminResponse {
   };
   maintenance: HelpdeskMaintenanceCatalogs & {
     frequencies: HelpdeskCatalogAdminItem[];
+  };
+  iso: {
+    suppliers: HelpdeskCatalogAdminItem[];
+    receipt_conditions: HelpdeskCatalogAdminItem[];
+    disposal_reasons: HelpdeskCatalogAdminItem[];
+    document_kinds: HelpdeskCatalogAdminItem[];
+    lifecycle_event_types: HelpdeskCatalogAdminItem[];
   };
 }
 
@@ -125,6 +137,11 @@ const CATALOG_CONFIG: Record<HelpdeskCatalogAdminKey, CatalogConfig> = {
     hasSortOrder: true,
     hasIntervalMonths: true,
   },
+  suppliers: { key: 'suppliers', tableName: 'helpdesk_suppliers', hasDescription: true },
+  receipt_conditions: { key: 'receipt_conditions', tableName: 'helpdesk_receipt_conditions', hasCode: true, hasDescription: true, hasSortOrder: true },
+  disposal_reasons: { key: 'disposal_reasons', tableName: 'helpdesk_disposal_reasons', hasCode: true, hasDescription: true, hasSortOrder: true },
+  document_kinds: { key: 'document_kinds', tableName: 'helpdesk_document_kinds', hasCode: true, hasDescription: true, hasSortOrder: true },
+  lifecycle_event_types: { key: 'lifecycle_event_types', tableName: 'helpdesk_lifecycle_event_types', hasCode: true, hasDescription: true, hasSortOrder: true },
 };
 
 const normalizeOptionalText = (value: unknown): string | null => {
@@ -354,6 +371,11 @@ export const listHelpdeskCatalogAdminData = async (): Promise<HelpdeskCatalogAdm
     ticketStatuses,
     ticketPriorities,
     frequencies,
+    suppliers,
+    receiptConditions,
+    disposalReasons,
+    documentKinds,
+    lifecycleEventTypes,
   ] = await Promise.all([
     listCatalogItems(CATALOG_CONFIG.categories),
     listCatalogItems(CATALOG_CONFIG.units),
@@ -368,6 +390,11 @@ export const listHelpdeskCatalogAdminData = async (): Promise<HelpdeskCatalogAdm
     listCatalogItems(CATALOG_CONFIG.ticket_statuses),
     listCatalogItems(CATALOG_CONFIG.ticket_priorities),
     listCatalogItems(CATALOG_CONFIG.frequencies),
+    listCatalogItems(CATALOG_CONFIG.suppliers),
+    listCatalogItems(CATALOG_CONFIG.receipt_conditions),
+    listCatalogItems(CATALOG_CONFIG.disposal_reasons),
+    listCatalogItems(CATALOG_CONFIG.document_kinds),
+    listCatalogItems(CATALOG_CONFIG.lifecycle_event_types),
   ]);
 
   return {
@@ -389,6 +416,13 @@ export const listHelpdeskCatalogAdminData = async (): Promise<HelpdeskCatalogAdm
     },
     maintenance: {
       frequencies: frequencies as HelpdeskMaintenanceCatalogs['frequencies'],
+    },
+    iso: {
+      suppliers,
+      receipt_conditions: receiptConditions,
+      disposal_reasons: disposalReasons,
+      document_kinds: documentKinds,
+      lifecycle_event_types: lifecycleEventTypes,
     },
   };
 };

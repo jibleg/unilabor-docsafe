@@ -102,6 +102,12 @@ export const mapHelpdeskError = (res: Response, error: any) => {
     });
   }
 
+  if (error?.code === 'HELPDESK_ASSET_CODE_SCOPE_REQUIRED') {
+    return res.status(400).json({
+      message: 'Para autogenerar el codigo de inventario selecciona unidad, area y clasificacion (o captura el codigo manualmente).',
+    });
+  }
+
   if (error?.code === '23505') {
     return res.status(409).json({ message: 'Ya existe un activo con ese codigo interno.' });
   }
@@ -170,12 +176,13 @@ export const getAssetPayload = (body: any): HelpdeskAssetPayload | null => {
   const assetCode = getText(body?.asset_code);
   const name = getText(body?.name);
 
-  if (!assetCode || !name) {
+  // asset_code puede ir vacio: el servicio autogenera el codigo ISO. Solo el nombre es obligatorio.
+  if (!name) {
     return null;
   }
 
   return {
-    asset_code: assetCode,
+    asset_code: assetCode ?? '',
     name,
     description: getText(body?.description),
     category_id: getNumberId(body?.category_id),
@@ -199,6 +206,12 @@ export const getAssetPayload = (body: any): HelpdeskAssetPayload | null => {
     legacy_consecutive: getText(body?.legacy_consecutive),
     legacy_component_consecutive: getText(body?.legacy_component_consecutive),
     notes: getText(body?.notes),
+    supplier_id: getNumberId(body?.supplier_id),
+    received_on: getText(body?.received_on),
+    placed_in_service_on: getText(body?.placed_in_service_on),
+    receipt_condition_id: getNumberId(body?.receipt_condition_id),
+    decommissioned_on: getText(body?.decommissioned_on),
+    disposal_reason_id: getNumberId(body?.disposal_reason_id),
   };
 };
 

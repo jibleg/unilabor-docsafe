@@ -43,6 +43,13 @@ export interface HelpdeskAssetPayload {
   legacy_consecutive?: string | null;
   legacy_component_consecutive?: string | null;
   notes?: string | null;
+  // ISO 15189:2022 (6.4/6.5)
+  supplier_id?: number | null;
+  received_on?: string | null;
+  placed_in_service_on?: string | null;
+  receipt_condition_id?: number | null;
+  decommissioned_on?: string | null;
+  disposal_reason_id?: number | null;
 }
 
 export interface HelpdeskAssetRecord extends HelpdeskAssetPayload {
@@ -59,6 +66,10 @@ export interface HelpdeskAssetRecord extends HelpdeskAssetPayload {
   purchase_condition?: HelpdeskCatalogItem | null;
   criticality?: HelpdeskCatalogItem | null;
   operational_status?: HelpdeskCatalogItem | null;
+  supplier?: HelpdeskCatalogItem | null;
+  receipt_condition?: HelpdeskCatalogItem | null;
+  disposal_reason?: HelpdeskCatalogItem | null;
+  asset_code_overridden?: boolean;
   assigned_employee?: {
     id: number;
     employee_code: string;
@@ -94,6 +105,11 @@ export interface HelpdeskCatalogs {
   purchase_conditions: HelpdeskCatalogItem[];
   criticalities: HelpdeskCatalogItem[];
   operational_statuses: HelpdeskCatalogItem[];
+  suppliers: HelpdeskCatalogItem[];
+  receipt_conditions: HelpdeskCatalogItem[];
+  disposal_reasons: HelpdeskCatalogItem[];
+  document_kinds: HelpdeskCatalogItem[];
+  lifecycle_event_types: HelpdeskCatalogItem[];
 }
 
 const helpdeskAssetsTableExists = async (): Promise<boolean> => {
@@ -182,6 +198,13 @@ const mapAssetRow = (row: any): HelpdeskAssetRecord => ({
   legacy_consecutive: row.legacy_consecutive ? String(row.legacy_consecutive) : null,
   legacy_component_consecutive: row.legacy_component_consecutive ? String(row.legacy_component_consecutive) : null,
   notes: row.notes ? String(row.notes) : null,
+  supplier_id: row.supplier_id ? Number(row.supplier_id) : null,
+  received_on: row.received_on ? toIsoDate(row.received_on) : null,
+  placed_in_service_on: row.placed_in_service_on ? toIsoDate(row.placed_in_service_on) : null,
+  receipt_condition_id: row.receipt_condition_id ? Number(row.receipt_condition_id) : null,
+  decommissioned_on: row.decommissioned_on ? toIsoDate(row.decommissioned_on) : null,
+  disposal_reason_id: row.disposal_reason_id ? Number(row.disposal_reason_id) : null,
+  asset_code_overridden: Boolean(row.asset_code_overridden),
   is_active: Boolean(row.is_active),
   created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
   updated_at: row.updated_at ? toIsoDateTime(row.updated_at) : undefined,
@@ -208,6 +231,19 @@ const mapAssetRow = (row: any): HelpdeskAssetRecord => ({
     row.operational_status_name,
     row.operational_status_code,
     row.operational_status_description,
+  ),
+  supplier: mapCatalog(row.supplier_id, row.supplier_name, undefined, row.supplier_description),
+  receipt_condition: mapCatalog(
+    row.receipt_condition_id,
+    row.receipt_condition_name,
+    row.receipt_condition_code,
+    row.receipt_condition_description,
+  ),
+  disposal_reason: mapCatalog(
+    row.disposal_reason_id,
+    row.disposal_reason_name,
+    row.disposal_reason_code,
+    row.disposal_reason_description,
   ),
   assigned_employee: mapEmployee(row, 'assigned'),
   responsible_employee: mapEmployee(row, 'responsible'),
@@ -241,6 +277,14 @@ const buildAssetQuery = () => `
     os.code AS operational_status_code,
     os.name AS operational_status_name,
     os.description AS operational_status_description,
+    sup.name AS supplier_name,
+    sup.description AS supplier_description,
+    rc.code AS receipt_condition_code,
+    rc.name AS receipt_condition_name,
+    rc.description AS receipt_condition_description,
+    dr.code AS disposal_reason_code,
+    dr.name AS disposal_reason_name,
+    dr.description AS disposal_reason_description,
     ae.employee_code AS assigned_employee_code,
     ae.full_name AS assigned_employee_name,
     ae.area AS assigned_employee_area,
@@ -259,6 +303,9 @@ const buildAssetQuery = () => `
   LEFT JOIN public.helpdesk_purchase_conditions pc ON pc.id = a.purchase_condition_id
   LEFT JOIN public.helpdesk_criticalities cr ON cr.id = a.criticality_id
   LEFT JOIN public.helpdesk_operational_statuses os ON os.id = a.operational_status_id
+  LEFT JOIN public.helpdesk_suppliers sup ON sup.id = a.supplier_id
+  LEFT JOIN public.helpdesk_receipt_conditions rc ON rc.id = a.receipt_condition_id
+  LEFT JOIN public.helpdesk_disposal_reasons dr ON dr.id = a.disposal_reason_id
   LEFT JOIN public.employees ae ON ae.id = a.assigned_employee_id
   LEFT JOIN public.employees re ON re.id = a.responsible_employee_id
 `;
@@ -378,6 +425,11 @@ export const listHelpdeskCatalogs = async (): Promise<HelpdeskCatalogs> => {
     purchaseConditions,
     criticalities,
     operationalStatuses,
+    suppliers,
+    receiptConditions,
+    disposalReasons,
+    documentKinds,
+    lifecycleEventTypes,
   ] = await Promise.all([
     listCatalog('helpdesk_asset_categories'),
     listCatalog('helpdesk_asset_units'),
@@ -388,6 +440,11 @@ export const listHelpdeskCatalogs = async (): Promise<HelpdeskCatalogs> => {
     listCatalog('helpdesk_purchase_conditions'),
     listCatalog('helpdesk_criticalities'),
     listCatalog('helpdesk_operational_statuses'),
+    listCatalog('helpdesk_suppliers', { hasCode: false, hasDescription: true }),
+    listCatalog('helpdesk_receipt_conditions'),
+    listCatalog('helpdesk_disposal_reasons'),
+    listCatalog('helpdesk_document_kinds'),
+    listCatalog('helpdesk_lifecycle_event_types'),
   ]);
 
   return {
@@ -400,6 +457,11 @@ export const listHelpdeskCatalogs = async (): Promise<HelpdeskCatalogs> => {
     purchase_conditions: purchaseConditions,
     criticalities,
     operational_statuses: operationalStatuses,
+    suppliers,
+    receipt_conditions: receiptConditions,
+    disposal_reasons: disposalReasons,
+    document_kinds: documentKinds,
+    lifecycle_event_types: lifecycleEventTypes,
   };
 };
 
@@ -554,11 +616,68 @@ export const getHelpdeskAssetById = async (assetId: number): Promise<HelpdeskAss
   return mapAssetRow(result.rows[0]);
 };
 
+const getCatalogCode = async (tableName: string, id: number | null | undefined): Promise<string | null> => {
+  if (!id) {
+    return null;
+  }
+  const result = await pool.query(`SELECT code FROM public.${tableName} WHERE id = $1 LIMIT 1;`, [id]);
+  const code = result.rows[0]?.code;
+  return code ? String(code).trim().toUpperCase() : null;
+};
+
+// Codigo ISO 19186 compuesto UNIDAD-AREA-CLASIFICACION-### con consecutivo
+// atomico por combinacion (counter table). El consecutivo se siembra desde el
+// MAX existente del scope para no colisionar con codigos preservados de la importacion.
+export const generateAssetCode = async (
+  unitId: number | null | undefined,
+  areaId: number | null | undefined,
+  categoryId: number | null | undefined,
+): Promise<string> => {
+  const [unitCode, areaCode, categoryCode] = await Promise.all([
+    getCatalogCode('helpdesk_asset_units', unitId),
+    getCatalogCode('helpdesk_asset_areas', areaId),
+    getCatalogCode('helpdesk_asset_categories', categoryId),
+  ]);
+
+  if (!unitCode || !areaCode || !categoryCode) {
+    const error = new Error('HELPDESK_ASSET_CODE_SCOPE_REQUIRED');
+    (error as any).code = 'HELPDESK_ASSET_CODE_SCOPE_REQUIRED';
+    throw error;
+  }
+
+  const scopeKey = `${unitCode}-${areaCode}-${categoryCode}`;
+  const result = await pool.query(
+    `
+      WITH seed AS (
+        SELECT COALESCE(MAX((regexp_replace(asset_code, '^.*-', ''))::int), 0) AS maxn
+        FROM public.helpdesk_assets
+        WHERE asset_code ~ ($1 || '-[0-9]+$')
+      )
+      INSERT INTO public.helpdesk_asset_code_counters (scope_key, last_value)
+      VALUES ($1, (SELECT maxn FROM seed) + 1)
+      ON CONFLICT (scope_key) DO UPDATE
+        SET last_value = GREATEST(helpdesk_asset_code_counters.last_value, (SELECT maxn FROM seed)) + 1,
+            updated_at = NOW()
+      RETURNING last_value;
+    `,
+    [scopeKey],
+  );
+
+  const next = Number(result.rows[0]?.last_value ?? 1);
+  return `${scopeKey}-${String(next).padStart(3, '0')}`;
+};
+
 export const createHelpdeskAsset = async (
   payload: HelpdeskAssetPayload,
   userId?: string | null,
 ): Promise<HelpdeskAssetRecord> => {
   await assertHelpdeskAssetsTable();
+
+  // Codigo explicito (manual o preservado en importacion) => override; vacio => autogenerar.
+  const providedCode = normalizeOptionalText(payload.asset_code);
+  const assetCode = providedCode
+    ?? await generateAssetCode(payload.unit_id, payload.area_id, payload.category_id);
+  const overridden = Boolean(providedCode);
 
   const brandId = payload.brand_id ?? await ensureBrand(payload.brand_name);
   const defaultStatusId = payload.operational_status_id ?? await getActiveStatusId();
@@ -589,18 +708,25 @@ export const createHelpdeskAsset = async (
         legacy_consecutive,
         legacy_component_consecutive,
         notes,
+        supplier_id,
+        received_on,
+        placed_in_service_on,
+        receipt_condition_id,
+        decommissioned_on,
+        disposal_reason_id,
+        asset_code_overridden,
         created_by_user_id,
         updated_by_user_id
       )
       VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
         $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-        $21, $22, $23, $24, $24
+        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $31
       )
       RETURNING id;
     `,
     [
-      payload.asset_code.trim(),
+      assetCode,
       payload.name.trim(),
       normalizeOptionalText(payload.description),
       payload.category_id ?? null,
@@ -623,6 +749,13 @@ export const createHelpdeskAsset = async (
       normalizeOptionalText(payload.legacy_consecutive),
       normalizeOptionalText(payload.legacy_component_consecutive),
       normalizeOptionalText(payload.notes),
+      payload.supplier_id ?? null,
+      normalizeOptionalText(payload.received_on),
+      normalizeOptionalText(payload.placed_in_service_on),
+      payload.receipt_condition_id ?? null,
+      normalizeOptionalText(payload.decommissioned_on),
+      payload.disposal_reason_id ?? null,
+      overridden,
       userId ?? null,
     ],
   );
@@ -653,6 +786,8 @@ export const updateHelpdeskAsset = async (
   }
 
   const brandId = payload.brand_id ?? await ensureBrand(payload.brand_name);
+  // No permitir blanquear el codigo: si llega vacio se conserva el actual.
+  const assetCode = normalizeOptionalText(payload.asset_code) ?? current.asset_code;
 
   await pool.query(
     `
@@ -681,12 +816,18 @@ export const updateHelpdeskAsset = async (
         legacy_consecutive = $21,
         legacy_component_consecutive = $22,
         notes = $23,
-        updated_by_user_id = $24,
+        supplier_id = $24,
+        received_on = $25,
+        placed_in_service_on = $26,
+        receipt_condition_id = $27,
+        decommissioned_on = $28,
+        disposal_reason_id = $29,
+        updated_by_user_id = $30,
         updated_at = NOW()
-      WHERE id = $25;
+      WHERE id = $31;
     `,
     [
-      payload.asset_code.trim(),
+      assetCode,
       payload.name.trim(),
       normalizeOptionalText(payload.description),
       payload.category_id ?? null,
@@ -709,6 +850,12 @@ export const updateHelpdeskAsset = async (
       normalizeOptionalText(payload.legacy_consecutive),
       normalizeOptionalText(payload.legacy_component_consecutive),
       normalizeOptionalText(payload.notes),
+      payload.supplier_id ?? null,
+      normalizeOptionalText(payload.received_on),
+      normalizeOptionalText(payload.placed_in_service_on),
+      payload.receipt_condition_id ?? null,
+      normalizeOptionalText(payload.decommissioned_on),
+      payload.disposal_reason_id ?? null,
       userId ?? null,
       assetId,
     ],

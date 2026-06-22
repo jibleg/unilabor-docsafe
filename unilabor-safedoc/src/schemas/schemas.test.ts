@@ -175,8 +175,11 @@ describe('employee.schema', () => {
 });
 
 describe('helpdesk.schema (resto)', () => {
-  it('helpdeskAssetSchema exige asset_code y name', () => {
-    expect(helpdeskAssetSchema.safeParse({ name: 'PC' }).success).toBe(false);
+  it('helpdeskAssetSchema exige name; asset_code es opcional (autogenerado)', () => {
+    // name sigue siendo obligatorio
+    expect(helpdeskAssetSchema.safeParse({ asset_code: 'PC1' }).success).toBe(false);
+    // asset_code opcional: el backend autogenera el codigo ISO si no viene
+    expect(helpdeskAssetSchema.safeParse({ name: 'PC' }).success).toBe(true);
     expect(helpdeskAssetSchema.safeParse({ asset_code: 'PC1', name: 'PC' }).success).toBe(true);
   });
 

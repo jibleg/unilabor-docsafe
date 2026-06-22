@@ -52,7 +52,20 @@ import {
   maintenanceOrderCloseSchema,
   maintenanceOrderRescheduleSchema,
   maintenancePlanSchema,
+  lifecycleEventSchema,
 } from '../schemas/helpdesk.schema';
+import {
+  createLifecycleEventController,
+  getAssetExpedientController,
+  listAssetLifecycleEventsController,
+  updateLifecycleEventController,
+} from '../controllers/helpdesk-lifecycle.controller';
+import {
+  listAssetDocumentsController,
+  uploadAssetDocumentController,
+  viewAssetDocumentController,
+} from '../controllers/helpdesk-asset-document.controller';
+import { upload } from '../middlewares/upload.middleware';
 
 const router = Router();
 
@@ -259,6 +272,48 @@ router.delete(
   '/assets/:id',
   authorizeModuleRole('HELPDESK', ['ADMIN']),
   deleteHelpdeskAssetController,
+);
+
+// --- Ciclo de vida del equipo (ISO 15189:2022) ---
+router.get(
+  '/assets/:id/expedient',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  getAssetExpedientController,
+);
+router.get(
+  '/assets/:id/lifecycle-events',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  listAssetLifecycleEventsController,
+);
+router.post(
+  '/assets/:id/lifecycle-events',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(lifecycleEventSchema),
+  createLifecycleEventController,
+);
+router.patch(
+  '/lifecycle-events/:eventId',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(lifecycleEventSchema),
+  updateLifecycleEventController,
+);
+
+// --- Evidencias documentales del equipo (PDF) ---
+router.get(
+  '/assets/:id/documents',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  listAssetDocumentsController,
+);
+router.post(
+  '/assets/:id/documents',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  upload.single('file'),
+  uploadAssetDocumentController,
+);
+router.get(
+  '/asset-documents/:documentId/view',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  viewAssetDocumentController,
 );
 
 export default router;

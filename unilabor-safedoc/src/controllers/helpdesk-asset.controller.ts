@@ -196,7 +196,7 @@ export const getHelpdeskAssetByIdController = async (req: AuthRequest, res: Resp
 export const createHelpdeskAssetController = async (req: AuthRequest, res: Response) => {
   const payload = getAssetPayload(req.body);
   if (!payload) {
-    return res.status(400).json({ message: 'Codigo interno y nombre del activo son obligatorios.' });
+    return res.status(400).json({ message: 'El nombre del activo es obligatorio.' });
   }
 
   try {
@@ -226,7 +226,7 @@ export const updateHelpdeskAssetController = async (req: AuthRequest, res: Respo
 
   const payload = getAssetPayload(req.body);
   if (!payload) {
-    return res.status(400).json({ message: 'Codigo interno y nombre del activo son obligatorios.' });
+    return res.status(400).json({ message: 'El nombre del activo es obligatorio.' });
   }
 
   try {
