@@ -137,11 +137,16 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
               ],
             },
             {
-              title: 'Gestión',
+              title: 'Inventario y Equipos (ISO 15189)',
               items: [
                 { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', roles: ['ADMIN', 'EDITOR'] },
-                { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets', roles: ['ADMIN', 'EDITOR'] },
                 { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
+              ],
+            },
+            {
+              title: 'Mesa de ayuda',
+              items: [
+                { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets', roles: ['ADMIN', 'EDITOR'] },
               ],
             },
             {

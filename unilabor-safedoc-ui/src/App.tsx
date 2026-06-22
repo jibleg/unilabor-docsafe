@@ -37,6 +37,9 @@ const ForgotPasswordPage = lazy(() =>
 const HelpdeskAssetsPage = lazy(() =>
   import('./pages/HelpdeskAssetsPage').then((module) => ({ default: module.HelpdeskAssetsPage })),
 );
+const HelpdeskAssetExpedientPage = lazy(() =>
+  import('./pages/HelpdeskAssetExpedientPage').then((module) => ({ default: module.HelpdeskAssetExpedientPage })),
+);
 const HelpdeskDashboardPage = lazy(() =>
   import('./pages/HelpdeskDashboardPage').then((module) => ({ default: module.HelpdeskDashboardPage })),
 );
@@ -295,6 +298,7 @@ function App() {
         <Route path="dashboard" element={<HelpdeskDashboardPage />} />
         <Route path="my-portal" element={<HelpdeskMyPortalPage />} />
         <Route path="assets" element={<HelpdeskAssetsPage />} />
+        <Route path="assets/:id/expedient" element={<HelpdeskAssetExpedientPage />} />
         <Route
           path="tickets"
           element={

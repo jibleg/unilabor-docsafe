@@ -68,6 +68,10 @@ export interface HelpdeskAssetPayload {
   legacy_consecutive?: string | null;
   legacy_component_consecutive?: string | null;
   notes?: string | null;
+  supplier_id?: number | null;
+  received_on?: string | null;
+  placed_in_service_on?: string | null;
+  receipt_condition_id?: number | null;
 }
 
 export interface HelpdeskTicketPayload {

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Edit3,
   Eye,
+  FolderOpen,
   Laptop,
   Loader2,
   Plus,
@@ -69,6 +71,10 @@ interface AssetFormState {
   legacy_consecutive: string;
   legacy_component_consecutive: string;
   notes: string;
+  supplier_id: string;
+  received_on: string;
+  placed_in_service_on: string;
+  receipt_condition_id: string;
 }
 
 const EMPTY_CATALOGS: HelpdeskCatalogs = {
@@ -81,6 +87,11 @@ const EMPTY_CATALOGS: HelpdeskCatalogs = {
   purchase_conditions: [],
   criticalities: [],
   operational_statuses: [],
+  suppliers: [],
+  receipt_conditions: [],
+  disposal_reasons: [],
+  document_kinds: [],
+  lifecycle_event_types: [],
 };
 
 const EMPTY_FORM: AssetFormState = {
@@ -107,6 +118,10 @@ const EMPTY_FORM: AssetFormState = {
   legacy_consecutive: '',
   legacy_component_consecutive: '',
   notes: '',
+  supplier_id: '',
+  received_on: '',
+  placed_in_service_on: '',
+  receipt_condition_id: '',
 };
 
 const catalogName = (item?: HelpdeskCatalogItem | null): string => item?.name ?? 'Sin clasificar';
@@ -154,6 +169,10 @@ const toFormState = (asset: HelpdeskAsset): AssetFormState => ({
   legacy_consecutive: asset.legacy_consecutive ?? '',
   legacy_component_consecutive: asset.legacy_component_consecutive ?? '',
   notes: asset.notes ?? '',
+  supplier_id: asset.supplier_id ? String(asset.supplier_id) : '',
+  received_on: dateValue(asset.received_on),
+  placed_in_service_on: dateValue(asset.placed_in_service_on),
+  receipt_condition_id: asset.receipt_condition_id ? String(asset.receipt_condition_id) : '',
 });
 
 const toPayload = (form: AssetFormState): HelpdeskAssetPayload => ({
@@ -180,9 +199,14 @@ const toPayload = (form: AssetFormState): HelpdeskAssetPayload => ({
   legacy_consecutive: form.legacy_consecutive.trim() || null,
   legacy_component_consecutive: form.legacy_component_consecutive.trim() || null,
   notes: form.notes.trim() || null,
+  supplier_id: numericOrNull(form.supplier_id),
+  received_on: form.received_on || null,
+  placed_in_service_on: form.placed_in_service_on || null,
+  receipt_condition_id: numericOrNull(form.receipt_condition_id),
 });
 
 export const HelpdeskAssetsPage = () => {
+  const navigate = useNavigate();
   const availableModules = useAuthStore((state) => state.availableModules);
   const moduleRole = getModuleRole(availableModules, 'HELPDESK') ?? 'VIEWER';
   const canWrite = hasAnyRole(moduleRole, ['ADMIN', 'EDITOR']);
@@ -270,11 +294,8 @@ export const HelpdeskAssetsPage = () => {
   };
 
   const validateForm = () => {
-    if (!form.asset_code.trim()) {
-      notifyWarning('El código interno del activo es obligatorio.');
-      return false;
-    }
-
+    // El código de inventario es opcional: si se deja vacío el backend lo autogenera
+    // (UNIDAD-ÁREA-CLASIFICACIÓN-###), por lo que solo el nombre es obligatorio.
     if (!form.name.trim()) {
       notifyWarning('El nombre del activo es obligatorio.');
       return false;
@@ -521,6 +542,14 @@ export const HelpdeskAssetsPage = () => {
                 </div>
               </div>
 
+              <button
+                type="button"
+                onClick={() => navigate(`/helpdesk/assets/${selectedAsset.id}/expedient`)}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-3 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              >
+                <FolderOpen size={16} /> Ver expediente del equipo
+              </button>
+
               <div className="grid gap-3 text-sm">
                 {[
                   ['Categoría', catalogName(selectedAsset.category)],
@@ -566,11 +595,12 @@ export const HelpdeskAssetsPage = () => {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Código interno
+                    Código de inventario (ISO 19186)
                   </span>
                   <input
                     value={form.asset_code}
                     onChange={(event) => setField('asset_code', event.target.value)}
+                    placeholder="Se autogenera (UNIDAD-ÁREA-CLASIF-###) si lo dejas vacío"
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                   />
                 </label>
@@ -670,6 +700,32 @@ export const HelpdeskAssetsPage = () => {
 
                 <CatalogSelect label="Modalidad de compra" value={form.purchase_modality_id} options={catalogs.purchase_modalities} onChange={(value) => setField('purchase_modality_id', value)} />
                 <CatalogSelect label="Condición de compra" value={form.purchase_condition_id} options={catalogs.purchase_conditions} onChange={(value) => setField('purchase_condition_id', value)} />
+                <CatalogSelect label="Proveedor" value={form.supplier_id} options={catalogs.suppliers} onChange={(value) => setField('supplier_id', value)} />
+                <CatalogSelect label="Condición al recibir (ISO 6.4)" value={form.receipt_condition_id} options={catalogs.receipt_conditions} onChange={(value) => setField('receipt_condition_id', value)} />
+
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Fecha de recepción
+                  </span>
+                  <input
+                    type="date"
+                    value={form.received_on}
+                    onChange={(event) => setField('received_on', event.target.value)}
+                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Puesta en servicio
+                  </span>
+                  <input
+                    type="date"
+                    value={form.placed_in_service_on}
+                    onChange={(event) => setField('placed_in_service_on', event.target.value)}
+                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+                  />
+                </label>
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">

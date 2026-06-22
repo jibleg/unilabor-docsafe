@@ -285,6 +285,13 @@ export const normalizeHelpdeskAsset = (input: unknown): HelpdeskAsset | null => 
     legacy_component_consecutive:
       getString(source, ['legacy_component_consecutive', 'legacyComponentConsecutive']) || null,
     notes: getString(source, ['notes']) || null,
+    supplier_id: getNullableNumber(source, ['supplier_id', 'supplierId']),
+    received_on: getString(source, ['received_on', 'receivedOn']) || null,
+    placed_in_service_on: getString(source, ['placed_in_service_on', 'placedInServiceOn']) || null,
+    receipt_condition_id: getNullableNumber(source, ['receipt_condition_id', 'receiptConditionId']),
+    decommissioned_on: getString(source, ['decommissioned_on', 'decommissionedOn']) || null,
+    disposal_reason_id: getNullableNumber(source, ['disposal_reason_id', 'disposalReasonId']),
+    asset_code_overridden: getBoolean(source, ['asset_code_overridden', 'assetCodeOverridden'], false),
     is_active: getBoolean(source, ['is_active', 'isActive'], true),
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),
@@ -417,6 +424,11 @@ export const normalizeHelpdeskCatalogs = (input: unknown): HelpdeskCatalogs => {
     purchase_conditions: pickCatalog('purchase_conditions', 'purchaseConditions'),
     criticalities: pickCatalog('criticalities'),
     operational_statuses: pickCatalog('operational_statuses', 'operationalStatuses'),
+    suppliers: pickCatalog('suppliers'),
+    receipt_conditions: pickCatalog('receipt_conditions', 'receiptConditions'),
+    disposal_reasons: pickCatalog('disposal_reasons', 'disposalReasons'),
+    document_kinds: pickCatalog('document_kinds', 'documentKinds'),
+    lifecycle_event_types: pickCatalog('lifecycle_event_types', 'lifecycleEventTypes'),
   };
 };
 

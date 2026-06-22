@@ -107,6 +107,13 @@ export interface HelpdeskAsset {
   legacy_consecutive?: string | null;
   legacy_component_consecutive?: string | null;
   notes?: string | null;
+  supplier_id?: number | null;
+  received_on?: string | null;
+  placed_in_service_on?: string | null;
+  receipt_condition_id?: number | null;
+  decommissioned_on?: string | null;
+  disposal_reason_id?: number | null;
+  asset_code_overridden?: boolean;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -119,6 +126,9 @@ export interface HelpdeskAsset {
   purchase_condition?: HelpdeskCatalogItem | null;
   criticality?: HelpdeskCatalogItem | null;
   operational_status?: HelpdeskCatalogItem | null;
+  supplier?: HelpdeskCatalogItem | null;
+  receipt_condition?: HelpdeskCatalogItem | null;
+  disposal_reason?: HelpdeskCatalogItem | null;
   assigned_employee?: HelpdeskAssetEmployee | null;
   responsible_employee?: HelpdeskAssetEmployee | null;
 }
@@ -203,6 +213,85 @@ export interface HelpdeskCatalogs {
   purchase_conditions: HelpdeskCatalogItem[];
   criticalities: HelpdeskCatalogItem[];
   operational_statuses: HelpdeskCatalogItem[];
+  suppliers: HelpdeskCatalogItem[];
+  receipt_conditions: HelpdeskCatalogItem[];
+  disposal_reasons: HelpdeskCatalogItem[];
+  document_kinds: HelpdeskCatalogItem[];
+  lifecycle_event_types: HelpdeskCatalogItem[];
+}
+
+export interface HelpdeskLifecycleEvent {
+  id: number;
+  asset_id: number;
+  event_type_id: number;
+  event_code: string;
+  event_date: string | null;
+  title: string;
+  description?: string | null;
+  maintenance_order_id?: number | null;
+  ticket_id?: number | null;
+  supplier_id?: number | null;
+  performed_by_employee_id?: number | null;
+  performed_by_provider?: string | null;
+  cost?: number | null;
+  currency?: string | null;
+  calibration_certificate_no?: string | null;
+  calibration_due_on?: string | null;
+  disposal_reason_id?: number | null;
+  from_location_id?: number | null;
+  to_location_id?: number | null;
+  notes?: string | null;
+  generated_act_document_id?: number | null;
+  event_type?: HelpdeskCatalogItem | null;
+  supplier?: HelpdeskCatalogItem | null;
+  disposal_reason?: HelpdeskCatalogItem | null;
+  from_location?: HelpdeskCatalogItem | null;
+  to_location?: HelpdeskCatalogItem | null;
+  performed_by_employee?: { id: number; employee_code: string; full_name: string } | null;
+}
+
+export interface HelpdeskAssetDocument {
+  id: number;
+  asset_id: number;
+  title: string;
+  document_kind_id?: number | null;
+  document_kind_code?: string | null;
+  document_kind_name?: string | null;
+  lifecycle_event_id?: number | null;
+  file_size: number;
+  mime_type: string;
+  reference_key?: string | null;
+  version: number;
+  is_current: boolean;
+  issued_on?: string | null;
+  expires_on?: string | null;
+  created_at?: string;
+}
+
+export interface HelpdeskAssetExpedient {
+  asset: HelpdeskAsset;
+  events: HelpdeskLifecycleEvent[];
+  documents: HelpdeskAssetDocument[];
+}
+
+export interface HelpdeskLifecycleEventPayload {
+  event_type_id: number;
+  event_date: string;
+  title: string;
+  description?: string | null;
+  maintenance_order_id?: number | null;
+  ticket_id?: number | null;
+  supplier_id?: number | null;
+  performed_by_employee_id?: number | null;
+  performed_by_provider?: string | null;
+  cost?: number | null;
+  currency?: string | null;
+  calibration_certificate_no?: string | null;
+  calibration_due_on?: string | null;
+  disposal_reason_id?: number | null;
+  from_location_id?: number | null;
+  to_location_id?: number | null;
+  notes?: string | null;
 }
 
 export interface HelpdeskTicketPriority extends HelpdeskCatalogItem {
