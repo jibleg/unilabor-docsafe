@@ -7,10 +7,12 @@ import {
   Laptop,
   Loader2,
   Plus,
+  Printer,
   RefreshCw,
   Search,
   Trash2,
 } from 'lucide-react';
+import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
 import {
   createHelpdeskAsset,
   deleteHelpdeskAssetById,
@@ -235,6 +237,7 @@ export const HelpdeskAssetsPage = () => {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<HelpdeskAsset | null>(null);
+  const [labelAsset, setLabelAsset] = useState<HelpdeskAsset | null>(null);
   const [editingAsset, setEditingAsset] = useState<HelpdeskAsset | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
@@ -550,6 +553,14 @@ export const HelpdeskAssetsPage = () => {
                 <FolderOpen size={16} /> Ver expediente del equipo
               </button>
 
+              <button
+                type="button"
+                onClick={() => setLabelAsset(selectedAsset)}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] px-3 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.3)]"
+              >
+                <Printer size={16} /> Imprimir etiqueta
+              </button>
+
               <div className="grid gap-3 text-sm">
                 {[
                   ['Categoría', catalogName(selectedAsset.category)],
@@ -595,7 +606,7 @@ export const HelpdeskAssetsPage = () => {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Código de inventario (ISO 19186)
+                    Código de inventario
                   </span>
                   <input
                     value={form.asset_code}
@@ -832,6 +843,16 @@ export const HelpdeskAssetsPage = () => {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {labelAsset ? (
+        <AssetLabelModal
+          assetCode={labelAsset.asset_code}
+          name={labelAsset.name}
+          brand={labelAsset.brand?.name ?? labelAsset.brand_name ?? null}
+          model={labelAsset.model ?? null}
+          onClose={() => setLabelAsset(null)}
+        />
       ) : null}
     </div>
   );

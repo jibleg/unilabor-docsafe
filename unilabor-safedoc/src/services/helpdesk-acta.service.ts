@@ -53,7 +53,7 @@ const renderActaPdf = (input: ActaInput): Promise<Buffer> => {
 
   // Tabla de datos
   const rows: Array<[string, string]> = [
-    ['Codigo de inventario (ISO 19186)', line(asset.asset_code)],
+    ['Codigo de inventario', line(asset.asset_code)],
     ['Equipo / Descripcion', line(asset.name)],
     ['Marca', line(asset.brand?.name)],
     ['Modelo', line(asset.model)],

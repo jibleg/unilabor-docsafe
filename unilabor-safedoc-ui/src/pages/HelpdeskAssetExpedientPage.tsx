@@ -11,6 +11,7 @@ import {
   MapPin,
   Trash2,
   Boxes,
+  Printer,
 } from 'lucide-react';
 import {
   fetchAssetExpedient,
@@ -30,6 +31,7 @@ import { notifyError, notifySuccess } from '../utils/notify';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { LifecycleEventForm } from '../components/helpdesk/LifecycleEventForm';
 import { AssetEvidencePanel } from '../components/helpdesk/AssetEvidencePanel';
+import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
 
 const EVENT_ICONS: Record<string, typeof PackagePlus> = {
   ACQUISITION: PackagePlus,
@@ -61,6 +63,7 @@ export const HelpdeskAssetExpedientPage = () => {
   const [savingEvent, setSavingEvent] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
+  const [showLabel, setShowLabel] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!assetId) {
@@ -156,9 +159,18 @@ export const HelpdeskAssetExpedientPage = () => {
             <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">{asset.asset_code}</h1>
             <p className="text-sm text-[var(--unilabor-ink)]">{asset.name}</p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-bold ${asset.is_active ? 'bg-[rgba(34,139,84,0.12)] text-[#1c7a4a]' : 'bg-[rgba(190,40,40,0.12)] text-[#b02a2a]'}`}>
-            {asset.is_active ? 'Activo' : 'Dado de baja'}
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowLabel(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.3)]"
+            >
+              <Printer size={16} /> Imprimir etiqueta
+            </button>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${asset.is_active ? 'bg-[rgba(34,139,84,0.12)] text-[#1c7a4a]' : 'bg-[rgba(190,40,40,0.12)] text-[#b02a2a]'}`}>
+              {asset.is_active ? 'Activo' : 'Dado de baja'}
+            </span>
+          </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
           <IdentityRow label="Marca" value={asset.brand?.name} />
@@ -257,6 +269,16 @@ export const HelpdeskAssetExpedientPage = () => {
             <PdfSafeViewer key={selectedPdfUrl} fileUrl={selectedPdfUrl} />
           </div>
         </div>
+      )}
+
+      {showLabel && (
+        <AssetLabelModal
+          assetCode={asset.asset_code}
+          name={asset.name}
+          brand={asset.brand?.name ?? asset.brand_name ?? null}
+          model={asset.model ?? null}
+          onClose={() => setShowLabel(false)}
+        />
       )}
     </div>
   );
