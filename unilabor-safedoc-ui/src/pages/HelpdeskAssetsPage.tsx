@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Edit3,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
 import { ActionsMenu } from '../components/ActionsMenu';
+import { SearchableSelect } from '../components/SearchableSelect';
 import {
   createHelpdeskAsset,
   deleteHelpdeskAssetById,
@@ -132,9 +133,6 @@ const catalogName = (item?: HelpdeskCatalogItem | null): string => item?.name ??
 const employeeLabel = (employee: Employee): string =>
   `${employee.employee_code} - ${employee.full_name}`;
 
-const getEmployeeOptionValue = (employee: Employee): string =>
-  `${employeeLabel(employee)}${employee.area ? ` | ${employee.area}` : ''}`;
-
 const numericOrNull = (value: string): number | null => {
   const parsedValue = Number(value);
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null;
@@ -234,6 +232,10 @@ export const HelpdeskAssetsPage = () => {
   );
   const [catalogs, setCatalogs] = useState<HelpdeskCatalogs>(EMPTY_CATALOGS);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const employeeOptions = useMemo(
+    () => employees.map((employee) => ({ value: String(employee.id), label: employeeLabel(employee), hint: employee.area ?? undefined })),
+    [employees],
+  );
   const [assetSummary, setAssetSummary] = useState<HelpdeskAssetSummary>(EMPTY_ASSET_SUMMARY);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -681,36 +683,28 @@ export const HelpdeskAssetsPage = () => {
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Asignado a colaborador
                   </span>
-                  <select
+                  <SearchableSelect
                     value={form.assigned_employee_id}
-                    onChange={(event) => setField('assigned_employee_id', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  >
-                    <option value="">Sin colaborador</option>
-                    {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {getEmployeeOptionValue(employee)}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setField('assigned_employee_id', value)}
+                    options={employeeOptions}
+                    placeholder="Sin colaborador"
+                    emptyLabel="Sin colaborador"
+                    searchPlaceholder="Buscar colaborador por nombre, codigo o area..."
+                  />
                 </label>
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                     Responsable técnico
                   </span>
-                  <select
+                  <SearchableSelect
                     value={form.responsible_employee_id}
-                    onChange={(event) => setField('responsible_employee_id', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  >
-                    <option value="">Sin responsable</option>
-                    {employees.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {getEmployeeOptionValue(employee)}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setField('responsible_employee_id', value)}
+                    options={employeeOptions}
+                    placeholder="Sin responsable"
+                    emptyLabel="Sin responsable"
+                    searchPlaceholder="Buscar responsable por nombre, codigo o area..."
+                  />
                 </label>
 
                 <CatalogSelect label="Modalidad de compra" value={form.purchase_modality_id} options={catalogs.purchase_modalities} onChange={(value) => setField('purchase_modality_id', value)} />
