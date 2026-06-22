@@ -133,6 +133,9 @@ const catalogName = (item?: HelpdeskCatalogItem | null): string => item?.name ??
 const employeeLabel = (employee: Employee): string =>
   `${employee.employee_code} - ${employee.full_name}`;
 
+const catalogToOptions = (items: HelpdeskCatalogItem[]) =>
+  items.map((item) => ({ value: String(item.id), label: item.name, hint: item.code ?? undefined }));
+
 const numericOrNull = (value: string): number | null => {
   const parsedValue = Number(value);
   return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : null;
@@ -633,11 +636,35 @@ export const HelpdeskAssetsPage = () => {
                   />
                 </label>
 
-                <CatalogSelect label="Categoría" value={form.category_id} options={catalogs.categories} onChange={(value) => setField('category_id', value)} />
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Categoría
+                  </span>
+                  <SearchableSelect
+                    value={form.category_id}
+                    onChange={(value) => setField('category_id', value)}
+                    options={catalogToOptions(catalogs.categories)}
+                    placeholder="Sin seleccionar"
+                    emptyLabel="Sin seleccionar"
+                    searchPlaceholder="Buscar categoria por nombre o codigo..."
+                  />
+                </label>
                 <CatalogSelect label="Estado operativo" value={form.operational_status_id} options={catalogs.operational_statuses} onChange={(value) => setField('operational_status_id', value)} />
                 <CatalogSelect label="Criticidad" value={form.criticality_id} options={catalogs.criticalities} onChange={(value) => setField('criticality_id', value)} />
                 <CatalogSelect label="Unidad" value={form.unit_id} options={catalogs.units} onChange={(value) => setField('unit_id', value)} />
-                <CatalogSelect label="Área" value={form.area_id} options={catalogs.areas} onChange={(value) => setField('area_id', value)} />
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Área
+                  </span>
+                  <SearchableSelect
+                    value={form.area_id}
+                    onChange={(value) => setField('area_id', value)}
+                    options={catalogToOptions(catalogs.areas)}
+                    placeholder="Sin seleccionar"
+                    emptyLabel="Sin seleccionar"
+                    searchPlaceholder="Buscar area por nombre o codigo..."
+                  />
+                </label>
                 <CatalogSelect label="Ubicación" value={form.location_id} options={catalogs.locations} onChange={(value) => setField('location_id', value)} />
 
                 <label className="block">
