@@ -24,9 +24,9 @@ export const AssetLabelModal = ({ assetCode, name, brand, model, onClose }: Asse
       JsBarcode(canvas, assetCode, {
         format: 'CODE128',
         displayValue: true,
-        fontSize: 18,
-        height: 70,
-        margin: 8,
+        fontSize: 16,
+        height: 55,
+        margin: 6,
         textMargin: 2,
         font: 'monospace',
       });
@@ -48,17 +48,17 @@ export const AssetLabelModal = ({ assetCode, name, brand, model, onClose }: Asse
     printWindow.document.write(`<!DOCTYPE html>
 <html><head><meta charset="utf-8" /><title>Etiqueta ${escapeHtml(assetCode)}</title>
 <style>
-  @page { size: 50mm 30mm; margin: 0; }
+  @page { size: 50mm 25mm; margin: 0; }
   html, body { margin: 0; padding: 0; }
   .label {
-    width: 50mm; height: 30mm; box-sizing: border-box; padding: 1.5mm;
+    width: 50mm; height: 25mm; box-sizing: border-box; padding: 1mm;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     font-family: Arial, Helvetica, sans-serif; text-align: center;
   }
-  .name { font-size: 8pt; font-weight: 700; line-height: 1.1; max-width: 47mm;
-    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .sub { font-size: 6pt; color: #333; margin-top: 0.3mm; }
-  img { max-width: 47mm; max-height: 17mm; margin-top: 0.6mm; }
+  .name { font-size: 7pt; font-weight: 700; line-height: 1.05; max-width: 48mm;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+  .sub { font-size: 5.5pt; color: #333; line-height: 1; }
+  img { max-width: 48mm; max-height: 14mm; margin-top: 0.4mm; }
 </style></head>
 <body>
   <div class="label">
@@ -93,7 +93,7 @@ export const AssetLabelModal = ({ assetCode, name, brand, model, onClose }: Asse
             ) : null}
           </div>
           <p className="text-center text-xs text-[var(--unilabor-neutral)]">
-            Codigo de barras Code128 · etiqueta de 50 × 30 mm (ajustable en el dialogo de impresion).
+            Codigo de barras Code128 · etiqueta de 50 × 25 mm (5 × 2.5 cm).
           </p>
           <button
             type="button"
