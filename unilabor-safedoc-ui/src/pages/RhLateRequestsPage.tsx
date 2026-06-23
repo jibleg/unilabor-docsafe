@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Clock, Loader2, UnlockKeyhole } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
+import { Clock, Eye, Loader2, UnlockKeyhole } from 'lucide-react';
 import { authorizeLateAttempt, getApiErrorMessage, listExpiredAssignments } from '../api/service';
+import { LateAssignmentDetailDrawer } from '../components/rh/LateAssignmentDetailDrawer';
 import type { EvaluationAssignment } from '../types/models';
+import { confirmAction } from '../utils/confirm';
 import { notifyError, notifySuccess } from '../utils/notify';
 
 export const RhLateRequestsPage = () => {
   const [items, setItems] = useState<EvaluationAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [authorizingId, setAuthorizingId] = useState<number | null>(null);
+  // Plazo de reapertura elegido por renglon (horas). Sin elegir => window_hours del template.
+  const [hoursById, setHoursById] = useState<Record<number, number>>({});
+  // Asignacion cuyo detalle se esta viendo (modal).
+  const [detailItem, setDetailItem] = useState<EvaluationAssignment | null>(null);
+
+  // Opciones de plazo de reapertura ofrecidas a RH.
+  const REOPEN_OPTIONS = [12, 24, 48, 72];
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -25,11 +35,21 @@ export const RhLateRequestsPage = () => {
     void load();
   }, [load]);
 
-  const authorize = async (assignmentId: number) => {
-    setAuthorizingId(assignmentId);
+  const authorize = async (item: EvaluationAssignment, hours: number) => {
+    const confirmed = await confirmAction(
+      'Autorizar realización extemporánea',
+      `Se reabrirá la evaluación de ${item.employee_name} con una nueva ventana de ${hours} h para realizarla.`,
+      `Autorizar (${hours}h)`,
+      'primary',
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setAuthorizingId(item.id);
     try {
-      await authorizeLateAttempt(assignmentId);
-      notifySuccess('Autorización extemporánea otorgada. Se reabrió la ventana de 72h.');
+      await authorizeLateAttempt(item.id, hours);
+      notifySuccess(`Autorización extemporánea otorgada. Se reabrió la ventana de ${hours}h.`);
       await load();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo autorizar la evaluacion.'));
@@ -78,19 +98,51 @@ export const RhLateRequestsPage = () => {
                   </span>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => void authorize(item.id)}
-                disabled={authorizingId === item.id}
-                className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
-              >
-                {authorizingId === item.id ? <Loader2 size={15} className="animate-spin" /> : <UnlockKeyhole size={15} />}
-                Autorizar extemporáneo
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDetailItem(item)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-slate-50"
+                >
+                  <Eye size={15} /> Ver detalle
+                </button>
+                <label className="flex items-center gap-1 text-xs font-medium text-[var(--unilabor-neutral)]">
+                  Plazo
+                  <select
+                    value={hoursById[item.id] ?? item.window_hours}
+                    onChange={(event) =>
+                      setHoursById((prev) => ({ ...prev, [item.id]: Number(event.target.value) }))
+                    }
+                    disabled={authorizingId === item.id}
+                    className="rounded-lg border border-[rgba(0,65,106,0.14)] bg-white px-2 py-1.5 text-sm font-semibold text-[var(--color-brand-700)] disabled:opacity-50"
+                  >
+                    {REOPEN_OPTIONS.map((hours) => (
+                      <option key={hours} value={hours}>
+                        {hours}h{hours === item.window_hours ? ' (def.)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void authorize(item, hoursById[item.id] ?? item.window_hours)}
+                  disabled={authorizingId === item.id}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
+                >
+                  {authorizingId === item.id ? <Loader2 size={15} className="animate-spin" /> : <UnlockKeyhole size={15} />}
+                  Autorizar extemporáneo
+                </button>
+              </div>
             </li>
           ))}
         </ul>
       )}
+
+      <AnimatePresence>
+        {detailItem && (
+          <LateAssignmentDetailDrawer assignment={detailItem} onClose={() => setDetailItem(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -193,6 +193,18 @@ export const gradeEvaluationSchema = z
   })
   .passthrough();
 
+export const authorizeLateSchema = z
+  .object({
+    // Plazo opcional de reapertura (horas). Si se omite, se usa window_hours del template.
+    reopen_hours: z.coerce
+      .number()
+      .int()
+      .min(1, 'El plazo minimo de reapertura es 1 hora')
+      .max(168, 'El plazo maximo de reapertura es 168 horas (7 dias)')
+      .optional(),
+  })
+  .passthrough();
+
 // --- Plantilla de constancia ---
 
 const certificateSignatureSchema = z.object({

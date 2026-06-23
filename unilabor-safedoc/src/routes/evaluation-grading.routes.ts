@@ -12,7 +12,7 @@ import {
 } from '../controllers/evaluation-grading.controller';
 import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { gradeEvaluationSchema } from '../schemas/training.schema';
+import { authorizeLateSchema, gradeEvaluationSchema } from '../schemas/training.schema';
 
 /**
  * Calificacion manual de evaluaciones con preguntas abiertas (RH ADMIN/EDITOR).
@@ -30,6 +30,6 @@ router.get('/report', traceabilityReportController);
 router.get('/:id/grading', getGradingDetailController);
 router.get('/:id/responses', evaluationResponsesController);
 router.post('/:id/grade', validate(gradeEvaluationSchema), gradeEvaluationController);
-router.post('/:id/authorize-late', authorizeLateController);
+router.post('/:id/authorize-late', validate(authorizeLateSchema), authorizeLateController);
 
 export default router;

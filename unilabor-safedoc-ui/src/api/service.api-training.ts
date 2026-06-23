@@ -509,8 +509,11 @@ export const listExpiredAssignments = async (query: PageQuery = {}): Promise<Pag
   return { data, pagination: extractPagination(response.data, data.length) };
 };
 
-export const authorizeLateAttempt = async (assignmentId: number): Promise<void> => {
-  await api.post(`/rh/evaluations/${assignmentId}/authorize-late`);
+export const authorizeLateAttempt = async (assignmentId: number, reopenHours?: number): Promise<void> => {
+  await api.post(
+    `/rh/evaluations/${assignmentId}/authorize-late`,
+    reopenHours ? { reopen_hours: reopenHours } : {},
+  );
 };
 
 export const listNotificationLog = async (

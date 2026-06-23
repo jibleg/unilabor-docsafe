@@ -170,11 +170,12 @@ export const authorizeLateController = async (req: AuthRequest, res: Response) =
   if (!assignmentId) {
     return res.status(400).json({ message: 'ID de evaluacion invalido.' });
   }
+  const reopenHours = req.body?.reopen_hours != null ? Number(req.body.reopen_hours) : undefined;
   try {
-    const assignment = await authorizeLateAttempt(assignmentId);
+    const assignment = await authorizeLateAttempt(assignmentId, reopenHours);
     await registerAuditEvent({
       user_id: req.user?.id ?? null,
-      action: `RH_EVAL_AUTHORIZE_LATE:${assignmentId}`,
+      action: `RH_EVAL_AUTHORIZE_LATE:${assignmentId}${reopenHours ? `:${reopenHours}h` : ''}`,
       ip_address: req.ip ?? null,
       module_code: 'RH',
       entity_type: 'evaluation_assignment',

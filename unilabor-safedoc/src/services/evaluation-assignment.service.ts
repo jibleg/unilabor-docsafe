@@ -324,8 +324,15 @@ export const requestLateAuthorization = async (assignmentId: number, employeeId:
   );
 };
 
-/** RH autoriza la realizacion extemporanea: reabre la ventana (mismo intento). */
-export const authorizeLateAttempt = async (assignmentId: number): Promise<EvaluationAssignmentRecord | null> => {
+/**
+ * RH autoriza la realizacion extemporanea: reabre la ventana (mismo intento).
+ * `reopenHours` permite fijar un plazo distinto (p. ej. 12 o 24h); si se omite,
+ * se usa el window_hours del template (72h por defecto).
+ */
+export const authorizeLateAttempt = async (
+  assignmentId: number,
+  reopenHours?: number,
+): Promise<EvaluationAssignmentRecord | null> => {
   const result = await pool.query(
     `SELECT a.status, t.window_hours
        FROM public.evaluation_assignments a
@@ -339,7 +346,10 @@ export const authorizeLateAttempt = async (assignmentId: number): Promise<Evalua
   if (String(result.rows[0].status) !== 'expired') {
     throwAssignmentCoded('EVAL_NOT_EXPIRED');
   }
-  const windowHours = Number(result.rows[0].window_hours);
+  const windowHours =
+    Number.isFinite(reopenHours) && (reopenHours as number) > 0
+      ? Math.floor(reopenHours as number)
+      : Number(result.rows[0].window_hours);
   await pool.query(
     `UPDATE public.evaluation_assignments
         SET status = 'authorized_late', available_at = NOW(),
