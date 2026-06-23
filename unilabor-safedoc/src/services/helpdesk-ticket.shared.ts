@@ -390,6 +390,35 @@ export const getDefaultPriorityId = async (): Promise<number | null> => {
   return result.rows[0]?.id ? Number(result.rows[0].id) : null;
 };
 
+/**
+ * Resuelve el `due_at` (SLA) de un ticket. Si el cliente envia un valor explicito
+ * se respeta; si no, se deriva de `now + priority.response_hours`. Si la prioridad
+ * no define horas de respuesta, devuelve null (ticket sin SLA).
+ */
+export const resolveTicketDueAt = async (
+  priorityId: number | null | undefined,
+  providedDueAt?: string | null,
+): Promise<string | null> => {
+  const provided = normalizeOptionalText(providedDueAt ?? null);
+  if (provided) {
+    return provided;
+  }
+  if (!priorityId) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `SELECT response_hours FROM public.helpdesk_ticket_priorities WHERE id = $1 LIMIT 1;`,
+    [priorityId],
+  );
+  const hours = Number(result.rows[0]?.response_hours);
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return null;
+  }
+
+  return new Date(Date.now() + hours * 3600 * 1000).toISOString();
+};
+
 export const getTicketStatusId = async (code: string): Promise<number | null> => {
   const result = await pool.query(
     `

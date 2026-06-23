@@ -81,6 +81,15 @@ export const mapHelpdeskError = (res: Response, error: any) => {
   }
 
   if (
+    error?.code === 'HELPDESK_TICKET_INVALID_STATE' ||
+    error?.code === 'HELPDESK_MAINTENANCE_ORDER_INVALID_STATE'
+  ) {
+    return res.status(409).json({
+      message: error.publicMessage ?? 'La operacion no es valida para el estado actual del registro.',
+    });
+  }
+
+  if (
     error?.code === '42703' &&
     typeof error?.message === 'string' &&
     ['risk_level', 'technical_release', 'operational_lock'].some((fieldName) =>

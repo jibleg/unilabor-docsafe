@@ -297,8 +297,22 @@ function App() {
         <Route index element={<Navigate to="/helpdesk/dashboard" replace />} />
         <Route path="dashboard" element={<HelpdeskDashboardPage />} />
         <Route path="my-portal" element={<HelpdeskMyPortalPage />} />
-        <Route path="assets" element={<HelpdeskAssetsPage />} />
-        <Route path="assets/:id/expedient" element={<HelpdeskAssetExpedientPage />} />
+        <Route
+          path="assets"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskAssetsPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="assets/:id/expedient"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskAssetExpedientPage />
+            </RoleGate>
+          }
+        />
         <Route
           path="tickets"
           element={
@@ -307,7 +321,14 @@ function App() {
             </RoleGate>
           }
         />
-        <Route path="maintenance" element={<HelpdeskMaintenancePage />} />
+        <Route
+          path="maintenance"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskMaintenancePage />
+            </RoleGate>
+          }
+        />
         <Route
           path="catalogs"
           element={

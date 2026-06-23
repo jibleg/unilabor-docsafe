@@ -766,6 +766,17 @@ export const updateMaintenancePlan = async (
   return getMaintenancePlanById(planId);
 };
 
+/**
+ * Construye un error de "estado previo invalido" para transiciones de orden.
+ * El controller lo mapea a HTTP 409 usando `publicMessage`.
+ */
+const invalidOrderState = (message: string): Error => {
+  const error = new Error('HELPDESK_MAINTENANCE_ORDER_INVALID_STATE');
+  (error as any).code = 'HELPDESK_MAINTENANCE_ORDER_INVALID_STATE';
+  (error as any).publicMessage = message;
+  return error;
+};
+
 export const startMaintenanceOrder = async (
   orderId: number,
   userId?: string | null,
@@ -775,6 +786,10 @@ export const startMaintenanceOrder = async (
   const current = await getMaintenanceOrderById(orderId);
   if (!current) {
     return null;
+  }
+
+  if (current.status !== 'SCHEDULED' && current.status !== 'RESCHEDULED') {
+    throw invalidOrderState('Solo se puede iniciar una orden programada o reprogramada.');
   }
 
   await pool.query(
@@ -804,6 +819,10 @@ export const rescheduleMaintenanceOrder = async (
   const current = await getMaintenanceOrderById(orderId);
   if (!current) {
     return null;
+  }
+
+  if (current.status !== 'SCHEDULED' && current.status !== 'RESCHEDULED') {
+    throw invalidOrderState('Solo se puede reprogramar una orden programada o reprogramada.');
   }
 
   const beforeDays = current.plan?.tolerance_before_days ?? 0;
@@ -859,6 +878,10 @@ export const closeMaintenanceOrder = async (
   const current = await getMaintenanceOrderById(orderId);
   if (!current) {
     return null;
+  }
+
+  if (current.status === 'CLOSED') {
+    throw invalidOrderState('Esta orden de mantenimiento ya esta cerrada.');
   }
 
   await withTransaction(async (client) => {

@@ -20,7 +20,19 @@ import {
   normalizeOptionalText,
   getRequiredEmployeeByUserId,
   calculateDowntimeMinutes,
+  resolveTicketDueAt,
 } from './helpdesk-ticket.shared';
+
+/**
+ * Construye un error de "estado previo invalido" para transiciones de ticket.
+ * El controller lo mapea a HTTP 409 usando `publicMessage`.
+ */
+const invalidTicketState = (message: string): Error => {
+  const error = new Error('HELPDESK_TICKET_INVALID_STATE');
+  (error as any).code = 'HELPDESK_TICKET_INVALID_STATE';
+  (error as any).publicMessage = message;
+  return error;
+};
 
 export const createHelpdeskTicket = async (
   payload: HelpdeskTicketPayload,
@@ -30,6 +42,8 @@ export const createHelpdeskTicket = async (
 
   const defaultStatusId = payload.status_id ?? await getDefaultStatusId();
   const defaultPriorityId = payload.priority_id ?? await getDefaultPriorityId();
+  // SLA: si el cliente no manda due_at, se deriva de la prioridad (response_hours).
+  const dueAt = await resolveTicketDueAt(defaultPriorityId, payload.due_at);
   const ticketCode = await generateTicketCode();
 
   const ticketId = await withTransaction(async (client) => {
@@ -71,7 +85,7 @@ export const createHelpdeskTicket = async (
         payload.description.trim(),
         normalizeOptionalText(payload.operational_impact),
         Boolean(payload.affects_results),
-        normalizeOptionalText(payload.due_at),
+        dueAt,
       ],
     );
 
@@ -285,6 +299,10 @@ export const evaluateHelpdeskTicketIsoRisk = async (
     return null;
   }
 
+  if (current.validated_at) {
+    throw invalidTicketState('No se puede evaluar el riesgo de un ticket que ya fue validado.');
+  }
+
   const normalizedRisk = payload.risk_level.trim().toUpperCase();
   const operationalLock =
     payload.operational_lock ??
@@ -367,6 +385,10 @@ export const releaseHelpdeskTicketTechnically = async (
     return null;
   }
 
+  if (current.validated_at) {
+    throw invalidTicketState('No se puede registrar la liberacion tecnica de un ticket ya validado.');
+  }
+
   await withTransaction(async (client) => {
     await client.query(
       `
@@ -426,6 +448,13 @@ export const solveHelpdeskTicket = async (
     return null;
   }
 
+  if (current.validated_at) {
+    throw invalidTicketState('Este ticket ya fue validado; no admite una nueva solucion.');
+  }
+  if (current.solved_at) {
+    throw invalidTicketState('Este ticket ya tiene una solucion registrada.');
+  }
+
   const solvedStatusId = await getTicketStatusId('SOLVED');
 
   await withTransaction(async (client) => {
@@ -476,6 +505,13 @@ export const validateHelpdeskTicketReturn = async (
   const current = await getHelpdeskTicketById(ticketId);
   if (!current) {
     return null;
+  }
+
+  if (current.validated_at) {
+    throw invalidTicketState('Este ticket ya fue validado.');
+  }
+  if (!current.solved_at) {
+    throw invalidTicketState('No se puede validar el retorno antes de registrar una solucion tecnica.');
   }
 
   const validatedStatusId = await getTicketStatusId('VALIDATED');
