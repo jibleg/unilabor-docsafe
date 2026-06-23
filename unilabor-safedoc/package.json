@@ -10,6 +10,8 @@
     "test:watch": "vitest",
     "migrate": "ts-node src/scripts/migrate.ts migrate",
     "migrate:status": "ts-node src/scripts/migrate.ts status",
+    "migrate:prod": "node dist/scripts/migrate.js migrate",
+    "migrate:status:prod": "node dist/scripts/migrate.js status",
     "import:inventory": "ts-node src/scripts/import-inventory.ts",
     "hash-password": "node scripts/hash-password.js"
   },
