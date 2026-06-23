@@ -96,10 +96,16 @@ export const startEvaluationScheduler = (): void => {
     return;
   }
   const expression = process.env.SCHEDULER_CRON || '*/15 * * * *';
-  scheduledTask = cron.schedule(expression, () => {
-    void runSchedulerTick().catch((error) => {
-      console.error('Error en el ciclo del scheduler de evaluaciones:', error);
+  // Arranque defensivo: una falla al programar el cron (p. ej. incompatibilidad de
+  // node-cron con la version de Node del servidor) NO debe tumbar la API.
+  try {
+    scheduledTask = cron.schedule(expression, () => {
+      void runSchedulerTick().catch((error) => {
+        console.error('Error en el ciclo del scheduler de evaluaciones:', error);
+      });
     });
-  });
-  console.log(`Scheduler de evaluaciones activo (cron "${expression}").`);
+    console.log(`Scheduler de evaluaciones activo (cron "${expression}").`);
+  } catch (error) {
+    console.error('No se pudo iniciar el scheduler de evaluaciones; la API continua sin el:', error);
+  }
 };
