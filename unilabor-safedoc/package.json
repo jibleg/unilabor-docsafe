@@ -10,6 +10,7 @@
     "test:watch": "vitest",
     "migrate": "ts-node src/scripts/migrate.ts migrate",
     "migrate:status": "ts-node src/scripts/migrate.ts status",
+    "import:inventory": "ts-node src/scripts/import-inventory.ts",
     "hash-password": "node scripts/hash-password.js"
   },
   "keywords": [],
@@ -41,6 +42,7 @@
     "@types/node": "^25.5.2",
     "@types/nodemailer": "^8.0.0",
     "@types/pg": "^8.20.0",
+    "exceljs": "^4.4.0",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2",
