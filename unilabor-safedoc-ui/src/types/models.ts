@@ -687,6 +687,9 @@ export interface Category {
 export type EvaluationQuestionType = 'single' | 'multiple' | 'boolean' | 'open';
 export type EvaluationSelectionMode = 'all' | 'random';
 export type EvaluationTemplateStatus = 'draft' | 'published';
+// 'quiz': cuestionario que contesta el colaborador. 'practical': capacitacion
+// presencial cuya calificacion captura RH directamente (sin cuestionario).
+export type EvaluationType = 'quiz' | 'practical';
 
 export interface TrainingCourse {
   id: number;
@@ -722,6 +725,7 @@ export interface EvaluationTemplate {
   training_course_id: number;
   title: string;
   instructions: string | null;
+  evaluation_type: EvaluationType;
   passing_score: number;
   window_hours: number;
   selection_mode: EvaluationSelectionMode;

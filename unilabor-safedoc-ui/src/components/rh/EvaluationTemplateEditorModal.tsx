@@ -11,6 +11,7 @@ import type {
   EvaluationQuestionType,
   EvaluationSelectionMode,
   EvaluationTemplate,
+  EvaluationType,
 } from '../../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
 
@@ -186,6 +187,7 @@ export const EvaluationTemplateEditorModal = ({
     setQuestions((current) => current.filter((_, i) => i !== index));
 
   const hasOpenQuestions = useMemo(() => questions.some((question) => question.type === 'open'), [questions]);
+  const isPractical = template?.evaluation_type === 'practical';
 
   const handleSave = async () => {
     if (!template) {
@@ -195,6 +197,30 @@ export const EvaluationTemplateEditorModal = ({
       notifyWarning('El título de la evaluación es obligatorio.');
       return;
     }
+
+    // Evaluacion practica: sin banco de preguntas. RH captura la nota directamente.
+    if (isPractical) {
+      setSaving(true);
+      try {
+        await updateEvaluationTemplate(template.id, {
+          title: template.title.trim(),
+          instructions: template.instructions,
+          evaluation_type: 'practical',
+          // Umbral fijo: se acredita con nota >= 8 (80%).
+          passing_score: 80,
+          status: template.status,
+        });
+        notifySuccess('Evaluación práctica guardada correctamente.');
+        onSaved();
+        onClose();
+      } catch (error) {
+        notifyError(getApiErrorMessage(error, 'No se pudo guardar la evaluación.'));
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     if (
       template.selection_mode === 'random' &&
       (!template.random_count || template.random_count > questions.length)
@@ -213,6 +239,7 @@ export const EvaluationTemplateEditorModal = ({
       await updateEvaluationTemplate(template.id, {
         title: template.title.trim(),
         instructions: template.instructions,
+        evaluation_type: 'quiz',
         passing_score: template.passing_score,
         window_hours: template.window_hours,
         selection_mode: template.selection_mode,
@@ -243,7 +270,7 @@ export const EvaluationTemplateEditorModal = ({
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            {!loading && template && (
+            {!loading && template && !isPractical && (
               <button
                 type="button"
                 onClick={addQuestion}
@@ -288,52 +315,74 @@ export const EvaluationTemplateEditorModal = ({
                   className={inputClass}
                 />
               </div>
-              <div>
-                <label className={labelClass}>Calificación mínima (%)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={template.passing_score}
-                  onChange={(event) => patchTemplate({ passing_score: Number(event.target.value) })}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Ventana para responder (horas)</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={template.window_hours}
-                  onChange={(event) => patchTemplate({ window_hours: Number(event.target.value) })}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Entrega de preguntas</label>
+              <div className="md:col-span-2">
+                <label className={labelClass}>Tipo de evaluación</label>
                 <select
-                  value={template.selection_mode}
-                  onChange={(event) =>
-                    patchTemplate({ selection_mode: event.target.value as EvaluationSelectionMode })
-                  }
+                  value={template.evaluation_type}
+                  onChange={(event) => patchTemplate({ evaluation_type: event.target.value as EvaluationType })}
                   className={inputClass}
                 >
-                  <option value="all">Todo el banco</option>
-                  <option value="random">Subconjunto aleatorio</option>
+                  <option value="quiz">Cuestionario (lo responde el colaborador)</option>
+                  <option value="practical">Práctica (RH captura la calificación)</option>
                 </select>
               </div>
-              {template.selection_mode === 'random' && (
-                <div>
-                  <label className={labelClass}>Preguntas a entregar (de {questions.length})</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={questions.length}
-                    value={template.random_count ?? ''}
-                    onChange={(event) => patchTemplate({ random_count: Number(event.target.value) })}
-                    className={inputClass}
-                  />
+
+              {isPractical ? (
+                <div className="md:col-span-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2.5 text-xs text-[var(--color-brand-700)]">
+                  Capacitación presencial: no lleva banco de preguntas. RH captura la calificación (0–10) de cada
+                  colaborador desde <strong>Capacitación práctica</strong>. Se acredita y genera la constancia con
+                  nota <strong>≥ 8</strong>.
                 </div>
+              ) : (
+                <>
+                  <div>
+                    <label className={labelClass}>Calificación mínima (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={template.passing_score}
+                      onChange={(event) => patchTemplate({ passing_score: Number(event.target.value) })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Ventana para responder (horas)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={template.window_hours}
+                      onChange={(event) => patchTemplate({ window_hours: Number(event.target.value) })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Entrega de preguntas</label>
+                    <select
+                      value={template.selection_mode}
+                      onChange={(event) =>
+                        patchTemplate({ selection_mode: event.target.value as EvaluationSelectionMode })
+                      }
+                      className={inputClass}
+                    >
+                      <option value="all">Todo el banco</option>
+                      <option value="random">Subconjunto aleatorio</option>
+                    </select>
+                  </div>
+                  {template.selection_mode === 'random' && (
+                    <div>
+                      <label className={labelClass}>Preguntas a entregar (de {questions.length})</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={questions.length}
+                        value={template.random_count ?? ''}
+                        onChange={(event) => patchTemplate({ random_count: Number(event.target.value) })}
+                        className={inputClass}
+                      />
+                    </div>
+                  )}
+                </>
               )}
               <div>
                 <label className={labelClass}>Estado</label>
@@ -356,7 +405,8 @@ export const EvaluationTemplateEditorModal = ({
               </div>
             )}
 
-            {/* Banco de preguntas */}
+            {/* Banco de preguntas (solo evaluaciones tipo cuestionario) */}
+            {!isPractical && (
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
@@ -462,6 +512,7 @@ export const EvaluationTemplateEditorModal = ({
                 </div>
               ))}
             </section>
+            )}
           </div>
         )}
 

@@ -4,6 +4,7 @@ import type {
   EvaluationQuestionRecord,
   EvaluationTemplateRecord,
   EvaluationQuestionType,
+  EvaluationType,
 } from '../types';
 
 /**
@@ -18,6 +19,7 @@ import type {
 export interface EvaluationTemplatePayload {
   title: string;
   instructions?: string | null;
+  evaluation_type?: 'quiz' | 'practical';
   passing_score?: number;
   window_hours?: number;
   selection_mode?: 'all' | 'random';
@@ -128,6 +130,7 @@ const mapTemplateRow = (row: any): EvaluationTemplateRecord => {
     instructions: row.instructions ? String(row.instructions) : null,
     passing_score: Number(row.passing_score),
     window_hours: Number(row.window_hours),
+    evaluation_type: String(row.evaluation_type ?? 'quiz') as EvaluationType,
     selection_mode: String(row.selection_mode) as 'all' | 'random',
     random_count: row.random_count !== null && row.random_count !== undefined ? Number(row.random_count) : null,
     status: String(row.status) as 'draft' | 'published',
@@ -149,7 +152,7 @@ const mapTemplateRow = (row: any): EvaluationTemplateRecord => {
 const TEMPLATE_BASE_QUERY = `
   SELECT
     t.id, t.training_course_id, t.title, t.instructions, t.passing_score, t.window_hours,
-    t.selection_mode, t.random_count, t.status, t.is_active, t.created_at, t.updated_at,
+    t.evaluation_type, t.selection_mode, t.random_count, t.status, t.is_active, t.created_at, t.updated_at,
     COUNT(q.id)::int AS question_count,
     COALESCE(BOOL_OR(q.type = 'open'), FALSE) AS requires_manual_grading
   FROM public.evaluation_templates t
@@ -197,19 +200,24 @@ export const createEvaluationTemplate = async (
     throwCoded('TRAINING_COURSE_NOT_FOUND');
   }
 
+  // Una evaluacion practica no usa banco de preguntas: se ignora el modo aleatorio.
+  const evaluationType: EvaluationType = payload.evaluation_type === 'practical' ? 'practical' : 'quiz';
+  const isPractical = evaluationType === 'practical';
+
   const result = await pool.query(
     `INSERT INTO public.evaluation_templates
-       (training_course_id, title, instructions, passing_score, window_hours, selection_mode, random_count, status, created_by_user_id)
-     VALUES ($1, $2, $3, COALESCE($4, 80), COALESCE($5, 72), COALESCE($6, 'all'), $7, COALESCE($8, 'draft'), $9)
+       (training_course_id, title, instructions, evaluation_type, passing_score, window_hours, selection_mode, random_count, status, created_by_user_id)
+     VALUES ($1, $2, $3, $4, COALESCE($5, 80), COALESCE($6, 72), COALESCE($7, 'all'), $8, COALESCE($9, 'draft'), $10)
      RETURNING id;`,
     [
       courseId,
       payload.title.trim(),
       normalizeOptionalText(payload.instructions),
+      evaluationType,
       payload.passing_score ?? null,
       payload.window_hours ?? null,
-      payload.selection_mode ?? null,
-      payload.selection_mode === 'random' ? payload.random_count ?? null : null,
+      isPractical ? 'all' : payload.selection_mode ?? null,
+      isPractical ? null : payload.selection_mode === 'random' ? payload.random_count ?? null : null,
       payload.status ?? null,
       createdByUserId,
     ],
@@ -249,9 +257,17 @@ export const updateEvaluationTemplate = async (
     }
     const current = currentResult.rows[0];
 
-    const selectionMode = payload.selection_mode ?? String(current.selection_mode);
-    const randomCount =
-      selectionMode === 'random'
+    const evaluationType: EvaluationType =
+      (payload.evaluation_type ?? String(current.evaluation_type ?? 'quiz')) === 'practical'
+        ? 'practical'
+        : 'quiz';
+    const isPractical = evaluationType === 'practical';
+
+    // Una evaluacion practica no usa banco: se fuerza modo 'all' sin aleatorio.
+    const selectionMode = isPractical ? 'all' : payload.selection_mode ?? String(current.selection_mode);
+    const randomCount = isPractical
+      ? null
+      : selectionMode === 'random'
         ? payload.random_count !== undefined
           ? payload.random_count
           : current.random_count !== null
@@ -270,12 +286,13 @@ export const updateEvaluationTemplate = async (
 
     await client.query(
       `UPDATE public.evaluation_templates
-        SET title = $1, instructions = $2, passing_score = $3, window_hours = $4,
-            selection_mode = $5, random_count = $6, status = $7, is_active = $8, updated_at = NOW()
-        WHERE id = $9;`,
+        SET title = $1, instructions = $2, evaluation_type = $3, passing_score = $4, window_hours = $5,
+            selection_mode = $6, random_count = $7, status = $8, is_active = $9, updated_at = NOW()
+        WHERE id = $10;`,
       [
         payload.title !== undefined ? payload.title.trim() : String(current.title),
         payload.instructions !== undefined ? normalizeOptionalText(payload.instructions) : current.instructions,
+        evaluationType,
         payload.passing_score ?? Number(current.passing_score),
         payload.window_hours ?? Number(current.window_hours),
         selectionMode,

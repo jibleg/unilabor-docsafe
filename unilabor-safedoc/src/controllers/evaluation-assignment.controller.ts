@@ -31,6 +31,12 @@ const mapAssignmentError = (res: Response, error: any): Response | null => {
       return res.status(404).json({ message: 'La evaluacion indicada no existe.' });
     case 'EVAL_TEMPLATE_NOT_PUBLISHED':
       return res.status(400).json({ message: 'Solo se pueden asignar evaluaciones publicadas.' });
+    case 'EVAL_TEMPLATE_IS_PRACTICAL':
+      return res.status(400).json({
+        message: 'Las evaluaciones practicas no se asignan: RH captura la calificacion directamente.',
+      });
+    case 'EVAL_PRACTICAL_NOT_TAKEABLE':
+      return res.status(400).json({ message: 'Esta evaluacion es practica y no se responde en linea.' });
     case 'EVAL_TEMPLATE_WITHOUT_QUESTIONS':
       return res.status(400).json({ message: 'La evaluacion no tiene preguntas en su banco.' });
     case 'RANDOM_COUNT_EXCEEDS_BANK':

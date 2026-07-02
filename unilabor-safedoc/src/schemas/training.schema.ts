@@ -53,6 +53,7 @@ export const updateTrainingCourseSchema = z
 const templateCoreShape = {
   title: requiredText('El titulo de la evaluacion es obligatorio'),
   instructions: optionalText,
+  evaluation_type: z.enum(['quiz', 'practical']).optional(),
   passing_score: z.coerce
     .number()
     .int('El puntaje de aprobacion debe ser entero')
@@ -161,6 +162,30 @@ export const assignEvaluationSchema = z
     employee_ids: z
       .array(z.coerce.number().int().positive())
       .min(1, 'Debes seleccionar al menos un colaborador'),
+  })
+  .passthrough();
+
+// --- Captura directa de evaluacion practica (RH) ---
+// Escala 0-10 (umbral nota 8 = 80%). Admite un decimal (ej. 8.5).
+
+const practicalResultSchema = z.object({
+  employee_id: z.coerce.number().int().positive(),
+  score: z.coerce
+    .number({ message: 'La calificacion es obligatoria' })
+    .min(0, 'La calificacion minima es 0')
+    .max(10, 'La calificacion maxima es 10'),
+});
+
+export const capturePracticalSchema = z
+  .object({
+    template_id: z.coerce.number().int().positive(),
+    // Fecha de la capacitacion (YYYY-MM-DD). Si se omite, se usa la fecha actual.
+    captured_at: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD')
+      .optional(),
+    results: z.array(practicalResultSchema).min(1, 'Debes capturar al menos un colaborador'),
   })
   .passthrough();
 

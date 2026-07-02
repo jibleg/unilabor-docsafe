@@ -19,6 +19,10 @@ import {
   type EvaluationTemplatePayload,
   type QuestionInput,
 } from '../services/evaluation-template.service';
+import {
+  capturePracticalResults,
+  type PracticalResultInput,
+} from '../services/evaluation-practical.service';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -40,6 +44,18 @@ const mapTrainingError = (res: Response, error: any): Response | null => {
       return res.status(400).json({
         message: 'La cantidad de preguntas aleatorias no puede superar el total del banco.',
       });
+    case 'EVAL_TEMPLATE_NOT_FOUND':
+      return res.status(404).json({ message: 'La evaluacion indicada no existe.' });
+    case 'EVAL_TEMPLATE_NOT_PUBLISHED':
+      return res.status(409).json({ message: 'La evaluacion no esta activa.' });
+    case 'EVAL_TEMPLATE_NOT_PRACTICAL':
+      return res.status(400).json({ message: 'Esta captura solo aplica a evaluaciones de tipo practico.' });
+    case 'EVAL_PRACTICAL_NO_RESULTS':
+      return res.status(400).json({ message: 'Debes capturar la calificacion de al menos un colaborador.' });
+    case 'EVAL_PRACTICAL_EMPLOYEE_NOT_FOUND':
+      return res.status(404).json({ message: 'Uno o mas colaboradores no existen o estan inactivos.' });
+    case 'EVAL_PRACTICAL_SCORE_OUT_OF_RANGE':
+      return res.status(400).json({ message: 'La calificacion debe estar entre 0 y 10.' });
     default:
       return null;
   }
@@ -251,5 +267,34 @@ export const replaceTemplateQuestionsController = async (req: AuthRequest, res: 
     if (mapped) return mapped;
     console.error('Error guardando banco de preguntas:', error);
     return res.status(500).json({ message: 'No se pudo guardar el banco de preguntas.' });
+  }
+};
+
+// --- Evaluacion practica: captura directa de calificacion por RH ---
+
+export const capturePracticalController = async (req: AuthRequest, res: Response) => {
+  const templateId = parseId(req.body?.template_id);
+  if (!templateId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const summary = await capturePracticalResults(
+      templateId,
+      typeof req.body?.captured_at === 'string' ? req.body.captured_at : null,
+      req.body.results as PracticalResultInput[],
+      req.user?.id ?? null,
+    );
+    await logTrainingAudit(
+      req.user?.id,
+      `RH_EVAL_PRACTICAL_CAPTURE:${templateId}:${summary.results.length}`,
+      templateId,
+      req.ip,
+    );
+    return res.status(201).json({ message: 'Calificaciones registradas correctamente.', summary });
+  } catch (error: any) {
+    const mapped = mapTrainingError(res, error);
+    if (mapped) return mapped;
+    console.error('Error capturando evaluacion practica:', error);
+    return res.status(500).json({ message: 'No se pudieron registrar las calificaciones.' });
   }
 };

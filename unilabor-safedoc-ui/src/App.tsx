@@ -98,6 +98,9 @@ const RhLateRequestsPage = lazy(() =>
 const RhTrainingDashboardPage = lazy(() =>
   import('./pages/RhTrainingDashboardPage').then((module) => ({ default: module.RhTrainingDashboardPage })),
 );
+const RhPracticalCapturePage = lazy(() =>
+  import('./pages/RhPracticalCapturePage').then((module) => ({ default: module.RhPracticalCapturePage })),
+);
 const UsersPage = lazy(() => import('./pages/UsersPage').then((module) => ({ default: module.UsersPage })));
 
 const RouteFallback = () => (
@@ -200,6 +203,14 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
               <RhGradingPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="practical-capture"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <RhPracticalCapturePage />
             </RoleGate>
           }
         />

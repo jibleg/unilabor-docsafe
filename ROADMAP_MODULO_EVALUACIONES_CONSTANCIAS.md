@@ -1,6 +1,6 @@
 # Roadmap - Modulo de Evaluaciones de Capacitacion y Constancias (ISO 15189:2022)
 
-Estado general del roadmap: `completada`
+Estado general del roadmap: `en curso` (Sprints 31-39 `completada`; Sprint 40 `pendiente`)
 
 Objetivo general:
 Construir, dentro del modulo RH, un flujo completo de evaluacion de capacitacion para colaboradores exigido por ISO 15189:2022: cerrada una capacitacion, el sistema instancia una evaluacion por colaborador, le notifica (SMS + correo + aviso in-app) que cuenta con 72 horas para realizarla, la califica de forma automatica (o manual cuando hay preguntas abiertas) y, si obtiene >= 80%, genera y archiva en automatico su constancia anual en su seccion de Constancias del expediente, visualizable al instante.
@@ -23,6 +23,7 @@ Construir, dentro del modulo RH, un flujo completo de evaluacion de capacitacion
 - Tipos de pregunta: opcion unica / multiple / V-F = **auto-calificables**; **abiertas = calificacion manual** por RH.
 - **Constancia disenable**: RH disena la plantilla (logo, texto con placeholders, 1..N firmas) y puede ver un **preliminar** (render con datos de muestra) antes de publicar.
 - UI del colaborador **responsiva** (smartphone / tablet / escritorio) con animaciones **motion.dev** (`motion@12`, ya instalado) y **mensaje de felicitacion segun calificacion**.
+- **Dos tipos de evaluacion** (Sprint 40): `quiz` (cuestionario que contesta el colaborador, Sprints 31-39) y `practical` (capacitacion presencial: RH captura la calificacion 0-10 directamente, sin cuestionario). Ambos comparten el mismo motor de emision de constancia (nota >= 8 = 80% = passing_score). Default `quiz` para no afectar lo existente.
 
 ## Estructura de sprints
 
@@ -37,6 +38,7 @@ Construir, dentro del modulo RH, un flujo completo de evaluacion de capacitacion
 | 37 | Notificaciones (correo + LabsMobile SMS) | Canal de notificacion abstracto, SMS LabsMobile, aviso de disponibilidad y de no-acreditado, log de envios | `completada` |
 | 38 | Scheduler 72h, vencimiento y extemporaneo | node-cron: recordatorio, marcar vencidas + avisar RH, flujo de autorizacion extemporanea | `completada` |
 | 39 | QA, trazabilidad ISO, dashboard y cierre | Dashboard RH, reporte de trazabilidad ISO 15189, auditoria, tests, documentacion | `completada` |
+| 40 | Evaluacion practica: captura directa por RH | Nuevo tipo `practical`: RH captura la calificacion (0-10) de capacitaciones presenciales sin cuestionario; nota >= 8 emite y archiva la constancia reusando el motor existente | `pendiente` |
 
 ## Dependencias sugeridas
 

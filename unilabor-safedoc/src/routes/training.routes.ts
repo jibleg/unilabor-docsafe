@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  capturePracticalController,
   createEvaluationTemplateController,
   createTrainingCourseController,
   deleteEvaluationTemplateController,
@@ -26,6 +27,7 @@ import { uploadCertificateImage } from '../middlewares/upload.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   assignEvaluationSchema,
+  capturePracticalSchema,
   createEvaluationTemplateSchema,
   createTrainingCourseSchema,
   replaceQuestionsSchema,
@@ -75,6 +77,9 @@ router.post(
   assignEvaluationController,
 );
 router.get('/templates/:templateId/assignments', listTemplateAssignmentsController);
+
+// Evaluacion practica: captura directa de calificacion (0-10) por RH
+router.post('/practical/capture', validate(capturePracticalSchema), capturePracticalController);
 
 // Plantilla de constancia + vista preliminar
 router.get('/:courseId/certificate', getCertificateTemplateController);

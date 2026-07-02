@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Award,
   BookOpen,
   ChevronDown,
   ChevronRight,
+  ClipboardCheck,
   GraduationCap,
   Loader2,
   Pencil,
@@ -23,7 +25,7 @@ import {
   updateTrainingCourse,
   type TrainingCoursePayload,
 } from '../api/service';
-import type { EvaluationTemplate, TrainingCourse } from '../types/models';
+import type { EvaluationTemplate, EvaluationType, TrainingCourse } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { confirmAction } from '../utils/confirm';
 import { usePaginatedList } from '../hooks/usePaginatedList';
@@ -49,6 +51,7 @@ const inputClass =
 const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]';
 
 export const RhTrainingsPage = () => {
+  const navigate = useNavigate();
   const {
     items: courses,
     pagination,
@@ -162,10 +165,17 @@ export const RhTrainingsPage = () => {
     }
   };
 
-  const handleCreateTemplate = async (courseId: number) => {
+  const handleCreateTemplate = async (courseId: number, evaluationType: EvaluationType = 'quiz') => {
     try {
-      const created = await createEvaluationTemplate(courseId, { title: 'Nueva evaluación' });
-      notifySuccess('Evaluación creada. Diséñala a continuación.');
+      const created = await createEvaluationTemplate(courseId, {
+        title: evaluationType === 'practical' ? 'Nueva práctica' : 'Nueva evaluación',
+        evaluation_type: evaluationType,
+      });
+      notifySuccess(
+        evaluationType === 'practical'
+          ? 'Evaluación práctica creada. Confirma su título a continuación.'
+          : 'Evaluación creada. Diséñala a continuación.',
+      );
       await loadTemplates(courseId);
       if (created) {
         setEditingTemplateId(created.id);
@@ -296,13 +306,22 @@ export const RhTrainingsPage = () => {
                       <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--color-brand-500)]">
                         Evaluaciones
                       </h3>
-                      <button
-                        type="button"
-                        onClick={() => void handleCreateTemplate(course.id)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                      >
-                        <Plus size={13} /> Nueva evaluación
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleCreateTemplate(course.id, 'quiz')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                        >
+                          <Plus size={13} /> Nueva evaluación
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleCreateTemplate(course.id, 'practical')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                        >
+                          <ClipboardCheck size={13} /> Nueva práctica
+                        </button>
+                      </div>
                     </div>
                     {loadingTemplates ? (
                       <div className="flex items-center py-4 text-xs text-[var(--unilabor-neutral)]">
@@ -314,7 +333,9 @@ export const RhTrainingsPage = () => {
                       </p>
                     ) : (
                       <ul className="space-y-2">
-                        {templates.map((template) => (
+                        {templates.map((template) => {
+                          const isPractical = template.evaluation_type === 'practical';
+                          return (
                           <li
                             key={template.id}
                             className="flex items-center justify-between gap-3 rounded-xl border border-[rgba(0,65,106,0.1)] bg-white/90 px-3 py-2"
@@ -324,35 +345,66 @@ export const RhTrainingsPage = () => {
                               onClick={() => setEditingTemplateId(template.id)}
                               className="flex flex-1 items-center gap-2 text-left"
                             >
-                              <BookOpen size={15} className="text-[var(--color-brand-500)]" />
+                              {isPractical ? (
+                                <ClipboardCheck size={15} className="text-[var(--color-brand-500)]" />
+                              ) : (
+                                <BookOpen size={15} className="text-[var(--color-brand-500)]" />
+                              )}
                               <span className="text-sm font-medium text-[var(--unilabor-ink)]">
                                 {template.title}
                               </span>
                               <span
                                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                                  template.status === 'published'
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-amber-100 text-amber-700'
+                                  isPractical ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'
                                 }`}
                               >
-                                {template.status === 'published' ? 'Publicada' : 'Borrador'}
+                                {isPractical ? 'Práctica' : 'Cuestionario'}
                               </span>
+                              {!isPractical && (
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                                    template.status === 'published'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                  }`}
+                                >
+                                  {template.status === 'published' ? 'Publicada' : 'Borrador'}
+                                </span>
+                              )}
                               <span className="text-xs text-[var(--unilabor-neutral)]">
-                                {template.question_count ?? 0} pregunta(s) | min {template.passing_score}% |{' '}
-                                {template.window_hours}h
-                                {template.requires_manual_grading ? ' | revision RH' : ''}
+                                {isPractical ? (
+                                  'RH captura la calificación · acredita ≥ 8'
+                                ) : (
+                                  <>
+                                    {template.question_count ?? 0} pregunta(s) | min {template.passing_score}% |{' '}
+                                    {template.window_hours}h
+                                    {template.requires_manual_grading ? ' | revision RH' : ''}
+                                  </>
+                                )}
                               </span>
                             </button>
                             <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setAssigningTemplate(template)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                                aria-label="Asignar evaluación"
-                                title="Asignar a colaboradores"
-                              >
-                                <UserPlus size={14} />
-                              </button>
+                              {isPractical ? (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/rh/practical-capture?template=${template.id}`)}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                                  aria-label="Capturar calificaciones"
+                                  title="Capturar calificaciones"
+                                >
+                                  <ClipboardCheck size={14} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setAssigningTemplate(template)}
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                                  aria-label="Asignar evaluación"
+                                  title="Asignar a colaboradores"
+                                >
+                                  <UserPlus size={14} />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setEditingTemplateId(template.id)}
@@ -372,7 +424,8 @@ export const RhTrainingsPage = () => {
                               </button>
                             </div>
                           </li>
-                        ))}
+                          );
+                        })}
                       </ul>
                     )}
                   </div>

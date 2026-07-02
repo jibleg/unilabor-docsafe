@@ -65,6 +65,7 @@ interface AssignmentContext {
   instructions: string | null;
   passing_score: number;
   window_hours: number;
+  evaluation_type: string;
 }
 
 const loadAssignmentContext = async (
@@ -74,7 +75,7 @@ const loadAssignmentContext = async (
 ): Promise<AssignmentContext> => {
   const result = await client.query(
     `SELECT a.id, a.employee_id, a.status, a.deadline_at, a.started_at, a.template_id,
-            t.title AS template_title, t.instructions, t.passing_score, t.window_hours,
+            t.title AS template_title, t.instructions, t.passing_score, t.window_hours, t.evaluation_type,
             c.title AS course_title
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
@@ -101,6 +102,7 @@ const loadAssignmentContext = async (
     instructions: row.instructions ? String(row.instructions) : null,
     passing_score: Number(row.passing_score),
     window_hours: Number(row.window_hours),
+    evaluation_type: String(row.evaluation_type ?? 'quiz'),
   };
 };
 
@@ -176,6 +178,9 @@ export const startEvaluation = async (
   employeeId: number,
 ): Promise<EvaluationTakingView> => {
   const ctx = await loadAssignmentContext(assignmentId, employeeId);
+  if (ctx.evaluation_type === 'practical') {
+    throwCoded('EVAL_PRACTICAL_NOT_TAKEABLE');
+  }
   if (!['pending', 'in_progress', 'authorized_late'].includes(ctx.status)) {
     throwCoded('EVAL_NOT_ACTIONABLE');
   }
@@ -235,6 +240,9 @@ export const submitEvaluation = async (
     await client.query('BEGIN');
 
     const ctx = await loadAssignmentContext(assignmentId, employeeId, client);
+    if (ctx.evaluation_type === 'practical') {
+      throwCoded('EVAL_PRACTICAL_NOT_TAKEABLE');
+    }
     if (!['pending', 'in_progress', 'authorized_late'].includes(ctx.status)) {
       throwCoded('EVAL_NOT_ACTIONABLE');
     }

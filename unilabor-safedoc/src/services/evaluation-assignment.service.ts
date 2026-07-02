@@ -98,7 +98,7 @@ export const assignEvaluation = async (
   await assertTable();
 
   const templateResult = await pool.query(
-    `SELECT t.id, t.is_active, t.status, t.window_hours, t.selection_mode, t.random_count,
+    `SELECT t.id, t.is_active, t.status, t.evaluation_type, t.window_hours, t.selection_mode, t.random_count,
             (SELECT COUNT(*)::int FROM public.evaluation_questions q WHERE q.template_id = t.id) AS question_count
        FROM public.evaluation_templates t WHERE t.id = $1 LIMIT 1;`,
     [templateId],
@@ -108,6 +108,11 @@ export const assignEvaluation = async (
   }
   const template = templateResult.rows[0];
 
+  // Las evaluaciones practicas no se asignan al colaborador: RH captura la nota
+  // directamente (ver evaluation-practical.service.ts).
+  if (String(template.evaluation_type) === 'practical') {
+    throwCoded('EVAL_TEMPLATE_IS_PRACTICAL');
+  }
   if (!template.is_active || String(template.status) !== 'published') {
     throwCoded('EVAL_TEMPLATE_NOT_PUBLISHED');
   }
@@ -261,7 +266,9 @@ export const listEmployeeAssignments = async (
 
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
-  const whereClause = 'WHERE a.employee_id = $1';
+  // Las evaluaciones practicas no las realiza el colaborador: se excluyen de su
+  // listado (solo ve la constancia resultante en su expediente).
+  const whereClause = `WHERE a.employee_id = $1 AND t.evaluation_type <> 'practical'`;
 
   const limitSql = paginate ? 'LIMIT $2 OFFSET $3' : '';
   const dataValues = paginate ? [employeeId, limit, offset] : [employeeId];
@@ -277,7 +284,8 @@ export const listEmployeeAssignments = async (
   }
 
   const countResult = await pool.query(
-    `SELECT COUNT(*)::int AS total FROM public.evaluation_assignments a ${whereClause};`,
+    `SELECT COUNT(*)::int AS total FROM public.evaluation_assignments a
+       JOIN public.evaluation_templates t ON t.id = a.template_id ${whereClause};`,
     [employeeId],
   );
   return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);

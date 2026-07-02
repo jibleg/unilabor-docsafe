@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock,
+  ClipboardPen,
   FileText,
   GraduationCap,
   Inbox,
@@ -100,6 +101,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
             title: 'Capacitación',
             items: [
               { icon: GraduationCap, label: 'Capacitaciones', path: '/rh/trainings', roles: ['ADMIN', 'EDITOR'] },
+              { icon: ClipboardPen, label: 'Capacitación práctica', path: '/rh/practical-capture', roles: ['ADMIN', 'EDITOR'] },
               { icon: BarChart3, label: 'Panel capacitación', path: '/rh/training-dashboard', roles: ['ADMIN', 'EDITOR'] },
               { icon: ClipboardCheck, label: 'Calificación', path: '/rh/grading', roles: ['ADMIN', 'EDITOR'] },
               { icon: Clock, label: 'Extemporáneos', path: '/rh/late-requests', roles: ['ADMIN', 'EDITOR'] },

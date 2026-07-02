@@ -42,6 +42,9 @@ export interface EmployeeRecord {
 export type EvaluationQuestionType = 'single' | 'multiple' | 'boolean' | 'open';
 export type EvaluationSelectionMode = 'all' | 'random';
 export type EvaluationTemplateStatus = 'draft' | 'published';
+// 'quiz': cuestionario que contesta el colaborador. 'practical': capacitacion
+// presencial cuya calificacion captura RH directamente (sin cuestionario).
+export type EvaluationType = 'quiz' | 'practical';
 
 export interface TrainingCourseRecord {
   id: number;
@@ -80,6 +83,7 @@ export interface EvaluationTemplateRecord {
   instructions: string | null;
   passing_score: number;
   window_hours: number;
+  evaluation_type: EvaluationType;
   selection_mode: EvaluationSelectionMode;
   random_count: number | null;
   status: EvaluationTemplateStatus;

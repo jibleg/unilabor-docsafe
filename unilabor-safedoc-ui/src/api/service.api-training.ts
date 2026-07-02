@@ -25,6 +25,7 @@ import type {
   EvaluationTakingQuestion,
   EvaluationTakingView,
   EvaluationTemplate,
+  EvaluationType,
   EvaluationDashboard,
   EvaluationTemplateStatus,
   EvaluationResponsesDetail,
@@ -52,6 +53,7 @@ export interface TrainingCoursePayload {
 export interface EvaluationTemplatePayload {
   title: string;
   instructions?: string | null;
+  evaluation_type?: EvaluationType;
   passing_score?: number;
   window_hours?: number;
   selection_mode?: EvaluationSelectionMode;
@@ -149,6 +151,7 @@ const normalizeTemplate = (input: unknown): EvaluationTemplate | null => {
     training_course_id: getNumber(source, ['training_course_id']) ?? 0,
     title,
     instructions: getString(source, ['instructions']) || null,
+    evaluation_type: (getString(source, ['evaluation_type']) as EvaluationType) || 'quiz',
     passing_score: getNumber(source, ['passing_score']) ?? 80,
     window_hours: getNumber(source, ['window_hours']) ?? 72,
     selection_mode: (getString(source, ['selection_mode']) as EvaluationSelectionMode) || 'all',
@@ -294,6 +297,66 @@ export const assignEvaluation = async (
   return {
     created: Number(summary?.created ?? 0),
     skipped: Number(summary?.skipped ?? 0),
+  };
+};
+
+// --- Evaluacion practica: captura directa por RH ---
+
+export interface PracticalResultInput {
+  employee_id: number;
+  score: number; // 0-10
+}
+
+export interface PracticalCaptureRow {
+  employee_id: number;
+  assignment_id: number;
+  status: 'passed' | 'failed';
+  score: number;
+  percentage: number;
+  certificate_document_id: number | null;
+}
+
+export interface PracticalCaptureSummary {
+  acreditados: number;
+  no_acreditados: number;
+  constancias_emitidas: number;
+  reemplazados: number;
+  results: PracticalCaptureRow[];
+}
+
+export const capturePracticalResults = async (
+  templateId: number,
+  results: PracticalResultInput[],
+  capturedAt?: string | null,
+): Promise<PracticalCaptureSummary> => {
+  const response = await api.post('/rh/trainings/practical/capture', {
+    template_id: templateId,
+    ...(capturedAt ? { captured_at: capturedAt } : {}),
+    results,
+  });
+  const summary = asRecord(asRecord(unwrapPayload(response.data))?.summary);
+  const results_out: PracticalCaptureRow[] = Array.isArray(summary?.results)
+    ? (summary!.results as unknown[])
+        .map((raw): PracticalCaptureRow | null => {
+          const r = asRecord(raw);
+          if (!r) return null;
+          return {
+            employee_id: getNumber(r, ['employee_id']) ?? 0,
+            assignment_id: getNumber(r, ['assignment_id']) ?? 0,
+            status: (getString(r, ['status']) as 'passed' | 'failed') || 'failed',
+            score: getNumber(r, ['score']) ?? 0,
+            percentage: getNumber(r, ['percentage']) ?? 0,
+            certificate_document_id: getNumber(r, ['certificate_document_id']) ?? null,
+          };
+        })
+        .filter((r): r is PracticalCaptureRow => r !== null)
+    : [];
+  return {
+    acreditados: Number(summary?.acreditados ?? 0),
+    no_acreditados: Number(summary?.no_acreditados ?? 0),
+    constancias_emitidas: Number(summary?.constancias_emitidas ?? 0),
+    reemplazados: Number(summary?.reemplazados ?? 0),
+    results: results_out,
   };
 };
 

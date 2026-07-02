@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assignEvaluationSchema,
+  capturePracticalSchema,
   createEvaluationTemplateSchema,
   createTrainingCourseSchema,
   gradeEvaluationSchema,
@@ -50,6 +51,69 @@ describe('createEvaluationTemplateSchema', () => {
 
   it('rechaza passing_score fuera de rango', () => {
     const result = createEvaluationTemplateSchema.safeParse({ title: 'Eval', passing_score: 120 });
+    expect(result.success).toBe(false);
+  });
+
+  it('acepta evaluation_type practico', () => {
+    const result = createEvaluationTemplateSchema.safeParse({ title: 'Eval', evaluation_type: 'practical' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza un evaluation_type invalido', () => {
+    const result = createEvaluationTemplateSchema.safeParse({ title: 'Eval', evaluation_type: 'oral' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('capturePracticalSchema', () => {
+  it('acepta una captura con varios colaboradores y decimales', () => {
+    const result = capturePracticalSchema.safeParse({
+      template_id: 5,
+      captured_at: '2026-07-02',
+      results: [
+        { employee_id: 1, score: 8 },
+        { employee_id: 2, score: 8.5 },
+        { employee_id: 3, score: 7 },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('acepta sin captured_at (usa fecha actual)', () => {
+    const result = capturePracticalSchema.safeParse({
+      template_id: 5,
+      results: [{ employee_id: 1, score: 10 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rechaza lista de resultados vacia', () => {
+    const result = capturePracticalSchema.safeParse({ template_id: 5, results: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rechaza calificacion mayor a 10', () => {
+    const result = capturePracticalSchema.safeParse({
+      template_id: 5,
+      results: [{ employee_id: 1, score: 11 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rechaza calificacion negativa', () => {
+    const result = capturePracticalSchema.safeParse({
+      template_id: 5,
+      results: [{ employee_id: 1, score: -1 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rechaza captured_at con formato invalido', () => {
+    const result = capturePracticalSchema.safeParse({
+      template_id: 5,
+      captured_at: '02/07/2026',
+      results: [{ employee_id: 1, score: 8 }],
+    });
     expect(result.success).toBe(false);
   });
 });
