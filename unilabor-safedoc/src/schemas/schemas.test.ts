@@ -172,6 +172,40 @@ describe('employee.schema', () => {
     expect(updateEmployeeSchema.safeParse({ area: 'Laboratorio' }).success).toBe(true);
     expect(updateEmployeeSchema.safeParse({ full_name: '' }).success).toBe(false);
   });
+
+  it('telefono acepta 10 digitos con o sin mascara y los normaliza', () => {
+    const conMascara = createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '993 117 3210' });
+    expect(conMascara.success).toBe(true);
+    // Se normaliza a solo digitos (10) para almacenar.
+    expect((conMascara as any).data.phone).toBe('9931173210');
+
+    const conGuiones = createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '(993) 117-3210' });
+    expect(conGuiones.success).toBe(true);
+    expect((conGuiones as any).data.phone).toBe('9931173210');
+  });
+
+  it('telefono vacio o nulo queda como null (sin telefono)', () => {
+    const vacio = createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '' });
+    expect(vacio.success).toBe(true);
+    expect((vacio as any).data.phone).toBe(null);
+
+    const nulo = createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: null });
+    expect(nulo.success).toBe(true);
+    expect((nulo as any).data.phone).toBe(null);
+  });
+
+  it('telefono ausente no agrega la clave phone (no toca en updates)', () => {
+    const sinPhone = updateEmployeeSchema.safeParse({ area: 'Lab' });
+    expect(sinPhone.success).toBe(true);
+    expect('phone' in (sinPhone as any).data).toBe(false);
+  });
+
+  it('telefono con menos o mas de 10 digitos es invalido', () => {
+    expect(createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '12345' }).success).toBe(false);
+    expect(createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '993 117 32100' }).success).toBe(
+      false,
+    );
+  });
 });
 
 describe('helpdesk.schema (resto)', () => {

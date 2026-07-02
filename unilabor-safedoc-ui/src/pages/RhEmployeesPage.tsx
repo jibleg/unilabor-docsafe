@@ -52,12 +52,29 @@ const EMPTY_FORM: EmployeeFormState = {
 const getLinkableUserOptionLabel = (user: LinkableUser): string =>
   `${user.full_name} - ${user.email}`;
 
+// Mascara de telefono nacional MX: hasta 10 digitos agrupados como "XXX XXX XXXX".
+const formatPhoneMask = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  return [digits.slice(0, 3), digits.slice(3, 6), digits.slice(6, 10)].filter(Boolean).join(' ');
+};
+
+// Solo los digitos del telefono (para validar y enviar). '' si no hay.
+const phoneDigits = (value: string): string => value.replace(/\D/g, '');
+
+// Normaliza a los 10 digitos nacionales para mostrar en el form: datos antiguos
+// pueden venir con lada (ej. '+529931173210', 12 digitos) -> se toma el numero
+// nacional (ultimos 10). Numeros de 10 digitos quedan igual.
+const toNationalDigits = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+  return digits.length > 10 ? digits.slice(-10) : digits;
+};
+
 const toEmployeePayload = (form: EmployeeFormState): EmployeePayload => ({
   employee_code: form.employee_code.trim() || undefined,
   user_id: form.user_id || null,
   full_name: form.full_name.trim(),
   email: form.email.trim(),
-  phone: form.phone.trim() || null,
+  phone: phoneDigits(form.phone) || null,
   area: form.area.trim() || undefined,
   position: form.position.trim() || undefined,
 });
@@ -152,6 +169,13 @@ export const RhEmployeesPage = () => {
       return false;
     }
 
+    // Telefono opcional; si se captura, debe tener 10 digitos.
+    const digits = phoneDigits(form.phone);
+    if (digits.length > 0 && digits.length !== 10) {
+      notifyWarning('El telefono debe tener 10 digitos (XXX XXX XXXX).');
+      return false;
+    }
+
     return true;
   };
 
@@ -171,7 +195,7 @@ export const RhEmployeesPage = () => {
       user_id: employee.user_id ?? '',
       full_name: employee.full_name,
       email: employee.email,
-      phone: employee.phone ?? '',
+      phone: formatPhoneMask(toNationalDigits(employee.phone ?? '')),
       area: employee.area ?? '',
       position: employee.position ?? '',
     });
@@ -699,13 +723,15 @@ export const RhEmployeesPage = () => {
                   </label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={12}
                     value={form.phone}
-                    onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                    onChange={(event) => setForm((current) => ({ ...current, phone: formatPhoneMask(event.target.value) }))}
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                    placeholder="+5215512345678"
+                    placeholder="993 117 3210"
                   />
                   <p className="mt-1 text-[10px] text-[var(--unilabor-neutral)]">
-                    Formato internacional (E.164). Se usará para avisar por SMS las evaluaciones de capacitación.
+                    10 dígitos (XXX XXX XXXX). Se usará para avisar por SMS las evaluaciones de capacitación (se antepone la lada 52).
                   </p>
                 </div>
                 <div>

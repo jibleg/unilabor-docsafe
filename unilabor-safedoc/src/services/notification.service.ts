@@ -55,7 +55,10 @@ const smsChannel: NotificationChannel = {
       (error as any).code = 'SMS_NOT_CONFIGURED';
       throw error;
     }
-    const msisdn = recipient.replace(/[^\d]/g, '');
+    // Numero nacional MX de 10 digitos -> anteponer lada de pais 52 para LabsMobile.
+    // Si ya trae lada (>= 11 digitos, p. ej. datos antiguos '+52...'), se usa tal cual.
+    const digits = recipient.replace(/[^\d]/g, '');
+    const msisdn = digits.length === 10 ? `52${digits}` : digits;
     const auth = Buffer.from(`${config.username}:${config.token}`).toString('base64');
     try {
       const response = await fetch(config.apiBase, {

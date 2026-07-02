@@ -2,15 +2,19 @@ import { z } from 'zod';
 
 const requiredText = (message: string) => z.string().trim().min(1, message);
 
-// Telefono opcional en formato E.164 (ej. +5215512345678). Se acepta vacio/nulo;
-// habilita el SMS (LabsMobile) de sprints posteriores.
+// Telefono opcional: 10 digitos (numero nacional MX). Se acepta con o sin mascara
+// (espacios/guiones/parentesis) y se normaliza a solo digitos para almacenar. El
+// envio de SMS (LabsMobile) antepone la lada de pais 52 (ver notification.service).
+// Vacio o nulo = sin telefono. `undefined` (campo ausente) se conserva para no
+// tocar el telefono en actualizaciones parciales.
 const optionalPhone = z
-  .string()
-  .trim()
-  .regex(/^\+?[1-9]\d{6,14}$/, 'El telefono debe ser un numero valido en formato E.164 (ej. +5215512345678)')
-  .optional()
-  .or(z.literal('').transform(() => undefined))
-  .nullable();
+  .union([z.string(), z.null()])
+  .transform((value) => (value === null ? '' : value.replace(/\D/g, '')))
+  .refine((digits) => digits === '' || /^\d{10}$/.test(digits), {
+    message: 'El telefono debe tener 10 digitos (XXX XXX XXXX)',
+  })
+  .transform((digits) => (digits === '' ? null : digits))
+  .optional();
 
 export const createEmployeeSchema = z
   .object({
