@@ -62,7 +62,7 @@ const formatPhoneMask = (value: string): string => {
 const phoneDigits = (value: string): string => value.replace(/\D/g, '');
 
 // Normaliza a los 10 digitos nacionales para mostrar en el form: datos antiguos
-// pueden venir con lada (ej. '+529931173210', 12 digitos) -> se toma el numero
+// pueden venir con lada (ej. '+520000000000', 12 digitos) -> se toma el numero
 // nacional (ultimos 10). Numeros de 10 digitos quedan igual.
 const toNationalDigits = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -728,7 +728,7 @@ export const RhEmployeesPage = () => {
                     value={form.phone}
                     onChange={(event) => setForm((current) => ({ ...current, phone: formatPhoneMask(event.target.value) }))}
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                    placeholder="993 117 3210"
+                    placeholder="000 000 0000"
                   />
                   <p className="mt-1 text-[10px] text-[var(--unilabor-neutral)]">
                     10 dígitos (XXX XXX XXXX). Se usará para avisar por SMS las evaluaciones de capacitación (se antepone la lada 52).

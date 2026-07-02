@@ -174,14 +174,14 @@ describe('employee.schema', () => {
   });
 
   it('telefono acepta 10 digitos con o sin mascara y los normaliza', () => {
-    const conMascara = createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '993 117 3210' });
+    const conMascara = createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '555 123 4567' });
     expect(conMascara.success).toBe(true);
     // Se normaliza a solo digitos (10) para almacenar.
-    expect((conMascara as any).data.phone).toBe('9931173210');
+    expect((conMascara as any).data.phone).toBe('5551234567');
 
-    const conGuiones = createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '(993) 117-3210' });
+    const conGuiones = createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '(555) 123-4567' });
     expect(conGuiones.success).toBe(true);
-    expect((conGuiones as any).data.phone).toBe('9931173210');
+    expect((conGuiones as any).data.phone).toBe('5551234567');
   });
 
   it('telefono vacio o nulo queda como null (sin telefono)', () => {
@@ -202,7 +202,7 @@ describe('employee.schema', () => {
 
   it('telefono con menos o mas de 10 digitos es invalido', () => {
     expect(createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '12345' }).success).toBe(false);
-    expect(createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '993 117 32100' }).success).toBe(
+    expect(createEmployeeSchema.safeParse({ full_name: 'Ana', email: 'a@b.mx', phone: '555 123 45678' }).success).toBe(
       false,
     );
   });
