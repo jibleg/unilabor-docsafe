@@ -4,6 +4,7 @@ import { RhHomeRedirect } from './components/RhHomeRedirect';
 import { ToastContainer, Zoom } from 'react-toastify';
 import { ModuleGuard } from './components/ModuleGuard';
 import { RoleGate } from './components/RoleGate';
+import { ConfirmHost } from './components/ConfirmHost';
 import { QualityLayout } from './layouts/QualityLayout';
 import { RhLayout } from './layouts/RhLayout';
 import { HelpdeskLayout } from './layouts/HelpdeskLayout';
@@ -375,6 +376,7 @@ function App() {
       toastClassName="unilabor-toast"
       progressClassName="unilabor-toast-progress"
     />
+    <ConfirmHost />
   </BrowserRouter>
   );
 }

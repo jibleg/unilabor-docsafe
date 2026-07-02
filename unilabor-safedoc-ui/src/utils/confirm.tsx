@@ -1,74 +1,74 @@
-import { toast } from 'react-toastify';
-
 export type ConfirmVariant = 'danger' | 'primary';
 
-const CONFIRM_BUTTON_CLASS: Record<ConfirmVariant, string> = {
-  // Alto contraste para buena visibilidad (la tonalidad institucional azul claro
-  // no resaltaba lo suficiente sobre el toast).
-  danger:
-    'rounded-lg bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-rose-700',
-  primary:
-    'rounded-lg bg-[var(--color-brand-700)] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:opacity-90',
+export interface ConfirmDialogState {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  variant: ConfirmVariant;
+}
+
+interface PendingConfirm extends ConfirmDialogState {
+  resolve: (value: boolean) => void;
+}
+
+// Confirmacion SINGLETON: solo puede haber una abierta a la vez. El host la
+// dibuja como modal bloqueante (backdrop), asi que el usuario no puede disparar
+// otra mientras esta abierta; si aun asi llega otra peticion, se ignora
+// (resuelve false) para evitar apilado de dialogos.
+let current: PendingConfirm | null = null;
+let notifyHost: (() => void) | null = null;
+
+/** Suscribe al host (montado una vez). Devuelve la funcion para desuscribir. */
+export const subscribeConfirm = (listener: () => void): (() => void) => {
+  notifyHost = listener;
+  return () => {
+    if (notifyHost === listener) {
+      notifyHost = null;
+    }
+  };
+};
+
+/** Estado actual de la confirmacion (o null si no hay ninguna abierta). */
+export const getConfirmState = (): ConfirmDialogState | null =>
+  current
+    ? {
+        title: current.title,
+        description: current.description,
+        confirmLabel: current.confirmLabel,
+        variant: current.variant,
+      }
+    : null;
+
+/** Resuelve la confirmacion activa (true = confirmar, false = cancelar). */
+export const resolveConfirm = (value: boolean): void => {
+  if (!current) {
+    return;
+  }
+  const { resolve } = current;
+  current = null;
+  notifyHost?.();
+  resolve(value);
 };
 
 /**
- * Confirmacion basada en toast (react-toastify) en lugar del window.confirm
- * nativo. Devuelve true si el usuario confirma, false si cancela o cierra.
- * `variant` define el color del boton de confirmacion (rojo para acciones
- * sensibles como cerrar sesion / inactivar; azul para confirmaciones neutras).
+ * Confirmacion modal bloqueante (reemplaza al window.confirm nativo y al toast).
+ * Devuelve true si el usuario confirma, false si cancela, presiona Escape o hace
+ * clic fuera. `variant` define el color del boton de confirmacion (rojo para
+ * acciones sensibles como cerrar sesion / inactivar; azul para confirmaciones
+ * neutras). Requiere que <ConfirmHost/> este montado una vez en la app.
  */
 export const confirmAction = (
   title: string,
   description: string,
   confirmLabel: string,
   variant: ConfirmVariant = 'danger',
-): Promise<boolean> =>
-  new Promise((resolve) => {
-    let settled = false;
-
-    const settle = (value: boolean) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      resolve(value);
-    };
-
-    toast(
-      ({ closeToast }) => (
-        <div className="space-y-3">
-          <p className="text-sm font-bold text-[var(--unilabor-ink)]">{title}</p>
-          <p className="text-xs text-[var(--unilabor-neutral)]">{description}</p>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100"
-              onClick={() => {
-                settle(false);
-                closeToast();
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className={CONFIRM_BUTTON_CLASS[variant]}
-              onClick={() => {
-                settle(true);
-                closeToast();
-              }}
-            >
-              {confirmLabel}
-            </button>
-          </div>
-        </div>
-      ),
-      {
-        autoClose: false,
-        closeOnClick: false,
-        closeButton: false,
-        draggable: false,
-        onClose: () => settle(false),
-      },
-    );
+): Promise<boolean> => {
+  if (current) {
+    // Ya hay una confirmacion abierta: ignora la nueva (evita apilar dialogos).
+    return Promise.resolve(false);
+  }
+  return new Promise<boolean>((resolve) => {
+    current = { title, description, confirmLabel, variant, resolve };
+    notifyHost?.();
   });
+};
