@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  ChevronRight,
   Eye,
   Loader2,
   PackagePlus,
@@ -12,6 +13,8 @@ import {
   Trash2,
   Boxes,
   Printer,
+  Plus,
+  X,
 } from 'lucide-react';
 import {
   fetchAssetExpedient,
@@ -64,6 +67,7 @@ export const HelpdeskAssetExpedientPage = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
   const [showLabel, setShowLabel] = useState(false);
+  const [showEventForm, setShowEventForm] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!assetId) {
@@ -90,6 +94,7 @@ export const HelpdeskAssetExpedientPage = () => {
     try {
       await createLifecycleEvent(assetId, payload);
       notifySuccess('Evento registrado en el expediente.');
+      setShowEventForm(false);
       await loadData();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo registrar el evento.'));
@@ -193,7 +198,16 @@ export const HelpdeskAssetExpedientPage = () => {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Linea de tiempo */}
         <div className="rounded-3xl border border-[rgba(0,65,106,0.1)] bg-white p-5 shadow-sm">
-          <h2 className="mb-3 text-lg font-bold text-[var(--color-brand-700)]">Linea de tiempo</h2>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Linea de tiempo</h2>
+            <button
+              type="button"
+              onClick={() => setShowEventForm(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              <Plus size={16} /> Registrar evento
+            </button>
+          </div>
           {events.length === 0 ? (
             <p className="rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] p-4 text-sm text-[var(--unilabor-neutral)]">
               Aun no hay eventos registrados.
@@ -207,34 +221,52 @@ export const HelpdeskAssetExpedientPage = () => {
                     <span className="absolute -left-[27px] flex h-5 w-5 items-center justify-center rounded-full bg-[var(--color-brand-700)] text-white">
                       <Icon size={12} />
                     </span>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-bold text-[var(--unilabor-ink)]">{ev.title}</p>
-                      <span className="text-xs text-[var(--unilabor-neutral)]">{dash(ev.event_date)}</span>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate(`/helpdesk/assets/${assetId}/events/${ev.id}`)}
+                      onKeyDown={(keyEvent) => {
+                        if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+                          keyEvent.preventDefault();
+                          navigate(`/helpdesk/assets/${assetId}/events/${ev.id}`);
+                        }
+                      }}
+                      className="-mx-2 cursor-pointer rounded-xl px-2 py-1.5 transition hover:bg-[rgba(191,212,230,0.24)]"
+                      title="Ver detalle del evento"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-bold text-[var(--unilabor-ink)]">{ev.title}</p>
+                        <span className="text-xs text-[var(--unilabor-neutral)]">{dash(ev.event_date)}</span>
+                      </div>
+                      <p className="text-xs font-semibold text-[var(--color-brand-700)]">
+                        {ev.event_type?.name ?? ''} · {ev.event_code}
+                      </p>
+                      {ev.description ? <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">{ev.description}</p> : null}
+                      {ev.disposal_reason ? <p className="mt-1 text-xs text-[#b02a2a]">Motivo: {ev.disposal_reason.name}</p> : null}
+                      <div className="mt-1 flex items-center gap-3">
+                        {ev.generated_act_document_id ? (
+                          <button
+                            type="button"
+                            onClick={(clickEvent) => {
+                              clickEvent.stopPropagation();
+                              handleView(ev.generated_act_document_id as number);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"
+                          >
+                            <Eye size={12} /> Ver acta/reporte
+                          </button>
+                        ) : null}
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-500)]">
+                          Ver detalle <ChevronRight size={12} />
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-xs font-semibold text-[var(--color-brand-700)]">
-                      {ev.event_type?.name ?? ''} · {ev.event_code}
-                    </p>
-                    {ev.description ? <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">{ev.description}</p> : null}
-                    {ev.disposal_reason ? <p className="mt-1 text-xs text-[#b02a2a]">Motivo: {ev.disposal_reason.name}</p> : null}
-                    {ev.generated_act_document_id ? (
-                      <button
-                        type="button"
-                        onClick={() => handleView(ev.generated_act_document_id as number)}
-                        className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"
-                      >
-                        <Eye size={12} /> Ver acta/reporte
-                      </button>
-                    ) : null}
                   </li>
                 );
               })}
             </ol>
           )}
 
-          <div className="mt-5 border-t border-[rgba(0,65,106,0.08)] pt-4">
-            <h3 className="mb-3 text-sm font-bold text-[var(--color-brand-700)]">Registrar nuevo evento</h3>
-            <LifecycleEventForm catalogs={catalogs} saving={savingEvent} onSubmit={handleCreateEvent} />
-          </div>
         </div>
 
         {/* Evidencias */}
@@ -279,6 +311,26 @@ export const HelpdeskAssetExpedientPage = () => {
           model={asset.model ?? null}
           onClose={() => setShowLabel(false)}
         />
+      )}
+
+      {showEventForm && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="my-6 w-full max-w-xl overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-3">
+              <div className="text-sm font-bold text-[var(--color-brand-700)]">Registrar nuevo evento</div>
+              <button
+                type="button"
+                onClick={() => setShowEventForm(false)}
+                className="rounded-full p-1 text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5">
+              <LifecycleEventForm catalogs={catalogs} saving={savingEvent} onSubmit={handleCreateEvent} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

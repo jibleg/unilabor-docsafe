@@ -48,6 +48,22 @@ export const updateLifecycleEvent = async (
   return (asRecord(unwrapPayload(response.data))?.event as HelpdeskLifecycleEvent) ?? null;
 };
 
+export interface LifecycleEventDetail {
+  event: HelpdeskLifecycleEvent;
+  documents: HelpdeskAssetDocument[];
+}
+
+// Detalle de un evento + sus evidencias asociadas (documentos con ese lifecycle_event_id).
+export const fetchLifecycleEventDetail = async (eventId: number): Promise<LifecycleEventDetail | null> => {
+  const response = await api.get(`/helpdesk/lifecycle-events/${eventId}`);
+  const payload = asRecord(unwrapPayload(response.data));
+  const event = payload?.event as HelpdeskLifecycleEvent | undefined;
+  if (!event) {
+    return null;
+  }
+  return { event, documents: asArray(payload?.documents) as HelpdeskAssetDocument[] };
+};
+
 export interface ListAssetDocumentsParams {
   lifecycle_event_id?: number | null;
   document_kind_id?: number | null;

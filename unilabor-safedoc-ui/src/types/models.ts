@@ -247,6 +247,111 @@ export interface HelpdeskOrgStructure {
   users: HelpdeskOrgUser[];
 }
 
+// --- Acta de entrega-recepcion de activos (ISO 15189:2022) ---
+export type HelpdeskHandoverStatus = 'DRAFT' | 'SIGNED' | 'VOID';
+
+export interface HelpdeskHandoverItem {
+  asset_id: number;
+  asset_code: string;
+  asset_name: string;
+  brand_name?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  receipt_condition_id?: number | null;
+  receipt_condition_name?: string | null;
+  observations?: string | null;
+}
+
+export interface HelpdeskHandover {
+  id: number;
+  folio: string;
+  unit_id: number;
+  unit_name?: string | null;
+  area_id: number;
+  area_name?: string | null;
+  delivered_by_user_id?: string | null;
+  delivered_by_name: string;
+  received_by_user_id?: string | null;
+  received_by_name: string;
+  handover_at?: string | null;
+  status: HelpdeskHandoverStatus;
+  void_reason?: string | null;
+  notes?: string | null;
+  has_document: boolean;
+  item_count: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  items?: HelpdeskHandoverItem[];
+}
+
+export interface HelpdeskHandoverItemPayload {
+  asset_id: number;
+  receipt_condition_id?: number | null;
+  observations?: string | null;
+}
+
+export interface HelpdeskHandoverPayload {
+  unit_id: number;
+  area_id: number;
+  received_by_user_id: string;
+  received_by_name: string;
+  delivered_by_name: string;
+  notes?: string | null;
+  items: HelpdeskHandoverItemPayload[];
+}
+
+export interface HelpdeskHandoverSignPayload {
+  deliverer_signature: string;
+  receiver_signature: string;
+  delivered_by_name?: string | null;
+  received_by_name?: string | null;
+  notes?: string | null;
+}
+
+// --- Movimientos del activo (cambio de unidad/area/categoria/responsable) ---
+export interface HelpdeskAssetMovement {
+  id: number;
+  folio: string;
+  asset_id: number;
+  asset_name: string;
+  movement_at?: string | null;
+  reason?: string | null;
+  from_unit_id?: number | null;
+  from_unit_name?: string | null;
+  to_unit_id?: number | null;
+  to_unit_name?: string | null;
+  from_area_id?: number | null;
+  from_area_name?: string | null;
+  to_area_id?: number | null;
+  to_area_name?: string | null;
+  from_category_id?: number | null;
+  from_category_name?: string | null;
+  to_category_id?: number | null;
+  to_category_name?: string | null;
+  from_asset_code?: string | null;
+  to_asset_code?: string | null;
+  code_changed: boolean;
+  performed_by_user_id?: string | null;
+  performed_by_name: string;
+  responsible_user_id?: string | null;
+  responsible_name: string;
+  lifecycle_event_id?: number | null;
+  created_at?: string | null;
+}
+
+export interface HelpdeskAssetMovementPayload {
+  asset_id: number;
+  to_unit_id?: number | null;
+  to_area_id?: number | null;
+  to_category_id?: number | null;
+  reason: string;
+  performed_by_name: string;
+  performed_by_signature: string;
+  responsible_user_id?: string | null;
+  responsible_name: string;
+  responsible_signature: string;
+}
+
 export interface HelpdeskLifecycleEvent {
   id: number;
   asset_id: number;
@@ -417,6 +522,7 @@ export type HelpdeskCatalogAdminKey =
   | 'areas'
   | 'locations'
   | 'brands'
+  | 'suppliers'
   | 'purchase_modalities'
   | 'purchase_conditions'
   | 'criticalities'
@@ -439,6 +545,7 @@ export interface HelpdeskCatalogAdminResponse {
     areas: HelpdeskCatalogAdminItem[];
     locations: HelpdeskCatalogAdminItem[];
     brands: HelpdeskCatalogAdminItem[];
+    suppliers: HelpdeskCatalogAdminItem[];
     purchase_modalities: HelpdeskCatalogAdminItem[];
     purchase_conditions: HelpdeskCatalogAdminItem[];
     criticalities: HelpdeskCatalogAdminItem[];

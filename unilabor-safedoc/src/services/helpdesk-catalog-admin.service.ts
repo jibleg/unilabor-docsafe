@@ -499,5 +499,23 @@ export const deactivateHelpdeskCatalogItem = async (
   return getCatalogItemById(catalogKey, itemId);
 };
 
+// Borrado DEFINITIVO de la fila. Solo procede si el registro no tiene
+// dependencias: las llaves foraneas lo garantizan (Postgres rechaza con 23503 si
+// algun activo/ticket/etc. lo referencia) y el controller traduce ese error a
+// "en uso". Devuelve false si el registro no existe.
+export const deleteHelpdeskCatalogItem = async (
+  catalogKey: HelpdeskCatalogAdminKey,
+  itemId: number,
+): Promise<boolean> => {
+  const config = getCatalogConfig(catalogKey);
+  const existing = await getCatalogItemById(catalogKey, itemId);
+  if (!existing) {
+    return false;
+  }
+
+  await pool.query(`DELETE FROM public.${config.tableName} WHERE id = $1;`, [itemId]);
+  return true;
+};
+
 export const isHelpdeskCatalogAdminKey = (value: string): value is HelpdeskCatalogAdminKey =>
   Object.prototype.hasOwnProperty.call(CATALOG_CONFIG, value);

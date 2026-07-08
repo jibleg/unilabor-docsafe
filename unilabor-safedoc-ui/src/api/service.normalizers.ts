@@ -21,6 +21,10 @@ import type {
   HelpdeskMaintenanceOrder,
   HelpdeskMaintenanceOrderChecklistItem,
   HelpdeskMaintenancePlanTask,
+  HelpdeskAssetMovement,
+  HelpdeskHandover,
+  HelpdeskHandoverItem,
+  HelpdeskHandoverStatus,
   HelpdeskOrgArea,
   HelpdeskOrgStructure,
   HelpdeskOrgUnit,
@@ -471,6 +475,93 @@ export const normalizeHelpdeskOrgStructure = (input: unknown): HelpdeskOrgStruct
   return { units, areas, users };
 };
 
+export const normalizeHelpdeskHandoverItem = (input: unknown): HelpdeskHandoverItem | null => {
+  const row = asRecord(input);
+  if (!row || row.asset_id === undefined) {
+    return null;
+  }
+  return {
+    asset_id: getNumber(row, ['asset_id']),
+    asset_code: getString(row, ['asset_code']),
+    asset_name: getString(row, ['asset_name']),
+    brand_name: getString(row, ['brand_name']) || null,
+    model: getString(row, ['model']) || null,
+    serial_number: getString(row, ['serial_number']) || null,
+    receipt_condition_id: getNumber(row, ['receipt_condition_id']) || null,
+    receipt_condition_name: getString(row, ['receipt_condition_name']) || null,
+    observations: getString(row, ['observations']) || null,
+  };
+};
+
+export const normalizeHelpdeskHandover = (input: unknown): HelpdeskHandover | null => {
+  const row = asRecord(input);
+  if (!row || row.id === undefined) {
+    return null;
+  }
+  const status = getString(row, ['status']) as HelpdeskHandoverStatus;
+  return {
+    id: getNumber(row, ['id']),
+    folio: getString(row, ['folio']),
+    unit_id: getNumber(row, ['unit_id']),
+    unit_name: getString(row, ['unit_name']) || null,
+    area_id: getNumber(row, ['area_id']),
+    area_name: getString(row, ['area_name']) || null,
+    delivered_by_user_id: getString(row, ['delivered_by_user_id']) || null,
+    delivered_by_name: getString(row, ['delivered_by_name']),
+    received_by_user_id: getString(row, ['received_by_user_id']) || null,
+    received_by_name: getString(row, ['received_by_name']),
+    handover_at: getString(row, ['handover_at']) || null,
+    status: status || 'DRAFT',
+    void_reason: getString(row, ['void_reason']) || null,
+    notes: getString(row, ['notes']) || null,
+    has_document: getBoolean(row, ['has_document']),
+    item_count: getNumber(row, ['item_count']),
+    created_at: getString(row, ['created_at']) || null,
+    updated_at: getString(row, ['updated_at']) || null,
+    items: Array.isArray(row.items)
+      ? row.items
+          .map(normalizeHelpdeskHandoverItem)
+          .filter((item): item is HelpdeskHandoverItem => item !== null)
+      : undefined,
+  };
+};
+
+export const normalizeHelpdeskAssetMovement = (input: unknown): HelpdeskAssetMovement | null => {
+  const row = asRecord(input);
+  if (!row || row.id === undefined) {
+    return null;
+  }
+  return {
+    id: getNumber(row, ['id']),
+    folio: getString(row, ['folio']),
+    asset_id: getNumber(row, ['asset_id']),
+    asset_name: getString(row, ['asset_name']),
+    movement_at: getString(row, ['movement_at']) || null,
+    reason: getString(row, ['reason']) || null,
+    from_unit_id: getNumber(row, ['from_unit_id']) || null,
+    from_unit_name: getString(row, ['from_unit_name']) || null,
+    to_unit_id: getNumber(row, ['to_unit_id']) || null,
+    to_unit_name: getString(row, ['to_unit_name']) || null,
+    from_area_id: getNumber(row, ['from_area_id']) || null,
+    from_area_name: getString(row, ['from_area_name']) || null,
+    to_area_id: getNumber(row, ['to_area_id']) || null,
+    to_area_name: getString(row, ['to_area_name']) || null,
+    from_category_id: getNumber(row, ['from_category_id']) || null,
+    from_category_name: getString(row, ['from_category_name']) || null,
+    to_category_id: getNumber(row, ['to_category_id']) || null,
+    to_category_name: getString(row, ['to_category_name']) || null,
+    from_asset_code: getString(row, ['from_asset_code']) || null,
+    to_asset_code: getString(row, ['to_asset_code']) || null,
+    code_changed: getBoolean(row, ['code_changed']),
+    performed_by_user_id: getString(row, ['performed_by_user_id']) || null,
+    performed_by_name: getString(row, ['performed_by_name']),
+    responsible_user_id: getString(row, ['responsible_user_id']) || null,
+    responsible_name: getString(row, ['responsible_name']),
+    lifecycle_event_id: getNumber(row, ['lifecycle_event_id']) || null,
+    created_at: getString(row, ['created_at']) || null,
+  };
+};
+
 export const normalizeHelpdeskTicketStatus = (input: unknown): HelpdeskTicketStatus | null => {
   const item = normalizeHelpdeskCatalogItem(input);
   const source = asRecord(input);
@@ -663,6 +754,8 @@ export const normalizeHelpdeskCatalogAdminResponse = (input: unknown): HelpdeskC
   const assets = asRecord(source.assets) ?? {};
   const tickets = asRecord(source.tickets) ?? {};
   const maintenance = asRecord(source.maintenance) ?? {};
+  // El backend agrupa proveedores y demás catálogos ISO bajo `iso`.
+  const iso = asRecord(source.iso) ?? {};
   const pick = (record: Record<string, unknown>, key: string, fallbackKey?: string) =>
     getArrayFromPayload(record[key] ?? (fallbackKey ? record[fallbackKey] : []), [key, fallbackKey ?? key])
       .map(normalizeHelpdeskCatalogAdminItem)
@@ -675,6 +768,7 @@ export const normalizeHelpdeskCatalogAdminResponse = (input: unknown): HelpdeskC
       areas: pick(assets, 'areas'),
       locations: pick(assets, 'locations'),
       brands: pick(assets, 'brands'),
+      suppliers: pick(iso, 'suppliers'),
       purchase_modalities: pick(assets, 'purchase_modalities', 'purchaseModalities'),
       purchase_conditions: pick(assets, 'purchase_conditions', 'purchaseConditions'),
       criticalities: pick(assets, 'criticalities'),

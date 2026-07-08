@@ -11,6 +11,7 @@ import {
 import {
   createHelpdeskCatalogItem,
   deactivateHelpdeskCatalogItem,
+  deleteHelpdeskCatalogItem,
   isHelpdeskCatalogAdminKey,
   listHelpdeskCatalogAdminData,
   updateHelpdeskCatalogItem,
@@ -147,6 +148,42 @@ export const deactivateHelpdeskCatalogItemController = async (req: AuthRequest, 
 
     console.error('Error desactivando registro de catalogo Helpdesk:', error);
     return res.status(500).json({ message: 'No se pudo desactivar el registro del catalogo.' });
+  }
+};
+
+export const deleteHelpdeskCatalogItemController = async (req: AuthRequest, res: Response) => {
+  const catalogKey = String(req.params.catalogKey ?? '');
+  const itemId = getNumberId(req.params.id);
+  if (!isHelpdeskCatalogAdminKey(catalogKey)) {
+    return res.status(400).json({ message: 'Catalogo invalido.' });
+  }
+  if (!itemId) {
+    return res.status(400).json({ message: 'ID de catalogo invalido.' });
+  }
+
+  try {
+    const removed = await deleteHelpdeskCatalogItem(catalogKey as HelpdeskCatalogAdminKey, itemId);
+    if (!removed) {
+      return res.status(404).json({ message: 'Registro de catalogo no encontrado.' });
+    }
+
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_CATALOG_DELETE:${catalogKey}:${itemId}`, req.ip, itemId, 'helpdesk_catalog');
+    return res.json({ message: 'Registro de catalogo eliminado definitivamente.' });
+  } catch (error: any) {
+    // 23503: el registro está referenciado por otros datos (activos, tickets, etc.).
+    if (error?.code === '23503') {
+      return res.status(409).json({
+        message: 'No se puede eliminar: el registro tiene dependencias (está en uso por activos u otros registros). Puedes desactivarlo en su lugar.',
+      });
+    }
+
+    const mappedError = mapHelpdeskCatalogAdminError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error eliminando registro de catalogo Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo eliminar el registro del catalogo.' });
   }
 };
 

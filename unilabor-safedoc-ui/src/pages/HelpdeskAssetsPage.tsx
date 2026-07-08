@@ -10,7 +10,6 @@ import {
   Printer,
   RefreshCw,
   Search,
-  Trash2,
 } from 'lucide-react';
 import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
 import { AssetLabelsPrintModal } from '../components/helpdesk/AssetLabelsPrintModal';
@@ -18,7 +17,6 @@ import { ActionsMenu } from '../components/ActionsMenu';
 import { SearchableSelect } from '../components/SearchableSelect';
 import {
   createHelpdeskAsset,
-  deleteHelpdeskAssetById,
   getApiErrorMessage,
   getHelpdeskOrgStructure,
   getHelpdeskSummary,
@@ -40,7 +38,6 @@ import type {
 } from '../types/models';
 import { getModuleRole } from '../utils/modules';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
-import { confirmAction } from '../utils/confirm';
 import { hasAnyRole } from '../utils/roles';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
@@ -140,6 +137,31 @@ const EMPTY_FORM: AssetFormState = {
 
 const catalogName = (item?: HelpdeskCatalogItem | null): string => item?.name ?? 'Sin clasificar';
 
+// Badges de la columna Clasificación (color según el código del catálogo).
+const BADGE_BASE = 'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold';
+const BADGE_NEUTRAL = 'bg-[rgba(0,65,106,0.08)] text-[var(--color-brand-700)]';
+const STATUS_BADGE: Record<string, string> = {
+  OPERATIONAL: 'bg-[rgba(22,128,74,0.12)] text-[#16804a]',
+  CONDITIONAL: 'bg-[rgba(180,120,20,0.16)] text-[#8a5a00]',
+  MAINTENANCE: 'bg-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)]',
+  OUT_OF_SERVICE: 'bg-[rgba(176,42,42,0.12)] text-[#b02a2a]',
+  RETIRED: 'bg-[rgba(82,96,109,0.14)] text-[#52606d]',
+};
+const CRITICALITY_BADGE: Record<string, string> = {
+  CRITICAL: 'bg-[rgba(176,42,42,0.12)] text-[#b02a2a]',
+  HIGH: 'bg-[rgba(180,120,20,0.16)] text-[#8a5a00]',
+  MEDIUM: 'bg-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)]',
+  LOW: 'bg-[rgba(22,128,74,0.12)] text-[#16804a]',
+};
+
+const ClassificationBadge = ({ item, palette }: { item?: HelpdeskCatalogItem | null; palette: Record<string, string> }) => {
+  if (!item) {
+    return null;
+  }
+  const className = palette[(item.code ?? '').toUpperCase()] ?? BADGE_NEUTRAL;
+  return <span className={`${BADGE_BASE} ${className}`}>{item.name}</span>;
+};
+
 const employeeLabel = (employee: Employee): string =>
   `${employee.employee_code} - ${employee.full_name}`;
 
@@ -224,7 +246,6 @@ export const HelpdeskAssetsPage = () => {
   const availableModules = useAuthStore((state) => state.availableModules);
   const moduleRole = getModuleRole(availableModules, 'HELPDESK') ?? 'VIEWER';
   const canWrite = hasAnyRole(moduleRole, ['ADMIN', 'EDITOR']);
-  const canDelete = hasAnyRole(moduleRole, ['ADMIN']);
 
   const [orgStructure, setOrgStructure] = useState<HelpdeskOrgStructure>(EMPTY_ORG_STRUCTURE);
   const [unitFilter, setUnitFilter] = useState('');
@@ -306,13 +327,8 @@ export const HelpdeskAssetsPage = () => {
   );
   const [catalogs, setCatalogs] = useState<HelpdeskCatalogs>(EMPTY_CATALOGS);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const employeeOptions = useMemo(
-    () => employees.map((employee) => ({ value: String(employee.id), label: employeeLabel(employee), hint: employee.area ?? undefined })),
-    [employees],
-  );
   const [assetSummary, setAssetSummary] = useState<HelpdeskAssetSummary>(EMPTY_ASSET_SUMMARY);
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<HelpdeskAsset | null>(null);
   const [labelAsset, setLabelAsset] = useState<HelpdeskAsset | null>(null);
   const [bulkLabels, setBulkLabels] = useState<HelpdeskAsset[] | null>(null);
@@ -473,36 +489,6 @@ export const HelpdeskAssetsPage = () => {
       notifyError(getApiErrorMessage(error, 'No se pudo guardar el activo.'));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDelete = async (asset: HelpdeskAsset) => {
-    if (!canDelete) {
-      return;
-    }
-
-    const confirmed = await confirmAction(
-      `Se dará de baja el activo "${asset.name}" (${asset.asset_code}).`,
-      'El activo quedará inactivo y dejará de aparecer en el inventario operativo.',
-      'Dar de baja',
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setDeletingId(asset.id);
-    try {
-      await deleteHelpdeskAssetById(asset.id);
-      notifySuccess('Activo dado de baja correctamente.');
-      if (selectedAsset?.id === asset.id) {
-        setSelectedAsset(null);
-      }
-      await refreshAssets();
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo dar de baja el activo.'));
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -691,9 +677,10 @@ export const HelpdeskAssetsPage = () => {
                       </td>
                       <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">
                         <p>{catalogName(asset.category)}</p>
-                        <p className="text-xs text-[var(--unilabor-neutral)]">
-                          {catalogName(asset.operational_status)} | {catalogName(asset.criticality)}
-                        </p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <ClassificationBadge item={asset.operational_status} palette={STATUS_BADGE} />
+                          <ClassificationBadge item={asset.criticality} palette={CRITICALITY_BADGE} />
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">
                         <p>{asset.assigned_employee?.full_name ?? 'Sin colaborador'}</p>
@@ -720,18 +707,6 @@ export const HelpdeskAssetsPage = () => {
                               },
                               ...(canWrite
                                 ? [{ key: 'editar', label: 'Editar', icon: <Edit3 size={14} />, onClick: () => openEdit(asset) }]
-                                : []),
-                              ...(canDelete
-                                ? [
-                                    {
-                                      key: 'baja',
-                                      label: 'Dar de baja',
-                                      icon: <Trash2 size={14} />,
-                                      danger: true,
-                                      disabled: deletingId === asset.id,
-                                      onClick: () => void handleDelete(asset),
-                                    },
-                                  ]
                                 : []),
                             ]}
                           />
@@ -789,17 +764,16 @@ export const HelpdeskAssetsPage = () => {
 
               <div className="grid gap-3 text-sm">
                 {[
-                  ['Categoría', catalogName(selectedAsset.category)],
-                  ['Estado operativo', catalogName(selectedAsset.operational_status)],
-                  ['Criticidad', catalogName(selectedAsset.criticality)],
                   ['Unidad', catalogName(selectedAsset.unit)],
                   ['Área', catalogName(selectedAsset.area)],
+                  ['Categoría', catalogName(selectedAsset.category)],
+                  ['Responsable', selectedAsset.responsible_employee?.full_name ?? 'Sin responsable'],
+                  ['Estado operativo', catalogName(selectedAsset.operational_status)],
+                  ['Criticidad', catalogName(selectedAsset.criticality)],
                   ['Ubicación', catalogName(selectedAsset.location)],
                   ['Marca', selectedAsset.brand?.name ?? selectedAsset.brand_name ?? 'Sin marca'],
                   ['Modelo', selectedAsset.model ?? 'Sin modelo'],
                   ['Serie', selectedAsset.serial_number ?? 'Sin serie'],
-                  ['Asignado a', selectedAsset.assigned_employee?.full_name ?? 'Sin asignación'],
-                  ['Responsable', selectedAsset.responsible_employee?.full_name ?? 'Sin responsable'],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">{label}</p>
@@ -958,20 +932,6 @@ export const HelpdeskAssetsPage = () => {
                   />
                 </label>
 
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Asignado a colaborador
-                  </span>
-                  <SearchableSelect
-                    value={form.assigned_employee_id}
-                    onChange={(value) => setField('assigned_employee_id', value)}
-                    options={employeeOptions}
-                    placeholder="Sin colaborador"
-                    emptyLabel="Sin colaborador"
-                    searchPlaceholder="Buscar colaborador por nombre, codigo o area..."
-                  />
-                </label>
-
                 <CatalogSelect label="Modalidad de compra" value={form.purchase_modality_id} options={catalogs.purchase_modalities} onChange={(value) => setField('purchase_modality_id', value)} />
                 <CatalogSelect label="Condición de compra" value={form.purchase_condition_id} options={catalogs.purchase_conditions} onChange={(value) => setField('purchase_condition_id', value)} />
                 <CatalogSelect label="Proveedor" value={form.supplier_id} options={catalogs.suppliers} onChange={(value) => setField('supplier_id', value)} />
@@ -1021,28 +981,6 @@ export const HelpdeskAssetsPage = () => {
                     type="date"
                     value={form.warranty_expires_on}
                     onChange={(event) => setField('warranty_expires_on', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Código inventario previo
-                  </span>
-                  <input
-                    value={form.inventory_legacy_code}
-                    onChange={(event) => setField('inventory_legacy_code', event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Consecutivo
-                  </span>
-                  <input
-                    value={form.legacy_consecutive}
-                    onChange={(event) => setField('legacy_consecutive', event.target.value)}
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                   />
                 </label>

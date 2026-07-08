@@ -41,6 +41,9 @@ const HelpdeskAssetsPage = lazy(() =>
 const HelpdeskAssetExpedientPage = lazy(() =>
   import('./pages/HelpdeskAssetExpedientPage').then((module) => ({ default: module.HelpdeskAssetExpedientPage })),
 );
+const HelpdeskLifecycleEventPage = lazy(() =>
+  import('./pages/HelpdeskLifecycleEventPage').then((module) => ({ default: module.HelpdeskLifecycleEventPage })),
+);
 const HelpdeskDashboardPage = lazy(() =>
   import('./pages/HelpdeskDashboardPage').then((module) => ({ default: module.HelpdeskDashboardPage })),
 );
@@ -52,6 +55,12 @@ const HelpdeskMaintenancePage = lazy(() =>
 );
 const HelpdeskOrgStructurePage = lazy(() =>
   import('./pages/HelpdeskOrgStructurePage').then((module) => ({ default: module.HelpdeskOrgStructurePage })),
+);
+const HelpdeskHandoversPage = lazy(() =>
+  import('./pages/HelpdeskHandoversPage').then((module) => ({ default: module.HelpdeskHandoversPage })),
+);
+const HelpdeskMovementsPage = lazy(() =>
+  import('./pages/HelpdeskMovementsPage').then((module) => ({ default: module.HelpdeskMovementsPage })),
 );
 const HelpdeskMyPortalPage = lazy(() =>
   import('./pages/HelpdeskMyPortalPage').then((module) => ({ default: module.HelpdeskMyPortalPage })),
@@ -329,6 +338,14 @@ function App() {
           }
         />
         <Route
+          path="assets/:id/events/:eventId"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskLifecycleEventPage />
+            </RoleGate>
+          }
+        />
+        <Route
           path="tickets"
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
@@ -341,6 +358,22 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
               <HelpdeskMaintenancePage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="handovers"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskHandoversPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="movements"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskMovementsPage />
             </RoleGate>
           }
         />

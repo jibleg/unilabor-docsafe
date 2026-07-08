@@ -384,6 +384,14 @@ export const deactivateHelpdeskCatalogAdminItem = async (
   return normalizeHelpdeskCatalogAdminItem(asRecord(unwrapPayload(response.data))?.item ?? unwrapPayload(response.data));
 };
 
+// Borrado DEFINITIVO. El backend rechaza (409) si el registro tiene dependencias.
+export const deleteHelpdeskCatalogAdminItem = async (
+  catalogKey: HelpdeskCatalogAdminKey,
+  itemId: number,
+): Promise<void> => {
+  await api.delete(`/helpdesk/catalog-admin/${catalogKey}/${itemId}`);
+};
+
 export const listMaintenancePlans = async (): Promise<HelpdeskMaintenancePlan[]> => {
   const response = await api.get('/helpdesk/maintenance/plans');
   return getArrayFromPayload(response.data, ['plans', 'items', 'results'])

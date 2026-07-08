@@ -95,6 +95,31 @@ export const getAssetExpedientController = async (req: AuthRequest, res: Respons
   }
 };
 
+// Detalle de un evento del ciclo de vida + sus evidencias asociadas (documentos
+// ligados por lifecycle_event_id). Alimenta la página de detalle del evento.
+export const getLifecycleEventDetailController = async (req: AuthRequest, res: Response) => {
+  const eventId = getNumberId(req.params.eventId);
+  if (!eventId) {
+    return res.status(400).json({ message: 'ID de evento invalido.' });
+  }
+
+  try {
+    const event = await getLifecycleEventById(eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Evento no encontrado.' });
+    }
+    const documents = await listAssetDocuments(event.asset_id, { lifecycleEventId: eventId });
+    return res.json({ event, documents });
+  } catch (error: any) {
+    const mapped = mapHelpdeskError(res, error);
+    if (mapped) {
+      return mapped;
+    }
+    console.error('Error obteniendo el detalle del evento de ciclo de vida:', error);
+    return res.status(500).json({ message: 'No se pudo obtener el detalle del evento.' });
+  }
+};
+
 export const createLifecycleEventController = async (req: AuthRequest, res: Response) => {
   const assetId = getNumberId(req.params.id);
   if (!assetId) {

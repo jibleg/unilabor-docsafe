@@ -155,6 +155,61 @@ export const maintenancePlanSchema = z.object({
   tasks: z.array(z.string().trim().min(1)).default([]),
 });
 
+// --- Acta de entrega-recepcion de activos (ISO 15189:2022) ---
+const handoverItemSchema = z
+  .object({
+    asset_id: z.coerce.number().int().positive('El activo es obligatorio'),
+    receipt_condition_id: optionalPositiveId.optional(),
+    observations: optionalText.optional(),
+  })
+  .passthrough();
+
+// Create/update de borrador: cabecera obligatoria; los items pueden ir vacios
+// mientras el acta es borrador (se exigen al firmar).
+export const handoverSchema = z
+  .object({
+    unit_id: requiredPositiveId('La unidad es obligatoria'),
+    area_id: requiredPositiveId('El área es obligatoria'),
+    received_by_user_id: z.string().trim().uuid('El responsable que recibe es obligatorio'),
+    received_by_name: requiredText('El nombre de quien recibe es obligatorio'),
+    delivered_by_name: requiredText('El nombre de quien entrega es obligatorio'),
+    notes: optionalText.optional(),
+    items: z.array(handoverItemSchema).default([]),
+  })
+  .passthrough();
+
+export const handoverSignSchema = z
+  .object({
+    deliverer_signature: requiredText('La firma de quien entrega es obligatoria'),
+    receiver_signature: requiredText('La firma de quien recibe es obligatoria'),
+    delivered_by_name: optionalText.optional(),
+    received_by_name: optionalText.optional(),
+    notes: optionalText.optional(),
+  })
+  .passthrough();
+
+export const handoverVoidSchema = z
+  .object({
+    reason: requiredText('El motivo de anulación es obligatorio'),
+  })
+  .passthrough();
+
+// --- Movimientos del activo (cambio de unidad/area/categoria/responsable) ---
+export const assetMovementSchema = z
+  .object({
+    asset_id: requiredPositiveId('El activo es obligatorio'),
+    to_unit_id: optionalPositiveId.optional(),
+    to_area_id: optionalPositiveId.optional(),
+    to_category_id: optionalPositiveId.optional(),
+    reason: requiredText('El motivo del movimiento es obligatorio'),
+    performed_by_name: requiredText('El nombre de quien realiza el movimiento es obligatorio'),
+    performed_by_signature: requiredText('La firma de quien realiza el movimiento es obligatoria'),
+    responsible_user_id: z.string().trim().uuid('El responsable debe ser un usuario válido').nullish(),
+    responsible_name: requiredText('El nombre del responsable es obligatorio'),
+    responsible_signature: requiredText('La firma del responsable es obligatoria'),
+  })
+  .passthrough();
+
 // --- Estructura organizacional (Unidad <-> Area <-> Responsables) ---
 // El reemplazo del conjunto acepta listas vacias (desasignar todo).
 export const unitAreasSchema = z.object({

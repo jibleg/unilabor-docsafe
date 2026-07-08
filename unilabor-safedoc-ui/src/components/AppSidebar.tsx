@@ -17,6 +17,7 @@ import {
   Laptop,
   LifeBuoy,
   LayoutDashboard,
+  Move,
   ShieldCheck,
   Tags,
   UserCircle2,
@@ -143,6 +144,8 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
               title: 'Inventario y Equipos (ISO 15189)',
               items: [
                 { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', roles: ['ADMIN', 'EDITOR'] },
+                { icon: ClipboardCheck, label: 'Entrega-Recepción', path: '/helpdesk/handovers', roles: ['ADMIN', 'EDITOR'] },
+                { icon: Move, label: 'Movimientos', path: '/helpdesk/movements', roles: ['ADMIN', 'EDITOR'] },
                 { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
               ],
             },

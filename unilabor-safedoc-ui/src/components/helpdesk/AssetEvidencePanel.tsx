@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { FileText, Loader2, Upload, Eye } from 'lucide-react';
 import type { HelpdeskAssetDocument, HelpdeskCatalogs, HelpdeskLifecycleEvent } from '../../types/models';
+import { SearchableSelect } from '../SearchableSelect';
 
 interface AssetEvidencePanelProps {
   documents: HelpdeskAssetDocument[];
@@ -28,6 +29,19 @@ export const AssetEvidencePanel = ({
   const [kindId, setKindId] = useState<number | ''>('');
   const [eventId, setEventId] = useState<number | ''>('');
   const [file, setFile] = useState<File | null>(null);
+
+  // La lista de eventos puede ser extensa: se usa un dropdown con buscador.
+  const eventOptions = useMemo(
+    () => [
+      { value: '', label: 'Sin evento' },
+      ...events.map((ev) => ({
+        value: String(ev.id),
+        label: `${ev.event_code} — ${ev.title}`,
+        hint: ev.event_type?.name ?? undefined,
+      })),
+    ],
+    [events],
+  );
 
   const submit = () => {
     if (!file || !title.trim()) {
@@ -68,12 +82,14 @@ export const AssetEvidencePanel = ({
             </div>
             <div>
               <label className={labelClass}>Asociar a evento (opcional)</label>
-              <select className={inputClass} value={eventId} onChange={(e) => setEventId(e.target.value ? Number(e.target.value) : '')}>
-                <option value="">Sin evento</option>
-                {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{ev.event_code} - {ev.title}</option>
-                ))}
-              </select>
+              <SearchableSelect
+                value={eventId ? String(eventId) : ''}
+                onChange={(value) => setEventId(value ? Number(value) : '')}
+                options={eventOptions}
+                placeholder="Sin evento"
+                emptyLabel="Sin evento"
+                searchPlaceholder="Buscar evento por folio o título..."
+              />
             </div>
           </div>
           <input

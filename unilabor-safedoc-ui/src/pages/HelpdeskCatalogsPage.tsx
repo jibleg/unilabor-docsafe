@@ -9,11 +9,13 @@ import {
   Plus,
   Power,
   RefreshCw,
+  Trash2,
   X,
 } from 'lucide-react';
 import {
   createHelpdeskCatalogAdminItem,
   deactivateHelpdeskCatalogAdminItem,
+  deleteHelpdeskCatalogAdminItem,
   getApiErrorMessage,
   listHelpdeskCatalogAdminData,
   type HelpdeskCatalogAdminPayload,
@@ -25,6 +27,7 @@ import type {
   HelpdeskCatalogAdminResponse,
 } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+import { confirmAction } from '../utils/confirm';
 
 type CatalogTab = 'assets' | 'tickets' | 'maintenance';
 type ModalMode = 'create' | 'edit' | 'deactivate';
@@ -65,6 +68,7 @@ const EMPTY_CATALOGS: HelpdeskCatalogAdminResponse = {
     areas: [],
     locations: [],
     brands: [],
+    suppliers: [],
     purchase_modalities: [],
     purchase_conditions: [],
     criticalities: [],
@@ -102,6 +106,7 @@ const catalogGroups: CatalogGroupConfig[] = [
   { key: 'areas', tab: 'assets', title: 'Áreas', helper: 'Relaciona responsables operativos del inventario.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'locations', tab: 'assets', title: 'Ubicaciones', helper: 'Identifica dónde se encuentra cada activo.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'brands', tab: 'assets', title: 'Marcas', helper: 'Normaliza fabricantes y proveedores de equipo.' },
+  { key: 'suppliers', tab: 'assets', title: 'Proveedores', helper: 'Alta de proveedores de equipo (proveedor ≠ marca).', supportsDescription: true },
   { key: 'purchase_modalities', tab: 'assets', title: 'Modalidades de compra', helper: 'Describe el origen o esquema de adquisición.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'purchase_conditions', tab: 'assets', title: 'Condiciones de compra', helper: 'Distingue estatus comerciales o contractuales.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
   { key: 'criticalities', tab: 'assets', title: 'Criticidades', helper: 'Mide impacto técnico y operativo del activo.', supportsCode: true, supportsDescription: true, supportsSortOrder: true },
@@ -127,6 +132,8 @@ const getItemsForGroup = (
       return catalogs.assets.locations;
     case 'brands':
       return catalogs.assets.brands;
+    case 'suppliers':
+      return catalogs.assets.suppliers;
     case 'purchase_modalities':
       return catalogs.assets.purchase_modalities;
     case 'purchase_conditions':
@@ -432,6 +439,27 @@ export const HelpdeskCatalogsPage = () => {
     }
   };
 
+  // Borrado definitivo: solo procede si el registro no tiene dependencias (el
+  // backend responde 409 si está en uso). Confirmación con el modal bloqueante.
+  const handleDeleteItem = async (group: CatalogGroupConfig, item: HelpdeskCatalogAdminItem) => {
+    const confirmed = await confirmAction(
+      `Eliminar definitivamente: ${item.name}`,
+      'El registro se borrará de la base de datos y no se podrá recuperar. Solo procede si no tiene dependencias (activos u otros registros que lo usen).',
+      'Eliminar definitivamente',
+      'danger',
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteHelpdeskCatalogAdminItem(group.key, item.id);
+      notifySuccess('Registro eliminado definitivamente.');
+      await loadCatalogs();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo eliminar el registro del catálogo.'));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -664,6 +692,15 @@ export const HelpdeskCatalogsPage = () => {
                                   Desactivar
                                 </button>
                               ) : null}
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteItem(group, item)}
+                                title="Eliminar definitivamente (solo si no tiene dependencias)"
+                                className="inline-flex items-center gap-1 rounded-lg border border-[rgba(153,27,27,0.24)] px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-[rgba(254,226,226,0.6)]"
+                              >
+                                <Trash2 size={14} />
+                                Eliminar
+                              </button>
                             </div>
                           </div>
                         </article>

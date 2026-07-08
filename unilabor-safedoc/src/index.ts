@@ -37,7 +37,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-app.use(express.json());
+// Limite ampliado: las actas de entrega-recepcion envian firmas electronicas
+// (PNG en base64) dentro del JSON, que superan el default de 100kb.
+app.use(express.json({ limit: '5mb' }));
 
 // Routes
 app.use('/api/auth', authRoutes);

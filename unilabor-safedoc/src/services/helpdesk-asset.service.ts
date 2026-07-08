@@ -172,7 +172,7 @@ const mapEmployee = (row: any, prefix: 'assigned' | 'responsible') => {
   };
 };
 
-const mapAssetRow = (row: any): HelpdeskAssetRecord => ({
+export const mapAssetRow = (row: any): HelpdeskAssetRecord => ({
   id: Number(row.id),
   asset_code: String(row.asset_code),
   name: String(row.name),
@@ -249,7 +249,7 @@ const mapAssetRow = (row: any): HelpdeskAssetRecord => ({
   responsible_employee: mapEmployee(row, 'responsible'),
 });
 
-const buildAssetQuery = () => `
+export const buildAssetQuery = () => `
   SELECT
     a.*,
     c.code AS category_code,

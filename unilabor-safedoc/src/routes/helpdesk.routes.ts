@@ -10,6 +10,7 @@ import {
   createHelpdeskTicketController,
   createMyHelpdeskTicketController,
   deactivateHelpdeskCatalogItemController,
+  deleteHelpdeskCatalogItemController,
   deleteHelpdeskAssetController,
   evaluateHelpdeskTicketIsoRiskController,
   getHelpdeskAssetByIdController,
@@ -58,10 +59,15 @@ import {
   lifecycleEventSchema,
   unitAreasSchema,
   areaResponsiblesSchema,
+  handoverSchema,
+  handoverSignSchema,
+  handoverVoidSchema,
+  assetMovementSchema,
 } from '../schemas/helpdesk.schema';
 import {
   createLifecycleEventController,
   getAssetExpedientController,
+  getLifecycleEventDetailController,
   listAssetLifecycleEventsController,
   updateLifecycleEventController,
 } from '../controllers/helpdesk-lifecycle.controller';
@@ -70,6 +76,22 @@ import {
   uploadAssetDocumentController,
   viewAssetDocumentController,
 } from '../controllers/helpdesk-asset-document.controller';
+import {
+  createHandoverController,
+  deleteHandoverController,
+  getHandoverByIdController,
+  listHandoverPendingAssetsController,
+  listHandoversController,
+  signHandoverController,
+  updateHandoverController,
+  viewHandoverActaController,
+  voidHandoverController,
+} from '../controllers/helpdesk-handover.controller';
+import {
+  createAssetMovementController,
+  listAssetMovementsController,
+  viewMovementSignatureController,
+} from '../controllers/helpdesk-asset-movement.controller';
 import { upload } from '../middlewares/upload.middleware';
 
 const router = Router();
@@ -155,6 +177,11 @@ router.post(
   authorizeModuleRole('HELPDESK', ['ADMIN']),
   deactivateHelpdeskCatalogItemController,
 );
+router.delete(
+  '/catalog-admin/:catalogKey/:id',
+  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  deleteHelpdeskCatalogItemController,
+);
 
 // --- Estructura organizacional (Unidad <-> Area <-> Responsables) ---
 router.get(
@@ -173,6 +200,76 @@ router.put(
   authorizeModuleRole('HELPDESK', ['ADMIN']),
   validate(areaResponsiblesSchema),
   setAreaResponsiblesController,
+);
+
+// --- Acta de entrega-recepcion de activos (ISO 15189:2022) ---
+// Las rutas literales van antes de '/handovers/:id' para no capturarlas como :id.
+router.get(
+  '/handovers/pending-assets',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  listHandoverPendingAssetsController,
+);
+router.get(
+  '/handovers',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  listHandoversController,
+);
+router.post(
+  '/handovers',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(handoverSchema),
+  createHandoverController,
+);
+router.get(
+  '/handovers/:id/acta',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  viewHandoverActaController,
+);
+router.get(
+  '/handovers/:id',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  getHandoverByIdController,
+);
+router.patch(
+  '/handovers/:id',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(handoverSchema),
+  updateHandoverController,
+);
+router.post(
+  '/handovers/:id/sign',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(handoverSignSchema),
+  signHandoverController,
+);
+router.post(
+  '/handovers/:id/void',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(handoverVoidSchema),
+  voidHandoverController,
+);
+router.delete(
+  '/handovers/:id',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  deleteHandoverController,
+);
+
+// --- Movimientos del activo (cambio de unidad/area/categoria/responsable) ---
+router.get(
+  '/movements',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  listAssetMovementsController,
+);
+router.post(
+  '/movements',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(assetMovementSchema),
+  createAssetMovementController,
+);
+router.get(
+  '/movements/:id/signature',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  viewMovementSignatureController,
 );
 router.get(
   '/maintenance/plans',
@@ -314,6 +411,11 @@ router.post(
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
   validate(lifecycleEventSchema),
   createLifecycleEventController,
+);
+router.get(
+  '/lifecycle-events/:eventId',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  getLifecycleEventDetailController,
 );
 router.patch(
   '/lifecycle-events/:eventId',
