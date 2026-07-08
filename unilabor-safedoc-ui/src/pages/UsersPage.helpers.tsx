@@ -51,7 +51,7 @@ export const FALLBACK_MODULE_OPTIONS: ModuleAccess[] = [
   },
   {
     code: 'HELPDESK',
-    name: 'Gestión de Activos y Soporte',
+    name: 'Gestión de Activos',
     description: 'Inventario ISO 15189, mantenimiento, calibración y mesa de ayuda',
     icon: 'life-buoy',
     role: 'ADMIN',

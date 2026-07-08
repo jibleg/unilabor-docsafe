@@ -233,7 +233,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
                 {moduleCode === 'RH'
                   ? 'Unilabor RH'
                   : moduleCode === 'HELPDESK'
-                    ? 'Unilabor Activos y Soporte'
+                    ? 'Unilabor Activos'
                     : 'Unilabor Calidad'}
               </p>
             </div>

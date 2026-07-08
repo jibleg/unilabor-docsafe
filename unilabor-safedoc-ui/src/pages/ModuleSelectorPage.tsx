@@ -27,7 +27,7 @@ const moduleVisuals: Record<
   },
   HELPDESK: {
     icon: LifeBuoy,
-    eyebrow: 'Módulo de Activos y Soporte',
+    eyebrow: 'Módulo de Activos',
     name: 'Gestión de Activos',
     description: 'Inventario y ciclo de vida de activos (ISO 15189), mantenimiento, calibración y mesa de ayuda.',
   },
