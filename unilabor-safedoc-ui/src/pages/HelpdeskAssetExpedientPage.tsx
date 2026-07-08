@@ -12,6 +12,8 @@ import {
   MapPin,
   Trash2,
   Boxes,
+  FileSignature,
+  Move,
   Printer,
   Plus,
   X,
@@ -38,11 +40,13 @@ import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
 
 const EVENT_ICONS: Record<string, typeof PackagePlus> = {
   ACQUISITION: PackagePlus,
+  HANDOVER: FileSignature,
   COMMISSIONING: Boxes,
   MAINTENANCE: Wrench,
   CALIBRATION: ShieldCheck,
   INCIDENT: AlertTriangle,
   RELOCATION: MapPin,
+  MOVEMENT: Move,
   DECOMMISSION: Trash2,
 };
 
