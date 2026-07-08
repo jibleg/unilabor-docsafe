@@ -255,10 +255,32 @@ const applyAssetSideEffects = async (
       `,
       [normalizeOptionalText(payload.event_date), payload.disposal_reason_id ?? null, userId ?? null, assetId],
     );
-    await recordAssetHistory(client, assetId, 'DECOMMISSION', 'Equipo dado de baja del inventario.', userId, {
-      decommissioned_on: payload.event_date,
-      disposal_reason_id: payload.disposal_reason_id ?? null,
-    });
+    // Cascada de baja: los componentes del equipo se dan de baja con el "todo".
+    // (Si un componente debe conservarse, se desvincula antes de la baja.)
+    const children = await client.query(
+      `
+        UPDATE public.helpdesk_assets
+        SET is_active = FALSE,
+            decommissioned_on = COALESCE($1, CURRENT_DATE),
+            disposal_reason_id = $2,
+            updated_by_user_id = $3,
+            updated_at = NOW()
+        WHERE parent_asset_id = $4 AND is_active = TRUE
+        RETURNING id;
+      `,
+      [normalizeOptionalText(payload.event_date), payload.disposal_reason_id ?? null, userId ?? null, assetId],
+    );
+    const childCount = children.rowCount ?? 0;
+    await recordAssetHistory(
+      client,
+      assetId,
+      'DECOMMISSION',
+      childCount > 0
+        ? `Equipo dado de baja del inventario (incluye ${childCount} componente(s)).`
+        : 'Equipo dado de baja del inventario.',
+      userId,
+      { decommissioned_on: payload.event_date, disposal_reason_id: payload.disposal_reason_id ?? null },
+    );
   }
 };
 

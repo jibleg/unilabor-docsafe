@@ -87,11 +87,18 @@ export const mapHelpdeskError = (res: Response, error: any) => {
 
   if (
     error?.code === 'HELPDESK_TICKET_INVALID_STATE' ||
-    error?.code === 'HELPDESK_MAINTENANCE_ORDER_INVALID_STATE'
+    error?.code === 'HELPDESK_MAINTENANCE_ORDER_INVALID_STATE' ||
+    error?.code === 'HELPDESK_ASSET_COMPONENT_NESTED' ||
+    error?.code === 'HELPDESK_ASSET_COMPONENT_SELF' ||
+    error?.code === 'HELPDESK_ASSET_COMPONENT_HAS_CHILDREN'
   ) {
     return res.status(409).json({
       message: error.publicMessage ?? 'La operacion no es valida para el estado actual del registro.',
     });
+  }
+
+  if (error?.code === 'HELPDESK_ASSET_NOT_FOUND') {
+    return res.status(404).json({ message: 'Activo no encontrado.' });
   }
 
   if (

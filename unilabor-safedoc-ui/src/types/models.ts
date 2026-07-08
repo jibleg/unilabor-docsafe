@@ -131,6 +131,11 @@ export interface HelpdeskAsset {
   disposal_reason?: HelpdeskCatalogItem | null;
   assigned_employee?: HelpdeskAssetEmployee | null;
   responsible_employee?: HelpdeskAssetEmployee | null;
+  // Activos compuestos: parent_asset_id NULL = activo "todo" (o plano).
+  parent_asset_id?: number | null;
+  component_count?: number;
+  parent?: { id: number; asset_code: string; name: string } | null;
+  components?: HelpdeskAsset[];
 }
 
 export interface HelpdeskAssetSummary {
@@ -350,6 +355,7 @@ export interface HelpdeskAssetMovementPayload {
   responsible_user_id?: string | null;
   responsible_name: string;
   responsible_signature: string;
+  include_components?: boolean;
 }
 
 export interface HelpdeskLifecycleEvent {

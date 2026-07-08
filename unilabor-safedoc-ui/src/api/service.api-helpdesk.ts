@@ -211,6 +211,33 @@ export const deleteHelpdeskAssetById = async (assetId: number): Promise<void> =>
   await api.delete(`/helpdesk/assets/${assetId}`);
 };
 
+// --- Activos compuestos (componentes) ---
+// Crea un componente bajo un activo "todo"; devuelve el PADRE actualizado.
+export const createAssetComponent = async (
+  parentId: number,
+  payload: HelpdeskAssetPayload,
+): Promise<HelpdeskAsset | null> => {
+  const response = await api.post(`/helpdesk/assets/${parentId}/components`, payload);
+  return normalizeHelpdeskAsset(asRecord(unwrapPayload(response.data))?.asset ?? unwrapPayload(response.data));
+};
+
+// Vincula un activo existente como componente del padre; devuelve el PADRE actualizado.
+export const attachAssetComponent = async (
+  parentId: number,
+  componentAssetId: number,
+): Promise<HelpdeskAsset | null> => {
+  const response = await api.post(`/helpdesk/assets/${parentId}/components/attach`, {
+    component_asset_id: componentAssetId,
+  });
+  return normalizeHelpdeskAsset(asRecord(unwrapPayload(response.data))?.asset ?? unwrapPayload(response.data));
+};
+
+// Desvincula un componente: vuelve a ser activo independiente. Devuelve el ex-componente.
+export const detachAssetComponent = async (componentAssetId: number): Promise<HelpdeskAsset | null> => {
+  const response = await api.post(`/helpdesk/assets/${componentAssetId}/detach`);
+  return normalizeHelpdeskAsset(asRecord(unwrapPayload(response.data))?.asset ?? unwrapPayload(response.data));
+};
+
 export const listHelpdeskTicketCatalogs = async (): Promise<HelpdeskTicketCatalogs> => {
   const response = await api.get('/helpdesk/ticket-catalogs');
   const payload = asRecord(unwrapPayload(response.data));

@@ -2,6 +2,9 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import {
   createHelpdeskAsset,
+  createAssetComponent,
+  attachAssetComponent,
+  detachAssetComponent,
   deactivateHelpdeskAsset,
   getHelpdeskAssetById,
   listHelpdeskAssets,
@@ -258,6 +261,77 @@ export const createHelpdeskAssetController = async (req: AuthRequest, res: Respo
 
     console.error('Error creando activo Helpdesk:', error);
     return res.status(500).json({ message: 'No se pudo registrar el activo.' });
+  }
+};
+
+// Crea un componente bajo el activo :id (activo "todo"). Devuelve el padre actualizado.
+export const createAssetComponentController = async (req: AuthRequest, res: Response) => {
+  const parentId = getNumberId(req.params.id);
+  if (!parentId) {
+    return res.status(400).json({ message: 'ID de activo invalido.' });
+  }
+  const payload = getAssetPayload(req.body);
+  if (!payload) {
+    return res.status(400).json({ message: 'El nombre del componente es obligatorio.' });
+  }
+
+  try {
+    const asset = await createAssetComponent(parentId, payload, req.user?.id ?? null);
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_ASSET_COMPONENT_CREATE:${parentId}`, req.ip, parentId);
+    return res.status(201).json({ message: 'Componente agregado correctamente.', asset });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+    console.error('Error creando componente Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo agregar el componente.' });
+  }
+};
+
+// Vincula un activo existente como componente del activo :id.
+export const attachAssetComponentController = async (req: AuthRequest, res: Response) => {
+  const parentId = getNumberId(req.params.id);
+  const componentId = getNumberId(req.body?.component_asset_id);
+  if (!parentId || !componentId) {
+    return res.status(400).json({ message: 'IDs de activo/componente invalidos.' });
+  }
+
+  try {
+    const asset = await attachAssetComponent(componentId, parentId, req.user?.id ?? null);
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_ASSET_COMPONENT_ATTACH:${parentId}:${componentId}`, req.ip, parentId);
+    return res.json({ message: 'Componente vinculado correctamente.', asset });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+    console.error('Error vinculando componente Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo vincular el componente.' });
+  }
+};
+
+// Desvincula el componente :id: vuelve a ser un activo independiente.
+export const detachAssetComponentController = async (req: AuthRequest, res: Response) => {
+  const componentId = getNumberId(req.params.id);
+  if (!componentId) {
+    return res.status(400).json({ message: 'ID de activo invalido.' });
+  }
+
+  try {
+    const asset = await detachAssetComponent(componentId, req.user?.id ?? null);
+    if (!asset) {
+      return res.status(404).json({ message: 'Activo no encontrado.' });
+    }
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_ASSET_COMPONENT_DETACH:${componentId}`, req.ip, componentId);
+    return res.json({ message: 'Componente desvinculado correctamente.', asset });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+    console.error('Error desvinculando componente Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo desvincular el componente.' });
   }
 };
 

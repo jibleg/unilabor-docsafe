@@ -6,6 +6,7 @@ import { withTransaction, type Queryable } from '../utils/transaction';
 import {
   buildAssetQuery,
   mapAssetRow,
+  listAssetComponents,
   type HelpdeskAssetRecord,
 } from './helpdesk-asset.service';
 import { createLifecycleEvent, setLifecycleEventGeneratedDocument } from './helpdesk-lifecycle.service';
@@ -497,15 +498,21 @@ export const signHandover = async (
     delivererSignaturePath = writeSignatureImage(payload.deliverer_signature);
     receiverSignaturePath = writeSignatureImage(payload.receiver_signature);
 
-    const assetLines: HandoverActaAssetLine[] = items.map((item, index) => ({
-      index: index + 1,
-      asset_code: item.asset_code,
-      name: item.asset_name,
-      brand_model: [item.brand_name, item.model].filter(Boolean).join(' / '),
-      serial_number: item.serial_number ?? '',
-      condition: item.receipt_condition_name ?? '',
-      observations: item.observations,
-    }));
+    const assetLines: HandoverActaAssetLine[] = await Promise.all(
+      items.map(async (item, index) => {
+        const components = await listAssetComponents(item.asset_id);
+        return {
+          index: index + 1,
+          asset_code: item.asset_code,
+          name: item.asset_name,
+          brand_model: [item.brand_name, item.model].filter(Boolean).join(' / '),
+          serial_number: item.serial_number ?? '',
+          condition: item.receipt_condition_name ?? '',
+          observations: item.observations,
+          components: components.map((c) => `${c.asset_code} ${c.name}`),
+        };
+      }),
+    );
 
     const pdfBuffer = await renderHandoverActaPdf({
       folio: detail.folio,

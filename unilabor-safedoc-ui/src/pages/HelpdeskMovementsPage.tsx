@@ -358,6 +358,7 @@ const MovementFormModal = ({ structure, categories, currentUserName, onClose, on
   const [reason, setReason] = useState('');
   const [performedSignature, setPerformedSignature] = useState<string | null>(null);
   const [responsibleSignature, setResponsibleSignature] = useState<string | null>(null);
+  const [includeComponents, setIncludeComponents] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Búsqueda de activos con debounce.
@@ -477,6 +478,7 @@ const MovementFormModal = ({ structure, categories, currentUserName, onClose, on
         responsible_user_id: responsibleId || null,
         responsible_name: responsibleName.trim(),
         responsible_signature: responsibleSignature,
+        include_components: (asset.component_count ?? 0) > 0 ? includeComponents : false,
       });
       notifySuccess(`Movimiento ${movement.folio} registrado${movement.code_changed ? ` · nuevo código ${movement.to_asset_code}` : ''}.`);
       await onCreated(movement);
@@ -591,6 +593,15 @@ const MovementFormModal = ({ structure, categories, currentUserName, onClose, on
                 <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Motivo del movimiento</span>
                 <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} placeholder="Describe el motivo…" className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm outline-none" />
               </label>
+
+              {asset && (asset.component_count ?? 0) > 0 ? (
+                <label className="flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(239,245,250,0.6)] px-3 py-2 text-sm text-[var(--unilabor-ink)]">
+                  <input type="checkbox" checked={includeComponents} onChange={(event) => setIncludeComponents(event.target.checked)} />
+                  <span>
+                    Mover también sus <b>{asset.component_count}</b> componente(s) a la misma adscripción (regenera sus códigos).
+                  </span>
+                </label>
+              ) : null}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">

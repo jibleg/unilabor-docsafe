@@ -318,6 +318,19 @@ export const normalizeHelpdeskAsset = (input: unknown): HelpdeskAsset | null => 
     operational_status: normalizeHelpdeskCatalogItem(source.operational_status ?? source.operationalStatus),
     assigned_employee: normalizeHelpdeskAssetEmployee(source.assigned_employee ?? source.assignedEmployee),
     responsible_employee: normalizeHelpdeskAssetEmployee(source.responsible_employee ?? source.responsibleEmployee),
+    // Activos compuestos
+    parent_asset_id: getNullableNumber(source, ['parent_asset_id', 'parentAssetId']),
+    component_count: getNumber(source, ['component_count', 'componentCount'], 0),
+    parent: asRecord(source.parent)
+      ? {
+          id: getNumber(asRecord(source.parent)!, ['id']),
+          asset_code: getString(asRecord(source.parent)!, ['asset_code', 'assetCode']),
+          name: getString(asRecord(source.parent)!, ['name']),
+        }
+      : null,
+    components: getArrayFromPayload(source.components ?? [], ['components'])
+      .map(normalizeHelpdeskAsset)
+      .filter((c): c is HelpdeskAsset => c !== null),
   };
 };
 

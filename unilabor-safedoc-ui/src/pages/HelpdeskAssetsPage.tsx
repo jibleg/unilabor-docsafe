@@ -1,22 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Boxes,
   Edit3,
   Eye,
   FolderOpen,
   Laptop,
+  Link2,
   Loader2,
   Plus,
   Printer,
   RefreshCw,
   Search,
+  Unlink,
 } from 'lucide-react';
 import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
 import { AssetLabelsPrintModal } from '../components/helpdesk/AssetLabelsPrintModal';
+import { AddComponentModal, AttachComponentModal } from '../components/helpdesk/AssetComponentModals';
 import { ActionsMenu } from '../components/ActionsMenu';
 import { SearchableSelect } from '../components/SearchableSelect';
 import {
   createHelpdeskAsset,
+  detachAssetComponent,
+  fetchHelpdeskAssetById,
   getApiErrorMessage,
   getHelpdeskOrgStructure,
   getHelpdeskSummary,
@@ -37,6 +43,7 @@ import type {
   HelpdeskOrgStructure,
 } from '../types/models';
 import { getModuleRole } from '../utils/modules';
+import { confirmAction } from '../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { hasAnyRole } from '../utils/roles';
 import { usePaginatedList } from '../hooks/usePaginatedList';
@@ -330,6 +337,8 @@ export const HelpdeskAssetsPage = () => {
   const [assetSummary, setAssetSummary] = useState<HelpdeskAssetSummary>(EMPTY_ASSET_SUMMARY);
   const [saving, setSaving] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<HelpdeskAsset | null>(null);
+  const [addComponentOpen, setAddComponentOpen] = useState(false);
+  const [attachComponentOpen, setAttachComponentOpen] = useState(false);
   const [labelAsset, setLabelAsset] = useState<HelpdeskAsset | null>(null);
   const [bulkLabels, setBulkLabels] = useState<HelpdeskAsset[] | null>(null);
   const [loadingBulk, setLoadingBulk] = useState(false);
@@ -412,6 +421,60 @@ export const HelpdeskAssetsPage = () => {
     reloadAssets();
     void loadSummary();
   }, [reloadAssets, loadSummary]);
+
+  // El listado paginado NO trae el arreglo components[] (solo component_count). Al
+  // abrir la ficha se muestra de inmediato la fila y en paralelo se trae el activo
+  // completo (con components[] y parent) para poblar el panel de componentes. El
+  // update es tolerante a carreras: solo aplica si la ficha sigue en el mismo id.
+  const openFicha = useCallback(async (asset: HelpdeskAsset) => {
+    setSelectedAsset(asset);
+    try {
+      const full = await fetchHelpdeskAssetById(asset.id);
+      if (full) {
+        setSelectedAsset((current) => (current && current.id === full.id ? full : current));
+      }
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar el detalle del activo.'));
+    }
+  }, []);
+
+  const refetchSelected = useCallback(async (assetId: number) => {
+    const full = await fetchHelpdeskAssetById(assetId);
+    if (full) {
+      setSelectedAsset((current) => (current && current.id === full.id ? full : current));
+    }
+  }, []);
+
+  // Desvincula un componente (vuelve a ser activo independiente). Refresca la ficha
+  // activa: si la ficha es el padre, se recarga con su lista actualizada; si es el
+  // propio componente, se recarga ya como activo independiente.
+  const handleDetachComponent = async (component: HelpdeskAsset) => {
+    const confirmed = await confirmAction(
+      'Desvincular componente',
+      `Desvincular ${component.asset_code} - ${component.name}? Volvera a ser un activo independiente.`,
+      'Desvincular',
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await detachAssetComponent(component.id);
+      notifySuccess('Componente desvinculado correctamente.');
+      if (selectedAsset) {
+        await refetchSelected(selectedAsset.id);
+      }
+      refreshAssets();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo desvincular el componente.'));
+    }
+  };
+
+  const handleComponentMutated = (updatedParent: HelpdeskAsset) => {
+    setSelectedAsset(updatedParent);
+    setAddComponentOpen(false);
+    setAttachComponentOpen(false);
+    refreshAssets();
+  };
 
   const summary = {
     total: assetSummary.assets,
@@ -674,6 +737,13 @@ export const HelpdeskAssetsPage = () => {
                             .filter(Boolean)
                             .join(' | ') || 'Sin marca/modelo/serie'}
                         </p>
+                        {asset.component_count && asset.component_count > 0 ? (
+                          <span className={`mt-1 gap-1 ${BADGE_BASE} ${BADGE_NEUTRAL}`}>
+                            <Boxes size={11} />
+                            {asset.component_count}{' '}
+                            {asset.component_count === 1 ? 'componente' : 'componentes'}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">
                         <p>{catalogName(asset.category)}</p>
@@ -692,7 +762,7 @@ export const HelpdeskAssetsPage = () => {
                         <div className="flex justify-end">
                           <ActionsMenu
                             items={[
-                              { key: 'ver', label: 'Ver ficha', icon: <Eye size={14} />, onClick: () => setSelectedAsset(asset) },
+                              { key: 'ver', label: 'Ver ficha', icon: <Eye size={14} />, onClick: () => void openFicha(asset) },
                               {
                                 key: 'expediente',
                                 label: 'Ver expediente',
@@ -780,6 +850,110 @@ export const HelpdeskAssetsPage = () => {
                     <p className="mt-1 font-semibold text-[var(--color-brand-700)]">{value}</p>
                   </div>
                 ))}
+              </div>
+
+              {/* Componentes: si el activo es a su vez componente, muestra su padre y
+                  permite desvincularlo; si es un activo "todo", lista/gestiona sus
+                  componentes. */}
+              <div className="space-y-3 border-t border-[rgba(0,65,106,0.08)] pt-4">
+                {selectedAsset.parent_asset_id != null ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-500)]">
+                      <Boxes size={14} /> Componente
+                    </div>
+                    <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-sm">
+                      <p className="text-[11px] text-[var(--unilabor-neutral)]">
+                        Este activo es componente de:
+                      </p>
+                      {selectedAsset.parent ? (
+                        <button
+                          type="button"
+                          onClick={() => selectedAsset.parent && void openFicha({ id: selectedAsset.parent.id, asset_code: selectedAsset.parent.asset_code, name: selectedAsset.parent.name } as HelpdeskAsset)}
+                          className="mt-1 text-left font-semibold text-[var(--color-brand-700)] underline decoration-dotted underline-offset-2 hover:opacity-80"
+                        >
+                          {selectedAsset.parent.asset_code} - {selectedAsset.parent.name}
+                        </button>
+                      ) : (
+                        <p className="mt-1 font-semibold text-[var(--color-brand-700)]">Activo padre</p>
+                      )}
+                    </div>
+                    {canWrite ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleDetachComponent(selectedAsset)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[rgba(176,42,42,0.28)] px-3 py-2 text-sm font-semibold text-[#b02a2a] transition hover:bg-[rgba(176,42,42,0.08)]"
+                      >
+                        <Unlink size={14} /> Desvincular de su activo padre
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-500)]">
+                        <Boxes size={14} /> Componentes ({selectedAsset.components?.length ?? 0})
+                      </div>
+                      {canWrite ? (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setAddComponentOpen(true)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+                          >
+                            <Plus size={13} /> Agregar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAttachComponentOpen(true)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.3)]"
+                          >
+                            <Link2 size={13} /> Vincular existente
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    {selectedAsset.components && selectedAsset.components.length > 0 ? (
+                      <ul className="space-y-2">
+                        {selectedAsset.components.map((component) => (
+                          <li
+                            key={component.id}
+                            className="flex items-start justify-between gap-2 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => void openFicha(component)}
+                                className="block truncate text-left text-sm font-semibold text-[var(--color-brand-700)] underline decoration-dotted underline-offset-2 hover:opacity-80"
+                              >
+                                {component.asset_code}
+                              </button>
+                              <p className="truncate text-xs text-[var(--unilabor-ink)]">{component.name}</p>
+                              {component.serial_number ? (
+                                <p className="truncate text-[11px] text-[var(--unilabor-neutral)]">
+                                  Serie: {component.serial_number}
+                                </p>
+                              ) : null}
+                            </div>
+                            {canWrite ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleDetachComponent(component)}
+                                title="Desvincular componente"
+                                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[rgba(176,42,42,0.28)] px-2 py-1 text-xs font-semibold text-[#b02a2a] transition hover:bg-[rgba(176,42,42,0.08)]"
+                              >
+                                <Unlink size={13} /> Desvincular
+                              </button>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] bg-[rgba(248,251,253,0.8)] px-3 py-3 text-xs text-[var(--unilabor-neutral)]">
+                        Sin componentes.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -1066,6 +1240,22 @@ export const HelpdeskAssetsPage = () => {
             model: asset.model ?? null,
           }))}
           onClose={() => setBulkLabels(null)}
+        />
+      ) : null}
+
+      {addComponentOpen && selectedAsset ? (
+        <AddComponentModal
+          parent={selectedAsset}
+          onClose={() => setAddComponentOpen(false)}
+          onCreated={handleComponentMutated}
+        />
+      ) : null}
+
+      {attachComponentOpen && selectedAsset ? (
+        <AttachComponentModal
+          parent={selectedAsset}
+          onClose={() => setAttachComponentOpen(false)}
+          onAttached={handleComponentMutated}
         />
       ) : null}
     </div>

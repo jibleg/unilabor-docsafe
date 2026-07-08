@@ -50,11 +50,16 @@ export interface HelpdeskAssetPayload {
   receipt_condition_id?: number | null;
   decommissioned_on?: string | null;
   disposal_reason_id?: number | null;
+  // Activo compuesto: el componente apunta a su activo "todo". NULL = whole (o plano).
+  parent_asset_id?: number | null;
 }
 
 export interface HelpdeskAssetRecord extends HelpdeskAssetPayload {
   id: number;
   is_active: boolean;
+  component_count?: number | undefined;
+  parent?: { id: number; asset_code: string; name: string } | null | undefined;
+  components?: HelpdeskAssetRecord[] | undefined;
   created_at?: string | undefined;
   updated_at?: string | undefined;
   category?: HelpdeskCatalogItem | null;
@@ -205,6 +210,15 @@ export const mapAssetRow = (row: any): HelpdeskAssetRecord => ({
   decommissioned_on: row.decommissioned_on ? toIsoDate(row.decommissioned_on) : null,
   disposal_reason_id: row.disposal_reason_id ? Number(row.disposal_reason_id) : null,
   asset_code_overridden: Boolean(row.asset_code_overridden),
+  parent_asset_id: row.parent_asset_id ? Number(row.parent_asset_id) : null,
+  component_count: row.component_count != null ? Number(row.component_count) : undefined,
+  parent: row.parent_asset_id
+    ? {
+        id: Number(row.parent_asset_id),
+        asset_code: String(row.parent_asset_code ?? ''),
+        name: String(row.parent_asset_name ?? ''),
+      }
+    : null,
   is_active: Boolean(row.is_active),
   created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
   updated_at: row.updated_at ? toIsoDateTime(row.updated_at) : undefined,
@@ -292,7 +306,11 @@ export const buildAssetQuery = () => `
     re.employee_code AS responsible_employee_code,
     re.full_name AS responsible_employee_name,
     re.area AS responsible_employee_area,
-    re.position AS responsible_employee_position
+    re.position AS responsible_employee_position,
+    p.asset_code AS parent_asset_code,
+    p.name AS parent_asset_name,
+    (SELECT COUNT(*)::int FROM public.helpdesk_assets ch
+      WHERE ch.parent_asset_id = a.id AND ch.is_active = TRUE) AS component_count
   FROM public.helpdesk_assets a
   LEFT JOIN public.helpdesk_asset_categories c ON c.id = a.category_id
   LEFT JOIN public.helpdesk_asset_units u ON u.id = a.unit_id
@@ -308,6 +326,7 @@ export const buildAssetQuery = () => `
   LEFT JOIN public.helpdesk_disposal_reasons dr ON dr.id = a.disposal_reason_id
   LEFT JOIN public.employees ae ON ae.id = a.assigned_employee_id
   LEFT JOIN public.employees re ON re.id = a.responsible_employee_id
+  LEFT JOIN public.helpdesk_assets p ON p.id = a.parent_asset_id
 `;
 
 const listCatalog = async (
@@ -524,6 +543,8 @@ export interface AssetListOptions extends PaginationInput {
   // Responsable = usuario del area. Filtra los activos cuyas areas tienen a ese
   // usuario como responsable (activo -> area -> responsables).
   responsibleUserId?: string | null | undefined;
+  // Solo activos "todo" (whole): excluye los componentes (parent_asset_id NULL).
+  topLevelOnly?: boolean | undefined;
 }
 
 export const listHelpdeskAssets = async (
@@ -540,6 +561,9 @@ export const listHelpdeskAssets = async (
   const filterValues: Array<string | number> = [...search.values];
   const clauses = ['a.is_active = TRUE', search.clause].filter(Boolean);
 
+  if (options.topLevelOnly) {
+    clauses.push('a.parent_asset_id IS NULL');
+  }
   if (options.unitId) {
     filterValues.push(options.unitId);
     clauses.push(`a.unit_id = $${filterValues.length}`);
@@ -624,6 +648,16 @@ export const employeeCanAccessHelpdeskAsset = async (
   return result.rows.length > 0;
 };
 
+// Componentes (hijos) activos de un activo "todo".
+export const listAssetComponents = async (parentId: number): Promise<HelpdeskAssetRecord[]> => {
+  await assertHelpdeskAssetsTable();
+  const result = await pool.query(
+    `${buildAssetQuery()} WHERE a.parent_asset_id = $1 AND a.is_active = TRUE ORDER BY a.asset_code ASC, a.name ASC;`,
+    [parentId],
+  );
+  return result.rows.map(mapAssetRow);
+};
+
 export const getHelpdeskAssetById = async (assetId: number): Promise<HelpdeskAssetRecord | null> => {
   await assertHelpdeskAssetsTable();
 
@@ -640,7 +674,9 @@ export const getHelpdeskAssetById = async (assetId: number): Promise<HelpdeskAss
     return null;
   }
 
-  return mapAssetRow(result.rows[0]);
+  const record = mapAssetRow(result.rows[0]);
+  record.components = await listAssetComponents(assetId);
+  return record;
 };
 
 const getCatalogCode = async (tableName: string, id: number | null | undefined): Promise<string | null> => {
@@ -685,6 +721,7 @@ export const generateAssetCode = async (
         SELECT COALESCE(MAX((regexp_replace(asset_code, '^.*-', ''))::int), 0) AS maxn
         FROM public.helpdesk_assets
         WHERE area_id = $2
+          AND parent_asset_id IS NULL
           AND asset_code ~ '-[0-9]+$'
       )
       INSERT INTO public.helpdesk_asset_code_counters (scope_key, last_value)
@@ -701,16 +738,57 @@ export const generateAssetCode = async (
   return `${unitCode}-${areaCode}-${categoryCode}-${String(next).padStart(3, '0')}`;
 };
 
+// Codigo de componente = `{codigo_padre}-{NNN}` (consecutivo por padre). Sigue el
+// mismo patron que ya trae el Excel (A-REC-EQC-001 -> A-REC-EQC-001-002).
+export const generateComponentCode = async (parentId: number): Promise<string> => {
+  const parent = await pool.query(`SELECT asset_code FROM public.helpdesk_assets WHERE id = $1 LIMIT 1;`, [parentId]);
+  const parentCode = parent.rows[0]?.asset_code ? String(parent.rows[0].asset_code) : null;
+  if (!parentCode) {
+    const error = new Error('HELPDESK_ASSET_NOT_FOUND');
+    (error as any).code = 'HELPDESK_ASSET_NOT_FOUND';
+    throw error;
+  }
+  const seed = await pool.query(
+    `SELECT COALESCE(MAX((regexp_replace(asset_code, '^.*-', ''))::int), 0) AS maxn
+       FROM public.helpdesk_assets
+      WHERE parent_asset_id = $1 AND asset_code ~ '-[0-9]+$';`,
+    [parentId],
+  );
+  const next = Number(seed.rows[0]?.maxn ?? 0) + 1;
+  return `${parentCode}-${String(next).padStart(3, '0')}`;
+};
+
+// Valida que un activo pueda ser PADRE (whole): existe, activo y no es a su vez
+// un componente (solo 2 niveles).
+const assertValidParent = async (parentId: number): Promise<HelpdeskAssetRecord> => {
+  const parent = await getHelpdeskAssetById(parentId);
+  if (!parent || !parent.is_active) {
+    const error = new Error('HELPDESK_ASSET_NOT_FOUND');
+    (error as any).code = 'HELPDESK_ASSET_NOT_FOUND';
+    throw error;
+  }
+  if (parent.parent_asset_id) {
+    const error = new Error('HELPDESK_ASSET_COMPONENT_NESTED');
+    (error as any).code = 'HELPDESK_ASSET_COMPONENT_NESTED';
+    (error as any).publicMessage = 'Un componente no puede tener sub-componentes (solo dos niveles).';
+    throw error;
+  }
+  return parent;
+};
+
 export const createHelpdeskAsset = async (
   payload: HelpdeskAssetPayload,
   userId?: string | null,
 ): Promise<HelpdeskAssetRecord> => {
   await assertHelpdeskAssetsTable();
 
-  // Codigo explicito (manual o preservado en importacion) => override; vacio => autogenerar.
+  // Codigo explicito (manual o preservado en importacion) => override; vacio =>
+  // autogenerar: componente ({padre}-NNN) si tiene padre, o whole (UNIDAD-AREA-CLASIF-NNN).
   const providedCode = normalizeOptionalText(payload.asset_code);
   const assetCode = providedCode
-    ?? await generateAssetCode(payload.unit_id, payload.area_id, payload.category_id);
+    ?? (payload.parent_asset_id
+      ? await generateComponentCode(payload.parent_asset_id)
+      : await generateAssetCode(payload.unit_id, payload.area_id, payload.category_id));
   const overridden = Boolean(providedCode);
 
   const brandId = payload.brand_id ?? await ensureBrand(payload.brand_name);
@@ -748,6 +826,7 @@ export const createHelpdeskAsset = async (
         receipt_condition_id,
         decommissioned_on,
         disposal_reason_id,
+        parent_asset_id,
         asset_code_overridden,
         created_by_user_id,
         updated_by_user_id
@@ -755,7 +834,7 @@ export const createHelpdeskAsset = async (
       VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
         $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $31
+        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $32
       )
       RETURNING id;
     `,
@@ -789,6 +868,7 @@ export const createHelpdeskAsset = async (
       payload.receipt_condition_id ?? null,
       normalizeOptionalText(payload.decommissioned_on),
       payload.disposal_reason_id ?? null,
+      payload.parent_asset_id ?? null,
       overridden,
       userId ?? null,
     ],
@@ -805,6 +885,89 @@ export const createHelpdeskAsset = async (
   }
 
   return created;
+};
+
+// Crea un COMPONENTE bajo un activo "todo". El componente hereda unidad/area/
+// ubicacion/categoria/responsable del padre cuando el payload no los trae, y su
+// codigo se autogenera como {padre}-NNN. Devuelve el activo padre actualizado.
+export const createAssetComponent = async (
+  parentId: number,
+  payload: HelpdeskAssetPayload,
+  userId?: string | null,
+): Promise<HelpdeskAssetRecord> => {
+  const parent = await assertValidParent(parentId);
+  await createHelpdeskAsset(
+    {
+      ...payload,
+      parent_asset_id: parentId,
+      asset_code: normalizeOptionalText(payload.asset_code) ?? '',
+      unit_id: payload.unit_id ?? parent.unit_id ?? null,
+      area_id: payload.area_id ?? parent.area_id ?? null,
+      location_id: payload.location_id ?? parent.location_id ?? null,
+      category_id: payload.category_id ?? parent.category_id ?? null,
+      responsible_employee_id: payload.responsible_employee_id ?? parent.responsible_employee_id ?? null,
+      assigned_employee_id: payload.assigned_employee_id ?? parent.assigned_employee_id ?? null,
+    },
+    userId,
+  );
+  const refreshed = await getHelpdeskAssetById(parentId);
+  return refreshed as HelpdeskAssetRecord;
+};
+
+// Vincula un activo existente como componente de un padre (whole).
+export const attachAssetComponent = async (
+  componentId: number,
+  parentId: number,
+  userId?: string | null,
+): Promise<HelpdeskAssetRecord> => {
+  if (componentId === parentId) {
+    const error = new Error('HELPDESK_ASSET_COMPONENT_SELF');
+    (error as any).code = 'HELPDESK_ASSET_COMPONENT_SELF';
+    (error as any).publicMessage = 'Un activo no puede ser componente de si mismo.';
+    throw error;
+  }
+  const parent = await assertValidParent(parentId);
+  const child = await getHelpdeskAssetById(componentId);
+  if (!child || !child.is_active) {
+    const error = new Error('HELPDESK_ASSET_NOT_FOUND');
+    (error as any).code = 'HELPDESK_ASSET_NOT_FOUND';
+    throw error;
+  }
+  if ((child.component_count ?? 0) > 0) {
+    const error = new Error('HELPDESK_ASSET_COMPONENT_HAS_CHILDREN');
+    (error as any).code = 'HELPDESK_ASSET_COMPONENT_HAS_CHILDREN';
+    (error as any).publicMessage = 'El activo ya tiene componentes; no puede vincularse como componente de otro.';
+    throw error;
+  }
+
+  await pool.query(
+    `UPDATE public.helpdesk_assets SET parent_asset_id = $1, updated_by_user_id = $2, updated_at = NOW() WHERE id = $3;`,
+    [parentId, userId ?? null, componentId],
+  );
+  await recordAssetHistory(
+    componentId,
+    'UPDATE',
+    `Vinculado como componente de ${parent.asset_code}.`,
+    userId,
+  );
+  return (await getHelpdeskAssetById(parentId)) as HelpdeskAssetRecord;
+};
+
+// Desvincula un componente: vuelve a ser un activo independiente (whole).
+export const detachAssetComponent = async (
+  componentId: number,
+  userId?: string | null,
+): Promise<HelpdeskAssetRecord | null> => {
+  const child = await getHelpdeskAssetById(componentId);
+  if (!child) {
+    return null;
+  }
+  await pool.query(
+    `UPDATE public.helpdesk_assets SET parent_asset_id = NULL, updated_by_user_id = $1, updated_at = NOW() WHERE id = $2;`,
+    [userId ?? null, componentId],
+  );
+  await recordAssetHistory(componentId, 'UPDATE', 'Desvinculado como componente (activo independiente).', userId);
+  return getHelpdeskAssetById(componentId);
 };
 
 export const updateHelpdeskAsset = async (

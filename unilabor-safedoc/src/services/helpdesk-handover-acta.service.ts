@@ -13,6 +13,8 @@ export interface HandoverActaAssetLine {
   serial_number: string;
   condition: string;
   observations: string | null;
+  // Componentes del equipo (codigo + nombre) para dejarlos asentados en el acta.
+  components?: string[];
 }
 
 export interface HandoverActaInput {
@@ -122,7 +124,10 @@ export const renderHandoverActaPdf = (input: HandoverActaInput): Promise<Buffer>
     const obsHeight = asset.observations
       ? doc.heightOfString(`Obs: ${asset.observations}`, { width: TABLE_RIGHT - 60 }) + 2
       : 0;
-    const rowHeight = Math.max(12, ...heights) + obsHeight + 6;
+    const compText =
+      asset.components && asset.components.length > 0 ? `Componentes: ${asset.components.join(', ')}` : null;
+    const compHeight = compText ? doc.heightOfString(compText, { width: TABLE_RIGHT - 60 }) + 2 : 0;
+    const rowHeight = Math.max(12, ...heights) + obsHeight + compHeight + 6;
 
     if (rowTop + rowHeight > PAGE_BOTTOM) {
       doc.addPage();
@@ -135,9 +140,14 @@ export const renderHandoverActaPdf = (input: HandoverActaInput): Promise<Buffer>
     cells.forEach(({ col, value }) => {
       doc.fillColor(INK).text(value, COLS[col].x + 2, y, { width: COLS[col].w - 4 });
     });
+    let extraY = y + Math.max(12, ...heights) + 1;
     if (asset.observations) {
-      const obsY = y + Math.max(12, ...heights) + 1;
-      doc.fillColor(MUTED).fontSize(7.5).text(`Obs: ${asset.observations}`, 60, obsY, { width: TABLE_RIGHT - 60 });
+      doc.fillColor(MUTED).fontSize(7.5).text(`Obs: ${asset.observations}`, 60, extraY, { width: TABLE_RIGHT - 60 });
+      extraY += obsHeight;
+      doc.fontSize(8);
+    }
+    if (compText) {
+      doc.fillColor(MUTED).fontSize(7.5).text(compText, 60, extraY, { width: TABLE_RIGHT - 60 });
       doc.fontSize(8);
     }
     doc.y = y + rowHeight;

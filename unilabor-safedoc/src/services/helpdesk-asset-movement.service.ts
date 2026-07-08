@@ -16,6 +16,9 @@ export interface AssetMovementPayload {
   responsible_user_id?: string | null;
   responsible_name: string;
   responsible_signature: string;
+  // Si el activo es "todo", mover tambien sus componentes (misma adscripcion +
+  // regenerar sus codigos como {nuevo_codigo_padre}-suffix).
+  include_components?: boolean;
 }
 
 export interface AssetMovementRecord {
@@ -210,6 +213,7 @@ export const createAssetMovement = async (
 
   let performedSigPath: string | null = null;
   let responsibleSigPath: string | null = null;
+  let movedComponents = 0;
 
   try {
     performedSigPath = writeSignatureImage(payload.performed_by_signature);
@@ -226,6 +230,29 @@ export const createAssetMovement = async (
           `,
           [toUnit, toArea, toCategory, newCode, userId ?? null, assetId],
         );
+
+        // Cascada opcional: mover tambien los componentes a la misma adscripcion y
+        // regenerar su codigo como {nuevo_codigo_padre}-{suffix} (conserva el suffix).
+        if (payload.include_components) {
+          const children = await client.query(
+            `SELECT id, asset_code FROM public.helpdesk_assets WHERE parent_asset_id = $1 AND is_active = TRUE;`,
+            [assetId],
+          );
+          for (const child of children.rows) {
+            const childCode = String(child.asset_code);
+            const suffix = childCode.startsWith(`${fromCode}-`) ? childCode.slice(fromCode.length) : `-${child.id}`;
+            await client.query(
+              `
+                UPDATE public.helpdesk_assets
+                SET unit_id = $1, area_id = $2, category_id = $3, asset_code = $4,
+                    asset_code_overridden = FALSE, updated_by_user_id = $5, updated_at = NOW()
+                WHERE id = $6;
+              `,
+              [toUnit, toArea, toCategory, `${newCode}${suffix}`, userId ?? null, Number(child.id)],
+            );
+          }
+          movedComponents = children.rows.length;
+        }
       }
 
       await client.query(
@@ -287,8 +314,9 @@ export const createAssetMovement = async (
     const eventTypeId = await getMovementEventTypeId();
     if (eventTypeId) {
       try {
+        const componentsNote = movedComponents > 0 ? ` Incluye ${movedComponents} componente(s).` : '';
         const summary = orgChanged
-          ? `Movimiento de activo. Codigo ${fromCode} → ${newCode}. Responsable: ${payload.responsible_name.trim()}.`
+          ? `Movimiento de activo. Codigo ${fromCode} → ${newCode}. Responsable: ${payload.responsible_name.trim()}.${componentsNote}`
           : `Reasignacion de responsable a ${payload.responsible_name.trim()}.`;
         const event = await createLifecycleEvent(
           assetId,

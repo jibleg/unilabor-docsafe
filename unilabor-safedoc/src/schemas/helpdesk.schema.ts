@@ -37,6 +37,21 @@ export const helpdeskAssetSchema = z
   })
   .passthrough();
 
+// --- Componentes de activo (activos compuestos) ---
+// Un componente solo exige nombre; el resto (unidad/area/categoria/responsable)
+// se hereda del activo padre y el codigo se autogenera como {padre}-NNN.
+export const assetComponentSchema = z
+  .object({
+    name: requiredText('El nombre del componente es obligatorio'),
+  })
+  .passthrough();
+
+export const assetComponentAttachSchema = z
+  .object({
+    component_asset_id: requiredPositiveId('El componente es obligatorio'),
+  })
+  .passthrough();
+
 // --- Tickets ---
 export const helpdeskTicketSchema = z
   .object({
@@ -254,6 +269,7 @@ export const assetMovementSchema = z
     responsible_user_id: z.string().trim().uuid('El responsable debe ser un usuario válido').nullish(),
     responsible_name: requiredText('El nombre del responsable es obligatorio'),
     responsible_signature: requiredText('La firma del responsable es obligatoria'),
+    include_components: z.boolean().optional(),
   })
   .passthrough();
 

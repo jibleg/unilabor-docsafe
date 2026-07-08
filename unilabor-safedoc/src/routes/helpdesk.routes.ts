@@ -6,6 +6,9 @@ import {
   closeMaintenanceOrderController,
   confirmMyHelpdeskTicketFunctionalityController,
   createHelpdeskAssetController,
+  createAssetComponentController,
+  attachAssetComponentController,
+  detachAssetComponentController,
   createHelpdeskCatalogItemController,
   createMaintenancePlanController,
   createHelpdeskTicketController,
@@ -47,6 +50,8 @@ import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../midd
 import { validate } from '../middlewares/validate.middleware';
 import {
   helpdeskAssetSchema,
+  assetComponentSchema,
+  assetComponentAttachSchema,
   helpdeskCatalogItemSchema,
   helpdeskTicketCommentSchema,
   helpdeskTicketIsoRiskSchema,
@@ -467,6 +472,25 @@ router.delete(
   '/assets/:id',
   authorizeModuleRole('HELPDESK', ['ADMIN']),
   deleteHelpdeskAssetController,
+);
+
+// --- Componentes de activo (activos compuestos) ---
+router.post(
+  '/assets/:id/components',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(assetComponentSchema),
+  createAssetComponentController,
+);
+router.post(
+  '/assets/:id/components/attach',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(assetComponentAttachSchema),
+  attachAssetComponentController,
+);
+router.post(
+  '/assets/:id/detach',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  detachAssetComponentController,
 );
 
 // --- Ciclo de vida del equipo (ISO 15189:2022) ---

@@ -46,6 +46,7 @@ const getMovementPayload = (body: any): (AssetMovementPayload & { asset_id: numb
     responsible_user_id: getText(body?.responsible_user_id),
     responsible_name: responsibleName,
     responsible_signature: responsibleSignature,
+    include_components: body?.include_components === true || body?.include_components === 'true',
   };
 };
 
