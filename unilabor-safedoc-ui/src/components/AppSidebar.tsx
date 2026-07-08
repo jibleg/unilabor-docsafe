@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   AlertTriangle,
   BarChart3,
+  Building2,
   CalendarClock,
   ChevronDown,
   ChevronLeft,
@@ -155,6 +156,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
               title: 'Configuración',
               items: [
                 { icon: Wrench, label: 'Catálogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
+                { icon: Building2, label: 'Estructura', path: '/helpdesk/org-structure', roles: ['ADMIN'] },
                 { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
               ],
             },

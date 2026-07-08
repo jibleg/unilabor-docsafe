@@ -156,6 +156,12 @@ export const listHelpdeskAssetsController = async (req: AuthRequest, res: Respon
       page: req.query.page,
       limit: req.query.limit,
       search: typeof req.query.search === 'string' ? req.query.search : undefined,
+      unitId: getNumberId(req.query.unit_id),
+      areaId: getNumberId(req.query.area_id),
+      responsibleUserId:
+        typeof req.query.responsible_user_id === 'string' && req.query.responsible_user_id.trim()
+          ? req.query.responsible_user_id.trim()
+          : undefined,
     });
     return res.json(result);
   } catch (error: any) {

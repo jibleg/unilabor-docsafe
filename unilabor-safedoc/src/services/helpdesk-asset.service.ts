@@ -519,6 +519,11 @@ const ASSET_SEARCH_COLUMNS = [
 
 export interface AssetListOptions extends PaginationInput {
   search?: string | undefined;
+  unitId?: number | null | undefined;
+  areaId?: number | null | undefined;
+  // Responsable = usuario del area. Filtra los activos cuyas areas tienen a ese
+  // usuario como responsable (activo -> area -> responsables).
+  responsibleUserId?: string | null | undefined;
 }
 
 export const listHelpdeskAssets = async (
@@ -529,13 +534,35 @@ export const listHelpdeskAssets = async (
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
   const search = buildIlikeSearch(ASSET_SEARCH_COLUMNS, options.search, 0);
-  const whereClause = ['a.is_active = TRUE', search.clause].filter(Boolean).join(' AND ');
+
+  // Los valores de los filtros se indexan de forma dinamica ($1, $2, ...) porque
+  // la busqueda ILIKE puede o no aportar un valor previo.
+  const filterValues: Array<string | number> = [...search.values];
+  const clauses = ['a.is_active = TRUE', search.clause].filter(Boolean);
+
+  if (options.unitId) {
+    filterValues.push(options.unitId);
+    clauses.push(`a.unit_id = $${filterValues.length}`);
+  }
+  if (options.areaId) {
+    filterValues.push(options.areaId);
+    clauses.push(`a.area_id = $${filterValues.length}`);
+  }
+  if (options.responsibleUserId) {
+    filterValues.push(options.responsibleUserId);
+    clauses.push(
+      `a.area_id IN (
+        SELECT rp.area_id FROM public.helpdesk_area_responsibles rp WHERE rp.user_id = $${filterValues.length}
+      )`,
+    );
+  }
+  const whereClause = clauses.join(' AND ');
 
   const base = buildAssetQuery();
   const limitSql = paginate
-    ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}`
+    ? `LIMIT $${filterValues.length + 1} OFFSET $${filterValues.length + 2}`
     : '';
-  const dataValues = paginate ? [...search.values, limit, offset] : search.values;
+  const dataValues = paginate ? [...filterValues, limit, offset] : filterValues;
 
   const dataResult = await pool.query(
     `${base} WHERE ${whereClause} ORDER BY a.updated_at DESC, a.name ASC ${limitSql};`,
@@ -549,7 +576,7 @@ export const listHelpdeskAssets = async (
 
   const countResult = await pool.query(
     `SELECT COUNT(*)::int AS total FROM (${base} WHERE ${whereClause}) sub;`,
-    search.values,
+    filterValues,
   );
   return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };
@@ -625,9 +652,12 @@ const getCatalogCode = async (tableName: string, id: number | null | undefined):
   return code ? String(code).trim().toUpperCase() : null;
 };
 
-// Codigo ISO 19186 compuesto UNIDAD-AREA-CLASIFICACION-### con consecutivo
-// atomico por combinacion (counter table). El consecutivo se siembra desde el
-// MAX existente del scope para no colisionar con codigos preservados de la importacion.
+// Codigo compuesto UNIDAD-AREA-CATEGORIA-NNN. El consecutivo NNN es POR AREA
+// (1..N): todos los activos de una misma area comparten un unico correlativo,
+// sin importar la categoria (dos activos de la misma area con distinta categoria
+// llevan numeros consecutivos, no reinician por categoria). El contador es
+// atomico (counter table con scope por area) y se siembra desde el MAX existente
+// del area para no colisionar con codigos preservados de la importacion.
 export const generateAssetCode = async (
   unitId: number | null | undefined,
   areaId: number | null | undefined,
@@ -645,13 +675,17 @@ export const generateAssetCode = async (
     throw error;
   }
 
-  const scopeKey = `${unitCode}-${areaCode}-${categoryCode}`;
+  // Scope del contador = el area (namespaced para no chocar con contadores
+  // legacy por combinacion UNIDAD-AREA-CATEGORIA). La semilla lee el MAX del
+  // sufijo numerico entre los activos existentes de ESA area (por area_id).
+  const scopeKey = `AREA:${areaCode}`;
   const result = await pool.query(
     `
       WITH seed AS (
         SELECT COALESCE(MAX((regexp_replace(asset_code, '^.*-', ''))::int), 0) AS maxn
         FROM public.helpdesk_assets
-        WHERE asset_code ~ ($1 || '-[0-9]+$')
+        WHERE area_id = $2
+          AND asset_code ~ '-[0-9]+$'
       )
       INSERT INTO public.helpdesk_asset_code_counters (scope_key, last_value)
       VALUES ($1, (SELECT maxn FROM seed) + 1)
@@ -660,11 +694,11 @@ export const generateAssetCode = async (
             updated_at = NOW()
       RETURNING last_value;
     `,
-    [scopeKey],
+    [scopeKey, areaId],
   );
 
   const next = Number(result.rows[0]?.last_value ?? 1);
-  return `${scopeKey}-${String(next).padStart(3, '0')}`;
+  return `${unitCode}-${areaCode}-${categoryCode}-${String(next).padStart(3, '0')}`;
 };
 
 export const createHelpdeskAsset = async (

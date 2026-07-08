@@ -17,13 +17,23 @@ const optionalPositiveId = z.coerce
 
 const requiredText = (message: string) => z.string().trim().min(1, message);
 
+// ID obligatorio (> 0). Coacciona null/undefined/0 a fallo con el mensaje dado
+// (el frontend envia numericOrNull -> null cuando el campo queda sin seleccionar).
+const requiredPositiveId = (message: string) =>
+  z.coerce.number({ message }).int(message).positive(message);
+
 // --- Activos ---
-// El controller exige asset_code y name no vacios (tanto en create como update).
+// Obligatorios (create y update): nombre, categoria, unidad, area y responsable
+// tecnico. El asset_code es opcional: si viene vacio el backend autogenera
+// UNIDAD-AREA-CATEGORIA-NNN (consecutivo por area).
 export const helpdeskAssetSchema = z
   .object({
-    // asset_code opcional: si viene vacio el backend autogenera UNIDAD-AREA-CLASIFICACION-###.
     asset_code: optionalText.optional(),
     name: requiredText('El nombre del activo es obligatorio'),
+    category_id: requiredPositiveId('La categoría es obligatoria'),
+    unit_id: requiredPositiveId('La unidad es obligatoria'),
+    area_id: requiredPositiveId('El área es obligatoria'),
+    responsible_employee_id: requiredPositiveId('El responsable técnico es obligatorio'),
   })
   .passthrough();
 
@@ -143,4 +153,14 @@ export const maintenancePlanSchema = z.object({
   checklist_required: z.boolean().default(true),
   evidence_required: z.boolean().default(true),
   tasks: z.array(z.string().trim().min(1)).default([]),
+});
+
+// --- Estructura organizacional (Unidad <-> Area <-> Responsables) ---
+// El reemplazo del conjunto acepta listas vacias (desasignar todo).
+export const unitAreasSchema = z.object({
+  area_ids: z.array(z.coerce.number().int().positive()).default([]),
+});
+
+export const areaResponsiblesSchema = z.object({
+  user_ids: z.array(z.string().trim().uuid('El responsable debe ser un usuario valido')).default([]),
 });

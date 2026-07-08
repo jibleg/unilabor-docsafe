@@ -74,6 +74,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
               { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets' },
               { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
               { icon: Wrench, label: 'Catálogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
+              { icon: Building2, label: 'Estructura', path: '/helpdesk/org-structure', roles: ['ADMIN'] },
               { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
             ]
           : [

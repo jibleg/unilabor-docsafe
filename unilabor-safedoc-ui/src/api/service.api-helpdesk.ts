@@ -47,6 +47,7 @@ import type {
   HelpdeskMaintenanceCatalogs,
   HelpdeskMaintenancePlan,
   HelpdeskMaintenanceOrder,
+  HelpdeskOrgStructure,
   LinkableUser,
 } from '../types/models';
 import {
@@ -64,6 +65,7 @@ import {
   normalizeHelpdeskTicketStats,
   normalizeHelpdeskDashboardMetrics,
   normalizeHelpdeskCatalogs,
+  normalizeHelpdeskOrgStructure,
   normalizeHelpdeskTicketCatalogs,
   normalizeHelpdeskTicket,
   normalizeMaintenanceCatalogs,
@@ -111,14 +113,63 @@ export const listHelpdeskAssets = async (): Promise<HelpdeskAsset[]> => {
     .filter((asset): asset is HelpdeskAsset => asset !== null);
 };
 
+export interface HelpdeskAssetQuery extends PageQuery {
+  unitId?: number | null;
+  areaId?: number | null;
+  responsibleUserId?: string | null;
+}
+
+const buildAssetFilterParams = (query: HelpdeskAssetQuery): Record<string, string | number> => {
+  const params = buildPageParams(query);
+  if (query.unitId) {
+    params.unit_id = query.unitId;
+  }
+  if (query.areaId) {
+    params.area_id = query.areaId;
+  }
+  if (query.responsibleUserId) {
+    params.responsible_user_id = query.responsibleUserId;
+  }
+  return params;
+};
+
 export const listHelpdeskAssetsPaginated = async (
-  query: PageQuery = {},
+  query: HelpdeskAssetQuery = {},
 ): Promise<PageResult<HelpdeskAsset>> => {
-  const response = await api.get('/helpdesk/assets', { params: buildPageParams(query) });
+  const response = await api.get('/helpdesk/assets', { params: buildAssetFilterParams(query) });
   const data = getArrayFromPayload(response.data, ['assets', 'items', 'results'])
     .map(normalizeHelpdeskAsset)
     .filter((asset): asset is HelpdeskAsset => asset !== null);
   return { data, pagination: extractPagination(response.data, data.length) };
+};
+
+// Etiquetas en lote: trae TODOS los activos que cumplen los filtros (sin paginar)
+// para imprimir sus etiquetas en una sola corrida. Omite page/limit a proposito.
+export const listHelpdeskAssetsForLabels = async (
+  filters: Pick<HelpdeskAssetQuery, 'unitId' | 'areaId' | 'responsibleUserId'> = {},
+): Promise<HelpdeskAsset[]> => {
+  const response = await api.get('/helpdesk/assets', { params: buildAssetFilterParams(filters) });
+  return getArrayFromPayload(response.data, ['assets', 'items', 'results'])
+    .map(normalizeHelpdeskAsset)
+    .filter((asset): asset is HelpdeskAsset => asset !== null);
+};
+
+// --- Estructura organizacional (Unidad <-> Area <-> Responsables) ---
+export const getHelpdeskOrgStructure = async (): Promise<HelpdeskOrgStructure> => {
+  const response = await api.get('/helpdesk/org-structure');
+  const payload = unwrapPayload(response.data);
+  return normalizeHelpdeskOrgStructure(asRecord(payload)?.structure ?? payload);
+};
+
+export const setHelpdeskUnitAreas = async (unitId: number, areaIds: number[]): Promise<void> => {
+  await api.put(`/helpdesk/units/${unitId}/areas`, { area_ids: areaIds });
+};
+
+export const setHelpdeskAreaResponsibles = async (
+  areaId: number,
+  userIds: string[],
+): Promise<void> => {
+  await api.put(`/helpdesk/areas/${areaId}/responsibles`, { user_ids: userIds });
 };
 
 export const listMyHelpdeskAssets = async (): Promise<{ employee: Employee | null; assets: HelpdeskAsset[] }> => {

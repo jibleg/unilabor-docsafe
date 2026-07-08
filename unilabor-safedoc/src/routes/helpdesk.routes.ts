@@ -14,6 +14,7 @@ import {
   evaluateHelpdeskTicketIsoRiskController,
   getHelpdeskAssetByIdController,
   getHelpdeskDashboardController,
+  getHelpdeskOrgStructureController,
   getHelpdeskSummaryController,
   getHelpdeskTicketByIdController,
   getMyHelpdeskTicketByIdController,
@@ -30,6 +31,8 @@ import {
   listMaintenancePlansController,
   rescheduleMaintenanceOrderController,
   releaseHelpdeskTicketTechnicallyController,
+  setAreaResponsiblesController,
+  setUnitAreasController,
   solveHelpdeskTicketController,
   startMaintenanceOrderController,
   updateHelpdeskAssetController,
@@ -53,6 +56,8 @@ import {
   maintenanceOrderRescheduleSchema,
   maintenancePlanSchema,
   lifecycleEventSchema,
+  unitAreasSchema,
+  areaResponsiblesSchema,
 } from '../schemas/helpdesk.schema';
 import {
   createLifecycleEventController,
@@ -149,6 +154,25 @@ router.post(
   '/catalog-admin/:catalogKey/:id/deactivate',
   authorizeModuleRole('HELPDESK', ['ADMIN']),
   deactivateHelpdeskCatalogItemController,
+);
+
+// --- Estructura organizacional (Unidad <-> Area <-> Responsables) ---
+router.get(
+  '/org-structure',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  getHelpdeskOrgStructureController,
+);
+router.put(
+  '/units/:unitId/areas',
+  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  validate(unitAreasSchema),
+  setUnitAreasController,
+);
+router.put(
+  '/areas/:areaId/responsibles',
+  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  validate(areaResponsiblesSchema),
+  setAreaResponsiblesController,
 );
 router.get(
   '/maintenance/plans',

@@ -50,6 +50,9 @@ const HelpdeskCatalogsPage = lazy(() =>
 const HelpdeskMaintenancePage = lazy(() =>
   import('./pages/HelpdeskMaintenancePage').then((module) => ({ default: module.HelpdeskMaintenancePage })),
 );
+const HelpdeskOrgStructurePage = lazy(() =>
+  import('./pages/HelpdeskOrgStructurePage').then((module) => ({ default: module.HelpdeskOrgStructurePage })),
+);
 const HelpdeskMyPortalPage = lazy(() =>
   import('./pages/HelpdeskMyPortalPage').then((module) => ({ default: module.HelpdeskMyPortalPage })),
 );
@@ -346,6 +349,14 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN']} redirectTo="/helpdesk/dashboard">
               <HelpdeskCatalogsPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="org-structure"
+          element={
+            <RoleGate allowedRoles={['ADMIN']} redirectTo="/helpdesk/dashboard">
+              <HelpdeskOrgStructurePage />
             </RoleGate>
           }
         />

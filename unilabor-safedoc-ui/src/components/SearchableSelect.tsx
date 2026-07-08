@@ -60,15 +60,25 @@ export const SearchableSelect = ({
       }
       setOpen(false);
     };
-    const handleDismiss = () => setOpen(false);
+    // Cierra el menú al hacer scroll de la PÁGINA (el menú es position:fixed y su
+    // posición se calcula una sola vez). Pero ignora el scroll ORIGINADO dentro
+    // del propio menú: con captura, window recibe también el scroll de la lista
+    // interna, y sin este guard cerraría el dropdown al intentar desplazarlo.
+    const handleScroll = (event: Event) => {
+      if (menuRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      setOpen(false);
+    };
+    const handleResize = () => setOpen(false);
     document.addEventListener('mousedown', handlePointer);
-    window.addEventListener('scroll', handleDismiss, true);
-    window.addEventListener('resize', handleDismiss);
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 10);
     return () => {
       document.removeEventListener('mousedown', handlePointer);
-      window.removeEventListener('scroll', handleDismiss, true);
-      window.removeEventListener('resize', handleDismiss);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
       window.clearTimeout(focusTimer);
     };
   }, [open]);

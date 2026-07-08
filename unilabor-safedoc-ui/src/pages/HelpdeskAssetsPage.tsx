@@ -13,14 +13,17 @@ import {
   Trash2,
 } from 'lucide-react';
 import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
+import { AssetLabelsPrintModal } from '../components/helpdesk/AssetLabelsPrintModal';
 import { ActionsMenu } from '../components/ActionsMenu';
 import { SearchableSelect } from '../components/SearchableSelect';
 import {
   createHelpdeskAsset,
   deleteHelpdeskAssetById,
   getApiErrorMessage,
+  getHelpdeskOrgStructure,
   getHelpdeskSummary,
   listEmployees,
+  listHelpdeskAssetsForLabels,
   listHelpdeskAssetsPaginated,
   listHelpdeskCatalogs,
   type HelpdeskAssetPayload,
@@ -33,6 +36,7 @@ import type {
   HelpdeskAssetSummary,
   HelpdeskCatalogItem,
   HelpdeskCatalogs,
+  HelpdeskOrgStructure,
 } from '../types/models';
 import { getModuleRole } from '../utils/modules';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
@@ -96,6 +100,12 @@ const EMPTY_CATALOGS: HelpdeskCatalogs = {
   disposal_reasons: [],
   document_kinds: [],
   lifecycle_event_types: [],
+};
+
+const EMPTY_ORG_STRUCTURE: HelpdeskOrgStructure = {
+  units: [],
+  areas: [],
+  users: [],
 };
 
 const EMPTY_FORM: AssetFormState = {
@@ -216,6 +226,58 @@ export const HelpdeskAssetsPage = () => {
   const canWrite = hasAnyRole(moduleRole, ['ADMIN', 'EDITOR']);
   const canDelete = hasAnyRole(moduleRole, ['ADMIN']);
 
+  const [orgStructure, setOrgStructure] = useState<HelpdeskOrgStructure>(EMPTY_ORG_STRUCTURE);
+  const [unitFilter, setUnitFilter] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
+  const [userFilter, setUserFilter] = useState('');
+  const assetFilters = useMemo(
+    () => ({ unit_id: unitFilter, area_id: areaFilter, responsible_user_id: userFilter }),
+    [unitFilter, areaFilter, userFilter],
+  );
+
+  // Cascada Unidad -> Área -> Responsable, construida sobre la estructura M:N.
+  const unitOptions = useMemo(
+    () => orgStructure.units.map((unit) => ({ value: String(unit.id), label: unit.name, hint: unit.code ?? undefined })),
+    [orgStructure.units],
+  );
+  // Solo áreas de la unidad seleccionada; sin unidad no hay áreas que filtrar.
+  const areaOptions = useMemo(() => {
+    const unitId = numericOrNull(unitFilter);
+    if (!unitId) {
+      return [];
+    }
+    return orgStructure.areas
+      .filter((area) => area.unit_ids.includes(unitId))
+      .map((area) => ({ value: String(area.id), label: area.name, hint: area.code ?? undefined }));
+  }, [orgStructure.areas, unitFilter]);
+  // Solo responsables del área seleccionada; sin área no hay responsables.
+  const userOptions = useMemo(() => {
+    const areaId = numericOrNull(areaFilter);
+    if (!areaId) {
+      return [];
+    }
+    const responsibleIds = new Set(
+      orgStructure.areas.find((area) => area.id === areaId)?.responsible_user_ids ?? [],
+    );
+    return orgStructure.users
+      .filter((user) => responsibleIds.has(user.id))
+      .map((user) => ({ value: user.id, label: user.full_name, hint: user.email || undefined }));
+  }, [orgStructure.areas, orgStructure.users, areaFilter]);
+
+  const hasActiveFilters = Boolean(unitFilter || areaFilter || userFilter);
+
+  // Al cambiar un filtro superior se limpian los inferiores para no quedar con
+  // combinaciones imposibles (área de otra unidad, usuario de otra área).
+  const handleUnitFilterChange = (value: string) => {
+    setUnitFilter(value);
+    setAreaFilter('');
+    setUserFilter('');
+  };
+  const handleAreaFilterChange = (value: string) => {
+    setAreaFilter(value);
+    setUserFilter('');
+  };
+
   const {
     items: assets,
     pagination,
@@ -226,9 +288,18 @@ export const HelpdeskAssetsPage = () => {
     loading,
     reload: reloadAssets,
   } = usePaginatedList<HelpdeskAsset>(
-    (q) => listHelpdeskAssetsPaginated({ page: q.page, limit: q.limit, search: q.search }),
+    (q) =>
+      listHelpdeskAssetsPaginated({
+        page: q.page,
+        limit: q.limit,
+        search: q.search,
+        unitId: numericOrNull(q.filters.unit_id ?? ''),
+        areaId: numericOrNull(q.filters.area_id ?? ''),
+        responsibleUserId: q.filters.responsible_user_id || null,
+      }),
     {
       pageSize: 20,
+      filters: assetFilters,
       onError: (error) =>
         notifyError(getApiErrorMessage(error, 'No se pudo cargar el inventario técnico.')),
     },
@@ -244,18 +315,65 @@ export const HelpdeskAssetsPage = () => {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<HelpdeskAsset | null>(null);
   const [labelAsset, setLabelAsset] = useState<HelpdeskAsset | null>(null);
+  const [bulkLabels, setBulkLabels] = useState<HelpdeskAsset[] | null>(null);
+  const [loadingBulk, setLoadingBulk] = useState(false);
   const [editingAsset, setEditingAsset] = useState<HelpdeskAsset | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
 
+  // Cascada del formulario Unidad -> Área -> Responsable (estricto, sin fallback).
+  // El Área solo lista las áreas de la unidad; el Responsable técnico solo los
+  // empleados cuyo usuario vinculado es responsable del área (empleado.user_id ->
+  // responsables del área en la Estructura).
+  const formAreaOptions = useMemo(() => {
+    const unitId = numericOrNull(form.unit_id);
+    if (!unitId) {
+      return [];
+    }
+    return orgStructure.areas
+      .filter((area) => area.unit_ids.includes(unitId))
+      .map((area) => ({ value: String(area.id), label: area.name, hint: area.code ?? undefined }));
+  }, [orgStructure.areas, form.unit_id]);
+  const formResponsibleOptions = useMemo(() => {
+    const areaId = numericOrNull(form.area_id);
+    if (!areaId) {
+      return [];
+    }
+    const responsibleUserIds = new Set(
+      orgStructure.areas.find((area) => area.id === areaId)?.responsible_user_ids ?? [],
+    );
+    return employees
+      .filter((employee) => employee.user_id && responsibleUserIds.has(employee.user_id))
+      .map((employee) => ({ value: String(employee.id), label: employeeLabel(employee), hint: employee.area ?? undefined }));
+  }, [orgStructure.areas, employees, form.area_id]);
+
+  const handleFormUnitChange = (value: string) => {
+    setForm((current) => ({ ...current, unit_id: value, area_id: '', responsible_employee_id: '' }));
+  };
+  const handleFormAreaChange = (value: string) => {
+    setForm((current) => ({ ...current, area_id: value, responsible_employee_id: '' }));
+  };
+
+  // Campos obligatorios del activo (el código de inventario se autogenera). El
+  // botón Guardar permanece deshabilitado hasta completarlos todos.
+  const isFormValid = Boolean(
+    form.name.trim() &&
+      numericOrNull(form.category_id) &&
+      numericOrNull(form.unit_id) &&
+      numericOrNull(form.area_id) &&
+      numericOrNull(form.responsible_employee_id),
+  );
+
   const loadAuxData = useCallback(async () => {
     try {
-      const [catalogData, employeeData] = await Promise.all([
+      const [catalogData, employeeData, orgData] = await Promise.all([
         listHelpdeskCatalogs(),
         listEmployees(),
+        getHelpdeskOrgStructure(),
       ]);
       setCatalogs(catalogData);
       setEmployees(employeeData);
+      setOrgStructure(orgData);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catálogos del inventario.'));
     }
@@ -303,10 +421,26 @@ export const HelpdeskAssetsPage = () => {
   };
 
   const validateForm = () => {
-    // El código de inventario es opcional: si se deja vacío el backend lo autogenera
-    // (UNIDAD-ÁREA-CLASIFICACIÓN-###), por lo que solo el nombre es obligatorio.
+    // El código de inventario se autogenera (UNIDAD-ÁREA-CLASIFICACIÓN-###). Son
+    // obligatorios: nombre, categoría, unidad, área y responsable técnico.
     if (!form.name.trim()) {
       notifyWarning('El nombre del activo es obligatorio.');
+      return false;
+    }
+    if (!numericOrNull(form.category_id)) {
+      notifyWarning('La categoría es obligatoria.');
+      return false;
+    }
+    if (!numericOrNull(form.unit_id)) {
+      notifyWarning('La unidad es obligatoria.');
+      return false;
+    }
+    if (!numericOrNull(form.area_id)) {
+      notifyWarning('El área es obligatoria.');
+      return false;
+    }
+    if (!numericOrNull(form.responsible_employee_id)) {
+      notifyWarning('El responsable técnico es obligatorio.');
       return false;
     }
 
@@ -376,6 +510,28 @@ export const HelpdeskAssetsPage = () => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  // Impresión de etiquetas en lote: trae TODOS los activos que cumplen los
+  // filtros actuales (unidad/área/responsable) y abre el modal de impresión.
+  const handleBulkPrint = async () => {
+    setLoadingBulk(true);
+    try {
+      const matches = await listHelpdeskAssetsForLabels({
+        unitId: numericOrNull(unitFilter),
+        areaId: numericOrNull(areaFilter),
+        responsibleUserId: userFilter || null,
+      });
+      if (matches.length === 0) {
+        notifyWarning('No hay activos que cumplan los filtros seleccionados.');
+        return;
+      }
+      setBulkLabels(matches);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar las etiquetas del lote.'));
+    } finally {
+      setLoadingBulk(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -427,14 +583,75 @@ export const HelpdeskAssetsPage = () => {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,0.8fr)]">
         <div className="space-y-4">
-          <div className="flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)]">
-            <Search size={18} className="text-[var(--color-brand-700)]" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por código, nombre, marca, modelo, serie, categoría o responsable..."
-              className="w-full bg-transparent text-sm text-[var(--unilabor-ink)] outline-none"
-            />
+          <div className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)]">
+            <div className="flex items-center gap-3">
+              <Search size={18} className="text-[var(--color-brand-700)]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar por código, nombre, marca, modelo, serie, categoría o responsable..."
+                className="w-full bg-transparent text-sm text-[var(--unilabor-ink)] outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Unidad
+                </span>
+                <SearchableSelect
+                  value={unitFilter}
+                  onChange={handleUnitFilterChange}
+                  options={unitOptions}
+                  placeholder="Todas las unidades"
+                  emptyLabel="Todas las unidades"
+                  searchPlaceholder="Buscar unidad por nombre o código..."
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Área
+                </span>
+                <SearchableSelect
+                  value={areaFilter}
+                  onChange={handleAreaFilterChange}
+                  options={areaOptions}
+                  placeholder={unitFilter ? 'Todas las áreas' : 'Selecciona una unidad'}
+                  emptyLabel="Todas las áreas"
+                  searchPlaceholder="Buscar área por nombre o código..."
+                  disabled={!unitFilter}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Responsable
+                </span>
+                <SearchableSelect
+                  value={userFilter}
+                  onChange={setUserFilter}
+                  options={userOptions}
+                  placeholder={areaFilter ? 'Todos los responsables' : 'Selecciona un área'}
+                  emptyLabel="Todos los responsables"
+                  searchPlaceholder="Buscar responsable por nombre o correo..."
+                  disabled={!areaFilter}
+                />
+              </label>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-[rgba(0,65,106,0.06)] pt-3">
+              <p className="text-xs text-[var(--unilabor-neutral)]">
+                {hasActiveFilters
+                  ? 'Imprime las etiquetas de todos los activos que cumplen los filtros seleccionados.'
+                  : 'Selecciona unidad, área o responsable para imprimir sus etiquetas en lote.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleBulkPrint()}
+                disabled={loadingBulk}
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
+              >
+                {loadingBulk ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                Imprimir etiquetas (lote)
+              </button>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)]">
@@ -619,15 +836,16 @@ export const HelpdeskAssetsPage = () => {
                   </span>
                   <input
                     value={form.asset_code}
-                    onChange={(event) => setField('asset_code', event.target.value)}
-                    placeholder="Se autogenera (UNIDAD-ÁREA-CLASIF-###) si lo dejas vacío"
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+                    readOnly
+                    placeholder="Se autogenera (UNIDAD-ÁREA-CLASIF-###)"
+                    title="El código se genera automáticamente y no es editable."
+                    className="w-full cursor-not-allowed rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(232,238,243,0.9)] px-3 py-2.5 text-sm text-[var(--unilabor-neutral)] outline-none"
                   />
                 </label>
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Nombre del activo
+                    Nombre del activo <span className="text-[#b02a2a]">*</span>
                   </span>
                   <input
                     value={form.name}
@@ -636,9 +854,57 @@ export const HelpdeskAssetsPage = () => {
                   />
                 </label>
 
+                {/* Prioridad: Unidad -> Área -> Responsable (cascada estricta, obligatorios) */}
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Categoría
+                    Unidad <span className="text-[#b02a2a]">*</span>
+                  </span>
+                  <SearchableSelect
+                    value={form.unit_id}
+                    onChange={handleFormUnitChange}
+                    options={catalogToOptions(catalogs.units)}
+                    placeholder="Selecciona una unidad"
+                    emptyLabel="Sin seleccionar"
+                    searchPlaceholder="Buscar unidad por nombre o codigo..."
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Área <span className="text-[#b02a2a]">*</span>
+                  </span>
+                  <SearchableSelect
+                    value={form.area_id}
+                    onChange={handleFormAreaChange}
+                    options={formAreaOptions}
+                    placeholder={form.unit_id ? 'Sin seleccionar' : 'Selecciona una unidad'}
+                    emptyLabel="Sin seleccionar"
+                    searchPlaceholder="Buscar area por nombre o codigo..."
+                    disabled={!form.unit_id}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Responsable técnico <span className="text-[#b02a2a]">*</span>
+                  </span>
+                  <SearchableSelect
+                    value={form.responsible_employee_id}
+                    onChange={(value) => setField('responsible_employee_id', value)}
+                    options={formResponsibleOptions}
+                    placeholder={form.area_id ? 'Sin responsable' : 'Selecciona un área'}
+                    emptyLabel="Sin responsable"
+                    searchPlaceholder="Buscar responsable del área..."
+                    disabled={!form.area_id}
+                  />
+                  {form.area_id && formResponsibleOptions.length === 0 ? (
+                    <span className="mt-1 block text-xs text-[var(--unilabor-neutral)]">
+                      Esta área no tiene responsables configurados. Asígnalos en Help Desk → Estructura.
+                    </span>
+                  ) : null}
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Categoría <span className="text-[#b02a2a]">*</span>
                   </span>
                   <SearchableSelect
                     value={form.category_id}
@@ -651,20 +917,6 @@ export const HelpdeskAssetsPage = () => {
                 </label>
                 <CatalogSelect label="Estado operativo" value={form.operational_status_id} options={catalogs.operational_statuses} onChange={(value) => setField('operational_status_id', value)} />
                 <CatalogSelect label="Criticidad" value={form.criticality_id} options={catalogs.criticalities} onChange={(value) => setField('criticality_id', value)} />
-                <CatalogSelect label="Unidad" value={form.unit_id} options={catalogs.units} onChange={(value) => setField('unit_id', value)} />
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Área
-                  </span>
-                  <SearchableSelect
-                    value={form.area_id}
-                    onChange={(value) => setField('area_id', value)}
-                    options={catalogToOptions(catalogs.areas)}
-                    placeholder="Sin seleccionar"
-                    emptyLabel="Sin seleccionar"
-                    searchPlaceholder="Buscar area por nombre o codigo..."
-                  />
-                </label>
                 <CatalogSelect label="Ubicación" value={form.location_id} options={catalogs.locations} onChange={(value) => setField('location_id', value)} />
 
                 <label className="block">
@@ -717,20 +969,6 @@ export const HelpdeskAssetsPage = () => {
                     placeholder="Sin colaborador"
                     emptyLabel="Sin colaborador"
                     searchPlaceholder="Buscar colaborador por nombre, codigo o area..."
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Responsable técnico
-                  </span>
-                  <SearchableSelect
-                    value={form.responsible_employee_id}
-                    onChange={(value) => setField('responsible_employee_id', value)}
-                    options={employeeOptions}
-                    placeholder="Sin responsable"
-                    emptyLabel="Sin responsable"
-                    searchPlaceholder="Buscar responsable por nombre, codigo o area..."
                   />
                 </label>
 
@@ -850,7 +1088,8 @@ export const HelpdeskAssetsPage = () => {
               <button
                 type="button"
                 onClick={() => void handleSave()}
-                disabled={saving}
+                disabled={saving || !isFormValid}
+                title={isFormValid ? undefined : 'Completa nombre, categoría, unidad, área y responsable.'}
                 className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
               >
                 {saving ? (
@@ -877,6 +1116,18 @@ export const HelpdeskAssetsPage = () => {
           brand={labelAsset.brand?.name ?? labelAsset.brand_name ?? null}
           model={labelAsset.model ?? null}
           onClose={() => setLabelAsset(null)}
+        />
+      ) : null}
+
+      {bulkLabels ? (
+        <AssetLabelsPrintModal
+          assets={bulkLabels.map((asset) => ({
+            assetCode: asset.asset_code,
+            name: asset.name,
+            brand: asset.brand?.name ?? asset.brand_name ?? null,
+            model: asset.model ?? null,
+          }))}
+          onClose={() => setBulkLabels(null)}
         />
       ) : null}
     </div>

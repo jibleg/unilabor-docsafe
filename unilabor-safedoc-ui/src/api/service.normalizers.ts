@@ -21,6 +21,10 @@ import type {
   HelpdeskMaintenanceOrder,
   HelpdeskMaintenanceOrderChecklistItem,
   HelpdeskMaintenancePlanTask,
+  HelpdeskOrgArea,
+  HelpdeskOrgStructure,
+  HelpdeskOrgUnit,
+  HelpdeskOrgUser,
   LinkableUser,
   ManagedUser,
   ModuleAccess,
@@ -430,6 +434,41 @@ export const normalizeHelpdeskCatalogs = (input: unknown): HelpdeskCatalogs => {
     document_kinds: pickCatalog('document_kinds', 'documentKinds'),
     lifecycle_event_types: pickCatalog('lifecycle_event_types', 'lifecycleEventTypes'),
   };
+};
+
+export const normalizeHelpdeskOrgStructure = (input: unknown): HelpdeskOrgStructure => {
+  const source = asRecord(input) ?? {};
+
+  const toRows = (value: unknown, key: string): Record<string, unknown>[] =>
+    getArrayFromPayload(value, [key])
+      .map((raw) => asRecord(raw))
+      .filter((row): row is Record<string, unknown> => row !== null && row.id !== undefined);
+
+  const units: HelpdeskOrgUnit[] = toRows(source.units, 'units').map((row) => ({
+    id: getNumber(row, ['id']),
+    code: getString(row, ['code']) || null,
+    name: getString(row, ['name']),
+  }));
+
+  const areas: HelpdeskOrgArea[] = toRows(source.areas, 'areas').map((row) => ({
+    id: getNumber(row, ['id']),
+    code: getString(row, ['code']) || null,
+    name: getString(row, ['name']),
+    unit_ids: getArrayFromPayload(row.unit_ids, ['unit_ids'])
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0),
+    responsible_user_ids: getArrayFromPayload(row.responsible_user_ids, ['responsible_user_ids'])
+      .map((value) => String(value))
+      .filter((value) => value.length > 0),
+  }));
+
+  const users: HelpdeskOrgUser[] = toRows(source.users, 'users').map((row) => ({
+    id: getString(row, ['id']),
+    full_name: getString(row, ['full_name']),
+    email: getString(row, ['email']),
+  }));
+
+  return { units, areas, users };
 };
 
 export const normalizeHelpdeskTicketStatus = (input: unknown): HelpdeskTicketStatus | null => {

@@ -220,6 +220,33 @@ export interface HelpdeskCatalogs {
   lifecycle_event_types: HelpdeskCatalogItem[];
 }
 
+// --- Estructura organizacional (Unidad <-> Area <-> Responsables) ---
+export interface HelpdeskOrgUnit {
+  id: number;
+  code?: string | null;
+  name: string;
+}
+
+export interface HelpdeskOrgArea {
+  id: number;
+  code?: string | null;
+  name: string;
+  unit_ids: number[];
+  responsible_user_ids: string[];
+}
+
+export interface HelpdeskOrgUser {
+  id: string;
+  full_name: string;
+  email: string;
+}
+
+export interface HelpdeskOrgStructure {
+  units: HelpdeskOrgUnit[];
+  areas: HelpdeskOrgArea[];
+  users: HelpdeskOrgUser[];
+}
+
 export interface HelpdeskLifecycleEvent {
   id: number;
   asset_id: number;

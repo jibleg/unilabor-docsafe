@@ -15,6 +15,7 @@ import {
   closeMaintenanceOrderById,
   createMaintenancePlan,
   getApiErrorMessage,
+  getHelpdeskOrgStructure,
   listEmployees,
   listHelpdeskAssets,
   listMaintenanceCatalogs,
@@ -25,6 +26,7 @@ import {
   type HelpdeskMaintenanceOrderClosePayload,
   updateMaintenancePlanById,
 } from '../api/service';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { useAuthStore } from '../store/useAuthStore';
 import type {
   Employee,
@@ -32,6 +34,7 @@ import type {
   HelpdeskMaintenanceCatalogs,
   HelpdeskMaintenanceOrder,
   HelpdeskMaintenancePlan,
+  HelpdeskOrgStructure,
 } from '../types/models';
 import { getModuleRole } from '../utils/modules';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
@@ -57,6 +60,9 @@ import {
   type OrderExecutionFormState,
   type RescheduleFormState,
 } from './HelpdeskMaintenancePage.helpers';
+
+const EMPTY_ORG_STRUCTURE: HelpdeskOrgStructure = { units: [], areas: [], users: [] };
+
 export const HelpdeskMaintenancePage = () => {
   const availableModules = useAuthStore((state) => state.availableModules);
   const moduleRole = getModuleRole(availableModules, 'HELPDESK') ?? 'VIEWER';
@@ -67,9 +73,13 @@ export const HelpdeskMaintenancePage = () => {
   const [catalogs, setCatalogs] = useState<HelpdeskMaintenanceCatalogs>(EMPTY_CATALOGS);
   const [assets, setAssets] = useState<HelpdeskAsset[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [orgStructure, setOrgStructure] = useState<HelpdeskOrgStructure>(EMPTY_ORG_STRUCTURE);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState('');
+  const [unitFilter, setUnitFilter] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
+  const [userFilter, setUserFilter] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<HelpdeskMaintenancePlan | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<HelpdeskMaintenanceOrder | null>(null);
   const [editingPlan, setEditingPlan] = useState<HelpdeskMaintenancePlan | null>(null);
@@ -83,12 +93,13 @@ export const HelpdeskMaintenancePage = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [planResult, orderResult, catalogResult, assetResult, employeeResult] = await Promise.allSettled([
+      const [planResult, orderResult, catalogResult, assetResult, employeeResult, orgResult] = await Promise.allSettled([
         listMaintenancePlans(),
         listMaintenanceOrders(),
         listMaintenanceCatalogs(),
         listHelpdeskAssets(),
         listEmployees(),
+        getHelpdeskOrgStructure(),
       ]);
 
       if (planResult.status === 'fulfilled') {
@@ -138,6 +149,12 @@ export const HelpdeskMaintenancePage = () => {
       } else {
         notifyError(getApiErrorMessage(employeeResult.reason, 'No se pudieron cargar los colaboradores.'));
       }
+
+      if (orgResult.status === 'fulfilled') {
+        setOrgStructure(orgResult.value);
+      } else {
+        notifyError(getApiErrorMessage(orgResult.reason, 'No se pudo cargar la estructura organizacional.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -147,14 +164,79 @@ export const HelpdeskMaintenancePage = () => {
     void loadData();
   }, [loadData]);
 
+  // Cascada Unidad -> Área -> Responsable (misma lógica que helpdesk/assets),
+  // construida sobre la estructura organizacional M:N.
+  const unitOptions = useMemo(
+    () => orgStructure.units.map((unit) => ({ value: String(unit.id), label: unit.name, hint: unit.code ?? undefined })),
+    [orgStructure.units],
+  );
+  const areaOptions = useMemo(() => {
+    const unitId = numericOrNull(unitFilter);
+    if (!unitId) {
+      return [];
+    }
+    return orgStructure.areas
+      .filter((area) => area.unit_ids.includes(unitId))
+      .map((area) => ({ value: String(area.id), label: area.name, hint: area.code ?? undefined }));
+  }, [orgStructure.areas, unitFilter]);
+  const userOptions = useMemo(() => {
+    const areaId = numericOrNull(areaFilter);
+    if (!areaId) {
+      return [];
+    }
+    const responsibleIds = new Set(
+      orgStructure.areas.find((area) => area.id === areaId)?.responsible_user_ids ?? [],
+    );
+    return orgStructure.users
+      .filter((user) => responsibleIds.has(user.id))
+      .map((user) => ({ value: user.id, label: user.full_name, hint: user.email || undefined }));
+  }, [orgStructure.areas, orgStructure.users, areaFilter]);
+
+  const handleUnitFilterChange = (value: string) => {
+    setUnitFilter(value);
+    setAreaFilter('');
+    setUserFilter('');
+  };
+  const handleAreaFilterChange = (value: string) => {
+    setAreaFilter(value);
+    setUserFilter('');
+  };
+
+  // Los planes no traen unit_id/area_id, pero sí referencian asset_id: se resuelve
+  // la unidad/área del plan desde el listado completo de activos ya cargado.
+  const assetById = useMemo(() => {
+    const map = new Map<number, HelpdeskAsset>();
+    assets.forEach((asset) => map.set(asset.id, asset));
+    return map;
+  }, [assets]);
+
   const filteredPlans = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return plans;
-    }
+    const unitId = numericOrNull(unitFilter);
+    const areaId = numericOrNull(areaFilter);
+    const responsibleAreaIds = userFilter
+      ? new Set(
+          orgStructure.areas
+            .filter((area) => area.responsible_user_ids.includes(userFilter))
+            .map((area) => area.id),
+        )
+      : null;
 
-    return plans.filter((plan) =>
-      [
+    return plans.filter((plan) => {
+      const asset = assetById.get(plan.asset_id);
+      if (unitId && asset?.unit_id !== unitId) {
+        return false;
+      }
+      if (areaId && asset?.area_id !== areaId) {
+        return false;
+      }
+      if (responsibleAreaIds && !(asset?.area_id != null && responsibleAreaIds.has(asset.area_id))) {
+        return false;
+      }
+      if (!normalizedQuery) {
+        return true;
+      }
+      return [
         plan.plan_code,
         plan.title,
         plan.asset?.asset_code ?? '',
@@ -162,9 +244,9 @@ export const HelpdeskMaintenancePage = () => {
         plan.frequency?.name ?? '',
         plan.responsible_employee?.full_name ?? '',
         plan.provider_name ?? '',
-      ].some((value) => value.toLowerCase().includes(normalizedQuery)),
-    );
-  }, [plans, query]);
+      ].some((value) => value.toLowerCase().includes(normalizedQuery));
+    });
+  }, [plans, query, unitFilter, areaFilter, userFilter, orgStructure.areas, assetById]);
 
   const summary = useMemo(() => ({
     total: plans.length,
@@ -411,14 +493,59 @@ export const HelpdeskMaintenancePage = () => {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(360px,0.9fr)]">
         <div className="space-y-4">
-          <div className="flex items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)]">
-            <Search size={18} className="text-[var(--color-brand-700)]" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por plan, activo, frecuencia, responsable o proveedor..."
-              className="w-full bg-transparent text-sm text-[var(--unilabor-ink)] outline-none"
-            />
+          <div className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)]">
+            <div className="flex items-center gap-3">
+              <Search size={18} className="text-[var(--color-brand-700)]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar por plan, activo, frecuencia, responsable o proveedor..."
+                className="w-full bg-transparent text-sm text-[var(--unilabor-ink)] outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Unidad
+                </span>
+                <SearchableSelect
+                  value={unitFilter}
+                  onChange={handleUnitFilterChange}
+                  options={unitOptions}
+                  placeholder="Todas las unidades"
+                  emptyLabel="Todas las unidades"
+                  searchPlaceholder="Buscar unidad por nombre o código..."
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Área
+                </span>
+                <SearchableSelect
+                  value={areaFilter}
+                  onChange={handleAreaFilterChange}
+                  options={areaOptions}
+                  placeholder={unitFilter ? 'Todas las áreas' : 'Selecciona una unidad'}
+                  emptyLabel="Todas las áreas"
+                  searchPlaceholder="Buscar área por nombre o código..."
+                  disabled={!unitFilter}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Responsable
+                </span>
+                <SearchableSelect
+                  value={userFilter}
+                  onChange={setUserFilter}
+                  options={userOptions}
+                  placeholder={areaFilter ? 'Todos los responsables' : 'Selecciona un área'}
+                  emptyLabel="Todos los responsables"
+                  searchPlaceholder="Buscar responsable por nombre o correo..."
+                  disabled={!areaFilter}
+                />
+              </label>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)]">
