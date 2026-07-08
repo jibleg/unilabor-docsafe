@@ -96,20 +96,18 @@ body {
   -ms-user-select: none;
 }
 
+/* Contenedor anclado abajo a la derecha (posicion la fija react-toastify via
+   position="bottom-right"); aqui solo se ajusta el ancho, mas compacto. */
 .unilabor-toast-container {
-  top: 50% !important;
-  left: 50% !important;
-  margin: 0 !important;
-  width: min(92vw, 460px) !important;
-  transform: translate(-50%, -50%) !important;
-  padding: 0 !important;
+  width: min(90vw, 340px) !important;
 }
 
 .unilabor-toast {
   border: 1px solid var(--unilabor-border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 20px 45px rgba(0, 65, 106, 0.12);
+  border-radius: 12px;
+  min-height: auto;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 4px 16px rgba(16, 34, 46, 0.1);
 }
 
 .unilabor-toast.Toastify__toast--success {
@@ -137,9 +135,10 @@ body {
 }
 
 .unilabor-toast .Toastify__toast-body {
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: #173047;
+  font-size: 0.83rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #2b3f52;
 }
 
 .unilabor-toast .Toastify__close-button {
@@ -152,9 +151,10 @@ body {
 }
 
 .unilabor-toast-progress {
-  height: 4px;
+  height: 2px;
   border-radius: 999px;
-  margin: 0 10px 8px;
+  margin: 0 10px 6px;
+  opacity: 0.65;
 }
 
 .Toastify__toast--success .unilabor-toast-progress {

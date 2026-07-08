@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { RhHomeRedirect } from './components/RhHomeRedirect';
-import { ToastContainer, Zoom } from 'react-toastify';
+import { ToastContainer, Slide } from 'react-toastify';
 import { ModuleGuard } from './components/ModuleGuard';
 import { RoleGate } from './components/RoleGate';
 import { ConfirmHost } from './components/ConfirmHost';
@@ -429,15 +429,15 @@ function App() {
     </Routes>
     </Suspense>
     <ToastContainer
-      position="top-center"
-      autoClose={5000}
+      position="bottom-right"
+      autoClose={4000}
       hideProgressBar={false}
       closeOnClick
       pauseOnHover
       draggable={false}
       newestOnTop
       theme="light"
-      transition={Zoom}
+      transition={Slide}
       className="unilabor-toast-container"
       toastClassName="unilabor-toast"
       progressClassName="unilabor-toast-progress"

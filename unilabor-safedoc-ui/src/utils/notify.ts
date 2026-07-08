@@ -1,7 +1,7 @@
 import { toast } from 'react-toastify';
 
 const defaultToastOptions = {
-  autoClose: 5000,
+  autoClose: 4000,
   closeOnClick: true,
   pauseOnHover: true,
   draggable: false,
