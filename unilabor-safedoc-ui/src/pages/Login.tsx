@@ -12,7 +12,7 @@ import { getModuleHomePath } from '../utils/modules';
 const moduleHighlights = [
   ['CALIDAD', 'Control documental institucional y trazabilidad de calidad.'],
   ['RH', 'Expediente digital del colaborador y gestión documental de personal.'],
-  ['HELPDESK', 'Mesa de ayuda, activos y mantenimiento de equipos.'],
+  ['Activos y Soporte', 'Inventario y equipos (ISO 15189), mantenimiento, calibración y mesa de ayuda.'],
 ] as const;
 
 export const LoginPage = () => {

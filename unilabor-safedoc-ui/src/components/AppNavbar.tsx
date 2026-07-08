@@ -115,7 +115,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
               />
             </span>
             <span className="ml-2 text-base font-bold tracking-tight text-[var(--color-brand-700)]">
-              {moduleCode === 'RH' ? 'SafeDoc RH' : moduleCode === 'HELPDESK' ? 'SafeDoc Helpdesk' : 'SafeDoc'}
+              {moduleCode === 'RH' ? 'SafeDoc RH' : moduleCode === 'HELPDESK' ? 'SafeDoc Activos y Soporte' : 'SafeDoc'}
             </span>
           </NavLink>
         </div>

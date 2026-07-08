@@ -24,8 +24,8 @@ const moduleVisuals: Record<
   },
   HELPDESK: {
     icon: LifeBuoy,
-    eyebrow: 'Módulo Helpdesk',
-    description: 'Mesa de ayuda, activos, tickets y mantenimiento de equipos del laboratorio.',
+    eyebrow: 'Módulo de Activos y Soporte',
+    description: 'Inventario y ciclo de vida de activos (ISO 15189), mantenimiento, calibración y mesa de ayuda.',
   },
 };
 

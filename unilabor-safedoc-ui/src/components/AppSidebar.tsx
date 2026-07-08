@@ -153,7 +153,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
               ],
             },
             {
-              title: 'Mesa de ayuda',
+              title: 'Soporte',
               items: [
                 { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets', roles: ['ADMIN', 'EDITOR'] },
               ],
@@ -233,7 +233,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
                 {moduleCode === 'RH'
                   ? 'Unilabor RH'
                   : moduleCode === 'HELPDESK'
-                    ? 'Unilabor Helpdesk'
+                    ? 'Unilabor Activos y Soporte'
                     : 'Unilabor Calidad'}
               </p>
             </div>
