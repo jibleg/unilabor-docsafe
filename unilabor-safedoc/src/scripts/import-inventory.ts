@@ -41,8 +41,8 @@ const COL = {
   complementaryInfo: 15,
   serial: 16,
   location: 17,
-  observation: 18,
-  responsible: 19,
+  // OBSERVACION (18) y RESPONSABLE (19) se omiten a proposito en la importacion
+  // de produccion: no vienen en el inventario y se asignan despues.
 } as const;
 
 const DEFAULT_SHEET = 'INVENTARIO.UNILABOR';
@@ -72,8 +72,6 @@ const LOCATION_NAME_ALIASES: Record<string, string> = {
 };
 // Valores que significan "sin dato" en cualquier columna de texto.
 const NULL_TOKENS = new Set(['', 'N/E', 'N/A', 'N\\A', 'NE', 'NA', 'NINGUNO', '∅', '-', '.']);
-// Prefijos de titulo en la columna RESPONSABLE (se retiran antes de matchear).
-const RESPONSIBLE_TITLE = /^(Q|ING|LIC|IMG|MTRO|MTRA|DR|DRA|C|TEC|TECO)\s*[.,]\s*/i;
 
 interface ParsedArgs {
   file: string;
@@ -97,9 +95,11 @@ interface ImportReport {
   created: number;
   failed: number;
   rowsWithWarnings: RowReport[];
-  unresolvedResponsibles: Map<string, number>;
   createdLocations: Set<string>;
   unmatchedCatalog: Map<string, Set<string>>; // catalogo -> valores sin resolver
+  wholes: number; // activos "todo" (sin componente)
+  linkedComponents: number; // componentes vinculados a su padre
+  orphanComponents: Set<string>; // componentes cuyo padre no esta en el inventario
 }
 
 // ---------------------------------------------------------------------------
@@ -148,11 +148,6 @@ interface CatalogIndex {
   byCode: Map<string, number>; // fold(code) -> id
 }
 
-interface EmployeeRow {
-  id: number;
-  tokens: Set<string>; // fold de cada token del nombre completo
-}
-
 async function loadCatalogByCode(table: string): Promise<CatalogIndex> {
   const { rows } = await pool.query(`SELECT id, code FROM public.${table} WHERE is_active = TRUE;`);
   const byCode = new Map<string, number>();
@@ -167,34 +162,6 @@ async function loadLocationsByName(): Promise<Map<string, number>> {
   const byName = new Map<string, number>();
   for (const row of rows) byName.set(fold(String(row.name)), Number(row.id));
   return byName;
-}
-
-async function loadEmployees(): Promise<EmployeeRow[]> {
-  const { rows } = await pool.query(`SELECT id, full_name FROM public.employees WHERE is_active = TRUE;`);
-  return rows.map((row) => ({
-    id: Number(row.id),
-    tokens: new Set(fold(String(row.full_name)).split(' ').filter(Boolean)),
-  }));
-}
-
-/**
- * Empareja el texto libre de RESPONSABLE contra un empleado. Estrategia estricta:
- * tras quitar el titulo, TODOS los tokens del texto deben existir como token del
- * nombre del empleado. Solo se acepta si hay EXACTAMENTE un empleado candidato.
- * Devuelve el id, o null (sin match o ambiguo) con la razon.
- */
-function matchEmployee(
-  raw: string,
-  employees: EmployeeRow[],
-): { id: number | null; reason: 'matched' | 'no-match' | 'ambiguous' } {
-  const cleaned = fold(raw.replace(RESPONSIBLE_TITLE, ''));
-  const tokens = cleaned.split(' ').filter(Boolean);
-  if (tokens.length === 0) return { id: null, reason: 'no-match' };
-
-  const candidates = employees.filter((emp) => tokens.every((tok) => emp.tokens.has(tok)));
-  if (candidates.length === 1) return { id: candidates[0]!.id, reason: 'matched' };
-  if (candidates.length === 0) return { id: null, reason: 'no-match' };
-  return { id: null, reason: 'ambiguous' };
 }
 
 /** Get-or-create de ubicacion por nombre. En dry-run solo registra que se crearia. */
@@ -214,10 +181,12 @@ async function resolveLocation(
 
   // Codigo derivado del nombre (slug corto, unico por sufijo si colisiona).
   const baseCode = fold(aliased).replace(/[^A-Z0-9]+/g, '_').slice(0, 24) || 'LOC';
+  // El indice unico es sobre UPPER(code) (expresion), no sobre la columna cruda:
+  // el ON CONFLICT debe apuntar a la misma expresion.
   const inserted = await pool.query(
     `INSERT INTO public.helpdesk_locations (code, name)
      VALUES ($1, $2)
-     ON CONFLICT (code) DO UPDATE SET is_active = TRUE
+     ON CONFLICT (UPPER(code)) DO UPDATE SET is_active = TRUE
      RETURNING id;`,
     [baseCode, aliased],
   );
@@ -269,14 +238,13 @@ async function run(): Promise<void> {
   console.log(`Archivo: ${args.file}  |  Hoja: ${args.sheet}\n`);
 
   // Carga de catalogos a memoria.
-  const [units, areas, categories, modalities, conditions, locations, employees] = await Promise.all([
+  const [units, areas, categories, modalities, conditions, locations] = await Promise.all([
     loadCatalogByCode('helpdesk_asset_units'),
     loadCatalogByCode('helpdesk_asset_areas'),
     loadCatalogByCode('helpdesk_asset_categories'),
     loadCatalogByCode('helpdesk_purchase_modalities'),
     loadCatalogByCode('helpdesk_purchase_conditions'),
     loadLocationsByName(),
-    loadEmployees(),
   ]);
 
   const report: ImportReport = {
@@ -286,15 +254,30 @@ async function run(): Promise<void> {
     created: 0,
     failed: 0,
     rowsWithWarnings: [],
-    unresolvedResponsibles: new Map(),
     createdLocations: new Set(),
     unmatchedCatalog: new Map(),
+    wholes: 0,
+    linkedComponents: 0,
+    orphanComponents: new Set(),
   };
 
   const noteUnmatched = (catalog: string, value: string) => {
     if (!report.unmatchedCatalog.has(catalog)) report.unmatchedCatalog.set(catalog, new Set());
     report.unmatchedCatalog.get(catalog)!.add(value);
   };
+
+  // --- Pasada de PARSEO: se leen todas las filas a memoria (sin escribir) para
+  //     poder crear primero los activos "todo" y luego vincular los componentes. ---
+  interface ParsedRow {
+    excelRow: number;
+    assetCode: string;
+    name: string;
+    payload: HelpdeskAssetPayload;
+    warnings: string[];
+    isComponent: boolean;
+    parentCode: string | null;
+  }
+  const parsedRows: ParsedRow[] = [];
 
   const lastRow = args.limit ? Math.min(sheet.rowCount, args.limit + 1) : sheet.rowCount;
   for (let r = 2; r <= lastRow; r += 1) {
@@ -355,21 +338,8 @@ async function run(): Promise<void> {
       locationId = await resolveLocation(rawLocation, locations, report, args.commit);
     }
 
-    // --- Responsable (match estricto) ---
-    const rawResponsible = orNull(cellText(row.getCell(COL.responsible).value));
-    let responsibleId: number | null = null;
-    if (rawResponsible) {
-      const match = matchEmployee(rawResponsible, employees);
-      responsibleId = match.id;
-      if (match.reason !== 'matched') {
-        warnings.push(`responsable sin resolver (${match.reason}): "${rawResponsible}"`);
-        report.unresolvedResponsibles.set(
-          rawResponsible,
-          (report.unresolvedResponsibles.get(rawResponsible) ?? 0) + 1,
-        );
-      }
-    }
-
+    // RESPONSABLE y OBSERVACION se omiten en esta importacion (no vienen en el
+    // inventario de prod); quedan NULL y se asignan despues.
     const payload: HelpdeskAssetPayload = {
       asset_code: assetCode, // preservado => override (no autogenera)
       name,
@@ -384,33 +354,70 @@ async function run(): Promise<void> {
       complementary_info: orNull(cellText(row.getCell(COL.complementaryInfo).value)),
       purchase_modality_id: modalityId,
       purchase_condition_id: conditionId,
-      responsible_employee_id: responsibleId,
+      responsible_employee_id: null,
       inventory_legacy_code: assetCode,
       legacy_consecutive: orNull(cellText(row.getCell(COL.consecutive).value)),
       legacy_component_consecutive: orNull(cellText(row.getCell(COL.componentConsecutive).value)),
-      notes: orNull(cellText(row.getCell(COL.observation).value)),
+      notes: null,
     };
 
-    report.processed += 1;
-    if (warnings.length > 0) {
-      report.rowsWithWarnings.push({ excelRow: r, assetCode, name, warnings });
-    }
+    const componentConsec = orNull(cellText(row.getCell(COL.componentConsecutive).value));
+    const isComponent = Boolean(componentConsec);
+    // Padre = codigo del componente sin el ultimo segmento -NNN. Ej:
+    // A-REC-EQC-001-002 -> A-REC-EQC-001.
+    const parentCode = isComponent ? assetCode.replace(/-[^-]+$/, '') : null;
 
-    if (args.commit) {
-      try {
-        await createHelpdeskAsset(payload, null);
-        report.created += 1;
-      } catch (err) {
-        report.failed += 1;
-        const message = err instanceof Error ? err.message : String(err);
-        report.rowsWithWarnings.push({
-          excelRow: r,
-          assetCode,
-          name,
-          warnings: [`ERROR AL INSERTAR: ${message}`],
-        });
-      }
+    parsedRows.push({ excelRow: r, assetCode, name, payload, warnings, isComponent, parentCode });
+  }
+
+  // Codigos "todo" presentes en el inventario (para detectar componentes huerfanos).
+  const wholeCodes = new Set(parsedRows.filter((p) => !p.isComponent).map((p) => fold(p.assetCode)));
+  const codeToId = new Map<string, number>(); // fold(codigo) -> id (solo en commit)
+
+  const insertRow = async (p: ParsedRow, parentId: number | null) => {
+    report.processed += 1;
+    if (p.warnings.length > 0) {
+      report.rowsWithWarnings.push({ excelRow: p.excelRow, assetCode: p.assetCode, name: p.name, warnings: p.warnings });
     }
+    if (!args.commit) return;
+    try {
+      const created = await createHelpdeskAsset({ ...p.payload, parent_asset_id: parentId }, null);
+      codeToId.set(fold(p.assetCode), created.id);
+      report.created += 1;
+    } catch (err) {
+      report.failed += 1;
+      const message = err instanceof Error ? err.message : String(err);
+      report.rowsWithWarnings.push({
+        excelRow: p.excelRow,
+        assetCode: p.assetCode,
+        name: p.name,
+        warnings: [`ERROR AL INSERTAR: ${message}`],
+      });
+    }
+  };
+
+  // Pasada 1: activos "todo" (se crean primero y se mapea codigo -> id).
+  for (const p of parsedRows) {
+    if (p.isComponent) continue;
+    report.wholes += 1;
+    await insertRow(p, null);
+  }
+  // Pasada 2: componentes -> se vinculan a su padre por codigo base (parent_asset_id).
+  for (const p of parsedRows) {
+    if (!p.isComponent) continue;
+    const parentKey = p.parentCode ? fold(p.parentCode) : null;
+    const parentPresent = parentKey ? wholeCodes.has(parentKey) : false;
+    let parentId: number | null = null;
+    if (!parentPresent) {
+      report.orphanComponents.add(p.assetCode);
+      p.warnings.push(
+        `componente huerfano: el padre "${p.parentCode}" no esta en el inventario (se importa como activo independiente)`,
+      );
+    } else {
+      report.linkedComponents += 1;
+      parentId = parentKey ? codeToId.get(parentKey) ?? null : null;
+    }
+    await insertRow(p, parentId);
   }
 
   printAndWriteReport(report, args);
@@ -428,6 +435,8 @@ function printAndWriteReport(report: ImportReport, args: ParsedArgs): void {
   out(`Filas totales:      ${report.totalRows}`);
   out(`Saltadas sin codigo:${report.skippedNoCode}`);
   out(`Procesadas:         ${report.processed}`);
+  out(`Activos "todo":     ${report.wholes}`);
+  out(`Componentes:        ${report.linkedComponents} vinculados a su padre + ${report.orphanComponents.size} huerfanos`);
   if (args.commit) {
     out(`Creadas en BD:      ${report.created}`);
     out(`Fallidas:           ${report.failed}`);
@@ -435,6 +444,11 @@ function printAndWriteReport(report: ImportReport, args: ParsedArgs): void {
     out(`(dry-run: no se escribio nada en la BD)`);
   }
   out(`Filas con avisos:   ${report.rowsWithWarnings.length}`);
+
+  if (report.orphanComponents.size > 0) {
+    out(`\n--- Componentes huerfanos (padre ausente; se importan como independientes) (${report.orphanComponents.size}) ---`);
+    out('  ' + [...report.orphanComponents].sort().join(', '));
+  }
 
   if (report.unmatchedCatalog.size > 0) {
     out('\n--- Valores de catalogo sin resolver (quedan NULL en el activo) ---');
@@ -448,13 +462,6 @@ function printAndWriteReport(report: ImportReport, args: ParsedArgs): void {
       `\n--- Ubicaciones nuevas ${args.commit ? 'creadas' : 'que se crearian'} (${report.createdLocations.size}) ---`,
     );
     out('  ' + [...report.createdLocations].sort().join(', '));
-  }
-
-  if (report.unresolvedResponsibles.size > 0) {
-    out(`\n--- Responsables sin resolver (quedan NULL, resolver a mano) (${report.unresolvedResponsibles.size}) ---`);
-    for (const [name, count] of [...report.unresolvedResponsibles.entries()].sort((a, b) => b[1] - a[1])) {
-      out(`  "${name}"  (${count} activo/s)`);
-    }
   }
 
   if (report.rowsWithWarnings.length > 0) {
