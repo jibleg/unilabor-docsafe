@@ -21,6 +21,10 @@ import type {
   HelpdeskMaintenanceOrder,
   HelpdeskMaintenanceOrderChecklistItem,
   HelpdeskMaintenancePlanTask,
+  HelpdeskCalibrationCatalogs,
+  HelpdeskCalibrationPlan,
+  HelpdeskCalibrationOrder,
+  HelpdeskScheduleMode,
   HelpdeskAssetMovement,
   HelpdeskHandover,
   HelpdeskHandoverItem,
@@ -947,6 +951,141 @@ export const normalizeMaintenancePlan = (input: unknown): HelpdeskMaintenancePla
     orders: getArrayFromPayload(source.orders ?? [], ['orders'])
       .map(normalizeMaintenanceOrder)
       .filter((order): order is HelpdeskMaintenanceOrder => order !== null),
+  };
+};
+
+// --- Calibracion (ISO 15189:2022) ---
+const normalizeScheduleMode = (value: unknown): HelpdeskScheduleMode =>
+  value === 'CALENDAR' ? 'CALENDAR' : 'FREQUENCY';
+
+export const normalizeCalibrationCatalogs = (input: unknown): HelpdeskCalibrationCatalogs => {
+  const source = asRecord(input) ?? {};
+  return {
+    frequencies: getArrayFromPayload(source.frequencies ?? [], ['frequencies'])
+      .map(normalizeMaintenanceFrequency)
+      .filter((item): item is HelpdeskMaintenanceFrequency => item !== null),
+  };
+};
+
+export const normalizeCalibrationOrder = (input: unknown): HelpdeskCalibrationOrder | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const orderCode = getString(source, ['order_code', 'orderCode']);
+  const scheduledFor = getString(source, ['scheduled_for', 'scheduledFor']);
+  if (!id || !orderCode || !scheduledFor) {
+    return null;
+  }
+
+  const planRecord = asRecord(source.plan);
+  const assetRecord = asRecord(source.asset);
+
+  return {
+    id,
+    order_code: orderCode,
+    plan_id: getNullableNumber(source, ['plan_id', 'planId']) ?? undefined,
+    asset_id: getNullableNumber(source, ['asset_id', 'assetId']) ?? undefined,
+    scheduled_for: scheduledFor,
+    window_starts_on: getString(source, ['window_starts_on', 'windowStartsOn']) || null,
+    window_ends_on: getString(source, ['window_ends_on', 'windowEndsOn']) || null,
+    status: getString(source, ['status'], 'SCHEDULED'),
+    started_at: getString(source, ['started_at', 'startedAt']) || null,
+    completed_at: getString(source, ['completed_at', 'completedAt']) || null,
+    completed_by_user_id: getString(source, ['completed_by_user_id', 'completedByUserId']) || null,
+    provider_name: getString(source, ['provider_name', 'providerName']) || null,
+    result: getString(source, ['result']) || null,
+    certificate_no: getString(source, ['certificate_no', 'certificateNo']) || null,
+    calibration_due_on: getString(source, ['calibration_due_on', 'calibrationDueOn']) || null,
+    findings: getString(source, ['findings']) || null,
+    evidence_notes: getString(source, ['evidence_notes', 'evidenceNotes']) || null,
+    lifecycle_event_id: getNullableNumber(source, ['lifecycle_event_id', 'lifecycleEventId']),
+    rescheduled_from: getString(source, ['rescheduled_from', 'rescheduledFrom']) || null,
+    rescheduled_at: getString(source, ['rescheduled_at', 'rescheduledAt']) || null,
+    reschedule_reason: getString(source, ['reschedule_reason', 'rescheduleReason']) || null,
+    plan: planRecord
+      ? {
+          id: getNumber(planRecord, ['id']),
+          plan_code: getString(planRecord, ['plan_code', 'planCode']),
+          title: getString(planRecord, ['title']),
+          schedule_mode: normalizeScheduleMode(planRecord.schedule_mode ?? planRecord.scheduleMode),
+          frequency_id: getNullableNumber(planRecord, ['frequency_id', 'frequencyId']),
+          interval_months: getNullableNumber(planRecord, ['interval_months', 'intervalMonths']),
+          tolerance_before_days: getNumber(planRecord, ['tolerance_before_days', 'toleranceBeforeDays']),
+          tolerance_after_days: getNumber(planRecord, ['tolerance_after_days', 'toleranceAfterDays']),
+        }
+      : null,
+    asset: assetRecord
+      ? {
+          id: getNumber(assetRecord, ['id']),
+          asset_code: getString(assetRecord, ['asset_code', 'assetCode']),
+          name: getString(assetRecord, ['name']),
+          operational_status_name: getString(assetRecord, ['operational_status_name', 'operationalStatusName']) || null,
+        }
+      : null,
+  };
+};
+
+export const normalizeCalibrationPlan = (input: unknown): HelpdeskCalibrationPlan | null => {
+  const source = asRecord(input);
+  if (!source) {
+    return null;
+  }
+
+  const id = getNumber(source, ['id']);
+  const planCode = getString(source, ['plan_code', 'planCode']);
+  const assetId = getNumber(source, ['asset_id', 'assetId']);
+  const title = getString(source, ['title']);
+  if (!id || !planCode || !assetId || !title) {
+    return null;
+  }
+
+  const assetRecord = asRecord(source.asset);
+  const docRecord = asRecord(source.quality_document ?? source.qualityDocument);
+
+  return {
+    id,
+    plan_code: planCode,
+    asset_id: assetId,
+    frequency_id: getNullableNumber(source, ['frequency_id', 'frequencyId']),
+    schedule_mode: normalizeScheduleMode(source.schedule_mode ?? source.scheduleMode),
+    responsible_employee_id: getNullableNumber(source, ['responsible_employee_id', 'responsibleEmployeeId']),
+    quality_document_id: getString(source, ['quality_document_id', 'qualityDocumentId']) || null,
+    title,
+    description: getString(source, ['description']) || null,
+    provider_name: getString(source, ['provider_name', 'providerName']) || null,
+    standard_ref: getString(source, ['standard_ref', 'standardRef']) || null,
+    starts_on: getString(source, ['starts_on', 'startsOn']),
+    next_due_on: getString(source, ['next_due_on', 'nextDueOn']),
+    tolerance_before_days: getNumber(source, ['tolerance_before_days', 'toleranceBeforeDays']),
+    tolerance_after_days: getNumber(source, ['tolerance_after_days', 'toleranceAfterDays']),
+    certificate_required: getBoolean(source, ['certificate_required', 'certificateRequired'], true),
+    evidence_required: getBoolean(source, ['evidence_required', 'evidenceRequired'], true),
+    is_active: getBoolean(source, ['is_active', 'isActive'], true),
+    created_at: getString(source, ['created_at', 'createdAt']),
+    updated_at: getString(source, ['updated_at', 'updatedAt']),
+    asset: assetRecord
+      ? {
+          id: getNumber(assetRecord, ['id']),
+          asset_code: getString(assetRecord, ['asset_code', 'assetCode']),
+          name: getString(assetRecord, ['name']),
+          operational_status_name: getString(assetRecord, ['operational_status_name', 'operationalStatusName']) || null,
+        }
+      : null,
+    frequency: normalizeMaintenanceFrequency(source.frequency),
+    responsible_employee: normalizeHelpdeskAssetEmployee(source.responsible_employee ?? source.responsibleEmployee),
+    quality_document: docRecord
+      ? {
+          id: getString(docRecord, ['id']),
+          title: getString(docRecord, ['title']),
+          filename: getString(docRecord, ['filename']) || null,
+        }
+      : null,
+    orders: getArrayFromPayload(source.orders ?? [], ['orders'])
+      .map(normalizeCalibrationOrder)
+      .filter((order): order is HelpdeskCalibrationOrder => order !== null),
   };
 };
 

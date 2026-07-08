@@ -2,6 +2,7 @@ import pool from '../config/db';
 import { toIsoDate, toIsoDateTime } from '../utils/date-serialization';
 import { withTransaction, type Queryable } from '../utils/transaction';
 import type { HelpdeskCatalogItem } from './helpdesk-asset.service';
+import { createLifecycleEvent } from './helpdesk-lifecycle.service';
 import {
   PaginatedResult,
   PaginationInput,
@@ -11,30 +12,30 @@ import {
   resolvePagination,
 } from '../utils/pagination';
 
-export type MaintenanceScheduleMode = 'FREQUENCY' | 'CALENDAR';
+export type CalibrationScheduleMode = 'FREQUENCY' | 'CALENDAR';
 
-export interface HelpdeskMaintenancePlanPayload {
+export interface HelpdeskCalibrationPlanPayload {
   asset_id: number;
   frequency_id?: number | null;
-  schedule_mode?: MaintenanceScheduleMode;
+  schedule_mode?: CalibrationScheduleMode;
   responsible_employee_id?: number | null;
   quality_document_id?: string | null;
   title: string;
   description?: string | null;
   provider_name?: string | null;
+  standard_ref?: string | null;
   starts_on: string;
   next_due_on: string;
   tolerance_before_days?: number;
   tolerance_after_days?: number;
-  checklist_required?: boolean;
+  certificate_required?: boolean;
   evidence_required?: boolean;
-  tasks?: string[];
 }
 
-export interface HelpdeskMaintenancePlanRecord extends Omit<HelpdeskMaintenancePlanPayload, 'tasks'> {
+export interface HelpdeskCalibrationPlanRecord extends Omit<HelpdeskCalibrationPlanPayload, never> {
   id: number;
   plan_code: string;
-  schedule_mode: MaintenanceScheduleMode;
+  schedule_mode: CalibrationScheduleMode;
   is_active: boolean;
   created_at?: string | undefined;
   updated_at?: string | undefined;
@@ -56,12 +57,6 @@ export interface HelpdeskMaintenancePlanRecord extends Omit<HelpdeskMaintenanceP
     title: string;
     filename: string | null;
   } | null;
-  tasks: Array<{
-    id: number;
-    task_text: string;
-    is_required: boolean;
-    sort_order: number;
-  }>;
   orders: Array<{
     id: number;
     order_code: string;
@@ -72,36 +67,31 @@ export interface HelpdeskMaintenancePlanRecord extends Omit<HelpdeskMaintenanceP
     started_at?: string | null;
     completed_at?: string | null;
     result?: string | null;
+    certificate_no?: string | null;
+    calibration_due_on?: string | null;
   }>;
 }
 
-export interface HelpdeskMaintenanceCatalogs {
+export interface HelpdeskCalibrationCatalogs {
   frequencies: Array<HelpdeskCatalogItem & { interval_months: number }>;
 }
 
-export interface HelpdeskMaintenanceOrderChecklistPayload {
-  plan_task_id?: number | null;
-  task_text: string;
-  result: string;
-  notes?: string | null;
-}
-
-export interface HelpdeskMaintenanceOrderClosePayload {
+export interface HelpdeskCalibrationOrderClosePayload {
   completed_at: string;
-  performed_activities: string;
   result: string;
+  certificate_no?: string | null;
+  calibration_due_on?: string | null;
   findings?: string | null;
   provider_name?: string | null;
   evidence_notes?: string | null;
-  checklist?: HelpdeskMaintenanceOrderChecklistPayload[];
 }
 
-export interface HelpdeskMaintenanceOrderReschedulePayload {
+export interface HelpdeskCalibrationOrderReschedulePayload {
   scheduled_for: string;
   reschedule_reason: string;
 }
 
-export interface HelpdeskMaintenanceOrderRecord {
+export interface HelpdeskCalibrationOrderRecord {
   id: number;
   order_code: string;
   plan_id: number;
@@ -113,11 +103,13 @@ export interface HelpdeskMaintenanceOrderRecord {
   started_at: string | null;
   completed_at: string | null;
   completed_by_user_id: string | null;
-  performed_activities: string | null;
-  findings: string | null;
   provider_name: string | null;
   result: string | null;
+  certificate_no: string | null;
+  calibration_due_on: string | null;
+  findings: string | null;
   evidence_notes: string | null;
+  lifecycle_event_id: number | null;
   rescheduled_from: string | null;
   rescheduled_at: string | null;
   reschedule_reason: string | null;
@@ -127,7 +119,7 @@ export interface HelpdeskMaintenanceOrderRecord {
     id: number;
     plan_code: string;
     title: string;
-    schedule_mode: MaintenanceScheduleMode;
+    schedule_mode: CalibrationScheduleMode;
     frequency_id: number | null;
     interval_months: number | null;
     tolerance_before_days: number;
@@ -138,26 +130,18 @@ export interface HelpdeskMaintenanceOrderRecord {
     asset_code: string;
     name: string;
   } | null;
-  checklist: Array<{
-    id: number;
-    plan_task_id: number | null;
-    task_text: string;
-    result: string;
-    notes: string | null;
-    sort_order: number;
-  }>;
 }
 
-const maintenanceTableExists = async (): Promise<boolean> => {
-  const result = await pool.query(`SELECT to_regclass('public.helpdesk_maintenance_plans') IS NOT NULL AS exists;`);
+const calibrationTableExists = async (): Promise<boolean> => {
+  const result = await pool.query(`SELECT to_regclass('public.helpdesk_calibration_plans') IS NOT NULL AS exists;`);
   return Boolean(result.rows[0]?.exists);
 };
 
-const assertMaintenanceTables = async () => {
-  const exists = await maintenanceTableExists();
+const assertCalibrationTables = async () => {
+  const exists = await calibrationTableExists();
   if (!exists) {
-    const error = new Error('HELPDESK_MAINTENANCE_TABLES_NOT_AVAILABLE');
-    (error as any).code = 'HELPDESK_MAINTENANCE_TABLES_NOT_AVAILABLE';
+    const error = new Error('HELPDESK_CALIBRATION_TABLES_NOT_AVAILABLE');
+    (error as any).code = 'HELPDESK_CALIBRATION_TABLES_NOT_AVAILABLE';
     throw error;
   }
 };
@@ -166,24 +150,21 @@ const normalizeOptionalText = (value: unknown): string | null => {
   if (typeof value !== 'string') {
     return null;
   }
-
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : null;
 };
 
-const normalizeScheduleMode = (value: unknown): MaintenanceScheduleMode =>
+const normalizeScheduleMode = (value: unknown): CalibrationScheduleMode =>
   value === 'CALENDAR' ? 'CALENDAR' : 'FREQUENCY';
 
 const generatePlanCode = async (): Promise<string> => {
-  // nextval es atomico: no colisiona aunque dos solicitudes lleguen a la vez.
-  const result = await pool.query(`SELECT nextval('public.helpdesk_maintenance_plan_code_seq') AS next_id;`);
-  return `MP-${String(Number(result.rows[0]?.next_id ?? 0)).padStart(6, '0')}`;
+  const result = await pool.query(`SELECT nextval('public.helpdesk_calibration_plan_code_seq') AS next_id;`);
+  return `CP-${String(Number(result.rows[0]?.next_id ?? 0)).padStart(6, '0')}`;
 };
 
 const generateOrderCode = async (): Promise<string> => {
-  // nextval es atomico: no colisiona aunque dos solicitudes lleguen a la vez.
-  const result = await pool.query(`SELECT nextval('public.helpdesk_maintenance_order_code_seq') AS next_id;`);
-  return `OM-${String(Number(result.rows[0]?.next_id ?? 0)).padStart(6, '0')}`;
+  const result = await pool.query(`SELECT nextval('public.helpdesk_calibration_order_code_seq') AS next_id;`);
+  return `OC-${String(Number(result.rows[0]?.next_id ?? 0)).padStart(6, '0')}`;
 };
 
 const addDays = (dateValue: string, days: number): string => {
@@ -197,7 +178,6 @@ const addMonths = (dateValue: string, months: number): string => {
   date.setMonth(date.getMonth() + months);
   return date.toISOString().slice(0, 10);
 };
-
 
 const buildPlanQuery = () => `
   SELECT
@@ -214,38 +194,19 @@ const buildPlanQuery = () => `
     e.position AS responsible_employee_position,
     d.title AS quality_document_title,
     d.file_path AS quality_document_filename
-  FROM public.helpdesk_maintenance_plans p
+  FROM public.helpdesk_calibration_plans p
   LEFT JOIN public.helpdesk_assets a ON a.id = p.asset_id
   LEFT JOIN public.helpdesk_maintenance_frequencies f ON f.id = p.frequency_id
   LEFT JOIN public.employees e ON e.id = p.responsible_employee_id
   LEFT JOIN public.documents d ON d.id = p.quality_document_id
 `;
 
-const listPlanTasks = async (planId: number): Promise<HelpdeskMaintenancePlanRecord['tasks']> => {
-  const result = await pool.query(
-    `
-      SELECT id, task_text, is_required, sort_order
-      FROM public.helpdesk_maintenance_plan_tasks
-      WHERE plan_id = $1
-      ORDER BY sort_order ASC, id ASC;
-    `,
-    [planId],
-  );
-
-  return result.rows.map((row) => ({
-    id: Number(row.id),
-    task_text: String(row.task_text),
-    is_required: Boolean(row.is_required),
-    sort_order: Number(row.sort_order ?? 0),
-  }));
-};
-
-const listPlanOrders = async (planId: number): Promise<HelpdeskMaintenancePlanRecord['orders']> => {
+const listPlanOrders = async (planId: number): Promise<HelpdeskCalibrationPlanRecord['orders']> => {
   const result = await pool.query(
     `
       SELECT id, order_code, scheduled_for, window_starts_on, window_ends_on, status
-           , started_at, completed_at, result
-      FROM public.helpdesk_maintenance_orders
+           , started_at, completed_at, result, certificate_no, calibration_due_on
+      FROM public.helpdesk_calibration_orders
       WHERE plan_id = $1
       ORDER BY scheduled_for ASC, id ASC;
     `,
@@ -262,6 +223,8 @@ const listPlanOrders = async (planId: number): Promise<HelpdeskMaintenancePlanRe
     started_at: row.started_at ? toIsoDateTime(row.started_at) : null,
     completed_at: row.completed_at ? toIsoDateTime(row.completed_at) : null,
     result: row.result ? String(row.result) : null,
+    certificate_no: row.certificate_no ? String(row.certificate_no) : null,
+    calibration_due_on: row.calibration_due_on ? toIsoDate(row.calibration_due_on) : null,
   }));
 };
 
@@ -277,60 +240,15 @@ const buildOrderQuery = () => `
     f.interval_months,
     a.asset_code,
     a.name AS asset_name
-  FROM public.helpdesk_maintenance_orders o
-  INNER JOIN public.helpdesk_maintenance_plans p ON p.id = o.plan_id
+  FROM public.helpdesk_calibration_orders o
+  INNER JOIN public.helpdesk_calibration_plans p ON p.id = o.plan_id
   INNER JOIN public.helpdesk_assets a ON a.id = o.asset_id
   LEFT JOIN public.helpdesk_maintenance_frequencies f ON f.id = p.frequency_id
 `;
 
-const listOrderChecklist = async (orderId: number): Promise<HelpdeskMaintenanceOrderRecord['checklist']> => {
-  const savedResult = await pool.query(
-    `
-      SELECT id, plan_task_id, task_text, result, notes, sort_order
-      FROM public.helpdesk_maintenance_order_checklist
-      WHERE order_id = $1
-      ORDER BY sort_order ASC, id ASC;
-    `,
-    [orderId],
-  );
-
-  if (savedResult.rows.length > 0) {
-    return savedResult.rows.map((row) => ({
-      id: Number(row.id),
-      plan_task_id: row.plan_task_id ? Number(row.plan_task_id) : null,
-      task_text: String(row.task_text),
-      result: String(row.result),
-      notes: row.notes ? String(row.notes) : null,
-      sort_order: Number(row.sort_order ?? 0),
-    }));
-  }
-
-  const taskResult = await pool.query(
-    `
-      SELECT t.id AS plan_task_id, t.task_text, t.sort_order
-      FROM public.helpdesk_maintenance_plan_tasks t
-      INNER JOIN public.helpdesk_maintenance_orders o ON o.plan_id = t.plan_id
-      WHERE o.id = $1
-      ORDER BY t.sort_order ASC, t.id ASC;
-    `,
-    [orderId],
-  );
-
-  return taskResult.rows.map((row, index) => ({
-    id: 0 - (index + 1),
-    plan_task_id: Number(row.plan_task_id),
-    task_text: String(row.task_text),
-    result: 'PENDING',
-    notes: null,
-    sort_order: Number(row.sort_order ?? 0),
-  }));
-};
-
-const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> => {
-  const orderId = Number(row.id);
-
-  const order: HelpdeskMaintenanceOrderRecord = {
-    id: orderId,
+const mapOrderRow = (row: any): HelpdeskCalibrationOrderRecord => {
+  const order: HelpdeskCalibrationOrderRecord = {
+    id: Number(row.id),
     order_code: String(row.order_code),
     plan_id: Number(row.plan_id),
     asset_id: Number(row.asset_id),
@@ -341,11 +259,13 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
     started_at: row.started_at ? toIsoDateTime(row.started_at) : null,
     completed_at: row.completed_at ? toIsoDateTime(row.completed_at) : null,
     completed_by_user_id: row.completed_by_user_id ? String(row.completed_by_user_id) : null,
-    performed_activities: row.performed_activities ? String(row.performed_activities) : null,
-    findings: row.findings ? String(row.findings) : null,
     provider_name: row.provider_name ? String(row.provider_name) : null,
     result: row.result ? String(row.result) : null,
+    certificate_no: row.certificate_no ? String(row.certificate_no) : null,
+    calibration_due_on: row.calibration_due_on ? toIsoDate(row.calibration_due_on) : null,
+    findings: row.findings ? String(row.findings) : null,
     evidence_notes: row.evidence_notes ? String(row.evidence_notes) : null,
+    lifecycle_event_id: row.lifecycle_event_id ? Number(row.lifecycle_event_id) : null,
     rescheduled_from: row.rescheduled_from ? String(row.rescheduled_from) : null,
     rescheduled_at: row.rescheduled_at ? toIsoDateTime(row.rescheduled_at) : null,
     reschedule_reason: row.reschedule_reason ? String(row.reschedule_reason) : null,
@@ -368,7 +288,6 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
           name: String(row.asset_name ?? ''),
         }
       : null,
-    checklist: await listOrderChecklist(orderId),
   };
 
   if (row.created_at) {
@@ -381,7 +300,7 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
   return order;
 };
 
-const mapPlanRow = async (row: any): Promise<HelpdeskMaintenancePlanRecord> => {
+const mapPlanRow = async (row: any): Promise<HelpdeskCalibrationPlanRecord> => {
   const planId = Number(row.id);
 
   return {
@@ -395,11 +314,12 @@ const mapPlanRow = async (row: any): Promise<HelpdeskMaintenancePlanRecord> => {
     title: String(row.title),
     description: row.description ? String(row.description) : null,
     provider_name: row.provider_name ? String(row.provider_name) : null,
+    standard_ref: row.standard_ref ? String(row.standard_ref) : null,
     starts_on: row.starts_on ? toIsoDate(row.starts_on) : '',
     next_due_on: row.next_due_on ? toIsoDate(row.next_due_on) : '',
     tolerance_before_days: Number(row.tolerance_before_days ?? 0),
     tolerance_after_days: Number(row.tolerance_after_days ?? 0),
-    checklist_required: Boolean(row.checklist_required),
+    certificate_required: Boolean(row.certificate_required),
     evidence_required: Boolean(row.evidence_required),
     is_active: Boolean(row.is_active),
     created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
@@ -437,13 +357,12 @@ const mapPlanRow = async (row: any): Promise<HelpdeskMaintenancePlanRecord> => {
           filename: row.quality_document_filename ? String(row.quality_document_filename) : null,
         }
       : null,
-    tasks: await listPlanTasks(planId),
     orders: await listPlanOrders(planId),
   };
 };
 
-export const listMaintenanceCatalogs = async (): Promise<HelpdeskMaintenanceCatalogs> => {
-  await assertMaintenanceTables();
+export const listCalibrationCatalogs = async (): Promise<HelpdeskCalibrationCatalogs> => {
+  await assertCalibrationTables();
 
   const result = await pool.query(`
     SELECT id, code, name, description, interval_months, is_active, sort_order
@@ -465,8 +384,8 @@ export const listMaintenanceCatalogs = async (): Promise<HelpdeskMaintenanceCata
   };
 };
 
-export const listMaintenancePlans = async (): Promise<HelpdeskMaintenancePlanRecord[]> => {
-  await assertMaintenanceTables();
+export const listCalibrationPlans = async (): Promise<HelpdeskCalibrationPlanRecord[]> => {
+  await assertCalibrationTables();
 
   const result = await pool.query(`
     ${buildPlanQuery()}
@@ -477,22 +396,16 @@ export const listMaintenancePlans = async (): Promise<HelpdeskMaintenancePlanRec
   return Promise.all(result.rows.map(mapPlanRow));
 };
 
-const ORDER_SEARCH_COLUMNS = [
-  'a.asset_code',
-  'a.name',
-  'p.plan_code',
-  'p.title',
-  'o.status',
-];
+const ORDER_SEARCH_COLUMNS = ['a.asset_code', 'a.name', 'p.plan_code', 'p.title', 'o.status', 'o.certificate_no'];
 
-export interface MaintenanceOrderListOptions extends PaginationInput {
+export interface CalibrationOrderListOptions extends PaginationInput {
   search?: string | undefined;
 }
 
-export const listMaintenanceOrders = async (
-  options: MaintenanceOrderListOptions = {},
-): Promise<PaginatedResult<HelpdeskMaintenanceOrderRecord>> => {
-  await assertMaintenanceTables();
+export const listCalibrationOrders = async (
+  options: CalibrationOrderListOptions = {},
+): Promise<PaginatedResult<HelpdeskCalibrationOrderRecord>> => {
+  await assertCalibrationTables();
 
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
@@ -512,16 +425,11 @@ export const listMaintenanceOrders = async (
       o.scheduled_for ASC,
       o.updated_at DESC
   `;
-  const limitSql = paginate
-    ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}`
-    : '';
+  const limitSql = paginate ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}` : '';
   const dataValues = paginate ? [...search.values, limit, offset] : search.values;
 
-  const dataResult = await pool.query(
-    `${base} ${whereClause} ${orderBy} ${limitSql};`,
-    dataValues,
-  );
-  const data = await Promise.all(dataResult.rows.map(mapOrderRow));
+  const dataResult = await pool.query(`${base} ${whereClause} ${orderBy} ${limitSql};`, dataValues);
+  const data = dataResult.rows.map(mapOrderRow);
 
   if (!paginate) {
     return buildPaginatedResult(data, data.length, 1, data.length || 1);
@@ -534,41 +442,23 @@ export const listMaintenanceOrders = async (
   return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };
 
-export const getMaintenanceOrderById = async (orderId: number): Promise<HelpdeskMaintenanceOrderRecord | null> => {
-  await assertMaintenanceTables();
+export const getCalibrationOrderById = async (orderId: number): Promise<HelpdeskCalibrationOrderRecord | null> => {
+  await assertCalibrationTables();
 
-  const result = await pool.query(
-    `
-      ${buildOrderQuery()}
-      WHERE o.id = $1
-      LIMIT 1;
-    `,
-    [orderId],
-  );
-
+  const result = await pool.query(`${buildOrderQuery()} WHERE o.id = $1 LIMIT 1;`, [orderId]);
   if (result.rows.length === 0) {
     return null;
   }
-
   return mapOrderRow(result.rows[0]);
 };
 
-export const getMaintenancePlanById = async (planId: number): Promise<HelpdeskMaintenancePlanRecord | null> => {
-  await assertMaintenanceTables();
+export const getCalibrationPlanById = async (planId: number): Promise<HelpdeskCalibrationPlanRecord | null> => {
+  await assertCalibrationTables();
 
-  const result = await pool.query(
-    `
-      ${buildPlanQuery()}
-      WHERE p.id = $1
-      LIMIT 1;
-    `,
-    [planId],
-  );
-
+  const result = await pool.query(`${buildPlanQuery()} WHERE p.id = $1 LIMIT 1;`, [planId]);
   if (result.rows.length === 0) {
     return null;
   }
-
   return mapPlanRow(result.rows[0]);
 };
 
@@ -585,14 +475,8 @@ const createScheduledOrder = async (
 
   await executor.query(
     `
-      INSERT INTO public.helpdesk_maintenance_orders (
-        order_code,
-        plan_id,
-        asset_id,
-        scheduled_for,
-        window_starts_on,
-        window_ends_on,
-        created_by_user_id
+      INSERT INTO public.helpdesk_calibration_orders (
+        order_code, plan_id, asset_id, scheduled_for, window_starts_on, window_ends_on, created_by_user_id
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       ON CONFLICT (plan_id, scheduled_for) DO NOTHING;
@@ -609,38 +493,28 @@ const createScheduledOrder = async (
   );
 };
 
-export const createMaintenancePlan = async (
-  payload: HelpdeskMaintenancePlanPayload,
+export const createCalibrationPlan = async (
+  payload: HelpdeskCalibrationPlanPayload,
   userId?: string | null,
-): Promise<HelpdeskMaintenancePlanRecord> => {
-  await assertMaintenanceTables();
+): Promise<HelpdeskCalibrationPlanRecord> => {
+  await assertCalibrationTables();
 
   const planCode = await generatePlanCode();
+  const beforeDays = Math.max(Number(payload.tolerance_before_days ?? 0), 0);
+  const afterDays = Math.max(Number(payload.tolerance_after_days ?? 0), 0);
+
   const planId = await withTransaction(async (client) => {
     const result = await client.query(
       `
-        INSERT INTO public.helpdesk_maintenance_plans (
-          plan_code,
-          asset_id,
-          frequency_id,
-          schedule_mode,
-          responsible_employee_id,
-          provider_name,
-          quality_document_id,
-          title,
-          description,
-          starts_on,
-          next_due_on,
-          tolerance_before_days,
-          tolerance_after_days,
-          checklist_required,
-          evidence_required,
-          created_by_user_id,
-          updated_by_user_id
+        INSERT INTO public.helpdesk_calibration_plans (
+          plan_code, asset_id, frequency_id, schedule_mode, responsible_employee_id,
+          provider_name, standard_ref, quality_document_id, title, description,
+          starts_on, next_due_on, tolerance_before_days, tolerance_after_days,
+          certificate_required, evidence_required, created_by_user_id, updated_by_user_id
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8,
-          $9, $10, $11, $12, $13, $14, $15, $16, $16
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+          $11, $12, $13, $14, $15, $16, $17, $17
         )
         RETURNING id;
       `,
@@ -651,89 +525,60 @@ export const createMaintenancePlan = async (
         normalizeScheduleMode(payload.schedule_mode),
         payload.responsible_employee_id ?? null,
         normalizeOptionalText(payload.provider_name),
+        normalizeOptionalText(payload.standard_ref),
         payload.quality_document_id ?? null,
         payload.title.trim(),
         normalizeOptionalText(payload.description),
         payload.starts_on,
         payload.next_due_on,
-        Math.max(Number(payload.tolerance_before_days ?? 0), 0),
-        Math.max(Number(payload.tolerance_after_days ?? 0), 0),
-        payload.checklist_required ?? true,
+        beforeDays,
+        afterDays,
+        payload.certificate_required ?? true,
         payload.evidence_required ?? true,
         userId ?? null,
       ],
     );
 
     const id = Number(result.rows[0]?.id);
-    const tasks = (payload.tasks ?? []).map((task) => task.trim()).filter(Boolean);
-
-    for (const [index, task] of tasks.entries()) {
-      await client.query(
-        `
-          INSERT INTO public.helpdesk_maintenance_plan_tasks (plan_id, task_text, sort_order)
-          VALUES ($1, $2, $3);
-        `,
-        [id, task, (index + 1) * 10],
-      );
-    }
-
-    await createScheduledOrder(
-      id,
-      payload.asset_id,
-      payload.next_due_on,
-      Math.max(Number(payload.tolerance_before_days ?? 0), 0),
-      Math.max(Number(payload.tolerance_after_days ?? 0), 0),
-      userId,
-      client,
-    );
-
+    await createScheduledOrder(id, payload.asset_id, payload.next_due_on, beforeDays, afterDays, userId, client);
     return id;
   });
 
-  const created = await getMaintenancePlanById(planId);
+  const created = await getCalibrationPlanById(planId);
   if (!created) {
-    const error = new Error('HELPDESK_MAINTENANCE_PLAN_CREATION_FAILED');
-    (error as any).code = 'HELPDESK_MAINTENANCE_PLAN_CREATION_FAILED';
+    const error = new Error('HELPDESK_CALIBRATION_PLAN_CREATION_FAILED');
+    (error as any).code = 'HELPDESK_CALIBRATION_PLAN_CREATION_FAILED';
     throw error;
   }
 
   return created;
 };
 
-export const updateMaintenancePlan = async (
+export const updateCalibrationPlan = async (
   planId: number,
-  payload: HelpdeskMaintenancePlanPayload,
+  payload: HelpdeskCalibrationPlanPayload,
   userId?: string | null,
-): Promise<HelpdeskMaintenancePlanRecord | null> => {
-  await assertMaintenanceTables();
+): Promise<HelpdeskCalibrationPlanRecord | null> => {
+  await assertCalibrationTables();
 
-  const current = await getMaintenancePlanById(planId);
+  const current = await getCalibrationPlanById(planId);
   if (!current) {
     return null;
   }
 
+  const beforeDays = Math.max(Number(payload.tolerance_before_days ?? 0), 0);
+  const afterDays = Math.max(Number(payload.tolerance_after_days ?? 0), 0);
+
   await withTransaction(async (client) => {
     await client.query(
       `
-        UPDATE public.helpdesk_maintenance_plans
+        UPDATE public.helpdesk_calibration_plans
         SET
-          asset_id = $1,
-          frequency_id = $2,
-          schedule_mode = $3,
-          responsible_employee_id = $4,
-          provider_name = $5,
-          quality_document_id = $6,
-          title = $7,
-          description = $8,
-          starts_on = $9,
-          next_due_on = $10,
-          tolerance_before_days = $11,
-          tolerance_after_days = $12,
-          checklist_required = $13,
-          evidence_required = $14,
-          updated_by_user_id = $15,
-          updated_at = NOW()
-        WHERE id = $16;
+          asset_id = $1, frequency_id = $2, schedule_mode = $3, responsible_employee_id = $4,
+          provider_name = $5, standard_ref = $6, quality_document_id = $7, title = $8, description = $9,
+          starts_on = $10, next_due_on = $11, tolerance_before_days = $12, tolerance_after_days = $13,
+          certificate_required = $14, evidence_required = $15, updated_by_user_id = $16, updated_at = NOW()
+        WHERE id = $17;
       `,
       [
         payload.asset_id,
@@ -741,55 +586,35 @@ export const updateMaintenancePlan = async (
         normalizeScheduleMode(payload.schedule_mode),
         payload.responsible_employee_id ?? null,
         normalizeOptionalText(payload.provider_name),
+        normalizeOptionalText(payload.standard_ref),
         payload.quality_document_id ?? null,
         payload.title.trim(),
         normalizeOptionalText(payload.description),
         payload.starts_on,
         payload.next_due_on,
-        Math.max(Number(payload.tolerance_before_days ?? 0), 0),
-        Math.max(Number(payload.tolerance_after_days ?? 0), 0),
-        payload.checklist_required ?? true,
+        beforeDays,
+        afterDays,
+        payload.certificate_required ?? true,
         payload.evidence_required ?? true,
         userId ?? null,
         planId,
       ],
     );
 
-    await client.query('DELETE FROM public.helpdesk_maintenance_plan_tasks WHERE plan_id = $1;', [planId]);
-    const tasks = (payload.tasks ?? []).map((task) => task.trim()).filter(Boolean);
-    for (const [index, task] of tasks.entries()) {
-      await client.query(
-        `
-          INSERT INTO public.helpdesk_maintenance_plan_tasks (plan_id, task_text, sort_order)
-          VALUES ($1, $2, $3);
-        `,
-        [planId, task, (index + 1) * 10],
-      );
-    }
-
-    await createScheduledOrder(
-      planId,
-      payload.asset_id,
-      payload.next_due_on,
-      Math.max(Number(payload.tolerance_before_days ?? 0), 0),
-      Math.max(Number(payload.tolerance_after_days ?? 0), 0),
-      userId,
-      client,
-    );
+    await createScheduledOrder(planId, payload.asset_id, payload.next_due_on, beforeDays, afterDays, userId, client);
   });
 
-  return getMaintenancePlanById(planId);
+  return getCalibrationPlanById(planId);
 };
 
-// Resincroniza next_due_on del plan con la orden SCHEDULED mas proxima. Se usa
-// tras cargar un cronograma (modo CALENDAR) para que el plan refleje la
-// siguiente fecha pendiente en listados y estados.
+// Resincroniza next_due_on del plan con la orden SCHEDULED mas proxima (tras
+// cargar un cronograma en modo CALENDAR).
 const resyncNextDueOn = async (planId: number, userId: string | null | undefined, executor: Queryable) => {
   await executor.query(
     `
-      UPDATE public.helpdesk_maintenance_plans p
+      UPDATE public.helpdesk_calibration_plans p
       SET next_due_on = COALESCE(
-            (SELECT MIN(o.scheduled_for) FROM public.helpdesk_maintenance_orders o
+            (SELECT MIN(o.scheduled_for) FROM public.helpdesk_calibration_orders o
               WHERE o.plan_id = p.id AND o.status IN ('SCHEDULED', 'RESCHEDULED')),
             p.next_due_on),
           updated_by_user_id = $2,
@@ -801,15 +626,15 @@ const resyncNextDueOn = async (planId: number, userId: string | null | undefined
 };
 
 // Carga masiva de fechas provistas por el proveedor/responsable (modo CALENDAR):
-// crea una orden SCHEDULED por fecha, ignorando las ya existentes (idempotente).
-export const addMaintenanceScheduleDates = async (
+// una orden SCHEDULED por fecha, ignorando duplicados (idempotente).
+export const addCalibrationScheduleDates = async (
   planId: number,
   dates: string[],
   userId?: string | null,
-): Promise<HelpdeskMaintenancePlanRecord | null> => {
-  await assertMaintenanceTables();
+): Promise<HelpdeskCalibrationPlanRecord | null> => {
+  await assertCalibrationTables();
 
-  const plan = await getMaintenancePlanById(planId);
+  const plan = await getCalibrationPlanById(planId);
   if (!plan) {
     return null;
   }
@@ -831,27 +656,27 @@ export const addMaintenanceScheduleDates = async (
     await resyncNextDueOn(planId, userId, client);
   });
 
-  return getMaintenancePlanById(planId);
+  return getCalibrationPlanById(planId);
 };
 
 /**
- * Construye un error de "estado previo invalido" para transiciones de orden.
+ * Error de "estado previo invalido" para transiciones de orden.
  * El controller lo mapea a HTTP 409 usando `publicMessage`.
  */
 const invalidOrderState = (message: string): Error => {
-  const error = new Error('HELPDESK_MAINTENANCE_ORDER_INVALID_STATE');
-  (error as any).code = 'HELPDESK_MAINTENANCE_ORDER_INVALID_STATE';
+  const error = new Error('HELPDESK_CALIBRATION_ORDER_INVALID_STATE');
+  (error as any).code = 'HELPDESK_CALIBRATION_ORDER_INVALID_STATE';
   (error as any).publicMessage = message;
   return error;
 };
 
-export const startMaintenanceOrder = async (
+export const startCalibrationOrder = async (
   orderId: number,
   userId?: string | null,
-): Promise<HelpdeskMaintenanceOrderRecord | null> => {
-  await assertMaintenanceTables();
+): Promise<HelpdeskCalibrationOrderRecord | null> => {
+  await assertCalibrationTables();
 
-  const current = await getMaintenanceOrderById(orderId);
+  const current = await getCalibrationOrderById(orderId);
   if (!current) {
     return null;
   }
@@ -862,29 +687,25 @@ export const startMaintenanceOrder = async (
 
   await pool.query(
     `
-      UPDATE public.helpdesk_maintenance_orders
-      SET
-        status = 'IN_PROGRESS',
-        started_at = COALESCE(started_at, NOW()),
-        updated_by_user_id = $2,
-        updated_at = NOW()
-      WHERE id = $1
-        AND status IN ('SCHEDULED', 'RESCHEDULED');
+      UPDATE public.helpdesk_calibration_orders
+      SET status = 'IN_PROGRESS', started_at = COALESCE(started_at, NOW()),
+          updated_by_user_id = $2, updated_at = NOW()
+      WHERE id = $1 AND status IN ('SCHEDULED', 'RESCHEDULED');
     `,
     [orderId, userId ?? null],
   );
 
-  return getMaintenanceOrderById(orderId);
+  return getCalibrationOrderById(orderId);
 };
 
-export const rescheduleMaintenanceOrder = async (
+export const rescheduleCalibrationOrder = async (
   orderId: number,
-  payload: HelpdeskMaintenanceOrderReschedulePayload,
+  payload: HelpdeskCalibrationOrderReschedulePayload,
   userId?: string | null,
-): Promise<HelpdeskMaintenanceOrderRecord | null> => {
-  await assertMaintenanceTables();
+): Promise<HelpdeskCalibrationOrderRecord | null> => {
+  await assertCalibrationTables();
 
-  const current = await getMaintenanceOrderById(orderId);
+  const current = await getCalibrationOrderById(orderId);
   if (!current) {
     return null;
   }
@@ -899,20 +720,11 @@ export const rescheduleMaintenanceOrder = async (
   await withTransaction(async (client) => {
     await client.query(
       `
-        UPDATE public.helpdesk_maintenance_orders
-        SET
-          status = 'RESCHEDULED',
-          rescheduled_from = scheduled_for,
-          scheduled_for = $2,
-          window_starts_on = $3,
-          window_ends_on = $4,
-          rescheduled_at = NOW(),
-          reschedule_reason = $5,
-          reminder_sent_at = NULL,
-          updated_by_user_id = $6,
-          updated_at = NOW()
-        WHERE id = $1
-          AND status IN ('SCHEDULED', 'RESCHEDULED');
+        UPDATE public.helpdesk_calibration_orders
+        SET status = 'RESCHEDULED', rescheduled_from = scheduled_for, scheduled_for = $2,
+            window_starts_on = $3, window_ends_on = $4, rescheduled_at = NOW(),
+            reschedule_reason = $5, reminder_sent_at = NULL, updated_by_user_id = $6, updated_at = NOW()
+        WHERE id = $1 AND status IN ('SCHEDULED', 'RESCHEDULED');
       `,
       [
         orderId,
@@ -926,7 +738,7 @@ export const rescheduleMaintenanceOrder = async (
 
     await client.query(
       `
-        UPDATE public.helpdesk_maintenance_plans
+        UPDATE public.helpdesk_calibration_plans
         SET next_due_on = $2, updated_by_user_id = $3, updated_at = NOW()
         WHERE id = $1;
       `,
@@ -934,98 +746,95 @@ export const rescheduleMaintenanceOrder = async (
     );
   });
 
-  return getMaintenanceOrderById(orderId);
+  return getCalibrationOrderById(orderId);
 };
 
-export const closeMaintenanceOrder = async (
-  orderId: number,
-  payload: HelpdeskMaintenanceOrderClosePayload,
+// Registra en el expediente del activo un evento CALIBRATION con el certificado y
+// la proxima fecha. Best-effort: si algo falla no invalida el cierre ya persistido.
+const archiveCalibrationEvent = async (
+  order: HelpdeskCalibrationOrderRecord,
+  payload: HelpdeskCalibrationOrderClosePayload,
   userId?: string | null,
-): Promise<HelpdeskMaintenanceOrderRecord | null> => {
-  await assertMaintenanceTables();
+): Promise<number | null> => {
+  const typeResult = await pool.query(
+    `SELECT id FROM public.helpdesk_lifecycle_event_types WHERE UPPER(code) = 'CALIBRATION' LIMIT 1;`,
+  );
+  const eventTypeId = typeResult.rows[0]?.id ? Number(typeResult.rows[0].id) : null;
+  if (!eventTypeId) {
+    return null;
+  }
 
-  const current = await getMaintenanceOrderById(orderId);
+  const event = await createLifecycleEvent(
+    order.asset_id,
+    {
+      event_type_id: eventTypeId,
+      event_date: payload.completed_at.slice(0, 10),
+      title: `Calibracion — ${order.order_code}`,
+      description: `Resultado: ${payload.result.trim()}.`,
+      calibration_certificate_no: normalizeOptionalText(payload.certificate_no),
+      calibration_due_on: normalizeOptionalText(payload.calibration_due_on),
+      performed_by_provider: normalizeOptionalText(payload.provider_name),
+      notes: normalizeOptionalText(payload.findings),
+    },
+    userId,
+  );
+  return event.id;
+};
+
+export const closeCalibrationOrder = async (
+  orderId: number,
+  payload: HelpdeskCalibrationOrderClosePayload,
+  userId?: string | null,
+): Promise<HelpdeskCalibrationOrderRecord | null> => {
+  await assertCalibrationTables();
+
+  const current = await getCalibrationOrderById(orderId);
   if (!current) {
     return null;
   }
 
   if (current.status === 'CLOSED') {
-    throw invalidOrderState('Esta orden de mantenimiento ya esta cerrada.');
+    throw invalidOrderState('Esta orden de calibracion ya esta cerrada.');
   }
+
+  // La proxima fecha la dicta el certificado si el proveedor la indica; en su
+  // defecto se deriva de la frecuencia. Sin ninguna de las dos, no hay recurrencia.
+  // En modo CALENDAR las fechas ya vienen cargadas: el cierre no autogenera la
+  // siguiente (pero si conserva calibration_due_on como dato del certificado).
+  const certificateDue = normalizeOptionalText(payload.calibration_due_on);
+  const intervalMonths = current.plan?.interval_months ?? 0;
+  const isFrequency = current.plan?.schedule_mode === 'FREQUENCY';
+  const nextDueOn = isFrequency
+    ? certificateDue ?? (intervalMonths > 0 ? addMonths(current.scheduled_for, intervalMonths) : null)
+    : null;
 
   await withTransaction(async (client) => {
     await client.query(
       `
-        UPDATE public.helpdesk_maintenance_orders
-        SET
-          status = 'CLOSED',
-          started_at = COALESCE(started_at, NOW()),
-          completed_at = $2,
-          completed_by_user_id = $3,
-          performed_activities = $4,
-          findings = $5,
-          provider_name = $6,
-          result = $7,
-          evidence_notes = $8,
-          updated_by_user_id = $3,
-          updated_at = NOW()
+        UPDATE public.helpdesk_calibration_orders
+        SET status = 'CLOSED', started_at = COALESCE(started_at, NOW()), completed_at = $2,
+            completed_by_user_id = $3, provider_name = $4, result = $5, certificate_no = $6,
+            calibration_due_on = $7, findings = $8, evidence_notes = $9,
+            updated_by_user_id = $3, updated_at = NOW()
         WHERE id = $1;
       `,
       [
         orderId,
         payload.completed_at,
         userId ?? null,
-        payload.performed_activities.trim(),
-        normalizeOptionalText(payload.findings),
         normalizeOptionalText(payload.provider_name),
         payload.result.trim(),
+        normalizeOptionalText(payload.certificate_no),
+        certificateDue,
+        normalizeOptionalText(payload.findings),
         normalizeOptionalText(payload.evidence_notes),
       ],
     );
 
-    await client.query('DELETE FROM public.helpdesk_maintenance_order_checklist WHERE order_id = $1;', [orderId]);
-
-    const checklist = payload.checklist ?? [];
-    for (const [index, item] of checklist.entries()) {
-      const taskText = normalizeOptionalText(item.task_text);
-      if (!taskText) {
-        continue;
-      }
-
+    if (nextDueOn) {
       await client.query(
         `
-          INSERT INTO public.helpdesk_maintenance_order_checklist (
-            order_id,
-            plan_task_id,
-            task_text,
-            result,
-            notes,
-            sort_order
-          )
-          VALUES ($1, $2, $3, $4, $5, $6);
-        `,
-        [
-          orderId,
-          item.plan_task_id ?? null,
-          taskText,
-          normalizeOptionalText(item.result) ?? 'PENDING',
-          normalizeOptionalText(item.notes),
-          (index + 1) * 10,
-        ],
-      );
-    }
-
-    // En modo CALENDAR las fechas las provee el proveedor (ya cargadas); no se
-    // autogenera la siguiente al cerrar. Solo FREQUENCY deriva del intervalo.
-    if (
-      current.plan?.schedule_mode === 'FREQUENCY' &&
-      current.plan?.interval_months &&
-      current.plan.interval_months > 0
-    ) {
-      const nextDueOn = addMonths(current.scheduled_for, current.plan.interval_months);
-      await client.query(
-        `
-          UPDATE public.helpdesk_maintenance_plans
+          UPDATE public.helpdesk_calibration_plans
           SET next_due_on = $2, updated_by_user_id = $3, updated_at = NOW()
           WHERE id = $1;
         `,
@@ -1036,29 +845,43 @@ export const closeMaintenanceOrder = async (
         current.plan_id,
         current.asset_id,
         nextDueOn,
-        current.plan.tolerance_before_days,
-        current.plan.tolerance_after_days,
+        current.plan?.tolerance_before_days ?? 0,
+        current.plan?.tolerance_after_days ?? 0,
         userId,
         client,
       );
-    } else if (current.plan?.schedule_mode === 'CALENDAR') {
-      // Fechas provistas: apuntar next_due_on a la orden pendiente mas proxima.
+    } else {
+      // Modo CALENDAR (o sin recurrencia): apuntar next_due_on a la orden pendiente
+      // mas proxima para que el plan no quede anclado a una fecha ya cerrada.
       await resyncNextDueOn(current.plan_id, userId, client);
     }
   });
 
-  return getMaintenanceOrderById(orderId);
+  // Evento de ciclo de vida en el expediente (best-effort, ya persistido el cierre).
+  try {
+    const eventId = await archiveCalibrationEvent(current, payload, userId);
+    if (eventId) {
+      await pool.query(`UPDATE public.helpdesk_calibration_orders SET lifecycle_event_id = $1 WHERE id = $2;`, [
+        eventId,
+        orderId,
+      ]);
+    }
+  } catch (eventError) {
+    console.error(`No se pudo registrar el evento de calibracion de la orden ${current.order_code}:`, eventError);
+  }
+
+  return getCalibrationOrderById(orderId);
 };
 
-export const getPreventiveDueCount = async (): Promise<number> => {
-  const exists = await maintenanceTableExists();
+export const getCalibrationDueCount = async (): Promise<number> => {
+  const exists = await calibrationTableExists();
   if (!exists) {
     return 0;
   }
 
   const result = await pool.query(`
     SELECT COUNT(*)::int AS due_count
-    FROM public.helpdesk_maintenance_orders
+    FROM public.helpdesk_calibration_orders
     WHERE status = 'SCHEDULED'
       AND scheduled_for <= CURRENT_DATE + INTERVAL '30 days';
   `);

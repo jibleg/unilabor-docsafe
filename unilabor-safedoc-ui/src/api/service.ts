@@ -6,4 +6,5 @@ export * from './service.api-helpdesk';
 export * from './service.api-helpdesk-handover';
 export * from './service.api-helpdesk-movement';
 export * from './service.api-helpdesk-lifecycle';
+export * from './service.api-helpdesk-calibration';
 export * from './service.api-training';

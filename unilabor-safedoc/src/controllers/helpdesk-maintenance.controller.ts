@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import {
+  addMaintenanceScheduleDates,
   closeMaintenanceOrder,
   createMaintenancePlan,
   listMaintenanceCatalogs,
@@ -16,6 +17,7 @@ import {
   getMaintenancePlanPayload,
   getMaintenanceOrderClosePayload,
   getMaintenanceOrderReschedulePayload,
+  getScheduleDatesPayload,
   logHelpdeskAudit,
 } from './helpdesk-controller.shared';
 
@@ -124,6 +126,40 @@ export const updateMaintenancePlanController = async (req: AuthRequest, res: Res
 
     console.error('Error actualizando plan mantenimiento Helpdesk:', error);
     return res.status(500).json({ message: 'No se pudo actualizar el plan de mantenimiento.' });
+  }
+};
+
+export const addMaintenanceScheduleController = async (req: AuthRequest, res: Response) => {
+  const planId = getNumberId(req.params.id);
+  if (!planId) {
+    return res.status(400).json({ message: 'ID de plan invalido.' });
+  }
+
+  const dates = getScheduleDatesPayload(req.body);
+  if (!dates) {
+    return res.status(400).json({ message: 'Agrega al menos una fecha del cronograma.' });
+  }
+
+  try {
+    const plan = await addMaintenanceScheduleDates(planId, dates, req.user?.id ?? null);
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan de mantenimiento no encontrado.' });
+    }
+
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_MAINTENANCE_SCHEDULE_LOAD:${planId}`, req.ip, planId, 'helpdesk_maintenance_plan');
+
+    return res.json({
+      message: 'Cronograma cargado correctamente.',
+      plan,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error cargando cronograma mantenimiento Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo cargar el cronograma de mantenimiento.' });
   }
 };
 

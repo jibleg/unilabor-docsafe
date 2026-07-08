@@ -14,6 +14,11 @@ import type {
   HelpdeskMaintenanceOrderClosePayload,
   HelpdeskMaintenanceOrderReschedulePayload,
 } from '../services/helpdesk-maintenance.service';
+import type {
+  HelpdeskCalibrationPlanPayload,
+  HelpdeskCalibrationOrderClosePayload,
+  HelpdeskCalibrationOrderReschedulePayload,
+} from '../services/helpdesk-calibration.service';
 
 export const getText = (value: unknown): string | null => {
   if (typeof value !== 'string') {
@@ -327,6 +332,7 @@ export const getMaintenancePlanPayload = (body: any): HelpdeskMaintenancePlanPay
   return {
     asset_id: assetId,
     frequency_id: getNumberId(body?.frequency_id),
+    schedule_mode: body?.schedule_mode === 'CALENDAR' ? 'CALENDAR' : 'FREQUENCY',
     responsible_employee_id: getNumberId(body?.responsible_employee_id),
     quality_document_id: getText(body?.quality_document_id),
     title,
@@ -340,6 +346,15 @@ export const getMaintenancePlanPayload = (body: any): HelpdeskMaintenancePlanPay
     evidence_required: body?.evidence_required === undefined ? true : getBoolean(body?.evidence_required),
     tasks: taskValues,
   };
+};
+
+// Cronograma provisto (modo CALENDAR): normaliza la lista de fechas a strings
+// no vacios. Devuelve null si no hay ninguna valida.
+export const getScheduleDatesPayload = (body: any): string[] | null => {
+  const dates = Array.isArray(body?.dates)
+    ? body.dates.map((d: unknown) => getText(d)).filter((d: string | null): d is string => Boolean(d))
+    : [];
+  return dates.length > 0 ? dates : null;
 };
 
 export const getMaintenanceOrderClosePayload = (body: any): HelpdeskMaintenanceOrderClosePayload | null => {
@@ -374,6 +389,68 @@ export const getMaintenanceOrderClosePayload = (body: any): HelpdeskMaintenanceO
 };
 
 export const getMaintenanceOrderReschedulePayload = (body: any): HelpdeskMaintenanceOrderReschedulePayload | null => {
+  const scheduledFor = getText(body?.scheduled_for);
+  const rescheduleReason = getText(body?.reschedule_reason);
+
+  if (!scheduledFor || !rescheduleReason) {
+    return null;
+  }
+
+  return {
+    scheduled_for: scheduledFor,
+    reschedule_reason: rescheduleReason,
+  };
+};
+
+export const getCalibrationPlanPayload = (body: any): HelpdeskCalibrationPlanPayload | null => {
+  const assetId = getNumberId(body?.asset_id);
+  const title = getText(body?.title);
+  const startsOn = getText(body?.starts_on);
+  const nextDueOn = getText(body?.next_due_on);
+
+  if (!assetId || !title || !startsOn || !nextDueOn) {
+    return null;
+  }
+
+  return {
+    asset_id: assetId,
+    frequency_id: getNumberId(body?.frequency_id),
+    schedule_mode: body?.schedule_mode === 'CALENDAR' ? 'CALENDAR' : 'FREQUENCY',
+    responsible_employee_id: getNumberId(body?.responsible_employee_id),
+    quality_document_id: getText(body?.quality_document_id),
+    title,
+    description: getText(body?.description),
+    provider_name: getText(body?.provider_name),
+    standard_ref: getText(body?.standard_ref),
+    starts_on: startsOn,
+    next_due_on: nextDueOn,
+    tolerance_before_days: Number(body?.tolerance_before_days ?? 0),
+    tolerance_after_days: Number(body?.tolerance_after_days ?? 0),
+    certificate_required: body?.certificate_required === undefined ? true : getBoolean(body?.certificate_required),
+    evidence_required: body?.evidence_required === undefined ? true : getBoolean(body?.evidence_required),
+  };
+};
+
+export const getCalibrationOrderClosePayload = (body: any): HelpdeskCalibrationOrderClosePayload | null => {
+  const completedAt = getText(body?.completed_at);
+  const result = getText(body?.result);
+
+  if (!completedAt || !result) {
+    return null;
+  }
+
+  return {
+    completed_at: completedAt,
+    result,
+    certificate_no: getText(body?.certificate_no),
+    calibration_due_on: getText(body?.calibration_due_on),
+    findings: getText(body?.findings),
+    provider_name: getText(body?.provider_name),
+    evidence_notes: getText(body?.evidence_notes),
+  };
+};
+
+export const getCalibrationOrderReschedulePayload = (body: any): HelpdeskCalibrationOrderReschedulePayload | null => {
   const scheduledFor = getText(body?.scheduled_for);
   const rescheduleReason = getText(body?.reschedule_reason);
 

@@ -641,6 +641,80 @@ export interface HelpdeskMaintenancePlan {
   orders: HelpdeskMaintenanceOrder[];
 }
 
+// --- Calibracion (ISO 15189:2022, control metrologico 6.5) ---
+export type HelpdeskScheduleMode = 'FREQUENCY' | 'CALENDAR';
+
+export interface HelpdeskCalibrationCatalogs {
+  frequencies: HelpdeskMaintenanceFrequency[];
+}
+
+export interface HelpdeskCalibrationOrder {
+  id: number;
+  order_code: string;
+  plan_id?: number;
+  asset_id?: number;
+  scheduled_for: string;
+  window_starts_on?: string | null;
+  window_ends_on?: string | null;
+  status: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  completed_by_user_id?: string | null;
+  provider_name?: string | null;
+  result?: string | null;
+  certificate_no?: string | null;
+  calibration_due_on?: string | null;
+  findings?: string | null;
+  evidence_notes?: string | null;
+  lifecycle_event_id?: number | null;
+  rescheduled_from?: string | null;
+  rescheduled_at?: string | null;
+  reschedule_reason?: string | null;
+  plan?: {
+    id: number;
+    plan_code: string;
+    title: string;
+    schedule_mode: HelpdeskScheduleMode;
+    frequency_id?: number | null;
+    interval_months?: number | null;
+    tolerance_before_days: number;
+    tolerance_after_days: number;
+  } | null;
+  asset?: HelpdeskTicketAsset | null;
+}
+
+export interface HelpdeskCalibrationPlan {
+  id: number;
+  plan_code: string;
+  asset_id: number;
+  frequency_id?: number | null;
+  schedule_mode: HelpdeskScheduleMode;
+  responsible_employee_id?: number | null;
+  quality_document_id?: string | null;
+  title: string;
+  description?: string | null;
+  provider_name?: string | null;
+  standard_ref?: string | null;
+  starts_on: string;
+  next_due_on: string;
+  tolerance_before_days: number;
+  tolerance_after_days: number;
+  certificate_required: boolean;
+  evidence_required: boolean;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  asset?: HelpdeskTicketAsset | null;
+  frequency?: HelpdeskMaintenanceFrequency | null;
+  responsible_employee?: HelpdeskAssetEmployee | null;
+  quality_document?: {
+    id: string;
+    title: string;
+    filename?: string | null;
+  } | null;
+  orders: HelpdeskCalibrationOrder[];
+}
+
 export interface DocumentSection {
   id: number;
   code: string;

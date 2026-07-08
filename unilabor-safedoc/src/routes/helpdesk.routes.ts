@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   addHelpdeskTicketCommentController,
+  addMaintenanceScheduleController,
   addMyHelpdeskTicketCommentController,
   closeMaintenanceOrderController,
   confirmMyHelpdeskTicketFunctionalityController,
@@ -56,6 +57,10 @@ import {
   maintenanceOrderCloseSchema,
   maintenanceOrderRescheduleSchema,
   maintenancePlanSchema,
+  calibrationOrderCloseSchema,
+  calibrationOrderRescheduleSchema,
+  calibrationPlanSchema,
+  scheduleDatesSchema,
   lifecycleEventSchema,
   unitAreasSchema,
   areaResponsiblesSchema,
@@ -71,6 +76,17 @@ import {
   listAssetLifecycleEventsController,
   updateLifecycleEventController,
 } from '../controllers/helpdesk-lifecycle.controller';
+import {
+  addCalibrationScheduleController,
+  closeCalibrationOrderController,
+  createCalibrationPlanController,
+  listCalibrationCatalogsController,
+  listCalibrationOrdersController,
+  listCalibrationPlansController,
+  rescheduleCalibrationOrderController,
+  startCalibrationOrderController,
+  updateCalibrationPlanController,
+} from '../controllers/helpdesk-calibration.controller';
 import {
   listAssetDocumentsController,
   uploadAssetDocumentController,
@@ -309,6 +325,64 @@ router.post(
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
   validate(maintenanceOrderCloseSchema),
   closeMaintenanceOrderController,
+);
+router.post(
+  '/maintenance/plans/:id/schedule',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(scheduleDatesSchema),
+  addMaintenanceScheduleController,
+);
+
+// --- Calibracion (ISO 15189:2022, control metrologico 6.5) ---
+router.get(
+  '/calibration-catalogs',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  listCalibrationCatalogsController,
+);
+router.get(
+  '/calibration/plans',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  listCalibrationPlansController,
+);
+router.get(
+  '/calibration/orders',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  listCalibrationOrdersController,
+);
+router.post(
+  '/calibration/plans',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(calibrationPlanSchema),
+  createCalibrationPlanController,
+);
+router.patch(
+  '/calibration/plans/:id',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(calibrationPlanSchema),
+  updateCalibrationPlanController,
+);
+router.post(
+  '/calibration/orders/:id/start',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  startCalibrationOrderController,
+);
+router.post(
+  '/calibration/orders/:id/reschedule',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(calibrationOrderRescheduleSchema),
+  rescheduleCalibrationOrderController,
+);
+router.post(
+  '/calibration/orders/:id/close',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(calibrationOrderCloseSchema),
+  closeCalibrationOrderController,
+);
+router.post(
+  '/calibration/plans/:id/schedule',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  validate(scheduleDatesSchema),
+  addCalibrationScheduleController,
 );
 router.get(
   '/tickets',

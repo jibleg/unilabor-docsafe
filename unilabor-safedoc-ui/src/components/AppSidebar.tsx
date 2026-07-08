@@ -5,6 +5,7 @@ import {
   BarChart3,
   Building2,
   CalendarClock,
+  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -147,6 +148,8 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
                 { icon: ClipboardCheck, label: 'Entrega-Recepción', path: '/helpdesk/handovers', roles: ['ADMIN', 'EDITOR'] },
                 { icon: Move, label: 'Movimientos', path: '/helpdesk/movements', roles: ['ADMIN', 'EDITOR'] },
                 { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
+                { icon: ShieldCheck, label: 'Calibración', path: '/helpdesk/calibration', roles: ['ADMIN', 'EDITOR'] },
+                { icon: CalendarDays, label: 'Calendario de servicios', path: '/helpdesk/service-calendar', roles: ['ADMIN', 'EDITOR'] },
               ],
             },
             {

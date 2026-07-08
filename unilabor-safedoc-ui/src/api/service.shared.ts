@@ -156,6 +156,45 @@ export interface HelpdeskMaintenanceOrderReschedulePayload {
   reschedule_reason: string;
 }
 
+// --- Calibracion (ISO 15189:2022) ---
+export interface HelpdeskCalibrationPlanPayload {
+  asset_id: number;
+  frequency_id?: number | null;
+  schedule_mode?: 'FREQUENCY' | 'CALENDAR';
+  responsible_employee_id?: number | null;
+  quality_document_id?: string | null;
+  title: string;
+  description?: string | null;
+  provider_name?: string | null;
+  standard_ref?: string | null;
+  starts_on: string;
+  next_due_on: string;
+  tolerance_before_days?: number;
+  tolerance_after_days?: number;
+  certificate_required?: boolean;
+  evidence_required?: boolean;
+}
+
+export interface HelpdeskCalibrationOrderClosePayload {
+  completed_at: string;
+  result: string;
+  certificate_no?: string | null;
+  calibration_due_on?: string | null;
+  findings?: string | null;
+  provider_name?: string | null;
+  evidence_notes?: string | null;
+}
+
+export interface HelpdeskCalibrationOrderReschedulePayload {
+  scheduled_for: string;
+  reschedule_reason: string;
+}
+
+// Cronograma provisto (modo CALENDAR): lista de fechas ISO.
+export interface HelpdeskScheduleDatesPayload {
+  dates: string[];
+}
+
 export interface HelpdeskCatalogAdminPayload {
   code?: string | null;
   name: string;

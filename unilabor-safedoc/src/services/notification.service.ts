@@ -131,6 +131,23 @@ const dispatch = async (
   }
 };
 
+/**
+ * Envio generico por correo + SMS, reutilizable fuera de evaluaciones (p. ej.
+ * recordatorios de mantenimiento/calibracion). Registra en la bandeja de salida
+ * con assignment_id nulo; `template` distingue el tipo de aviso.
+ */
+export const sendGenericNotification = async (
+  recipient: { email: string | null; phone: string | null },
+  subject: string,
+  emailBody: string,
+  smsBody: string,
+  template: string,
+): Promise<{ emailSent: boolean; smsSent: boolean }> => {
+  const emailSent = await dispatch(emailChannel, recipient.email, subject, emailBody, template, null);
+  const smsSent = await dispatch(smsChannel, recipient.phone, subject, smsBody, template, null);
+  return { emailSent, smsSent };
+};
+
 const formatDeadline = (iso: string): string =>
   new Date(iso).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' });
 

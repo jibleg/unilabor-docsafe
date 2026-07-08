@@ -138,11 +138,20 @@ export const maintenanceOrderCloseSchema = z
   })
   .passthrough();
 
+// Cronograma provisto por el proveedor/responsable (modo CALENDAR): lista de
+// fechas ISO que se convierten en ordenes programadas. Compartido mant/calib.
+export const scheduleDatesSchema = z
+  .object({
+    dates: z.array(requiredText('La fecha es obligatoria')).min(1, 'Agrega al menos una fecha'),
+  })
+  .passthrough();
+
 export const maintenancePlanSchema = z.object({
   asset_id: z.coerce.number().int().positive('El activo es obligatorio'),
   title: z.string().trim().min(1, 'El titulo es obligatorio'),
   starts_on: z.string().trim().min(1, 'La fecha de inicio es obligatoria'),
   next_due_on: z.string().trim().min(1, 'La proxima ejecucion es obligatoria'),
+  schedule_mode: z.enum(['FREQUENCY', 'CALENDAR']).default('FREQUENCY'),
   frequency_id: optionalPositiveId.optional(),
   responsible_employee_id: optionalPositiveId.optional(),
   quality_document_id: optionalText.optional(),
@@ -153,6 +162,44 @@ export const maintenancePlanSchema = z.object({
   checklist_required: z.boolean().default(true),
   evidence_required: z.boolean().default(true),
   tasks: z.array(z.string().trim().min(1)).default([]),
+});
+
+// --- Calibracion (ISO 15189:2022, control metrologico 6.5) ---
+export const calibrationOrderRescheduleSchema = z
+  .object({
+    scheduled_for: requiredText('La nueva fecha programada es obligatoria'),
+    reschedule_reason: requiredText('La justificacion de reprogramacion es obligatoria'),
+  })
+  .passthrough();
+
+export const calibrationOrderCloseSchema = z
+  .object({
+    completed_at: requiredText('La fecha de calibracion es obligatoria'),
+    result: requiredText('El resultado de la calibracion es obligatorio'),
+    certificate_no: optionalText.optional(),
+    calibration_due_on: optionalText.optional(),
+    findings: optionalText.optional(),
+    provider_name: optionalText.optional(),
+    evidence_notes: optionalText.optional(),
+  })
+  .passthrough();
+
+export const calibrationPlanSchema = z.object({
+  asset_id: z.coerce.number().int().positive('El activo es obligatorio'),
+  title: z.string().trim().min(1, 'El titulo es obligatorio'),
+  starts_on: z.string().trim().min(1, 'La fecha de inicio es obligatoria'),
+  next_due_on: z.string().trim().min(1, 'La proxima calibracion es obligatoria'),
+  schedule_mode: z.enum(['FREQUENCY', 'CALENDAR']).default('FREQUENCY'),
+  frequency_id: optionalPositiveId.optional(),
+  responsible_employee_id: optionalPositiveId.optional(),
+  quality_document_id: optionalText.optional(),
+  description: optionalText.optional(),
+  provider_name: optionalText.optional(),
+  standard_ref: optionalText.optional(),
+  tolerance_before_days: z.coerce.number().int().min(0).default(0),
+  tolerance_after_days: z.coerce.number().int().min(0).default(0),
+  certificate_required: z.boolean().default(true),
+  evidence_required: z.boolean().default(true),
 });
 
 // --- Acta de entrega-recepcion de activos (ISO 15189:2022) ---

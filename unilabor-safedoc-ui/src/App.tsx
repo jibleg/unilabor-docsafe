@@ -53,6 +53,12 @@ const HelpdeskCatalogsPage = lazy(() =>
 const HelpdeskMaintenancePage = lazy(() =>
   import('./pages/HelpdeskMaintenancePage').then((module) => ({ default: module.HelpdeskMaintenancePage })),
 );
+const HelpdeskCalibrationPage = lazy(() =>
+  import('./pages/HelpdeskCalibrationPage').then((module) => ({ default: module.HelpdeskCalibrationPage })),
+);
+const HelpdeskServiceCalendarPage = lazy(() =>
+  import('./pages/HelpdeskServiceCalendarPage').then((module) => ({ default: module.HelpdeskServiceCalendarPage })),
+);
 const HelpdeskOrgStructurePage = lazy(() =>
   import('./pages/HelpdeskOrgStructurePage').then((module) => ({ default: module.HelpdeskOrgStructurePage })),
 );
@@ -358,6 +364,22 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
               <HelpdeskMaintenancePage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="calibration"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskCalibrationPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="service-calendar"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskServiceCalendarPage />
             </RoleGate>
           }
         />
