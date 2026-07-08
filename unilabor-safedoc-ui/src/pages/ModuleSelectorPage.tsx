@@ -10,11 +10,14 @@ const moduleVisuals: Record<
     icon: typeof FlaskConical;
     eyebrow: string;
     description: string;
+    // Nombre a mostrar en el card. Si se define, prevalece sobre el nombre del
+    // modulo que viene de la BD (util para un titulo mas corto en el selector).
+    name?: string;
   }
 > = {
   QUALITY: {
     icon: FlaskConical,
-    eyebrow: 'Módulo Quality',
+    eyebrow: 'Módulo Calidad',
     description: 'Gestión documental institucional, control de calidad y trazabilidad operativa.',
   },
   RH: {
@@ -25,6 +28,7 @@ const moduleVisuals: Record<
   HELPDESK: {
     icon: LifeBuoy,
     eyebrow: 'Módulo de Activos y Soporte',
+    name: 'Gestión de Activos',
     description: 'Inventario y ciclo de vida de activos (ISO 15189), mantenimiento, calibración y mesa de ayuda.',
   },
 };
@@ -57,7 +61,7 @@ const ModuleCard = ({
       <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--color-brand-500)]">
         {visual.eyebrow}
       </p>
-      <h2 className="mt-2 text-2xl font-black text-[var(--color-brand-700)]">{moduleAccess.name}</h2>
+      <h2 className="mt-2 text-2xl font-black text-[var(--color-brand-700)]">{visual.name ?? moduleAccess.name}</h2>
       <p className="mt-3 text-sm leading-7 text-[var(--unilabor-neutral)]">{visual.description}</p>
 
       <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-brand-700)]">
