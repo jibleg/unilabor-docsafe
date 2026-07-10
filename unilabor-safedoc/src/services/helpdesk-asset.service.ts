@@ -57,6 +57,11 @@ export interface HelpdeskAssetPayload {
 export interface HelpdeskAssetRecord extends HelpdeskAssetPayload {
   id: number;
   is_active: boolean;
+  // Revision de carga masiva (eje independiente del estado operativo).
+  review_status?: 'PENDING' | 'REVIEWED' | undefined;
+  reviewed_at?: string | null | undefined;
+  reviewed_by?: string | null | undefined;
+  reviewed_by_name?: string | null | undefined;
   component_count?: number | undefined;
   parent?: { id: number; asset_code: string; name: string } | null | undefined;
   components?: HelpdeskAssetRecord[] | undefined;
@@ -210,6 +215,10 @@ export const mapAssetRow = (row: any): HelpdeskAssetRecord => ({
   decommissioned_on: row.decommissioned_on ? toIsoDate(row.decommissioned_on) : null,
   disposal_reason_id: row.disposal_reason_id ? Number(row.disposal_reason_id) : null,
   asset_code_overridden: Boolean(row.asset_code_overridden),
+  review_status: String(row.review_status ?? 'PENDING') === 'REVIEWED' ? 'REVIEWED' : 'PENDING',
+  reviewed_at: row.reviewed_at ? toIsoDateTime(row.reviewed_at) : null,
+  reviewed_by: row.reviewed_by ? String(row.reviewed_by) : null,
+  reviewed_by_name: row.reviewed_by_name ? String(row.reviewed_by_name) : null,
   parent_asset_id: row.parent_asset_id ? Number(row.parent_asset_id) : null,
   component_count: row.component_count != null ? Number(row.component_count) : undefined,
   parent: row.parent_asset_id
@@ -309,6 +318,7 @@ export const buildAssetQuery = () => `
     re.position AS responsible_employee_position,
     p.asset_code AS parent_asset_code,
     p.name AS parent_asset_name,
+    rv.full_name AS reviewed_by_name,
     (SELECT COUNT(*)::int FROM public.helpdesk_assets ch
       WHERE ch.parent_asset_id = a.id AND ch.is_active = TRUE) AS component_count
   FROM public.helpdesk_assets a
@@ -327,6 +337,7 @@ export const buildAssetQuery = () => `
   LEFT JOIN public.employees ae ON ae.id = a.assigned_employee_id
   LEFT JOIN public.employees re ON re.id = a.responsible_employee_id
   LEFT JOIN public.helpdesk_assets p ON p.id = a.parent_asset_id
+  LEFT JOIN public.users rv ON rv.id = a.reviewed_by
 `;
 
 const listCatalog = async (
@@ -545,6 +556,8 @@ export interface AssetListOptions extends PaginationInput {
   responsibleUserId?: string | null | undefined;
   // Solo activos "todo" (whole): excluye los componentes (parent_asset_id NULL).
   topLevelOnly?: boolean | undefined;
+  // Revision de carga: 'PENDING' | 'REVIEWED' (undefined = todos).
+  reviewStatus?: 'PENDING' | 'REVIEWED' | undefined;
 }
 
 export const listHelpdeskAssets = async (
@@ -563,6 +576,10 @@ export const listHelpdeskAssets = async (
 
   if (options.topLevelOnly) {
     clauses.push('a.parent_asset_id IS NULL');
+  }
+  if (options.reviewStatus === 'PENDING' || options.reviewStatus === 'REVIEWED') {
+    filterValues.push(options.reviewStatus);
+    clauses.push(`a.review_status = $${filterValues.length}`);
   }
   if (options.unitId) {
     filterValues.push(options.unitId);
@@ -1087,4 +1104,61 @@ export const deactivateHelpdeskAsset = async (
   });
 
   return getHelpdeskAssetById(assetId);
+};
+
+// Marca (o desmarca) un activo como REVISADO tras la depuracion de la carga masiva.
+// Eje independiente del estado operativo. reviewed=true => REVIEWED + sello quien/cuando;
+// reviewed=false => vuelve a PENDING y limpia el sello. Reversible. Traza ligera en history.
+export const setAssetReviewStatus = async (
+  assetId: number,
+  reviewed: boolean,
+  userId?: string | null,
+): Promise<HelpdeskAssetRecord | null> => {
+  await assertHelpdeskAssetsTable();
+
+  const current = await getHelpdeskAssetById(assetId);
+  if (!current) {
+    return null;
+  }
+
+  const nextStatus = reviewed ? 'REVIEWED' : 'PENDING';
+  await pool.query(
+    `
+      UPDATE public.helpdesk_assets
+      SET
+        review_status = $1,
+        reviewed_at = ${reviewed ? 'NOW()' : 'NULL'},
+        reviewed_by = ${reviewed ? '$2' : 'NULL'},
+        updated_by_user_id = $2,
+        updated_at = NOW()
+      WHERE id = $3;
+    `,
+    [nextStatus, userId ?? null, assetId],
+  );
+
+  await recordAssetHistory(
+    assetId,
+    'REVIEW',
+    reviewed ? 'Activo marcado como revisado.' : 'Activo devuelto a pendiente de revision.',
+    userId,
+    { review_status: current.review_status ?? 'PENDING' },
+    { review_status: nextStatus },
+  );
+
+  return getHelpdeskAssetById(assetId);
+};
+
+// Avance de la depuracion: cuantos activos vigentes estan revisados vs pendientes.
+export const getAssetReviewProgress = async (): Promise<{ total: number; reviewed: number; pending: number }> => {
+  await assertHelpdeskAssetsTable();
+  const result = await pool.query(`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE review_status = 'REVIEWED')::int AS reviewed
+    FROM public.helpdesk_assets
+    WHERE is_active = TRUE;
+  `);
+  const total = Number(result.rows[0]?.total ?? 0);
+  const reviewed = Number(result.rows[0]?.reviewed ?? 0);
+  return { total, reviewed, pending: total - reviewed };
 };

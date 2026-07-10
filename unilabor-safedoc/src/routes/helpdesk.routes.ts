@@ -25,6 +25,8 @@ import {
   getMyHelpdeskTicketByIdController,
   listHelpdeskCatalogAdminDataController,
   listHelpdeskAssetsController,
+  getAssetReviewProgressController,
+  setAssetReviewStatusController,
   listHelpdeskCatalogsController,
   listHelpdeskTicketCatalogsController,
   listHelpdeskTicketsController,
@@ -451,6 +453,12 @@ router.get(
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
   listHelpdeskAssetsController,
 );
+// Avance de la depuracion de la carga (antes de /assets/:id para no colisionar).
+router.get(
+  '/assets/review-progress',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  getAssetReviewProgressController,
+);
 router.get(
   '/assets/:id',
   authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
@@ -472,6 +480,12 @@ router.delete(
   '/assets/:id',
   authorizeModuleRole('HELPDESK', ['ADMIN']),
   deleteHelpdeskAssetController,
+);
+// Revision de carga: marcar/desmarcar activo como revisado.
+router.post(
+  '/assets/:id/review',
+  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  setAssetReviewStatusController,
 );
 
 // --- Componentes de activo (activos compuestos) ---

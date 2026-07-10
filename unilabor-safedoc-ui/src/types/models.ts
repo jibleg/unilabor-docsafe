@@ -114,6 +114,11 @@ export interface HelpdeskAsset {
   decommissioned_on?: string | null;
   disposal_reason_id?: number | null;
   asset_code_overridden?: boolean;
+  // Revision de carga masiva (eje independiente del estado operativo).
+  review_status?: 'PENDING' | 'REVIEWED';
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  reviewed_by_name?: string | null;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

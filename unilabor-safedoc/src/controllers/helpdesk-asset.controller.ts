@@ -10,6 +10,8 @@ import {
   listHelpdeskAssets,
   listHelpdeskCatalogs,
   updateHelpdeskAsset,
+  setAssetReviewStatus,
+  getAssetReviewProgress,
 } from '../services/helpdesk-asset.service';
 import {
   createHelpdeskCatalogItem,
@@ -202,6 +204,10 @@ export const listHelpdeskAssetsController = async (req: AuthRequest, res: Respon
         typeof req.query.responsible_user_id === 'string' && req.query.responsible_user_id.trim()
           ? req.query.responsible_user_id.trim()
           : undefined,
+      reviewStatus:
+        req.query.review_status === 'PENDING' || req.query.review_status === 'REVIEWED'
+          ? req.query.review_status
+          : undefined,
     });
     return res.json(result);
   } catch (error: any) {
@@ -332,6 +338,54 @@ export const detachAssetComponentController = async (req: AuthRequest, res: Resp
     }
     console.error('Error desvinculando componente Helpdesk:', error);
     return res.status(500).json({ message: 'No se pudo desvincular el componente.' });
+  }
+};
+
+// Avance de la depuracion de la carga: {total, reviewed, pending} de activos vigentes.
+export const getAssetReviewProgressController = async (_req: AuthRequest, res: Response) => {
+  try {
+    const progress = await getAssetReviewProgress();
+    return res.json(progress);
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+    console.error('Error obteniendo avance de revision Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo obtener el avance de revision.' });
+  }
+};
+
+// Marca o desmarca el activo :id como revisado (body { reviewed: boolean }).
+export const setAssetReviewStatusController = async (req: AuthRequest, res: Response) => {
+  const assetId = getNumberId(req.params.id);
+  if (!assetId) {
+    return res.status(400).json({ message: 'ID de activo invalido.' });
+  }
+  const reviewed = req.body?.reviewed === true;
+
+  try {
+    const asset = await setAssetReviewStatus(assetId, reviewed, req.user?.id ?? null);
+    if (!asset) {
+      return res.status(404).json({ message: 'Activo no encontrado.' });
+    }
+    await logHelpdeskAudit(
+      req.user?.id,
+      `HELPDESK_ASSET_REVIEW:${assetId}:${reviewed ? 'REVIEWED' : 'PENDING'}`,
+      req.ip,
+      assetId,
+    );
+    return res.json({
+      message: reviewed ? 'Activo marcado como revisado.' : 'Activo devuelto a pendiente.',
+      asset,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+    console.error('Error actualizando revision de activo Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar la revision del activo.' });
   }
 };
 

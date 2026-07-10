@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Boxes,
+  CheckCircle2,
+  Clock,
   Edit3,
   Eye,
   FolderOpen,
@@ -11,6 +13,7 @@ import {
   Plus,
   Printer,
   RefreshCw,
+  RotateCcw,
   Search,
   Unlink,
 } from 'lucide-react';
@@ -24,12 +27,15 @@ import {
   detachAssetComponent,
   fetchHelpdeskAssetById,
   getApiErrorMessage,
+  getAssetReviewProgress,
   getHelpdeskOrgStructure,
   getHelpdeskSummary,
   listEmployees,
   listHelpdeskAssetsForLabels,
   listHelpdeskAssetsPaginated,
   listHelpdeskCatalogs,
+  setAssetReviewStatus,
+  type AssetReviewProgress,
   type HelpdeskAssetPayload,
   updateHelpdeskAssetById,
 } from '../api/service';
@@ -161,6 +167,18 @@ const CRITICALITY_BADGE: Record<string, string> = {
   LOW: 'bg-[rgba(22,128,74,0.12)] text-[#16804a]',
 };
 
+// Badge de revisión de la carga (eje independiente del estado operativo).
+const ReviewBadge = ({ status }: { status?: 'PENDING' | 'REVIEWED' }) =>
+  status === 'REVIEWED' ? (
+    <span className={`${BADGE_BASE} gap-1 bg-[rgba(22,128,74,0.12)] text-[#16804a]`}>
+      <CheckCircle2 size={11} /> Revisado
+    </span>
+  ) : (
+    <span className={`${BADGE_BASE} gap-1 bg-[rgba(180,120,20,0.16)] text-[#8a5a00]`}>
+      <Clock size={11} /> Pendiente
+    </span>
+  );
+
 const ClassificationBadge = ({ item, palette }: { item?: HelpdeskCatalogItem | null; palette: Record<string, string> }) => {
   if (!item) {
     return null;
@@ -258,9 +276,12 @@ export const HelpdeskAssetsPage = () => {
   const [unitFilter, setUnitFilter] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
   const [userFilter, setUserFilter] = useState('');
+  // Filtro de revisión de la carga masiva: '' = todos, 'PENDING', 'REVIEWED'.
+  const [reviewFilter, setReviewFilter] = useState<'' | 'PENDING' | 'REVIEWED'>('');
+  const [reviewProgress, setReviewProgress] = useState<AssetReviewProgress>({ total: 0, reviewed: 0, pending: 0 });
   const assetFilters = useMemo(
-    () => ({ unit_id: unitFilter, area_id: areaFilter, responsible_user_id: userFilter }),
-    [unitFilter, areaFilter, userFilter],
+    () => ({ unit_id: unitFilter, area_id: areaFilter, responsible_user_id: userFilter, review_status: reviewFilter }),
+    [unitFilter, areaFilter, userFilter, reviewFilter],
   );
 
   // Cascada Unidad -> Área -> Responsable, construida sobre la estructura M:N.
@@ -324,6 +345,7 @@ export const HelpdeskAssetsPage = () => {
         unitId: numericOrNull(q.filters.unit_id ?? ''),
         areaId: numericOrNull(q.filters.area_id ?? ''),
         responsibleUserId: q.filters.responsible_user_id || null,
+        reviewStatus: (q.filters.review_status as '' | 'PENDING' | 'REVIEWED') || null,
       }),
     {
       pageSize: 20,
@@ -406,7 +428,9 @@ export const HelpdeskAssetsPage = () => {
 
   const loadSummary = useCallback(async () => {
     try {
-      setAssetSummary(await getHelpdeskSummary());
+      const [summaryData, progress] = await Promise.all([getHelpdeskSummary(), getAssetReviewProgress()]);
+      setAssetSummary(summaryData);
+      setReviewProgress(progress);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar el resumen de activos.'));
     }
@@ -466,6 +490,22 @@ export const HelpdeskAssetsPage = () => {
       refreshAssets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo desvincular el componente.'));
+    }
+  };
+
+  // Marca/desmarca un activo como revisado tras depurar su dato de la carga.
+  // Reversible; refresca la ficha activa (si aplica), el listado y el contador.
+  const handleToggleReview = async (asset: HelpdeskAsset) => {
+    const willReview = asset.review_status !== 'REVIEWED';
+    try {
+      const updated = await setAssetReviewStatus(asset.id, willReview);
+      notifySuccess(willReview ? 'Activo marcado como revisado.' : 'Activo devuelto a pendiente.');
+      if (updated && selectedAsset && selectedAsset.id === updated.id) {
+        setSelectedAsset(updated);
+      }
+      refreshAssets();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo actualizar la revisión del activo.'));
     }
   };
 
@@ -685,6 +725,42 @@ export const HelpdeskAssetsPage = () => {
                 />
               </label>
             </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[rgba(0,65,106,0.06)] pt-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Revisión
+                </span>
+                <div className="inline-flex overflow-hidden rounded-xl border border-[rgba(0,65,106,0.14)]">
+                  {([
+                    { value: '', label: 'Todos' },
+                    { value: 'PENDING', label: 'Pendientes' },
+                    { value: 'REVIEWED', label: 'Revisados' },
+                  ] as const).map((option) => (
+                    <button
+                      key={option.value || 'all'}
+                      type="button"
+                      onClick={() => setReviewFilter(option.value)}
+                      className={`px-3 py-1.5 text-xs font-semibold transition ${
+                        reviewFilter === option.value
+                          ? 'bg-[var(--color-brand-700)] text-white'
+                          : 'bg-white text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {reviewProgress.total > 0 ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--color-brand-700)]">
+                  <CheckCircle2 size={14} className="text-[#16804a]" />
+                  {reviewProgress.reviewed} de {reviewProgress.total} revisados
+                  <span className="font-normal text-[var(--unilabor-neutral)]">
+                    ({reviewProgress.pending} pendientes)
+                  </span>
+                </span>
+              ) : null}
+            </div>
             <div className="flex items-center justify-between gap-3 border-t border-[rgba(0,65,106,0.06)] pt-3">
               <p className="text-xs text-[var(--unilabor-neutral)]">
                 {hasActiveFilters
@@ -737,13 +813,16 @@ export const HelpdeskAssetsPage = () => {
                             .filter(Boolean)
                             .join(' | ') || 'Sin marca/modelo/serie'}
                         </p>
-                        {asset.component_count && asset.component_count > 0 ? (
-                          <span className={`mt-1 gap-1 ${BADGE_BASE} ${BADGE_NEUTRAL}`}>
-                            <Boxes size={11} />
-                            {asset.component_count}{' '}
-                            {asset.component_count === 1 ? 'componente' : 'componentes'}
-                          </span>
-                        ) : null}
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <ReviewBadge status={asset.review_status} />
+                          {asset.component_count && asset.component_count > 0 ? (
+                            <span className={`gap-1 ${BADGE_BASE} ${BADGE_NEUTRAL}`}>
+                              <Boxes size={11} />
+                              {asset.component_count}{' '}
+                              {asset.component_count === 1 ? 'componente' : 'componentes'}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">
                         <p>{catalogName(asset.category)}</p>
@@ -776,7 +855,20 @@ export const HelpdeskAssetsPage = () => {
                                 onClick: () => setLabelAsset(asset),
                               },
                               ...(canWrite
-                                ? [{ key: 'editar', label: 'Editar', icon: <Edit3 size={14} />, onClick: () => openEdit(asset) }]
+                                ? [
+                                    {
+                                      key: 'revisar',
+                                      label: asset.review_status === 'REVIEWED' ? 'Devolver a pendiente' : 'Marcar revisado',
+                                      icon:
+                                        asset.review_status === 'REVIEWED' ? (
+                                          <RotateCcw size={14} />
+                                        ) : (
+                                          <CheckCircle2 size={14} />
+                                        ),
+                                      onClick: () => void handleToggleReview(asset),
+                                    },
+                                    { key: 'editar', label: 'Editar', icon: <Edit3 size={14} />, onClick: () => openEdit(asset) },
+                                  ]
                                 : []),
                             ]}
                           />
@@ -831,6 +923,45 @@ export const HelpdeskAssetsPage = () => {
               >
                 <Printer size={16} /> Imprimir etiqueta
               </button>
+
+              {/* Revisión de la carga: estado + acción para marcar/desmarcar. */}
+              <div className="space-y-2 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Revisión de carga
+                  </p>
+                  <ReviewBadge status={selectedAsset.review_status} />
+                </div>
+                {selectedAsset.review_status === 'REVIEWED' && (selectedAsset.reviewed_by_name || selectedAsset.reviewed_at) ? (
+                  <p className="text-[11px] text-[var(--unilabor-neutral)]">
+                    {selectedAsset.reviewed_by_name ? `Por ${selectedAsset.reviewed_by_name}` : ''}
+                    {selectedAsset.reviewed_at
+                      ? ` · ${new Date(selectedAsset.reviewed_at).toLocaleDateString('es-MX')}`
+                      : ''}
+                  </p>
+                ) : null}
+                {canWrite ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleReview(selectedAsset)}
+                    className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      selectedAsset.review_status === 'REVIEWED'
+                        ? 'border border-[rgba(0,65,106,0.14)] text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]'
+                        : 'bg-[#16804a] text-white hover:opacity-90'
+                    }`}
+                  >
+                    {selectedAsset.review_status === 'REVIEWED' ? (
+                      <>
+                        <RotateCcw size={16} /> Devolver a pendiente
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={16} /> Marcar como revisado
+                      </>
+                    )}
+                  </button>
+                ) : null}
+              </div>
 
               <div className="grid gap-3 text-sm">
                 {[

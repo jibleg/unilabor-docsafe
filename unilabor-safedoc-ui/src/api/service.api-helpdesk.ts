@@ -117,6 +117,7 @@ export interface HelpdeskAssetQuery extends PageQuery {
   unitId?: number | null;
   areaId?: number | null;
   responsibleUserId?: string | null;
+  reviewStatus?: 'PENDING' | 'REVIEWED' | null;
 }
 
 const buildAssetFilterParams = (query: HelpdeskAssetQuery): Record<string, string | number> => {
@@ -129,6 +130,9 @@ const buildAssetFilterParams = (query: HelpdeskAssetQuery): Record<string, strin
   }
   if (query.responsibleUserId) {
     params.responsible_user_id = query.responsibleUserId;
+  }
+  if (query.reviewStatus === 'PENDING' || query.reviewStatus === 'REVIEWED') {
+    params.review_status = query.reviewStatus;
   }
   return params;
 };
@@ -209,6 +213,30 @@ export const updateHelpdeskAssetById = async (
 
 export const deleteHelpdeskAssetById = async (assetId: number): Promise<void> => {
   await api.delete(`/helpdesk/assets/${assetId}`);
+};
+
+// --- Revision de carga masiva ---
+export interface AssetReviewProgress {
+  total: number;
+  reviewed: number;
+  pending: number;
+}
+
+export const getAssetReviewProgress = async (): Promise<AssetReviewProgress> => {
+  const response = await api.get('/helpdesk/assets/review-progress');
+  const payload = asRecord(unwrapPayload(response.data)) ?? {};
+  const total = Number(payload.total ?? 0);
+  const reviewed = Number(payload.reviewed ?? 0);
+  return { total, reviewed, pending: Number(payload.pending ?? total - reviewed) };
+};
+
+// Marca (reviewed=true) o desmarca (false) un activo como revisado.
+export const setAssetReviewStatus = async (
+  assetId: number,
+  reviewed: boolean,
+): Promise<HelpdeskAsset | null> => {
+  const response = await api.post(`/helpdesk/assets/${assetId}/review`, { reviewed });
+  return normalizeHelpdeskAsset(asRecord(unwrapPayload(response.data))?.asset ?? unwrapPayload(response.data));
 };
 
 // --- Activos compuestos (componentes) ---
