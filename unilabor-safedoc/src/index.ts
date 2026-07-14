@@ -14,6 +14,7 @@ import trainingRoutes from './routes/training.routes';
 import evaluationAssignmentRoutes from './routes/evaluation-assignment.routes';
 import evaluationGradingRoutes from './routes/evaluation-grading.routes';
 import helpdeskRoutes from './routes/helpdesk.routes';
+import adminRoutes from './routes/admin.routes';
 import { assertRequiredEnv } from './config/env';
 import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
 import { startServiceReminderScheduler } from './services/helpdesk-service-scheduler.service';
@@ -34,7 +35,7 @@ const PORT = process.env.PORT || 4000;
 // CORS config
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
@@ -56,6 +57,7 @@ app.use('/api/rh/trainings', trainingRoutes);
 app.use('/api/rh/evaluations', evaluationGradingRoutes);
 app.use('/api/rh', evaluationAssignmentRoutes);
 app.use('/api/helpdesk', helpdeskRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
