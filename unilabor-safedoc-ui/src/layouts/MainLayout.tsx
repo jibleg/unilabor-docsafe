@@ -6,7 +6,7 @@ import { PendingEvaluationsBanner } from '../components/PendingEvaluationsBanner
 import { UserMenu } from '../components/UserMenu';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePendingEvaluationsStore } from '../store/usePendingEvaluationsStore';
-import { getCurrentUserProfile } from '../api/service';
+import { getCurrentUserProfile, getMyAccess } from '../api/service';
 import { tokenRequiresPasswordChange } from '../utils/auth';
 import { ChevronRight } from 'lucide-react';
 import type { ModuleCode } from '../types/models';
@@ -15,6 +15,8 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
+  const setAvailableModules = useAuthStore((state) => state.setAvailableModules);
+  const setPermissions = useAuthStore((state) => state.setPermissions);
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const refreshPendingEvaluations = usePendingEvaluationsStore((state) => state.refresh);
   const resetPendingEvaluations = usePendingEvaluationsStore((state) => state.reset);
@@ -59,12 +61,27 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
       }
     };
 
+    // Refresca modulos + permisos efectivos (RBAC) sin exigir re-login, para que
+    // los cambios de rol/permiso apliquen al recargar la app.
+    const refreshAccess = async () => {
+      try {
+        const { availableModules, permissions } = await getMyAccess();
+        if (!isCancelled) {
+          setAvailableModules(availableModules);
+          setPermissions(permissions);
+        }
+      } catch {
+        // Si falla, se conserva el acceso persistido; el backend sigue siendo la autoridad.
+      }
+    };
+
     void refreshProfile();
+    void refreshAccess();
 
     return () => {
       isCancelled = true;
     };
-  }, [token, mustChangePassword, setUser]);
+  }, [token, mustChangePassword, setUser, setAvailableModules, setPermissions]);
 
   if (!token) return <Navigate to="/login" />;
   if (mustChangePassword) {

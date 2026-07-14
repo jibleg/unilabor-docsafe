@@ -54,8 +54,8 @@ export const LoginPage = () => {
     setError('');
 
     try {
-      const { token, user, availableModules } = await login({ email, password });
-      setAuth(token, user, availableModules);
+      const { token, user, availableModules, permissions } = await login({ email, password });
+      setAuth(token, user, availableModules, permissions);
 
       if (user.mustChangePassword) {
         navigate('/change-password');

@@ -6,6 +6,7 @@ import type {
   LoginResponse,
   PageQuery,
   PageResult,
+  UserAccess,
 } from './service.shared';
 import api from './axios';
 import axios from 'axios';
@@ -64,10 +65,34 @@ export const login = async (payload: LoginRequest): Promise<LoginResponse> => {
     .map(normalizeModuleAccess)
     .filter((moduleAccess): moduleAccess is ModuleAccess => moduleAccess !== null);
 
+  const permissions = normalizePermissions(source);
+
   return {
     token,
     user,
     availableModules,
+    permissions,
+  };
+};
+
+// Normaliza el arreglo de permisos (codigos MODULO.RECURSO.ACCION) del backend.
+const normalizePermissions = (source: Record<string, unknown>): string[] =>
+  getArrayFromPayload(source, ['permissions'])
+    .map((value) => String(value ?? '').trim().toUpperCase())
+    .filter((code) => code.length > 0);
+
+// GET /auth/me/access - refresca modulos + permisos sin re-login.
+export const getMyAccess = async (): Promise<UserAccess> => {
+  const response = await api.get('/auth/me/access');
+  const source = asRecord(unwrapPayload(response.data)) ?? {};
+
+  const availableModules = getArrayFromPayload(source, ['availableModules', 'available_modules'])
+    .map(normalizeModuleAccess)
+    .filter((moduleAccess): moduleAccess is ModuleAccess => moduleAccess !== null);
+
+  return {
+    availableModules,
+    permissions: normalizePermissions(source),
   };
 };
 

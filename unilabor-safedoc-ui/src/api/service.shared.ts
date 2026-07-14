@@ -16,6 +16,12 @@ export interface LoginResponse {
   token: string;
   user: User;
   availableModules: ModuleAccess[];
+  permissions: string[];
+}
+
+export interface UserAccess {
+  availableModules: ModuleAccess[];
+  permissions: string[];
 }
 
 export interface CreateUserPayload {

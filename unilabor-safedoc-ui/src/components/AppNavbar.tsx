@@ -1,38 +1,14 @@
 import { useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  AlertTriangle,
-  Building2,
-  CalendarClock,
-  ClipboardCheck,
-  FileText,
-  LayoutDashboard,
-  Laptop,
-  LifeBuoy,
-  LogOut,
-  Menu,
-  Move,
-  ShieldCheck,
-  Tags,
-  UserCircle2,
-  Users,
-  Wrench,
-  X,
-} from 'lucide-react';
+import { Building2, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
-import { hasAnyRole } from '../utils/roles';
+import { hasPermission } from '../utils/permissions';
 import { getModuleRole } from '../utils/modules';
 import { confirmAction } from '../utils/confirm';
 import { useUserAvatar } from '../hooks/useUserAvatar';
+import { NAV_CONFIG } from '../config/navigation';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
-
-interface NavbarItem {
-  icon: typeof LayoutDashboard;
-  label: string;
-  path: string;
-  roles?: string[];
-}
 
 export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const location = useLocation();
@@ -45,6 +21,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   };
   const user = useAuthStore((state) => state.user);
   const availableModules = useAuthStore((state) => state.availableModules);
+  const permissions = useAuthStore((state) => state.permissions);
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const moduleRole = getModuleRole(availableModules, moduleCode) ?? user?.role ?? 'VIEWER';
   const { avatarUrl } = useUserAvatar();
@@ -55,45 +32,15 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const avatarInitial =
     displayName.trim().length > 0 ? displayName.trim().charAt(0).toUpperCase() : 'U';
 
-  const items = useMemo<NavbarItem[]>(
-    () =>
-      moduleCode === 'RH'
-        ? [
-            { icon: LayoutDashboard, label: 'Dashboard RH', path: '/rh/dashboard', roles: ['ADMIN', 'EDITOR'] },
-            { icon: Users, label: 'Colaboradores', path: '/rh/employees', roles: ['ADMIN', 'EDITOR'] },
-            { icon: FileText, label: 'Expedientes', path: '/rh/expedients', roles: ['ADMIN', 'EDITOR'] },
-            { icon: AlertTriangle, label: 'Alertas', path: '/rh/alerts', roles: ['ADMIN', 'EDITOR'] },
-            { icon: ShieldCheck, label: 'Auditoría RH', path: '/rh/audit', roles: ['ADMIN', 'EDITOR'] },
-            { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', roles: ['VIEWER'] },
-            { icon: Tags, label: 'Secciones', path: '/rh/document-sections', roles: ['ADMIN', 'EDITOR'] },
-            { icon: ShieldCheck, label: 'Tipos documentales', path: '/rh/document-types', roles: ['ADMIN', 'EDITOR'] },
-            { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
-          ]
-        : moduleCode === 'HELPDESK'
-          ? [
-              { icon: LayoutDashboard, label: 'Dashboard', path: '/helpdesk/dashboard' },
-              { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', roles: ['ADMIN', 'EDITOR'] },
-              { icon: ClipboardCheck, label: 'Entrega-Recepción', path: '/helpdesk/handovers', roles: ['ADMIN', 'EDITOR'] },
-              { icon: Move, label: 'Movimientos', path: '/helpdesk/movements', roles: ['ADMIN', 'EDITOR'] },
-              { icon: LifeBuoy, label: 'Solicitudes', path: '/helpdesk/tickets' },
-              { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', roles: ['ADMIN', 'EDITOR'] },
-              { icon: Wrench, label: 'Catálogos', path: '/helpdesk/catalogs', roles: ['ADMIN'] },
-              { icon: Building2, label: 'Estructura', path: '/helpdesk/org-structure', roles: ['ADMIN'] },
-              { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
-            ]
-          : [
-            { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard' },
-            { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
-            { icon: FileText, label: 'Documentos', path: '/quality/documents' },
-            { icon: Tags, label: 'Categorías', path: '/quality/categories', roles: ['ADMIN', 'EDITOR'] },
-            { icon: Users, label: 'Personal', path: '/quality/users', roles: ['ADMIN'] },
-            { icon: ShieldCheck, label: 'Auditoría', path: '/quality/audit', roles: ['ADMIN'] },
-          ],
+  // Misma fuente de navegacion que el sidebar, aplanada (el navbar movil no
+  // usa titulos de seccion). Se filtra por permiso efectivo.
+  const items = useMemo(
+    () => (NAV_CONFIG[moduleCode] ?? []).flatMap((section) => section.items),
     [moduleCode],
   );
 
-  const visibleItems = items.filter((item) =>
-    item.roles ? hasAnyRole(moduleRole, item.roles) : true,
+  const visibleItems = items.filter(
+    (item) => !item.permission || hasPermission(permissions, item.permission),
   );
 
   // Cierra el menu movil al cambiar de ruta, durante el render.
