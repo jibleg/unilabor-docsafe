@@ -70,7 +70,10 @@ export function usePaginatedList<T>(
   const fetcherRef = useRef(fetcher);
   const onErrorRef = useRef(onError);
   const filtersRef = useRef(filters);
-  const filtersInitialized = useRef(false);
+  // Guards por comparacion de valor (no booleano de "primer render"): asi el
+  // remonte de StrictMode en dev no resetea la pagina/busqueda restaurada.
+  const lastFiltersKey = useRef(filtersKey);
+  const lastSearch = useRef(search);
 
   // Mantener las refs sincronizadas fuera del render (evita usar callbacks obsoletos).
   useEffect(() => {
@@ -79,27 +82,24 @@ export function usePaginatedList<T>(
     filtersRef.current = filters;
   });
 
-  // Al cambiar los filtros: volver a la primera pagina y forzar un unico refetch.
-  // Ambos setState se agrupan en un solo render, por lo que el efecto de carga
-  // dispara una sola peticion (aunque la pagina actual no fuera la 1).
+  // Al cambiar los filtros (cambio real de valor): volver a la primera pagina y
+  // forzar un unico refetch.
   useEffect(() => {
-    if (!filtersInitialized.current) {
-      filtersInitialized.current = true;
+    if (lastFiltersKey.current === filtersKey) {
       return;
     }
+    lastFiltersKey.current = filtersKey;
     setPage(1);
     setRefreshKey((key) => key + 1);
   }, [filtersKey]);
 
-  // Debounce de la búsqueda. El setState ocurre dentro del timeout (no en el cuerpo
-  // del effect) y, al cambiar la búsqueda efectiva, se vuelve a la primera página.
-  // El primer render se omite para no resetear la página inicial restaurada.
-  const searchInitialized = useRef(false);
+  // Debounce de la búsqueda. Solo actua ante un cambio real del texto (para no
+  // resetear la página inicial restaurada ni en el remonte de StrictMode).
   useEffect(() => {
-    if (!searchInitialized.current) {
-      searchInitialized.current = true;
+    if (lastSearch.current === search) {
       return;
     }
+    lastSearch.current = search;
     const handle = window.setTimeout(() => {
       setDebouncedSearch(search.trim());
       setPage(1);
