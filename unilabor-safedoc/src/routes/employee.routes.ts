@@ -10,7 +10,7 @@ import {
   updateEmployeeDocumentAccessController,
   updateEmployeeController,
 } from '../controllers/employee.controller';
-import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
+import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   createEmployeeSchema,
@@ -20,33 +20,33 @@ import {
 
 const router = Router();
 
-router.use(verifyToken, authorizeModuleAccess('RH'));
+router.use(verifyToken);
 
 router.get(
   '/summary',
-  authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
+  requirePermission('RH.EMPLOYEES.READ'),
   getEmployeeSummaryController,
 );
 router.get(
   '/linkable-users',
-  authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
+  requirePermission('RH.EMPLOYEES.READ'),
   listLinkableUsersController,
 );
-router.get('/', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), listEmployeesController);
-router.get('/:id', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), getEmployeeByIdController);
+router.get('/', requirePermission('RH.EMPLOYEES.READ'), listEmployeesController);
+router.get('/:id', requirePermission('RH.EMPLOYEES.READ'), getEmployeeByIdController);
 router.get(
   '/:id/document-access',
-  authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
+  requirePermission('RH.EMPLOYEES.READ'),
   getEmployeeDocumentAccessController,
 );
-router.post('/', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), validate(createEmployeeSchema), createEmployeeController);
-router.patch('/:id', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), validate(updateEmployeeSchema), updateEmployeeController);
+router.post('/', requirePermission('RH.EMPLOYEES.WRITE'), validate(createEmployeeSchema), createEmployeeController);
+router.patch('/:id', requirePermission('RH.EMPLOYEES.WRITE'), validate(updateEmployeeSchema), updateEmployeeController);
 router.put(
   '/:id/document-access',
-  authorizeModuleRole('RH', ['ADMIN', 'EDITOR']),
+  requirePermission('RH.EMPLOYEES.WRITE'),
   validate(updateEmployeeDocumentAccessSchema),
   updateEmployeeDocumentAccessController,
 );
-router.delete('/:id', authorizeModuleRole('RH', ['ADMIN', 'EDITOR']), deleteEmployeeController);
+router.delete('/:id', requirePermission('RH.EMPLOYEES.WRITE'), deleteEmployeeController);
 
 export default router;

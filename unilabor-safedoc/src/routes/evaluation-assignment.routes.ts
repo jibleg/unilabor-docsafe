@@ -7,7 +7,7 @@ import {
   startMyEvaluationController,
   submitMyEvaluationController,
 } from '../controllers/evaluation-assignment.controller';
-import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
+import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { submitEvaluationSchema } from '../schemas/training.schema';
 
@@ -18,7 +18,7 @@ import { submitEvaluationSchema } from '../schemas/training.schema';
  */
 const router = Router();
 
-router.use(verifyToken, authorizeModuleAccess('RH'), authorizeModuleRole('RH', ['ADMIN', 'EDITOR', 'VIEWER']));
+router.use(verifyToken, requirePermission('RH.SELF.EVALUATIONS'));
 
 // Las rutas mas especificas van antes del parametro :id para no ser opacadas.
 router.get('/me/evaluations/pending-count', myPendingEvaluationsCountController);

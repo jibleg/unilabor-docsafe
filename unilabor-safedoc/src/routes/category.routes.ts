@@ -7,7 +7,7 @@ import {
   updateCategory,
   updateCategoryStatus,
 } from '../controllers/category.controller';
-import { authorize, authorizeModuleAccess, verifyToken } from '../middlewares/auth.middleware';
+import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   createCategorySchema,
@@ -18,13 +18,13 @@ import {
 const router = Router();
 
 // Consulta de catálogo paginado (autenticados)
-router.get('/', verifyToken, authorizeModuleAccess('QUALITY'), listCategories);
-router.get('/:id', verifyToken, authorizeModuleAccess('QUALITY'), getCategoryById);
+router.get('/', verifyToken, requirePermission('QUALITY.CATEGORIES.READ'), listCategories);
+router.get('/:id', verifyToken, requirePermission('QUALITY.CATEGORIES.READ'), getCategoryById);
 
-// CRUD de catálogo (ADMIN y EDITOR)
-router.post('/', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), validate(createCategorySchema), createCategory);
-router.patch('/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), validate(updateCategorySchema), updateCategory);
-router.patch('/:id/status', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), validate(updateCategoryStatusSchema), updateCategoryStatus);
-router.delete('/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), deleteCategory);
+// CRUD de catálogo (requiere escritura de categorías)
+router.post('/', verifyToken, requirePermission('QUALITY.CATEGORIES.WRITE'), validate(createCategorySchema), createCategory);
+router.patch('/:id', verifyToken, requirePermission('QUALITY.CATEGORIES.WRITE'), validate(updateCategorySchema), updateCategory);
+router.patch('/:id/status', verifyToken, requirePermission('QUALITY.CATEGORIES.WRITE'), validate(updateCategoryStatusSchema), updateCategoryStatus);
+router.delete('/:id', verifyToken, requirePermission('QUALITY.CATEGORIES.WRITE'), deleteCategory);
 
 export default router;

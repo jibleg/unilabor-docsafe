@@ -11,7 +11,7 @@ import {
   uploadDocument,
   viewDocument,
 } from '../controllers/document.controller';
-import { verifyToken, authorize, authorizeModuleAccess } from '../middlewares/auth.middleware';
+import { verifyToken, requirePermission } from '../middlewares/auth.middleware';
 import { upload as uploadMiddleware } from '../middlewares/upload.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
@@ -24,41 +24,40 @@ import {
 const router = Router();
 
 // Categorias disponibles para el usuario autenticado
-router.get('/categories', verifyToken, authorizeModuleAccess('QUALITY'), getCategories);
+router.get('/categories', verifyToken, requirePermission('QUALITY.CATEGORIES.READ'), getCategories);
 
-// Subida: solo ADMIN y EDITOR
-router.post('/upload', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), uploadMiddleware.single('file'), validate(uploadDocumentSchema), uploadDocument);
+// Subida: requiere escritura de documentos
+router.post('/upload', verifyToken, requirePermission('QUALITY.DOCUMENTS.WRITE'), uploadMiddleware.single('file'), validate(uploadDocumentSchema), uploadDocument);
 
 // Listado de documentos con filtro por rol/categoria
-router.get('/', verifyToken, authorizeModuleAccess('QUALITY'), getAllDocuments);
+router.get('/', verifyToken, requirePermission('QUALITY.DOCUMENTS.READ'), getAllDocuments);
 
 // Busqueda filtrada de documentos
-router.get('/search', verifyToken, authorizeModuleAccess('QUALITY'), searchDocuments);
+router.get('/search', verifyToken, requirePermission('QUALITY.DOCUMENTS.READ'), searchDocuments);
 
 // Estadisticas por estado (para tarjetas de resumen)
-router.get('/stats', verifyToken, authorizeModuleAccess('QUALITY'), getDocumentStats);
+router.get('/stats', verifyToken, requirePermission('QUALITY.DOCUMENTS.READ'), getDocumentStats);
 
 // Visualizacion segura de PDF
-router.get('/view/:filename', verifyToken, authorizeModuleAccess('QUALITY'), viewDocument);
+router.get('/view/:filename', verifyToken, requirePermission('QUALITY.DOCUMENTS.READ'), viewDocument);
 
-// Gestion de estado del documento: solo ADMIN y EDITOR
-router.patch('/status/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), validate(updateDocumentStatusSchema), toggleDocumentStatus);
+// Gestion de estado del documento: requiere escritura
+router.patch('/status/:id', verifyToken, requirePermission('QUALITY.DOCUMENTS.WRITE'), validate(updateDocumentStatusSchema), toggleDocumentStatus);
 
 // Reemplazo versionado del PDF: el actual queda derogado y se crea una nueva version vigente
 router.patch(
   '/:id/replace',
   verifyToken,
-  authorizeModuleAccess('QUALITY'),
-  authorize(['ADMIN', 'EDITOR']),
+  requirePermission('QUALITY.DOCUMENTS.WRITE'),
   uploadMiddleware.single('file'),
   validate(replaceDocumentFileSchema),
   replaceDocumentFile
 );
 
-// Edicion de metadata de documento: solo ADMIN y EDITOR
-router.patch('/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), validate(updateDocumentMetadataSchema), updateDocumentMetadata);
+// Edicion de metadata de documento: requiere escritura
+router.patch('/:id', verifyToken, requirePermission('QUALITY.DOCUMENTS.WRITE'), validate(updateDocumentMetadataSchema), updateDocumentMetadata);
 
-// Eliminacion de documento: solo ADMIN y EDITOR
-router.delete('/:id', verifyToken, authorizeModuleAccess('QUALITY'), authorize(['ADMIN', 'EDITOR']), deleteDocument);
+// Eliminacion de documento: requiere escritura
+router.delete('/:id', verifyToken, requirePermission('QUALITY.DOCUMENTS.WRITE'), deleteDocument);
 
 export default router;

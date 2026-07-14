@@ -48,7 +48,7 @@ import {
   updateHelpdeskTicketController,
   validateHelpdeskTicketReturnController,
 } from '../controllers/helpdesk.controller';
-import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
+import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   helpdeskAssetSchema,
@@ -119,108 +119,108 @@ import { upload } from '../middlewares/upload.middleware';
 
 const router = Router();
 
-router.use(verifyToken, authorizeModuleAccess('HELPDESK'));
+router.use(verifyToken);
 
 router.get(
   '/summary',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.DASHBOARD.READ'),
   getHelpdeskSummaryController,
 );
 router.get(
   '/dashboard',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.DASHBOARD.READ'),
   getHelpdeskDashboardController,
 );
 router.get(
   '/me/assets',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.SELF.ASSETS'),
   listMyHelpdeskAssetsController,
 );
 router.get(
   '/me/tickets',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.SELF.TICKETS'),
   listMyHelpdeskTicketsController,
 );
 router.get(
   '/me/tickets/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.SELF.TICKETS'),
   getMyHelpdeskTicketByIdController,
 );
 router.post(
   '/me/tickets',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.SELF.TICKETS'),
   validate(helpdeskTicketSchema),
   createMyHelpdeskTicketController,
 );
 router.post(
   '/me/tickets/:id/comments',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.SELF.TICKETS'),
   validate(helpdeskTicketCommentSchema),
   addMyHelpdeskTicketCommentController,
 );
 router.post(
   '/me/tickets/:id/confirm-functionality',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.SELF.TICKETS'),
   confirmMyHelpdeskTicketFunctionalityController,
 );
 router.get(
   '/catalogs',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.CATALOGS.READ'),
   listHelpdeskCatalogsController,
 );
 router.get(
   '/ticket-catalogs',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.CATALOGS.READ'),
   listHelpdeskTicketCatalogsController,
 );
 router.get(
   '/maintenance-catalogs',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.CATALOGS.READ'),
   listMaintenanceCatalogsController,
 );
 router.get(
   '/catalog-admin',
-  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  requirePermission('HELPDESK.CATALOGS.MANAGE'),
   listHelpdeskCatalogAdminDataController,
 );
 router.post(
   '/catalog-admin/:catalogKey',
-  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  requirePermission('HELPDESK.CATALOGS.MANAGE'),
   validate(helpdeskCatalogItemSchema),
   createHelpdeskCatalogItemController,
 );
 router.patch(
   '/catalog-admin/:catalogKey/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  requirePermission('HELPDESK.CATALOGS.MANAGE'),
   validate(helpdeskCatalogItemSchema),
   updateHelpdeskCatalogItemController,
 );
 router.post(
   '/catalog-admin/:catalogKey/:id/deactivate',
-  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  requirePermission('HELPDESK.CATALOGS.MANAGE'),
   deactivateHelpdeskCatalogItemController,
 );
 router.delete(
   '/catalog-admin/:catalogKey/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  requirePermission('HELPDESK.CATALOGS.MANAGE'),
   deleteHelpdeskCatalogItemController,
 );
 
 // --- Estructura organizacional (Unidad <-> Area <-> Responsables) ---
 router.get(
   '/org-structure',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ORG.READ'),
   getHelpdeskOrgStructureController,
 );
 router.put(
   '/units/:unitId/areas',
-  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  requirePermission('HELPDESK.ORG.MANAGE'),
   validate(unitAreasSchema),
   setUnitAreasController,
 );
 router.put(
   '/areas/:areaId/responsibles',
-  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  requirePermission('HELPDESK.ORG.MANAGE'),
   validate(areaResponsiblesSchema),
   setAreaResponsiblesController,
 );
@@ -229,113 +229,113 @@ router.put(
 // Las rutas literales van antes de '/handovers/:id' para no capturarlas como :id.
 router.get(
   '/handovers/pending-assets',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.HANDOVERS.READ'),
   listHandoverPendingAssetsController,
 );
 router.get(
   '/handovers',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.HANDOVERS.READ'),
   listHandoversController,
 );
 router.post(
   '/handovers',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.HANDOVERS.WRITE'),
   validate(handoverSchema),
   createHandoverController,
 );
 router.get(
   '/handovers/:id/acta',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.HANDOVERS.READ'),
   viewHandoverActaController,
 );
 router.get(
   '/handovers/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.HANDOVERS.READ'),
   getHandoverByIdController,
 );
 router.patch(
   '/handovers/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.HANDOVERS.WRITE'),
   validate(handoverSchema),
   updateHandoverController,
 );
 router.post(
   '/handovers/:id/sign',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.HANDOVERS.WRITE'),
   validate(handoverSignSchema),
   signHandoverController,
 );
 router.post(
   '/handovers/:id/void',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.HANDOVERS.WRITE'),
   validate(handoverVoidSchema),
   voidHandoverController,
 );
 router.delete(
   '/handovers/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.HANDOVERS.WRITE'),
   deleteHandoverController,
 );
 
 // --- Movimientos del activo (cambio de unidad/area/categoria/responsable) ---
 router.get(
   '/movements',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.MOVEMENTS.READ'),
   listAssetMovementsController,
 );
 router.post(
   '/movements',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.MOVEMENTS.WRITE'),
   validate(assetMovementSchema),
   createAssetMovementController,
 );
 router.get(
   '/movements/:id/signature',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.MOVEMENTS.READ'),
   viewMovementSignatureController,
 );
 router.get(
   '/maintenance/plans',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.MAINTENANCE.READ'),
   listMaintenancePlansController,
 );
 router.get(
   '/maintenance/orders',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.MAINTENANCE.READ'),
   listMaintenanceOrdersController,
 );
 router.post(
   '/maintenance/plans',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
   validate(maintenancePlanSchema),
   createMaintenancePlanController,
 );
 router.patch(
   '/maintenance/plans/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
   validate(maintenancePlanSchema),
   updateMaintenancePlanController,
 );
 router.post(
   '/maintenance/orders/:id/start',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
   startMaintenanceOrderController,
 );
 router.post(
   '/maintenance/orders/:id/reschedule',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
   validate(maintenanceOrderRescheduleSchema),
   rescheduleMaintenanceOrderController,
 );
 router.post(
   '/maintenance/orders/:id/close',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
   validate(maintenanceOrderCloseSchema),
   closeMaintenanceOrderController,
 );
 router.post(
   '/maintenance/plans/:id/schedule',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
   validate(scheduleDatesSchema),
   addMaintenanceScheduleController,
 );
@@ -343,195 +343,195 @@ router.post(
 // --- Calibracion (ISO 15189:2022, control metrologico 6.5) ---
 router.get(
   '/calibration-catalogs',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.CATALOGS.READ'),
   listCalibrationCatalogsController,
 );
 router.get(
   '/calibration/plans',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.CALIBRATION.READ'),
   listCalibrationPlansController,
 );
 router.get(
   '/calibration/orders',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.CALIBRATION.READ'),
   listCalibrationOrdersController,
 );
 router.post(
   '/calibration/plans',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.CALIBRATION.WRITE'),
   validate(calibrationPlanSchema),
   createCalibrationPlanController,
 );
 router.patch(
   '/calibration/plans/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.CALIBRATION.WRITE'),
   validate(calibrationPlanSchema),
   updateCalibrationPlanController,
 );
 router.post(
   '/calibration/orders/:id/start',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.CALIBRATION.WRITE'),
   startCalibrationOrderController,
 );
 router.post(
   '/calibration/orders/:id/reschedule',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.CALIBRATION.WRITE'),
   validate(calibrationOrderRescheduleSchema),
   rescheduleCalibrationOrderController,
 );
 router.post(
   '/calibration/orders/:id/close',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.CALIBRATION.WRITE'),
   validate(calibrationOrderCloseSchema),
   closeCalibrationOrderController,
 );
 router.post(
   '/calibration/plans/:id/schedule',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.CALIBRATION.WRITE'),
   validate(scheduleDatesSchema),
   addCalibrationScheduleController,
 );
 router.get(
   '/tickets',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.READ'),
   listHelpdeskTicketsController,
 );
 router.get(
   '/tickets/summary',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.READ'),
   getHelpdeskTicketStatsController,
 );
 router.get(
   '/tickets/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.READ'),
   getHelpdeskTicketByIdController,
 );
 router.post(
   '/tickets',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.WRITE'),
   validate(helpdeskTicketSchema),
   createHelpdeskTicketController,
 );
 router.patch(
   '/tickets/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.WRITE'),
   validate(helpdeskTicketSchema),
   updateHelpdeskTicketController,
 );
 router.post(
   '/tickets/:id/comments',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.WRITE'),
   validate(helpdeskTicketCommentSchema),
   addHelpdeskTicketCommentController,
 );
 router.post(
   '/tickets/:id/iso-risk',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.WRITE'),
   validate(helpdeskTicketIsoRiskSchema),
   evaluateHelpdeskTicketIsoRiskController,
 );
 router.post(
   '/tickets/:id/technical-release',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.WRITE'),
   validate(helpdeskTicketTechnicalReleaseSchema),
   releaseHelpdeskTicketTechnicallyController,
 );
 router.post(
   '/tickets/:id/solve',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.WRITE'),
   validate(helpdeskTicketSolveSchema),
   solveHelpdeskTicketController,
 );
 router.post(
   '/tickets/:id/validate-return',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.TICKETS.WRITE'),
   validate(helpdeskTicketValidateReturnSchema),
   validateHelpdeskTicketReturnController,
 );
 router.get(
   '/assets',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ASSETS.READ'),
   listHelpdeskAssetsController,
 );
 // Avance de la depuracion de la carga (antes de /assets/:id para no colisionar).
 router.get(
   '/assets/review-progress',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ASSETS.READ'),
   getAssetReviewProgressController,
 );
 router.get(
   '/assets/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ASSETS.READ'),
   getHelpdeskAssetByIdController,
 );
 router.post(
   '/assets',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   validate(helpdeskAssetSchema),
   createHelpdeskAssetController,
 );
 router.patch(
   '/assets/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   validate(helpdeskAssetSchema),
   updateHelpdeskAssetController,
 );
 router.delete(
   '/assets/:id',
-  authorizeModuleRole('HELPDESK', ['ADMIN']),
+  requirePermission('HELPDESK.ASSETS.DELETE'),
   deleteHelpdeskAssetController,
 );
 // Revision de carga: marcar/desmarcar activo como revisado.
 router.post(
   '/assets/:id/review',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   setAssetReviewStatusController,
 );
 
 // --- Componentes de activo (activos compuestos) ---
 router.post(
   '/assets/:id/components',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   validate(assetComponentSchema),
   createAssetComponentController,
 );
 router.post(
   '/assets/:id/components/attach',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   validate(assetComponentAttachSchema),
   attachAssetComponentController,
 );
 router.post(
   '/assets/:id/detach',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   detachAssetComponentController,
 );
 
 // --- Ciclo de vida del equipo (ISO 15189:2022) ---
 router.get(
   '/assets/:id/expedient',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ASSETS.READ'),
   getAssetExpedientController,
 );
 router.get(
   '/assets/:id/lifecycle-events',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ASSETS.READ'),
   listAssetLifecycleEventsController,
 );
 router.post(
   '/assets/:id/lifecycle-events',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   validate(lifecycleEventSchema),
   createLifecycleEventController,
 );
 router.get(
   '/lifecycle-events/:eventId',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ASSETS.READ'),
   getLifecycleEventDetailController,
 );
 router.patch(
   '/lifecycle-events/:eventId',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   validate(lifecycleEventSchema),
   updateLifecycleEventController,
 );
@@ -539,18 +539,18 @@ router.patch(
 // --- Evidencias documentales del equipo (PDF) ---
 router.get(
   '/assets/:id/documents',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ASSETS.READ'),
   listAssetDocumentsController,
 );
 router.post(
   '/assets/:id/documents',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR']),
+  requirePermission('HELPDESK.ASSETS.WRITE'),
   upload.single('file'),
   uploadAssetDocumentController,
 );
 router.get(
   '/asset-documents/:documentId/view',
-  authorizeModuleRole('HELPDESK', ['ADMIN', 'EDITOR', 'VIEWER']),
+  requirePermission('HELPDESK.ASSETS.READ'),
   viewAssetDocumentController,
 );
 

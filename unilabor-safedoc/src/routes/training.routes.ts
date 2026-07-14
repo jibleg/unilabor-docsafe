@@ -22,7 +22,7 @@ import {
   uploadCertificateImageController,
   upsertCertificateTemplateController,
 } from '../controllers/certificate.controller';
-import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
+import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { uploadCertificateImage } from '../middlewares/upload.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
@@ -42,7 +42,7 @@ import {
  */
 const router = Router();
 
-router.use(verifyToken, authorizeModuleAccess('RH'), authorizeModuleRole('RH', ['ADMIN', 'EDITOR']));
+router.use(verifyToken, requirePermission('RH.TRAINING.MANAGE'));
 
 // Capacitaciones
 router.get('/', listTrainingCoursesController);

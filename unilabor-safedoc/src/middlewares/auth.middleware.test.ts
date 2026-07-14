@@ -7,10 +7,22 @@ vi.mock('../services/module-access.service', () => ({
   listUserModuleAccess: vi.fn(),
 }));
 
+vi.mock('../services/permission.service', () => ({
+  getUserPermissionCodes: vi.fn(),
+}));
+
 import { listUserModuleAccess } from '../services/module-access.service';
-import { authorize, authorizeModuleAccess, authorizeModuleRole, verifyToken } from './auth.middleware';
+import { getUserPermissionCodes } from '../services/permission.service';
+import {
+  authorize,
+  authorizeModuleAccess,
+  authorizeModuleRole,
+  requirePermission,
+  verifyToken,
+} from './auth.middleware';
 
 const mockedListAccess = vi.mocked(listUserModuleAccess);
+const mockedGetPermissions = vi.mocked(getUserPermissionCodes);
 
 type ResMock = {
   statusCode?: number;
@@ -45,6 +57,7 @@ const moduleAccess = (code: string, role: string) => ({
 
 beforeEach(() => {
   mockedListAccess.mockReset();
+  mockedGetPermissions.mockReset();
 });
 
 describe('verifyToken', () => {
@@ -140,6 +153,54 @@ describe('authorizeModuleAccess', () => {
     await authorizeModuleAccess('HELPDESK')({ user: { id: 'u1', role: 'ADMIN' } } as any, res as any, next);
     expect(res.statusCode).toBe(403);
     expect(next).not.toHaveBeenCalled();
+  });
+});
+
+describe('requirePermission (RBAC por accion)', () => {
+  it('responde 401 sin usuario en la sesion', async () => {
+    const next = vi.fn();
+    const res = buildRes();
+    await requirePermission('HELPDESK.ASSETS.WRITE')({} as any, res as any, next);
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('llama next cuando el usuario tiene el permiso requerido', async () => {
+    mockedGetPermissions.mockResolvedValue(new Set(['HELPDESK.ASSETS.READ', 'HELPDESK.ASSETS.WRITE']));
+    const next = vi.fn();
+    const res = buildRes();
+    await requirePermission('HELPDESK.ASSETS.WRITE')(
+      { user: { id: 'u1', role: 'EDITOR' } } as any,
+      res as any,
+      next,
+    );
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.statusCode).toBeUndefined();
+  });
+
+  it('responde 403 cuando falta el permiso', async () => {
+    mockedGetPermissions.mockResolvedValue(new Set(['HELPDESK.ASSETS.READ']));
+    const next = vi.fn();
+    const res = buildRes();
+    await requirePermission('HELPDESK.ASSETS.WRITE')(
+      { user: { id: 'u1', role: 'VIEWER' } } as any,
+      res as any,
+      next,
+    );
+    expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('autoriza con semantica OR si tiene al menos uno de varios permisos', async () => {
+    mockedGetPermissions.mockResolvedValue(new Set(['HELPDESK.ASSETS.DELETE']));
+    const next = vi.fn();
+    const res = buildRes();
+    await requirePermission(['HELPDESK.ASSETS.WRITE', 'HELPDESK.ASSETS.DELETE'])(
+      { user: { id: 'u1', role: 'ADMIN' } } as any,
+      res as any,
+      next,
+    );
+    expect(next).toHaveBeenCalledOnce();
   });
 });
 

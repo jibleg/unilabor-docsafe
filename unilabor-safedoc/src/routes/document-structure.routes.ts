@@ -9,7 +9,7 @@ import {
   updateDocumentSectionController,
   updateDocumentTypeController,
 } from '../controllers/document-structure.controller';
-import { authorizeModuleAccess, authorizeModuleRole, verifyToken } from '../middlewares/auth.middleware';
+import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   createDocumentSectionSchema,
@@ -20,7 +20,7 @@ import {
 
 const router = Router();
 
-router.use(verifyToken, authorizeModuleAccess('RH'), authorizeModuleRole('RH', ['ADMIN', 'EDITOR']));
+router.use(verifyToken, requirePermission('RH.DOC_STRUCTURE.MANAGE'));
 
 router.get('/sections', listDocumentSectionsController);
 router.post('/sections', validate(createDocumentSectionSchema), createDocumentSectionController);
