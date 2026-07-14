@@ -335,6 +335,65 @@ export const deleteRole = async (roleId: number): Promise<void> => {
   }
 };
 
+// --- Vista centrada en el rol: que usuarios lo tienen ---
+export const listRoleUserIds = async (roleId: number): Promise<string[]> => {
+  const result = await pool.query(
+    `SELECT user_id FROM public.user_roles WHERE role_id = $1 AND is_active = TRUE;`,
+    [roleId],
+  );
+  return result.rows.map((row) => String(row.user_id));
+};
+
+// Reemplaza el conjunto de usuarios que tienen este rol (solo afecta a este
+// rol; conserva los demas roles de cada usuario). Con salvaguarda de ultimo admin.
+export const setRoleUsers = async (roleId: number, userIds: string[]): Promise<string[]> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const role = await client.query(`SELECT id FROM public.roles WHERE id = $1 FOR UPDATE;`, [roleId]);
+    if ((role.rowCount ?? 0) === 0) {
+      throw new RoleAdminError(404, 'Rol no encontrado');
+    }
+
+    const uniqueUserIds = Array.from(new Set(userIds.map((id) => id.trim()).filter(Boolean)));
+    if (uniqueUserIds.length > 0) {
+      const valid = await client.query(
+        `SELECT id::text AS id FROM public.users WHERE id::text = ANY($1::text[]);`,
+        [uniqueUserIds],
+      );
+      if ((valid.rowCount ?? 0) !== uniqueUserIds.length) {
+        throw new RoleAdminError(400, 'Uno o mas usuarios no existen');
+      }
+    }
+
+    await client.query(`DELETE FROM public.user_roles WHERE role_id = $1;`, [roleId]);
+    // Insercion fila por fila: user_id va como parametro unico para que Postgres
+    // lo castee al tipo real de users.id (uuid) sin asumirlo en SQL.
+    for (const userId of uniqueUserIds) {
+      await client.query(
+        `
+          INSERT INTO public.user_roles (user_id, role_id, is_active)
+          VALUES ($1, $2, TRUE)
+          ON CONFLICT (user_id, role_id) DO UPDATE
+          SET is_active = TRUE, updated_at = NOW();
+        `,
+        [userId, roleId],
+      );
+    }
+
+    await assertGuardStillPresent(client);
+    await client.query('COMMIT');
+    invalidateUserPermissions();
+    return listRoleUserIds(roleId);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 export const getUserRoleIds = async (userId: string): Promise<number[]> => {
   const result = await pool.query(
     `SELECT role_id FROM public.user_roles WHERE user_id = $1 AND is_active = TRUE ORDER BY role_id;`,

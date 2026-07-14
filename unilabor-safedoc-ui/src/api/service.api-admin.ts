@@ -103,6 +103,16 @@ export const deleteRbacRole = async (roleId: number): Promise<void> => {
   await api.delete(`/admin/roles/${roleId}`);
 };
 
+export const getRoleUserIds = async (roleId: number): Promise<string[]> => {
+  const response = await api.get(`/admin/roles/${roleId}/users`);
+  return getArrayFromPayload(response.data, ['user_ids', 'items', 'results']).map((id) => String(id));
+};
+
+export const setRoleUsers = async (roleId: number, userIds: string[]): Promise<string[]> => {
+  const response = await api.put(`/admin/roles/${roleId}/users`, { user_ids: userIds });
+  return getArrayFromPayload(response.data, ['user_ids', 'items', 'results']).map((id) => String(id));
+};
+
 export const getUserRoleIds = async (userId: string): Promise<number[]> => {
   const response = await api.get(`/admin/users/${encodeURIComponent(userId)}/roles`);
   return getArrayFromPayload(response.data, ['role_ids', 'items', 'results']).map((id) => Number(id));

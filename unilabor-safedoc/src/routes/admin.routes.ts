@@ -3,10 +3,12 @@ import {
   createRoleController,
   deleteRoleController,
   getRoleController,
+  getRoleUsersController,
   getUserRolesController,
   listPermissionsController,
   listRolesController,
   setRolePermissionsController,
+  setRoleUsersController,
   setUserRolesController,
   updateRoleController,
 } from '../controllers/role-admin.controller';
@@ -15,6 +17,7 @@ import { validate } from '../middlewares/validate.middleware';
 import {
   createRoleSchema,
   setRolePermissionsSchema,
+  setRoleUsersSchema,
   setUserRolesSchema,
   updateRoleSchema,
 } from '../schemas/role-admin.schema';
@@ -33,6 +36,8 @@ router.post('/roles', validate(createRoleSchema), createRoleController);
 router.get('/roles/:id', getRoleController);
 router.patch('/roles/:id', validate(updateRoleSchema), updateRoleController);
 router.put('/roles/:id/permissions', validate(setRolePermissionsSchema), setRolePermissionsController);
+router.get('/roles/:id/users', getRoleUsersController);
+router.put('/roles/:id/users', validate(setRoleUsersSchema), setRoleUsersController);
 router.delete('/roles/:id', deleteRoleController);
 
 // Asignacion de roles a usuarios (M:N)

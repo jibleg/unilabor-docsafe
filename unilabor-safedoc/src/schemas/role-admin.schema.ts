@@ -40,3 +40,12 @@ export const setRolePermissionsSchema = z.object({
 export const setUserRolesSchema = z.object({
   role_ids: roleIds,
 });
+
+const userIds = z
+  .array(z.string().trim().min(1))
+  .default([])
+  .transform((ids) => Array.from(new Set(ids)));
+
+export const setRoleUsersSchema = z.object({
+  user_ids: userIds,
+});

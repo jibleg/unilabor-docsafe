@@ -6,8 +6,10 @@ import {
   getRoleDetail,
   getUserRoleIds,
   listPermissions,
+  listRoleUserIds,
   listRoles,
   setRolePermissions,
+  setRoleUsers,
   setUserRoles,
   updateRole,
 } from '../services/role-admin.service';
@@ -112,6 +114,31 @@ export const deleteRoleController = async (req: Request, res: Response) => {
     res.json({ message: 'Rol eliminado' });
   } catch (error) {
     handleError(res, error, 'Error eliminando rol');
+  }
+};
+
+export const getRoleUsersController = async (req: Request, res: Response) => {
+  const roleId = parseId(req.params.id);
+  if (roleId === null) {
+    return res.status(400).json({ message: 'Id de rol invalido' });
+  }
+  try {
+    res.json({ user_ids: await listRoleUserIds(roleId) });
+  } catch (error) {
+    handleError(res, error, 'Error obteniendo usuarios del rol');
+  }
+};
+
+export const setRoleUsersController = async (req: Request, res: Response) => {
+  const roleId = parseId(req.params.id);
+  if (roleId === null) {
+    return res.status(400).json({ message: 'Id de rol invalido' });
+  }
+  try {
+    const userIds = await setRoleUsers(roleId, req.body.user_ids ?? []);
+    res.json({ user_ids: userIds });
+  } catch (error) {
+    handleError(res, error, 'Error asignando usuarios al rol');
   }
 };
 

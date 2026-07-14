@@ -5,11 +5,13 @@ import {
   deleteRbacRole,
   getApiErrorMessage,
   getRbacRole,
+  getRoleUserIds,
   getUserRoleIds,
   listRbacPermissions,
   listRbacRoles,
   listUsers,
   setRbacRolePermissions,
+  setRoleUsers,
   setUserRoleIds,
   updateRbacRole,
 } from '../api/service';
@@ -162,6 +164,8 @@ const RolesTab = ({
   const [saving, setSaving] = useState(false);
   // Modal de alta/edicion de rol (null = cerrado).
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; role?: RbacRoleSummary } | null>(null);
+  // Modal de asignacion de usuarios a un rol (null = cerrado).
+  const [usersModalRole, setUsersModalRole] = useState<RbacRoleSummary | null>(null);
 
   const selectRole = async (roleId: number) => {
     try {
@@ -253,24 +257,38 @@ const RolesTab = ({
                     {role.permission_count} permisos · {role.user_count} usuarios
                   </span>
                 </span>
-                {role.is_system ? (
-                  <span className="ml-2 shrink-0 rounded-full bg-[rgba(124,173,211,0.28)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-brand-700)]">
-                    Sistema
-                  </span>
-                ) : (
+                <span className="ml-2 flex shrink-0 items-center gap-1">
                   <span
                     role="button"
                     tabIndex={0}
                     onClick={(event) => {
                       event.stopPropagation();
-                      void removeRole(role);
+                      setUsersModalRole(role);
                     }}
-                    className="ml-2 shrink-0 rounded-lg p-1 text-[var(--unilabor-neutral)] hover:text-red-600"
-                    title="Eliminar rol"
+                    className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]"
+                    title="Asignar usuarios"
                   >
-                    <Trash2 size={15} />
+                    <Users size={15} />
                   </span>
-                )}
+                  {role.is_system ? (
+                    <span className="rounded-full bg-[rgba(124,173,211,0.28)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--color-brand-700)]">
+                      Sistema
+                    </span>
+                  ) : (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void removeRole(role);
+                      }}
+                      className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:text-red-600"
+                      title="Eliminar rol"
+                    >
+                      <Trash2 size={15} />
+                    </span>
+                  )}
+                </span>
               </button>
             </li>
           ))}
@@ -362,6 +380,174 @@ const RolesTab = ({
           }}
         />
       )}
+
+      {usersModalRole && (
+        <RoleUsersModal
+          role={usersModalRole}
+          onClose={() => setUsersModalRole(null)}
+          onChanged={onChanged}
+        />
+      )}
+    </div>
+  );
+};
+
+// -----------------------------------------------------------------------------
+// Modal centrado en el rol: lista todos los usuarios con un toggle para
+// asignar/quitar el rol. Cada cambio se persiste al momento (optimista).
+// -----------------------------------------------------------------------------
+const RoleUsersModal = ({
+  role,
+  onClose,
+  onChanged,
+}: {
+  role: RbacRoleSummary;
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+}) => {
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [assigned, setAssigned] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([listUsers(), getRoleUserIds(role.id)])
+      .then(([userList, ids]) => {
+        if (cancelled) return;
+        setUsers(userList);
+        setAssigned(new Set(ids));
+      })
+      .catch((error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar los usuarios')))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [role.id]);
+
+  const toggle = async (userId: string) => {
+    if (savingId) return;
+    const willAssign = !assigned.has(userId);
+    const next = new Set(assigned);
+    if (willAssign) next.add(userId);
+    else next.delete(userId);
+
+    setSavingId(userId);
+    setAssigned(next); // optimista
+    try {
+      const confirmed = await setRoleUsers(role.id, Array.from(next));
+      setAssigned(new Set(confirmed));
+      setTouched(true);
+    } catch (error) {
+      setAssigned(assigned); // revertir
+      notifyError(getApiErrorMessage(error, 'No se pudo actualizar la asignación'));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const close = () => {
+    if (touched) void onChanged();
+    onClose();
+  };
+
+  const filtered = users.filter((user) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return user.full_name.toLowerCase().includes(term) || user.email.toLowerCase().includes(term);
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-bold text-[var(--color-brand-700)]">
+              Usuarios del rol: {role.name}
+            </h2>
+            <p className="text-[11px] text-[var(--unilabor-neutral)]">
+              {assigned.size} usuario(s) con este rol · activa el interruptor para asignar o quitar
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-lg p-1 text-[var(--unilabor-neutral)] transition hover:text-[var(--color-brand-700)]"
+            aria-label="Cerrar"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="shrink-0 px-4 pt-3">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar usuario…"
+            className={inputClass}
+          />
+        </div>
+
+        <ul className="flex-1 space-y-1 overflow-y-auto overscroll-contain px-4 py-3">
+          {loading && <li className="px-2 py-4 text-sm text-[var(--unilabor-neutral)]">Cargando…</li>}
+          {!loading &&
+            filtered.map((user) => {
+              const on = assigned.has(user.id);
+              return (
+                <li key={user.id}>
+                  <button
+                    type="button"
+                    disabled={savingId !== null}
+                    onClick={() => void toggle(user.id)}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] px-3 py-2 text-left transition hover:bg-[rgba(191,212,230,0.22)] disabled:opacity-60"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-[var(--unilabor-ink)]">
+                        {user.full_name}
+                      </span>
+                      <span className="block truncate text-[11px] text-[var(--unilabor-neutral)]">{user.email}</span>
+                    </span>
+                    <span
+                      aria-hidden
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                        on ? 'bg-[var(--color-brand-600,#00416a)]' : 'bg-[rgba(0,65,106,0.2)]'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+                          on ? 'left-[18px]' : 'left-0.5'
+                        }`}
+                      />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          {!loading && filtered.length === 0 && (
+            <li className="px-2 py-4 text-sm text-[var(--unilabor-neutral)]">Sin resultados.</li>
+          )}
+        </ul>
+
+        <div className="flex shrink-0 justify-end border-t border-[rgba(0,65,106,0.08)] px-4 py-3">
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-lg bg-[var(--color-brand-600,#00416a)] px-4 py-1.5 text-sm font-semibold text-white"
+          >
+            Listo
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
