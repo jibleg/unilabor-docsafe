@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Boxes,
@@ -266,18 +266,64 @@ const toPayload = (form: AssetFormState): HelpdeskAssetPayload => ({
   receipt_condition_id: numericOrNull(form.receipt_condition_id),
 });
 
+// Snapshot del estado del listado (página, búsqueda y filtros) para restaurarlo
+// al volver del expediente de un activo. Persiste en sessionStorage (vive dentro
+// de la pestaña, se limpia al cerrarla).
+type AssetsListState = {
+  page: number;
+  search: string;
+  unitFilter: string;
+  areaFilter: string;
+  userFilter: string;
+  reviewFilter: '' | 'PENDING' | 'REVIEWED';
+};
+
+const LIST_STATE_KEY = 'helpdesk.assets.list-state';
+const DEFAULT_LIST_STATE: AssetsListState = {
+  page: 1,
+  search: '',
+  unitFilter: '',
+  areaFilter: '',
+  userFilter: '',
+  reviewFilter: '',
+};
+
+const readListState = (): AssetsListState => {
+  try {
+    const raw = sessionStorage.getItem(LIST_STATE_KEY);
+    if (raw) {
+      return { ...DEFAULT_LIST_STATE, ...(JSON.parse(raw) as Partial<AssetsListState>) };
+    }
+  } catch {
+    // sessionStorage no disponible o JSON inválido: se usa el estado por defecto.
+  }
+  return DEFAULT_LIST_STATE;
+};
+
+const writeListState = (state: AssetsListState): void => {
+  try {
+    sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // Sin persistencia: el listado simplemente no recordará su estado.
+  }
+};
+
 export const HelpdeskAssetsPage = () => {
   const navigate = useNavigate();
   const availableModules = useAuthStore((state) => state.availableModules);
   const moduleRole = getModuleRole(availableModules, 'HELPDESK') ?? 'VIEWER';
   const canWrite = hasAnyRole(moduleRole, ['ADMIN', 'EDITOR']);
 
+  // Estado restaurado (una sola lectura al montar) para conservar filtros y
+  // paginación al volver del expediente de un activo.
+  const restoredState = useRef(readListState()).current;
+
   const [orgStructure, setOrgStructure] = useState<HelpdeskOrgStructure>(EMPTY_ORG_STRUCTURE);
-  const [unitFilter, setUnitFilter] = useState('');
-  const [areaFilter, setAreaFilter] = useState('');
-  const [userFilter, setUserFilter] = useState('');
+  const [unitFilter, setUnitFilter] = useState(restoredState.unitFilter);
+  const [areaFilter, setAreaFilter] = useState(restoredState.areaFilter);
+  const [userFilter, setUserFilter] = useState(restoredState.userFilter);
   // Filtro de revisión de la carga masiva: '' = todos, 'PENDING', 'REVIEWED'.
-  const [reviewFilter, setReviewFilter] = useState<'' | 'PENDING' | 'REVIEWED'>('');
+  const [reviewFilter, setReviewFilter] = useState<'' | 'PENDING' | 'REVIEWED'>(restoredState.reviewFilter);
   const [reviewProgress, setReviewProgress] = useState<AssetReviewProgress>({ total: 0, reviewed: 0, pending: 0 });
   const assetFilters = useMemo(
     () => ({ unit_id: unitFilter, area_id: areaFilter, responsible_user_id: userFilter, review_status: reviewFilter }),
@@ -351,10 +397,24 @@ export const HelpdeskAssetsPage = () => {
     {
       pageSize: 20,
       filters: assetFilters,
+      initialPage: restoredState.page,
+      initialSearch: restoredState.search,
       onError: (error) =>
         notifyError(getApiErrorMessage(error, 'No se pudo cargar el inventario técnico.')),
     },
   );
+
+  // Persiste el estado del listado (para restaurarlo al volver del expediente).
+  useEffect(() => {
+    writeListState({
+      page,
+      search: query,
+      unitFilter,
+      areaFilter,
+      userFilter,
+      reviewFilter,
+    });
+  }, [page, query, unitFilter, areaFilter, userFilter, reviewFilter]);
   const [catalogs, setCatalogs] = useState<HelpdeskCatalogs>(EMPTY_CATALOGS);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [assetSummary, setAssetSummary] = useState<HelpdeskAssetSummary>(EMPTY_ASSET_SUMMARY);

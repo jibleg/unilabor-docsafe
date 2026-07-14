@@ -34,6 +34,12 @@ interface UsePaginatedListOptions {
    * se refetch una sola vez.
    */
   filters?: Record<string, string>;
+  /**
+   * Estado inicial para restaurar página/búsqueda al montar (p. ej. al volver de
+   * una vista de detalle). No dispara reseteo de página en el primer render.
+   */
+  initialPage?: number;
+  initialSearch?: string;
 }
 
 /**
@@ -45,19 +51,19 @@ export function usePaginatedList<T>(
   fetcher: (query: PaginatedListQuery) => Promise<PageResult<T>>,
   options: UsePaginatedListOptions = {},
 ): UsePaginatedListResult<T> {
-  const { pageSize = 20, debounceMs = 350, onError, filters = {} } = options;
+  const { pageSize = 20, debounceMs = 350, onError, filters = {}, initialPage = 1, initialSearch = '' } = options;
   const filtersKey = JSON.stringify(filters);
 
   const [items, setItems] = useState<T[]>([]);
   const [pagination, setPagination] = useState<PaginationMeta>({
-    page: 1,
+    page: initialPage,
     limit: pageSize,
     total: 0,
     totalPages: 1,
   });
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(initialPage);
+  const [search, setSearch] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch.trim());
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -87,7 +93,13 @@ export function usePaginatedList<T>(
 
   // Debounce de la búsqueda. El setState ocurre dentro del timeout (no en el cuerpo
   // del effect) y, al cambiar la búsqueda efectiva, se vuelve a la primera página.
+  // El primer render se omite para no resetear la página inicial restaurada.
+  const searchInitialized = useRef(false);
   useEffect(() => {
+    if (!searchInitialized.current) {
+      searchInitialized.current = true;
+      return;
+    }
     const handle = window.setTimeout(() => {
       setDebouncedSearch(search.trim());
       setPage(1);
