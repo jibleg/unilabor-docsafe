@@ -26,6 +26,17 @@ type Tab = 'roles' | 'users';
 const cardClass =
   'rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4 shadow-[0_10px_24px_rgba(0,65,106,0.06)]';
 
+// Etiquetas en espanol para los codigos de modulo.
+const MODULE_LABELS: Record<string, string> = {
+  QUALITY: 'Calidad',
+  RH: 'Recursos Humanos',
+  HELPDESK: 'Gestión de Activos',
+  ADMIN: 'Administración',
+  GLOBAL: 'General',
+};
+const moduleLabel = (code: string | null | undefined): string =>
+  MODULE_LABELS[(code ?? 'GLOBAL').toUpperCase()] ?? code ?? 'General';
+
 export const RolesPage = () => {
   const [tab, setTab] = useState<Tab>('roles');
   const [roles, setRoles] = useState<RbacRoleSummary[]>([]);
@@ -303,7 +314,7 @@ const RolesTab = ({
               {permissionGroups.map(([moduleCode, perms]) => (
                 <div key={moduleCode} className="rounded-xl border border-[rgba(0,65,106,0.08)] p-3">
                   <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
-                    {moduleCode}
+                    {moduleLabel(moduleCode)}
                   </h3>
                   <ul className="space-y-1.5">
                     {perms.map((permission) => (
@@ -317,13 +328,11 @@ const RolesTab = ({
                           />
                           <span className="min-w-0">
                             <span className="block font-medium text-[var(--unilabor-ink)]">
-                              {permission.resource}.{permission.action}
+                              {permission.description ?? `${permission.resource}.${permission.action}`}
                             </span>
-                            {permission.description && (
-                              <span className="block text-[11px] text-[var(--unilabor-neutral)]">
-                                {permission.description}
-                              </span>
-                            )}
+                            <span className="block font-mono text-[10px] text-[var(--unilabor-neutral)]">
+                              {permission.code}
+                            </span>
                           </span>
                         </label>
                       </li>
@@ -397,7 +406,7 @@ const CreateRoleForm = ({
         <option value="">Sin módulo</option>
         {moduleOptions.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {moduleLabel(option)}
           </option>
         ))}
       </select>
@@ -547,7 +556,7 @@ const UsersTab = ({ roles }: { roles: RbacRoleSummary[] }) => {
                     <span className="min-w-0">
                       <span className="block truncate font-medium text-[var(--unilabor-ink)]">{role.name}</span>
                       <span className="block truncate text-[11px] text-[var(--unilabor-neutral)]">
-                        {role.module_code ?? 'GLOBAL'} · {role.permission_count} permisos
+                        {moduleLabel(role.module_code)} · {role.permission_count} permisos
                       </span>
                     </span>
                   </label>
