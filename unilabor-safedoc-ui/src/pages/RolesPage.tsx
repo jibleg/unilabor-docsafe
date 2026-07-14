@@ -389,6 +389,16 @@ const RoleFormModal = ({
   const [isActive, setIsActive] = useState(role?.is_active ?? true);
   const [busy, setBusy] = useState(false);
 
+  // Bloquea el scroll del fondo mientras el modal esta abierto (evita que el
+  // scroll se propague al contenedor detras del backdrop).
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   const submit = async () => {
     if ((!isEdit && !code.trim()) || !name.trim()) {
       notifyError('Código y nombre son requeridos');
@@ -422,9 +432,9 @@ const RoleFormModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
-      <div className="flex w-full max-w-md flex-col rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
-        <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
+        <div className="flex shrink-0 items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
           <h2 className="text-base font-bold text-[var(--color-brand-700)]">
             {isEdit ? 'Editar rol' : 'Nuevo rol'}
           </h2>
@@ -438,7 +448,7 @@ const RoleFormModal = ({
           </button>
         </div>
 
-        <div className="space-y-3 px-4 py-4">
+        <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4">
           <div>
             <label className={labelClass}>Código</label>
             <input
@@ -501,7 +511,7 @@ const RoleFormModal = ({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-4 py-3">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-4 py-3">
           <button
             type="button"
             onClick={onClose}
