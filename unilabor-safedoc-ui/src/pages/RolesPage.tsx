@@ -544,7 +544,7 @@ const RoleUsersModal = ({
             onClick={close}
             className="rounded-lg bg-[var(--color-brand-600,#00416a)] px-4 py-1.5 text-sm font-semibold text-white"
           >
-            Listo
+            Guardar
           </button>
         </div>
       </div>
