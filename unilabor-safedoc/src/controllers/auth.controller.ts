@@ -4,7 +4,9 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/db';
 import { getJwtExpiresIn, getJwtSecret } from '../config/env';
 import { listUserModuleAccess } from '../services/module-access.service';
+import { getUserAccessSnapshot } from '../services/permission.service';
 import { recoverPasswordByEmail } from '../services/password.service';
+import type { AuthRequest } from '../middlewares/auth.middleware';
 
 const getTrimmedString = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -62,7 +64,11 @@ export const login = async (req: Request, res: Response) => {
     );
 
     // Registrar el acceso en la tabla de auditoría (Opcional pero recomendado)
+    // availableModules sigue viniendo del modelo legacy (user_module_roles);
+    // permissions es la capa nueva por accion (RBAC). Ambas se resuelven en
+    // servidor, no viajan en el JWT (evita permisos "stale" hasta el vencimiento).
     const availableModules = await listUserModuleAccess(user.id, user.role);
+    const { permissions } = await getUserAccessSnapshot(user.id);
     await logAuthAudit(user.id, 'LOGIN', req.ip);
 
     // Responder con el token y datos básicos del usuario
@@ -76,12 +82,30 @@ export const login = async (req: Request, res: Response) => {
         role: user.role,
         mustChangePassword: user.must_change_password
       },
-      availableModules
+      availableModules,
+      permissions
     });
 
   } catch (error) {
     console.error('Error en el login:', error);
     res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+// GET /api/auth/me/access - modulos accesibles + permisos efectivos del usuario
+// autenticado. Permite al frontend refrescar el acceso sin re-login.
+export const getMyAccess = async (req: AuthRequest, res: Response) => {
+  if (!req.user?.id) {
+    return res.status(401).json({ message: 'Sesion invalida o expirada' });
+  }
+
+  try {
+    const availableModules = await listUserModuleAccess(req.user.id, req.user.role);
+    const { permissions } = await getUserAccessSnapshot(req.user.id);
+    res.json({ availableModules, permissions });
+  } catch (error) {
+    console.error('Error obteniendo acceso del usuario:', error);
+    res.status(500).json({ message: 'No se pudo obtener el acceso del usuario' });
   }
 };
 

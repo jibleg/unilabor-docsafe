@@ -2,6 +2,7 @@
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../config/env';
 import { listUserModuleAccess } from '../services/module-access.service';
+import { getUserPermissionCodes } from '../services/permission.service';
 
 export interface JWTPayload {
   id: string;
@@ -54,6 +55,37 @@ export const authorize = (roles: string[]) => {
       });
     }
     next();
+  };
+};
+
+// RBAC por accion (Fase 1). Autoriza si el usuario tiene AL MENOS UNO de los
+// permisos indicados (semantica OR). Reemplazara progresivamente a
+// authorize/authorizeModuleRole conforme se migren las rutas (Fase 2).
+export const requirePermission = (required: string | string[]) => {
+  const requiredCodes = (Array.isArray(required) ? required : [required]).map((code) =>
+    code.trim().toUpperCase(),
+  );
+
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user?.id) {
+      return res.status(401).json({ message: 'Sesion invalida o expirada' });
+    }
+
+    try {
+      const permissions = await getUserPermissionCodes(req.user.id);
+      const hasPermission = requiredCodes.some((code) => permissions.has(code));
+
+      if (!hasPermission) {
+        return res.status(403).json({
+          message: 'No tienes el permiso necesario para realizar esta accion',
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error('Error validando permiso:', error);
+      return res.status(500).json({ message: 'No se pudo validar el permiso' });
+    }
   };
 };
 
