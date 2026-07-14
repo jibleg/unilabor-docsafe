@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Save, ShieldCheck, Trash2, Users } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2, Users, X } from 'lucide-react';
 import {
   createRbacRole,
   deleteRbacRole,
@@ -11,6 +11,7 @@ import {
   listUsers,
   setRbacRolePermissions,
   setUserRoleIds,
+  updateRbacRole,
 } from '../api/service';
 import type {
   ManagedUser,
@@ -25,6 +26,10 @@ type Tab = 'roles' | 'users';
 
 const cardClass =
   'rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4 shadow-[0_10px_24px_rgba(0,65,106,0.06)]';
+
+const inputClass =
+  'w-full rounded-lg border border-[rgba(0,65,106,0.12)] bg-white px-2 py-1.5 text-sm text-[var(--unilabor-ink)] outline-none focus:border-[var(--color-brand-300)]';
+const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]';
 
 // Etiquetas en espanol para los codigos de modulo.
 const MODULE_LABELS: Record<string, string> = {
@@ -155,7 +160,8 @@ const RolesTab = ({
   const [selected, setSelected] = useState<RbacRoleDetail | null>(null);
   const [draft, setDraft] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [creating, setCreating] = useState(false);
+  // Modal de alta/edicion de rol (null = cerrado).
+  const [modal, setModal] = useState<{ mode: 'create' | 'edit'; role?: RbacRoleSummary } | null>(null);
 
   const selectRole = async (roleId: number) => {
     try {
@@ -222,23 +228,12 @@ const RolesTab = ({
           </h2>
           <button
             type="button"
-            onClick={() => setCreating((value) => !value)}
+            onClick={() => setModal({ mode: 'create' })}
             className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 py-1 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.34)]"
           >
             <Plus size={14} /> Nuevo
           </button>
         </div>
-
-        {creating && (
-          <CreateRoleForm
-            moduleOptions={moduleOptions}
-            onCancel={() => setCreating(false)}
-            onCreated={async () => {
-              setCreating(false);
-              await onChanged();
-            }}
-          />
-        )}
 
         <ul className="space-y-1">
           {roles.map((role) => (
@@ -300,14 +295,23 @@ const RolesTab = ({
                   {selected.is_system ? ' · rol de sistema' : ''}
                 </p>
               </div>
-              <button
-                type="button"
-                disabled={!dirty || saving}
-                onClick={() => void savePermissions()}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-600,#00416a)] px-4 py-2 text-sm font-semibold text-white transition enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <Save size={16} /> Guardar permisos
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModal({ mode: 'edit', role: selected })}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.34)]"
+                >
+                  <Pencil size={15} /> Editar
+                </button>
+                <button
+                  type="button"
+                  disabled={!dirty || saving}
+                  onClick={() => void savePermissions()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-600,#00416a)] px-4 py-2 text-sm font-semibold text-white transition enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Save size={16} /> Guardar permisos
+                </button>
+              </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -344,84 +348,176 @@ const RolesTab = ({
           </div>
         )}
       </div>
+
+      {modal && (
+        <RoleFormModal
+          mode={modal.mode}
+          role={modal.role}
+          moduleOptions={moduleOptions}
+          onClose={() => setModal(null)}
+          onSaved={async (roleId) => {
+            setModal(null);
+            await onChanged();
+            await selectRole(roleId);
+          }}
+        />
+      )}
     </div>
   );
 };
 
-const CreateRoleForm = ({
+// Modal de alta/edicion de rol. En edicion el codigo y el modulo son fijos
+// (el backend no los modifica) y se puede activar/desactivar el rol.
+const RoleFormModal = ({
+  mode,
+  role,
   moduleOptions,
-  onCancel,
-  onCreated,
+  onClose,
+  onSaved,
 }: {
+  mode: 'create' | 'edit';
+  role?: RbacRoleSummary;
   moduleOptions: string[];
-  onCancel: () => void;
-  onCreated: () => Promise<void>;
+  onClose: () => void;
+  onSaved: (roleId: number) => Promise<void> | void;
 }) => {
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [moduleCode, setModuleCode] = useState('');
+  const isEdit = mode === 'edit';
+  const [code, setCode] = useState(role?.code ?? '');
+  const [name, setName] = useState(role?.name ?? '');
+  const [description, setDescription] = useState(role?.description ?? '');
+  const [moduleCode, setModuleCode] = useState(role?.module_code ?? '');
+  const [isActive, setIsActive] = useState(role?.is_active ?? true);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    if (!code.trim() || !name.trim()) {
+    if ((!isEdit && !code.trim()) || !name.trim()) {
       notifyError('Código y nombre son requeridos');
       return;
     }
     setBusy(true);
     try {
-      await createRbacRole({
-        code: code.trim().toUpperCase(),
-        name: name.trim(),
-        module_code: moduleCode || undefined,
-        permission_codes: [],
-      });
-      notifySuccess('Rol creado. Ahora asígnale permisos.');
-      await onCreated();
+      const saved =
+        isEdit && role
+          ? await updateRbacRole(role.id, {
+              name: name.trim(),
+              description: description.trim() || null,
+              is_active: isActive,
+            })
+          : await createRbacRole({
+              code: code.trim().toUpperCase(),
+              name: name.trim(),
+              description: description.trim() || undefined,
+              module_code: moduleCode || undefined,
+              permission_codes: [],
+            });
+      notifySuccess(isEdit ? 'Rol actualizado' : 'Rol creado. Ahora asígnale permisos.');
+      await onSaved(saved.id);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo crear el rol'));
+      notifyError(
+        getApiErrorMessage(error, isEdit ? 'No se pudo actualizar el rol' : 'No se pudo crear el rol'),
+      );
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="mb-3 space-y-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(239,245,250,0.6)] p-3">
-      <input
-        value={code}
-        onChange={(event) => setCode(event.target.value.toUpperCase())}
-        placeholder="CÓDIGO (ej. SOPORTE_N1)"
-        className="w-full rounded-lg border border-[rgba(0,65,106,0.12)] bg-white px-2 py-1.5 text-sm"
-      />
-      <input
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        placeholder="Nombre visible"
-        className="w-full rounded-lg border border-[rgba(0,65,106,0.12)] bg-white px-2 py-1.5 text-sm"
-      />
-      <select
-        value={moduleCode}
-        onChange={(event) => setModuleCode(event.target.value)}
-        className="w-full rounded-lg border border-[rgba(0,65,106,0.12)] bg-white px-2 py-1.5 text-sm"
-      >
-        <option value="">Sin módulo</option>
-        {moduleOptions.map((option) => (
-          <option key={option} value={option}>
-            {moduleLabel(option)}
-          </option>
-        ))}
-      </select>
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="rounded-lg px-3 py-1.5 text-sm text-[var(--unilabor-neutral)]">
-          Cancelar
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void submit()}
-          className="rounded-lg bg-[var(--color-brand-600,#00416a)] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
-        >
-          Crear
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+      <div className="flex w-full max-w-md flex-col rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
+        <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
+          <h2 className="text-base font-bold text-[var(--color-brand-700)]">
+            {isEdit ? 'Editar rol' : 'Nuevo rol'}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-[var(--unilabor-neutral)] transition hover:text-[var(--color-brand-700)]"
+            aria-label="Cerrar"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-3 px-4 py-4">
+          <div>
+            <label className={labelClass}>Código</label>
+            <input
+              value={code}
+              disabled={isEdit}
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+              placeholder="SOPORTE_N1"
+              className={`${inputClass} ${isEdit ? 'cursor-not-allowed opacity-60' : ''}`}
+            />
+            {isEdit && (
+              <p className="mt-1 text-[11px] text-[var(--unilabor-neutral)]">El código no se puede cambiar.</p>
+            )}
+          </div>
+          <div>
+            <label className={labelClass}>Nombre visible</label>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Soporte Nivel 1"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Descripción</label>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={2}
+              placeholder="Para qué sirve este rol"
+              className={inputClass}
+            />
+          </div>
+          {!isEdit && (
+            <div>
+              <label className={labelClass}>Módulo</label>
+              <select
+                value={moduleCode}
+                onChange={(event) => setModuleCode(event.target.value)}
+                className={inputClass}
+              >
+                <option value="">Sin módulo</option>
+                {moduleOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {moduleLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {isEdit && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--unilabor-ink)]">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(event) => setIsActive(event.target.checked)}
+                className="h-4 w-4 accent-[var(--color-brand-600,#00416a)]"
+              />
+              Rol activo
+            </label>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-4 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-sm text-[var(--unilabor-neutral)]"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void submit()}
+            className="rounded-lg bg-[var(--color-brand-600,#00416a)] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            {isEdit ? 'Guardar' : 'Crear'}
+          </button>
+        </div>
       </div>
     </div>
   );
