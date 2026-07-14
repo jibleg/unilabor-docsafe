@@ -22,6 +22,32 @@ export interface User {
   updated_at?: string;
 }
 
+// --- Administracion RBAC (roles, permisos, asignaciones) ---
+export interface RbacPermission {
+  id: number;
+  code: string;
+  resource: string;
+  action: string;
+  description: string | null;
+  module_code: string | null;
+}
+
+export interface RbacRoleSummary {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  module_code: string | null;
+  is_system: boolean;
+  is_active: boolean;
+  permission_count: number;
+  user_count: number;
+}
+
+export interface RbacRoleDetail extends RbacRoleSummary {
+  permissions: string[];
+}
+
 export interface ManagedUser {
   id: string;
   email: string;

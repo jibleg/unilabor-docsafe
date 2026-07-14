@@ -10,6 +10,7 @@ import {
   FileText,
   GraduationCap,
   Inbox,
+  KeyRound,
   Laptop,
   LayoutDashboard,
   LifeBuoy,
@@ -53,6 +54,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       items: [
         { icon: Tags, label: 'Categorías', path: '/quality/categories', permission: 'QUALITY.CATEGORIES.WRITE' },
         { icon: Users, label: 'Personal', path: '/quality/users', permission: 'ADMIN.USERS.READ' },
+        { icon: KeyRound, label: 'Roles y permisos', path: '/quality/roles', permission: 'ADMIN.ROLES.MANAGE' },
         { icon: ShieldCheck, label: 'Auditoría', path: '/quality/audit', permission: 'ADMIN.AUDIT.READ' },
       ],
     },

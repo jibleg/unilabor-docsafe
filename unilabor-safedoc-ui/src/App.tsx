@@ -4,6 +4,7 @@ import { RhHomeRedirect } from './components/RhHomeRedirect';
 import { ToastContainer, Slide } from 'react-toastify';
 import { ModuleGuard } from './components/ModuleGuard';
 import { RoleGate } from './components/RoleGate';
+import { PermissionGate } from './components/PermissionGate';
 import { ConfirmHost } from './components/ConfirmHost';
 import { QualityLayout } from './layouts/QualityLayout';
 import { RhLayout } from './layouts/RhLayout';
@@ -11,6 +12,7 @@ import { HelpdeskLayout } from './layouts/HelpdeskLayout';
 import 'react-toastify/dist/ReactToastify.css';
 
 const AuditPage = lazy(() => import('./pages/AuditPage').then((module) => ({ default: module.AuditPage })));
+const RolesPage = lazy(() => import('./pages/RolesPage').then((module) => ({ default: module.RolesPage })));
 const CategoriesPage = lazy(() =>
   import('./pages/CategoriesPage').then((module) => ({ default: module.CategoriesPage })),
 );
@@ -172,6 +174,14 @@ function App() {
             <RoleGate allowedRoles={['ADMIN']} redirectTo="/quality/dashboard">
               <AuditPage />
             </RoleGate>
+          }
+        />
+        <Route
+          path="roles"
+          element={
+            <PermissionGate permission="ADMIN.ROLES.MANAGE" redirectTo="/quality/dashboard">
+              <RolesPage />
+            </PermissionGate>
           }
         />
       </Route>
