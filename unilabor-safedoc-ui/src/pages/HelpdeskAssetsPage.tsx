@@ -336,6 +336,7 @@ export const HelpdeskAssetsPage = () => {
     setSearch: setQuery,
     loading,
     reload: reloadAssets,
+    updateItems: updateAssetItems,
   } = usePaginatedList<HelpdeskAsset>(
     (q) =>
       listHelpdeskAssetsPaginated({
@@ -494,16 +495,45 @@ export const HelpdeskAssetsPage = () => {
   };
 
   // Marca/desmarca un activo como revisado tras depurar su dato de la carga.
-  // Reversible; refresca la ficha activa (si aplica), el listado y el contador.
+  // Reversible. Actualiza SOLO la fila afectada y el contador en memoria (sin
+  // recargar todo el inventario), para no re-renderizar todo el contenedor.
   const handleToggleReview = async (asset: HelpdeskAsset) => {
     const willReview = asset.review_status !== 'REVIEWED';
     try {
       const updated = await setAssetReviewStatus(asset.id, willReview);
       notifySuccess(willReview ? 'Activo marcado como revisado.' : 'Activo devuelto a pendiente.');
+
+      const newStatus: 'PENDING' | 'REVIEWED' = willReview ? 'REVIEWED' : 'PENDING';
+      const patch: Partial<HelpdeskAsset> = updated
+        ? {
+            review_status: updated.review_status,
+            reviewed_at: updated.reviewed_at,
+            reviewed_by: updated.reviewed_by,
+            reviewed_by_name: updated.reviewed_by_name,
+          }
+        : { review_status: newStatus };
+
+      updateAssetItems((items) => {
+        // Con filtro de revisión activo, si la fila deja de coincidir, se quita
+        // de la vista; en cualquier otro caso se parchea en su lugar.
+        const dropsOut =
+          (reviewFilter === 'PENDING' && newStatus === 'REVIEWED') ||
+          (reviewFilter === 'REVIEWED' && newStatus === 'PENDING');
+        if (dropsOut) {
+          return items.filter((item) => item.id !== asset.id);
+        }
+        return items.map((item) => (item.id === asset.id ? { ...item, ...patch } : item));
+      });
+
+      setReviewProgress((prev) =>
+        willReview
+          ? { ...prev, reviewed: prev.reviewed + 1, pending: Math.max(0, prev.pending - 1) }
+          : { ...prev, reviewed: Math.max(0, prev.reviewed - 1), pending: prev.pending + 1 },
+      );
+
       if (updated && selectedAsset && selectedAsset.id === updated.id) {
         setSelectedAsset(updated);
       }
-      refreshAssets();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo actualizar la revisión del activo.'));
     }

@@ -17,6 +17,11 @@ export interface UsePaginatedListResult<T> {
   setSearch: (value: string) => void;
   loading: boolean;
   reload: () => void;
+  /**
+   * Actualiza los items en memoria sin refetch (p. ej. tras una mutación puntual
+   * de una fila), evitando recargar toda la lista.
+   */
+  updateItems: (updater: (items: T[]) => T[]) => void;
 }
 
 interface UsePaginatedListOptions {
@@ -123,6 +128,7 @@ export function usePaginatedList<T>(
   }, [page, debouncedSearch, pageSize, refreshKey]);
 
   const reload = useCallback(() => setRefreshKey((key) => key + 1), []);
+  const updateItems = useCallback((updater: (items: T[]) => T[]) => setItems(updater), []);
 
-  return { items, pagination, page, setPage, search, setSearch, loading, reload };
+  return { items, pagination, page, setPage, search, setSearch, loading, reload, updateItems };
 }
