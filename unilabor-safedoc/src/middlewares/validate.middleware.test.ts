@@ -49,4 +49,27 @@ describe('validate middleware', () => {
     expect(Array.isArray(res.body.errors)).toBe(true);
     expect(res.body.errors[0]).toMatchObject({ field: 'email' });
   });
+
+  it('trata una peticion sin body como objeto vacio', () => {
+    const optionalSchema = z.object({ temporaryPassword: z.string().min(6).optional() });
+    const req: any = { body: undefined };
+    const res = buildRes();
+    const next = vi.fn();
+
+    validate(optionalSchema)(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.body).toEqual({});
+  });
+
+  it('sigue reportando errores por campo cuando falta el body y el esquema exige campos', () => {
+    const req: any = { body: undefined };
+    const res = buildRes();
+    const next = vi.fn();
+
+    validate(schema)(req, res, next);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.errors[0]).toMatchObject({ field: 'email' });
+  });
 });

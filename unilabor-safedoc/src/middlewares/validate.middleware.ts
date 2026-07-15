@@ -8,11 +8,15 @@ import type { ZodType } from 'zod';
  * uniforme `{ message, errors: [{ field, message }] }`. Si pasa, reemplaza
  * `req.body` con los datos ya parseados/normalizados (coerciones y defaults del
  * esquema), de modo que el controller recibe entrada confiable.
+ *
+ * En Express 5 una peticion sin body deja `req.body` en `undefined`; lo tratamos
+ * como objeto vacio para que el esquema decida si los campos son opcionales en
+ * vez de fallar con "expected object, received undefined".
  */
 export const validate =
   (schema: ZodType) =>
   (req: Request, res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+    const result = schema.safeParse(req.body ?? {});
 
     if (!result.success) {
       return res.status(400).json({

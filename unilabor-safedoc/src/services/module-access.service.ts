@@ -8,13 +8,22 @@ type Queryable = {
   query: (text: string, params?: unknown[]) => Promise<{ rows: any[] }>;
 };
 
-const normalizeModuleCode = (value: unknown): ModuleCode => {
+/**
+ * Devuelve el codigo solo si es uno de los modulos de acceso que este servicio
+ * administra, o `null` en caso contrario.
+ *
+ * No cae a 'QUALITY' por defecto: la tabla `modules` tambien aloja modulos que
+ * no se asignan por esta via (p. ej. 'ADMIN', del RBAC), y tratarlos como
+ * QUALITY los duplicaba contra el modulo real.
+ */
+const normalizeModuleCode = (value: unknown): ModuleCode | null => {
   const normalizedValue = String(value ?? '').trim().toUpperCase();
-  if (normalizedValue === 'RH' || normalizedValue === 'HELPDESK') {
+
+  if (normalizedValue === 'QUALITY' || normalizedValue === 'RH' || normalizedValue === 'HELPDESK') {
     return normalizedValue;
   }
 
-  return 'QUALITY';
+  return null;
 };
 
 const normalizeUserRole = (value: unknown): UserRole => {
@@ -78,15 +87,23 @@ export const listSystemModules = async (): Promise<ModuleAccess[]> => {
 
   const result = await pool.query(query);
 
-  return result.rows.map((row) => ({
-    code: normalizeModuleCode(row.code),
-    name: String(row.name ?? ''),
-    description: row.description ? String(row.description) : null,
-    icon: row.icon ? String(row.icon) : null,
-    role: 'ADMIN',
-    is_active: Boolean(row.is_active),
-    sort_order: Number(row.sort_order ?? 0),
-  }));
+  return result.rows.flatMap((row) => {
+    const code = normalizeModuleCode(row.code);
+
+    return code === null
+      ? []
+      : [
+          {
+            code,
+            name: String(row.name ?? ''),
+            description: row.description ? String(row.description) : null,
+            icon: row.icon ? String(row.icon) : null,
+            role: 'ADMIN' as const,
+            is_active: Boolean(row.is_active),
+            sort_order: Number(row.sort_order ?? 0),
+          },
+        ];
+  });
 };
 
 export const listUserModuleAccess = async (
@@ -121,15 +138,23 @@ export const listUserModuleAccess = async (
 
   const result = await pool.query(query, [userId]);
 
-  return result.rows.map((row) => ({
-    code: normalizeModuleCode(row.code),
-    name: String(row.name ?? ''),
-    description: row.description ? String(row.description) : null,
-    icon: row.icon ? String(row.icon) : null,
-    role: normalizeUserRole(row.role),
-    is_active: Boolean(row.is_active),
-    sort_order: Number(row.sort_order ?? 0),
-  }));
+  return result.rows.flatMap((row) => {
+    const code = normalizeModuleCode(row.code);
+
+    return code === null
+      ? []
+      : [
+          {
+            code,
+            name: String(row.name ?? ''),
+            description: row.description ? String(row.description) : null,
+            icon: row.icon ? String(row.icon) : null,
+            role: normalizeUserRole(row.role),
+            is_active: Boolean(row.is_active),
+            sort_order: Number(row.sort_order ?? 0),
+          },
+        ];
+  });
 };
 
 export const syncUserModuleAccess = async (
@@ -152,9 +177,7 @@ export const syncUserModuleAccess = async (
     new Set(
       moduleCodes
         .map((moduleCode) => normalizeModuleCode(moduleCode))
-        .filter((moduleCode): moduleCode is ModuleCode =>
-          moduleCode === 'QUALITY' || moduleCode === 'RH' || moduleCode === 'HELPDESK',
-        ),
+        .filter((moduleCode): moduleCode is ModuleCode => moduleCode !== null),
     ),
   );
 
@@ -167,15 +190,23 @@ export const syncUserModuleAccess = async (
     `,
   );
 
-  const availableModules = activeModulesResult.rows.map((row) => ({
-    id: Number(row.id),
-    code: normalizeModuleCode(row.code),
-    name: String(row.name ?? ''),
-    description: row.description ? String(row.description) : null,
-    icon: row.icon ? String(row.icon) : null,
-    is_active: Boolean(row.is_active),
-    sort_order: Number(row.sort_order ?? 0),
-  }));
+  const availableModules = activeModulesResult.rows.flatMap((row) => {
+    const code = normalizeModuleCode(row.code);
+
+    return code === null
+      ? []
+      : [
+          {
+            id: Number(row.id),
+            code,
+            name: String(row.name ?? ''),
+            description: row.description ? String(row.description) : null,
+            icon: row.icon ? String(row.icon) : null,
+            is_active: Boolean(row.is_active),
+            sort_order: Number(row.sort_order ?? 0),
+          },
+        ];
+  });
 
   const selectedModules = availableModules.filter((moduleAccess) =>
     normalizedCodes.includes(moduleAccess.code),
