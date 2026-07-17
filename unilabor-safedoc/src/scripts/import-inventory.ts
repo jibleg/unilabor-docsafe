@@ -91,6 +91,7 @@ interface RowReport {
 interface ImportReport {
   totalRows: number;
   skippedNoCode: number;
+  autoCoded: number; // filas con datos pero sin codigo => codigo autogenerado
   processed: number;
   created: number;
   failed: number;
@@ -250,6 +251,7 @@ async function run(): Promise<void> {
   const report: ImportReport = {
     totalRows: 0,
     skippedNoCode: 0,
+    autoCoded: 0,
     processed: 0,
     created: 0,
     failed: 0,
@@ -285,12 +287,22 @@ async function run(): Promise<void> {
     report.totalRows += 1;
 
     const assetCode = cellText(row.getCell(COL.assetCode).value);
-    if (!assetCode) {
+    const description = cellText(row.getCell(COL.description).value);
+    // Fila realmente vacia (sin codigo Y sin descripcion) => ruido de la hoja, se ignora.
+    if (!assetCode && !description) {
       report.skippedNoCode += 1;
       continue;
     }
-    const name = cellText(row.getCell(COL.description).value) || 'SIN DESCRIPCION';
+    // Sin codigo pero CON datos => activo real: se importa y el servicio AUTOGENERA
+    // el codigo ({UNIDAD}-{AREA}-{CLASIF}-NNN). El NNN sale del contador del scope,
+    // no del consecutivo de la fila.
+    const autoCode = !assetCode;
+    const name = description || 'SIN DESCRIPCION';
     const warnings: string[] = [];
+    if (autoCode) {
+      report.autoCoded += 1;
+      warnings.push('sin CODIGO en la hoja: se autogenerara (no coincide con el consecutivo de la fila)');
+    }
 
     // --- Resolucion de catalogos por clave ---
     const unitCode = fold(cellText(row.getCell(COL.unitCode).value));
@@ -341,7 +353,7 @@ async function run(): Promise<void> {
     // RESPONSABLE y OBSERVACION se omiten en esta importacion (no vienen en el
     // inventario de prod); quedan NULL y se asignan despues.
     const payload: HelpdeskAssetPayload = {
-      asset_code: assetCode, // preservado => override (no autogenera)
+      asset_code: assetCode, // con valor => override; vacio => el servicio autogenera
       name,
       description: null,
       category_id: categoryId,
@@ -355,7 +367,7 @@ async function run(): Promise<void> {
       purchase_modality_id: modalityId,
       purchase_condition_id: conditionId,
       responsible_employee_id: null,
-      inventory_legacy_code: assetCode,
+      inventory_legacy_code: assetCode || null,
       legacy_consecutive: orNull(cellText(row.getCell(COL.consecutive).value)),
       legacy_component_consecutive: orNull(cellText(row.getCell(COL.componentConsecutive).value)),
       notes: null,
@@ -433,7 +445,8 @@ function printAndWriteReport(report: ImportReport, args: ParsedArgs): void {
   out('==================== REPORTE DE IMPORTACION ====================');
   out(`Modo:               ${args.commit ? 'COMMIT' : 'DRY-RUN'}`);
   out(`Filas totales:      ${report.totalRows}`);
-  out(`Saltadas sin codigo:${report.skippedNoCode}`);
+  out(`Saltadas (vacias):  ${report.skippedNoCode}`);
+  out(`Codigo autogenerado:${report.autoCoded}  (filas con datos pero sin CODIGO en la hoja)`);
   out(`Procesadas:         ${report.processed}`);
   out(`Activos "todo":     ${report.wholes}`);
   out(`Componentes:        ${report.linkedComponents} vinculados a su padre + ${report.orphanComponents.size} huerfanos`);
