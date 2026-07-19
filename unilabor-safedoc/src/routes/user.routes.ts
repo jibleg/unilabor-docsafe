@@ -3,7 +3,6 @@ import {
   createUser,
   deleteUserById,
   getAllUsers,
-  getModuleCatalog,
   getMyCategories,
   getUserCategoriesById,
   replaceUserCategoriesById,
@@ -34,7 +33,6 @@ const router = Router();
  * ADMINISTRACIÓN DE USUARIOS
  * Solo accesible por el rol ADMIN
  */
-router.get('/modules/catalog', verifyToken, requirePermission('ADMIN.USERS.READ'), getModuleCatalog);
 router.post('/', verifyToken, requirePermission('ADMIN.USERS.MANAGE'), validate(createUserSchema), createUser);
 router.get('/', verifyToken, requirePermission('ADMIN.USERS.READ'), getAllUsers);
 

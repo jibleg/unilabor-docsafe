@@ -5,7 +5,6 @@ import {
   createUser,
   deleteUserById,
   fetchCategories,
-  fetchModuleCatalog,
   fetchUserCategories,
   getApiErrorMessage,
   listUsersPaginated,
@@ -15,7 +14,7 @@ import {
   type CreateUserPayload,
   type UpdateUserPayload,
 } from '../api/service';
-import type { Category, ManagedUser, ModuleAccess, ModuleCode } from '../types/models';
+import type { Category, ManagedUser } from '../types/models';
 import { useAuthStore } from '../store/useAuthStore';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 
@@ -24,7 +23,6 @@ import {
   PAGE_SIZE_OPTIONS,
   EMAIL_REGEX,
   EMPTY_FORM,
-  FALLBACK_MODULE_OPTIONS,
   getRoleLabel,
   getRoleBadgeClassName,
   normalizeRoleValue,
@@ -39,10 +37,8 @@ export const UsersPage = () => {
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [moduleOptions, setModuleOptions] = useState<ModuleAccess[]>(FALLBACK_MODULE_OPTIONS);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
-  const [loadingModules, setLoadingModules] = useState(false);
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -94,25 +90,9 @@ export const UsersPage = () => {
     }
   }, []);
 
-  const loadModules = useCallback(async () => {
-    setLoadingModules(true);
-    try {
-      const modules = await fetchModuleCatalog();
-      if (modules.length > 0) {
-        setModuleOptions(modules);
-      }
-    } catch (requestError) {
-      notifyWarning(getApiErrorMessage(requestError, 'No se pudo cargar el catálogo de módulos. Se usará la configuración base.'));
-      setModuleOptions(FALLBACK_MODULE_OPTIONS);
-    } finally {
-      setLoadingModules(false);
-    }
-  }, []);
-
   useEffect(() => {
     void loadCategories();
-    void loadModules();
-  }, [loadCategories, loadModules]);
+  }, [loadCategories]);
 
   // Búsqueda con debounce: vuelve a la primera página al cambiar el término.
   useEffect(() => {
@@ -179,30 +159,6 @@ export const UsersPage = () => {
     });
   };
 
-  const toggleCreateModule = (moduleCode: ModuleCode) => {
-    setCreateForm((currentForm) => {
-      const alreadySelected = currentForm.moduleCodes.includes(moduleCode);
-      return {
-        ...currentForm,
-        moduleCodes: alreadySelected
-          ? currentForm.moduleCodes.filter((code) => code !== moduleCode)
-          : [...currentForm.moduleCodes, moduleCode],
-      };
-    });
-  };
-
-  const toggleEditModule = (moduleCode: ModuleCode) => {
-    setEditForm((currentForm) => {
-      const alreadySelected = currentForm.moduleCodes.includes(moduleCode);
-      return {
-        ...currentForm,
-        moduleCodes: alreadySelected
-          ? currentForm.moduleCodes.filter((code) => code !== moduleCode)
-          : [...currentForm.moduleCodes, moduleCode],
-      };
-    });
-  };
-
   const validateForm = (form: UserFormState): boolean => {
     if (!form.full_name.trim()) {
       notifyWarning('El nombre completo es obligatorio');
@@ -216,11 +172,6 @@ export const UsersPage = () => {
 
     if (!EMAIL_REGEX.test(form.email.trim())) {
       notifyWarning('El correo no tiene un formato válido');
-      return false;
-    }
-
-    if (form.role === 'VIEWER' && form.moduleCodes.includes('QUALITY') && form.categoryIds.length === 0) {
-      notifyWarning('Un usuario VIEWER debe tener al menos una categoría asignada');
       return false;
     }
 
@@ -250,7 +201,6 @@ export const UsersPage = () => {
       full_name: createForm.full_name.trim(),
       role: createForm.role,
       category_ids: createForm.categoryIds,
-      module_codes: createForm.moduleCodes,
     };
 
     setCreating(true);
@@ -274,7 +224,6 @@ export const UsersPage = () => {
       email: user.email,
       role: roleValue,
       categoryIds: [],
-      moduleCodes: user.modules?.map((moduleAccess) => moduleAccess.code) ?? ['QUALITY'],
     });
     setIsEditModalOpen(true);
 
@@ -316,7 +265,6 @@ export const UsersPage = () => {
       email: editForm.email.trim(),
       full_name: editForm.full_name.trim(),
       role: editForm.role,
-      module_codes: editForm.moduleCodes,
     };
 
     setSavingEdit(true);
@@ -602,13 +550,9 @@ export const UsersPage = () => {
           form={createForm}
           setForm={setCreateForm}
           onUpdateRole={updateCreateRole}
-          onToggleModule={toggleCreateModule}
           onToggleCategory={toggleCreateCategory}
-          moduleOptions={moduleOptions}
           categories={categories}
-          loadingModules={loadingModules}
           loadingCategories={loadingCategories}
-          modulesHelpText="El rol global sigue activo por compatibilidad. En la siguiente iteración cada módulo podrá tener su propio rol."
           showCredentialsNote
           submitting={creating}
           submitLabel="Guardar usuario"
@@ -625,13 +569,9 @@ export const UsersPage = () => {
           form={editForm}
           setForm={setEditForm}
           onUpdateRole={updateEditRole}
-          onToggleModule={toggleEditModule}
           onToggleCategory={toggleEditCategory}
-          moduleOptions={moduleOptions}
           categories={categories}
-          loadingModules={loadingModules}
           loadingCategories={loadingCategories || loadingUserCategories}
-          modulesHelpText="Desde aquí ya puedes activar o retirar acceso a QUALITY, RH y HELPDESK sin tocar la base manualmente."
           submitting={savingEdit}
           submitLabel="Guardar cambios"
           submittingLabel="Guardando..."

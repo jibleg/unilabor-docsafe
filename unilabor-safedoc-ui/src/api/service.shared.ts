@@ -2,7 +2,6 @@ import type {
   DocumentStatus,
   EmployeeAlertState,
   ModuleAccess,
-  ModuleCode,
   User,
 } from '../types/models';
 
@@ -29,14 +28,12 @@ export interface CreateUserPayload {
   full_name: string;
   role: string;
   category_ids?: number[];
-  module_codes?: ModuleCode[];
 }
 
 export interface UpdateUserPayload {
   email?: string;
   full_name?: string;
   role?: string;
-  module_codes?: ModuleCode[];
 }
 
 export interface EmployeePayload {

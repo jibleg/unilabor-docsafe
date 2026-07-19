@@ -53,7 +53,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
     <header className="sticky top-0 z-40 border-b border-[rgba(0,65,106,0.08)] bg-white/90 backdrop-blur-xl lg:hidden">
       <div className="navbar px-4">
         <div className="navbar-start">
-          <NavLink to={moduleCode === 'RH' ? '/rh' : moduleCode === 'HELPDESK' ? '/helpdesk/dashboard' : '/quality/dashboard'} className="btn btn-ghost px-2 normal-case">
+          <NavLink to={moduleCode === 'RH' ? '/rh' : moduleCode === 'HELPDESK' ? '/helpdesk/dashboard' : moduleCode === 'ADMIN' ? '/admin' : '/quality/dashboard'} className="btn btn-ghost px-2 normal-case">
             <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-1 shadow-[0_8px_18px_rgba(0,65,106,0.08)] sm:h-10 sm:w-10">
               <img
                 src={unilaborIcon}
@@ -62,7 +62,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
               />
             </span>
             <span className="ml-2 text-base font-bold tracking-tight text-[var(--color-brand-700)]">
-              {moduleCode === 'RH' ? 'SafeDoc RH' : moduleCode === 'HELPDESK' ? 'SafeDoc Activos' : 'SafeDoc'}
+              {moduleCode === 'RH' ? 'SafeDoc RH' : moduleCode === 'HELPDESK' ? 'SafeDoc Activos' : moduleCode === 'ADMIN' ? 'SafeDoc Admin' : 'SafeDoc'}
             </span>
           </NavLink>
         </div>

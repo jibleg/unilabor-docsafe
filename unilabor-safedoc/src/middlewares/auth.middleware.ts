@@ -1,7 +1,6 @@
 ﻿import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../config/env';
-import { listUserModuleAccess } from '../services/module-access.service';
 import { getUserPermissionCodes } from '../services/permission.service';
 
 export interface JWTPayload {
@@ -13,8 +12,6 @@ export interface JWTPayload {
 export interface AuthRequest extends Request {
   user?: JWTPayload;
 }
-
-type ModuleCode = 'QUALITY' | 'RH' | 'HELPDESK';
 
 export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -42,25 +39,14 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
     next();
   } catch (_error) {
     // 401 (no 403) para que el frontend distinga "sesion expirada/invalida"
-    // (-> logout + redirect) de "permisos insuficientes" (403 de authorize*).
+    // (-> logout + redirect) de "permisos insuficientes" (403 de requirePermission).
     return res.status(401).json({ message: 'Token invalido o expirado' });
   }
 };
 
-export const authorize = (roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({
-        message: 'No tienes los permisos necesarios para realizar esta accion',
-      });
-    }
-    next();
-  };
-};
-
-// RBAC por accion (Fase 1). Autoriza si el usuario tiene AL MENOS UNO de los
-// permisos indicados (semantica OR). Reemplazara progresivamente a
-// authorize/authorizeModuleRole conforme se migren las rutas (Fase 2).
+// RBAC por accion. Autoriza si el usuario tiene AL MENOS UNO de los permisos
+// indicados (semantica OR). Unico guard de autorizacion del sistema tras
+// deprecar los guards por rol de modulo (Fase 5).
 export const requirePermission = (required: string | string[]) => {
   const requiredCodes = (Array.isArray(required) ? required : [required]).map((code) =>
     code.trim().toUpperCase(),
@@ -85,56 +71,6 @@ export const requirePermission = (required: string | string[]) => {
     } catch (error) {
       console.error('Error validando permiso:', error);
       return res.status(500).json({ message: 'No se pudo validar el permiso' });
-    }
-  };
-};
-
-export const authorizeModuleAccess = (moduleCode: ModuleCode) => {
-  return async (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user?.id) {
-      return res.status(401).json({ message: 'Sesion invalida o expirada' });
-    }
-
-    try {
-      const availableModules = await listUserModuleAccess(req.user.id, req.user.role);
-      const moduleAccess = availableModules.find((entry) => entry.code === moduleCode);
-
-      if (!moduleAccess) {
-        return res.status(403).json({ message: `No tienes acceso al modulo ${moduleCode}` });
-      }
-
-      next();
-    } catch (error) {
-      console.error('Error validando acceso al modulo:', error);
-      return res.status(500).json({ message: 'No se pudo validar el acceso al modulo' });
-    }
-  };
-};
-
-export const authorizeModuleRole = (moduleCode: ModuleCode, roles: string[]) => {
-  return async (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user?.id) {
-      return res.status(401).json({ message: 'Sesion invalida o expirada' });
-    }
-
-    try {
-      const availableModules = await listUserModuleAccess(req.user.id, req.user.role);
-      const moduleAccess = availableModules.find((entry) => entry.code === moduleCode);
-
-      if (!moduleAccess) {
-        return res.status(403).json({ message: `No tienes acceso al modulo ${moduleCode}` });
-      }
-
-      if (!roles.includes(moduleAccess.role)) {
-        return res.status(403).json({
-          message: 'No tienes los permisos necesarios para realizar esta accion en este modulo',
-        });
-      }
-
-      next();
-    } catch (error) {
-      console.error('Error validando rol por modulo:', error);
-      return res.status(500).json({ message: 'No se pudo validar el permiso por modulo' });
     }
   };
 };

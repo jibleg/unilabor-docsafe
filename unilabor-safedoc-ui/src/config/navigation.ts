@@ -53,14 +53,25 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       title: 'Administración',
       items: [
         { icon: Tags, label: 'Categorías', path: '/quality/categories', permission: 'QUALITY.CATEGORIES.WRITE' },
-        { icon: Users, label: 'Personal', path: '/quality/users', permission: 'ADMIN.USERS.READ' },
-        { icon: KeyRound, label: 'Roles y permisos', path: '/quality/roles', permission: 'ADMIN.ROLES.MANAGE' },
-        { icon: ShieldCheck, label: 'Auditoría', path: '/quality/audit', permission: 'ADMIN.AUDIT.READ' },
       ],
     },
     {
       title: 'Mi espacio',
       items: [{ icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' }],
+    },
+  ],
+  ADMIN: [
+    {
+      title: 'Administración del sistema',
+      items: [
+        { icon: Users, label: 'Personal', path: '/admin/users', permission: 'ADMIN.USERS.READ' },
+        { icon: KeyRound, label: 'Roles y permisos', path: '/admin/roles', permission: 'ADMIN.ROLES.MANAGE' },
+        { icon: ShieldCheck, label: 'Auditoría', path: '/admin/audit', permission: 'ADMIN.AUDIT.READ' },
+      ],
+    },
+    {
+      title: 'Mi espacio',
+      items: [{ icon: UserCircle2, label: 'Mi perfil', path: '/admin/profile' }],
     },
   ],
   RH: [

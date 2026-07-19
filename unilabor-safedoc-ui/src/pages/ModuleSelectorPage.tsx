@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, FlaskConical, LifeBuoy } from 'lucide-react';
+import { ArrowRight, Building2, FlaskConical, LifeBuoy, ShieldCheck } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import type { ModuleAccess, ModuleCode } from '../types/models';
@@ -30,6 +30,12 @@ const moduleVisuals: Record<
     eyebrow: 'Módulo de Activos',
     name: 'Gestión de Activos',
     description: 'Inventario y ciclo de vida de activos (ISO 15189), mantenimiento, calibración y mesa de ayuda.',
+  },
+  ADMIN: {
+    icon: ShieldCheck,
+    eyebrow: 'Módulo Administración',
+    name: 'Administración del sistema',
+    description: 'Gestión de usuarios, roles y permisos, y consulta de la bitácora de auditoría.',
   },
 };
 

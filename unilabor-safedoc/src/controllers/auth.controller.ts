@@ -3,7 +3,6 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db';
 import { getJwtExpiresIn, getJwtSecret } from '../config/env';
-import { listUserModuleAccess } from '../services/module-access.service';
 import { getUserAccessSnapshot } from '../services/permission.service';
 import { recoverPasswordByEmail } from '../services/password.service';
 import type { AuthRequest } from '../middlewares/auth.middleware';
@@ -63,12 +62,11 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: getJwtExpiresIn() }
     );
 
-    // Registrar el acceso en la tabla de auditoría (Opcional pero recomendado)
-    // availableModules sigue viniendo del modelo legacy (user_module_roles);
-    // permissions es la capa nueva por accion (RBAC). Ambas se resuelven en
-    // servidor, no viajan en el JWT (evita permisos "stale" hasta el vencimiento).
-    const availableModules = await listUserModuleAccess(user.id, user.role);
-    const { permissions } = await getUserAccessSnapshot(user.id);
+    // availableModules y permissions salen ambos del RBAC (user_roles): unica
+    // fuente de verdad. `modules` deriva un rol efectivo por modulo para el
+    // frontend legacy (RoleGate/selector). Se resuelven en servidor, no viajan
+    // en el JWT (evita permisos "stale" hasta el vencimiento).
+    const { permissions, modules: availableModules } = await getUserAccessSnapshot(user.id);
     await logAuthAudit(user.id, 'LOGIN', req.ip);
 
     // Responder con el token y datos básicos del usuario
@@ -100,8 +98,7 @@ export const getMyAccess = async (req: AuthRequest, res: Response) => {
   }
 
   try {
-    const availableModules = await listUserModuleAccess(req.user.id, req.user.role);
-    const { permissions } = await getUserAccessSnapshot(req.user.id);
+    const { permissions, modules: availableModules } = await getUserAccessSnapshot(req.user.id);
     res.json({ availableModules, permissions });
   } catch (error) {
     console.error('Error obteniendo acceso del usuario:', error);

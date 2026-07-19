@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { RhHomeRedirect } from './components/RhHomeRedirect';
+import { AdminHomeRedirect } from './components/AdminHomeRedirect';
 import { ToastContainer, Slide } from 'react-toastify';
 import { ModuleGuard } from './components/ModuleGuard';
 import { RoleGate } from './components/RoleGate';
@@ -9,6 +10,7 @@ import { ConfirmHost } from './components/ConfirmHost';
 import { QualityLayout } from './layouts/QualityLayout';
 import { RhLayout } from './layouts/RhLayout';
 import { HelpdeskLayout } from './layouts/HelpdeskLayout';
+import { AdminLayout } from './layouts/AdminLayout';
 import 'react-toastify/dist/ReactToastify.css';
 
 const AuditPage = lazy(() => import('./pages/AuditPage').then((module) => ({ default: module.AuditPage })));
@@ -153,37 +155,50 @@ function App() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="documents" element={<DocumentsPage />} />
         <Route
-          path="users"
-          element={
-            <RoleGate allowedRoles={['ADMIN']} redirectTo="/quality/dashboard">
-              <UsersPage />
-            </RoleGate>
-          }
-        />
-        <Route
           path="categories"
           element={
-            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/quality/dashboard">
+            <PermissionGate permission="QUALITY.CATEGORIES.WRITE" redirectTo="/quality/dashboard">
               <CategoriesPage />
-            </RoleGate>
+            </PermissionGate>
           }
         />
+      </Route>
+
+      {/* Módulo Administración del sistema (usuarios, roles y auditoría) */}
+      <Route
+        path="/admin"
+        element={
+          <ModuleGuard moduleCode="ADMIN">
+            <AdminLayout />
+          </ModuleGuard>
+        }
+      >
+        <Route index element={<AdminHomeRedirect />} />
         <Route
-          path="audit"
+          path="users"
           element={
-            <RoleGate allowedRoles={['ADMIN']} redirectTo="/quality/dashboard">
-              <AuditPage />
-            </RoleGate>
+            <PermissionGate permission="ADMIN.USERS.READ" redirectTo="/admin">
+              <UsersPage />
+            </PermissionGate>
           }
         />
         <Route
           path="roles"
           element={
-            <PermissionGate permission="ADMIN.ROLES.MANAGE" redirectTo="/quality/dashboard">
+            <PermissionGate permission="ADMIN.ROLES.MANAGE" redirectTo="/admin">
               <RolesPage />
             </PermissionGate>
           }
         />
+        <Route
+          path="audit"
+          element={
+            <PermissionGate permission="ADMIN.AUDIT.READ" redirectTo="/admin">
+              <AuditPage />
+            </PermissionGate>
+          }
+        />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route
@@ -432,8 +447,8 @@ function App() {
       <Route path="/profile" element={<Navigate to="/quality/profile" replace />} />
       <Route path="/documents" element={<Navigate to="/quality/documents" replace />} />
       <Route path="/categories" element={<Navigate to="/quality/categories" replace />} />
-      <Route path="/users" element={<Navigate to="/quality/users" replace />} />
-      <Route path="/audit" element={<Navigate to="/quality/audit" replace />} />
+      <Route path="/users" element={<Navigate to="/admin/users" replace />} />
+      <Route path="/audit" element={<Navigate to="/admin/audit" replace />} />
 
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>

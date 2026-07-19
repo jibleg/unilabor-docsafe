@@ -3,10 +3,10 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db';
 import { sendWelcomeEmail } from '../services/email.service';
-import { listSystemModules, listUserModuleAccess, syncUserModuleAccess } from '../services/module-access.service';
+import { getUserAccessibleModules } from '../services/permission.service';
 import { resetPasswordForUserById } from '../services/password.service';
 import * as categoryService from '../services/category.service';
-import { AuthRequest, ModuleCode, UserRole } from '../types';
+import { AuthRequest, UserRole } from '../types';
 import {
   buildIlikeSearch,
   buildPaginatedResult,
@@ -15,7 +15,6 @@ import {
 } from '../utils/pagination';
 
 const allowedRoles: UserRole[] = ['ADMIN', 'EDITOR', 'VIEWER'];
-const allowedModuleCodes: ModuleCode[] = ['QUALITY', 'RH', 'HELPDESK'];
 
 const getStringValue = (value: unknown): string | null => {
   if (typeof value === 'string') {
@@ -44,26 +43,6 @@ const parseCategoryIds = (rawValue: unknown): number[] | null => {
   }
 
   return Array.from(new Set(parsedIds));
-};
-
-const parseModuleCodes = (rawValue: unknown): ModuleCode[] | null => {
-  if (rawValue === undefined || rawValue === null) {
-    return [];
-  }
-
-  if (!Array.isArray(rawValue)) {
-    return null;
-  }
-
-  const normalizedValues = rawValue
-    .map((value) => String(value ?? '').trim().toUpperCase())
-    .filter((value): value is ModuleCode => allowedModuleCodes.includes(value as ModuleCode));
-
-  if (normalizedValues.length !== rawValue.length) {
-    return null;
-  }
-
-  return Array.from(new Set(normalizedValues));
 };
 
 const parseUserId = (rawValue: unknown): string | null => {
@@ -108,39 +87,18 @@ const logUserAudit = async (userId: string | undefined, action: string, ipAddres
   }
 };
 
-export const getModuleCatalog = async (_req: AuthRequest, res: Response) => {
-  try {
-    const modules = await listSystemModules();
-    res.json({
-      modules: modules.map((moduleAccess) => ({
-        code: moduleAccess.code,
-        name: moduleAccess.name,
-        description: moduleAccess.description,
-        icon: moduleAccess.icon,
-        is_active: moduleAccess.is_active,
-        sort_order: moduleAccess.sort_order ?? 0,
-      })),
-    });
-  } catch (error) {
-    console.error('Error obteniendo catalogo de modulos:', error);
-    res.status(500).json({ message: 'Error al obtener el catalogo de modulos' });
-  }
-};
-
 export const createUser = async (req: AuthRequest, res: Response) => {
   // Entrada validada/normalizada por validate(createUserSchema): role en
-  // mayusculas, category_ids numericos unicos, module_codes (default ['QUALITY'])
-  // y la regla "VIEWER requiere al menos una categoria" ya verificadas.
-  const { email, full_name, role, category_ids, module_codes } = req.body as {
+  // mayusculas y category_ids numericos unicos ya verificados. El acceso a
+  // modulos NO se asigna aqui: se otorga vía roles en la UI de Roles (RBAC).
+  const { email, full_name, role, category_ids } = req.body as {
     email: string;
     full_name: string;
     role: UserRole;
     category_ids: number[];
-    module_codes: ModuleCode[];
   };
   const normalizedRole = role;
   const parsedCategoryIds = category_ids;
-  const effectiveModuleCodes = module_codes;
 
   const client = await pool.connect();
 
@@ -165,13 +123,6 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     const values = [email, passwordHash, full_name, normalizedRole];
     const result = await client.query(query, values);
     const createdUser = result.rows[0];
-
-    const assignedModules = await syncUserModuleAccess(
-      client,
-      createdUser.id,
-      effectiveModuleCodes,
-      normalizedRole,
-    );
 
     if (parsedCategoryIds.length > 0) {
       const hasUserCategoriesTable = await userCategoriesTableExists(client);
@@ -227,7 +178,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       user: {
         ...createdUser,
         category_ids: parsedCategoryIds,
-        modules: assignedModules,
+        modules: await getUserAccessibleModules(createdUser.id),
       },
     });
   } catch (error: any) {
@@ -242,12 +193,6 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     if (error?.code === 'INVALID_CATEGORY_IDS') {
       return res.status(400).json({
         message: 'Una o mas categorias no existen o estan inactivas.',
-      });
-    }
-
-    if (error?.code === 'INVALID_MODULE_CODES') {
-      return res.status(400).json({
-        message: `Uno o mas modulos no existen o estan inactivos. Valores permitidos: ${allowedModuleCodes.join(', ')}`,
       });
     }
 
@@ -319,7 +264,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
     const usersWithModules = await Promise.all(
       result.rows.map(async (row) => ({
         ...row,
-        modules: await listUserModuleAccess(String(row.id), row.role),
+        modules: await getUserAccessibleModules(String(row.id)),
       })),
     );
 
@@ -432,22 +377,14 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
   const email = getStringValue(req.body?.email);
   const fullName = getStringValue(req.body?.full_name);
   const role = getStringValue(req.body?.role);
-  const rawModuleCodes = req.body?.module_codes ?? req.body?.moduleCodes;
-  const parsedModuleCodes = parseModuleCodes(rawModuleCodes);
 
   const normalizedEmail = email?.trim().toLowerCase();
   const normalizedFullName = fullName?.trim();
   const normalizedRole = role?.trim().toUpperCase() as UserRole | undefined;
 
-  if (parsedModuleCodes === null) {
+  if (!normalizedEmail && !normalizedFullName && !normalizedRole) {
     return res.status(400).json({
-      message: `module_codes debe ser un arreglo con valores validos: ${allowedModuleCodes.join(', ')}`,
-    });
-  }
-
-  if (!normalizedEmail && !normalizedFullName && !normalizedRole && rawModuleCodes === undefined) {
-    return res.status(400).json({
-      message: 'Debes enviar al menos un campo para actualizar: email, full_name, role o module_codes',
+      message: 'Debes enviar al menos un campo para actualizar: email, full_name o role',
     });
   }
 
@@ -457,18 +394,12 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
 
   try {
     const currentUserResult = await pool.query(
-      'SELECT id, role FROM users WHERE id = $1 LIMIT 1',
+      'SELECT id FROM users WHERE id = $1 LIMIT 1',
       [userId]
     );
     if (currentUserResult.rows.length === 0) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
-
-    const effectiveRole = normalizedRole ?? String(currentUserResult.rows[0]?.role ?? '').toUpperCase() as UserRole;
-    const currentModules = await listUserModuleAccess(userId, effectiveRole);
-    const effectiveModuleCodes = rawModuleCodes !== undefined
-      ? parsedModuleCodes ?? []
-      : currentModules.map((moduleAccess) => moduleAccess.code);
 
     if (normalizedEmail) {
       const emailExists = await pool.query(
@@ -480,24 +411,10 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    if (effectiveRole === 'VIEWER' && effectiveModuleCodes.includes('QUALITY')) {
-      const hasUserCategoriesTable = await pool.query(
-        `SELECT to_regclass('public.user_categories') IS NOT NULL AS exists;`
-      );
-      if (Boolean(hasUserCategoriesTable.rows[0]?.exists)) {
-        const categoryCountResult = await pool.query(
-          'SELECT COUNT(*)::int AS total FROM user_categories WHERE user_id = $1',
-          [userId]
-        );
-        const categoryCount = Number(categoryCountResult.rows[0]?.total ?? 0);
-        if (categoryCount === 0) {
-          return res.status(400).json({
-            message: 'No puedes asignar rol VIEWER a un usuario sin categorias asociadas',
-          });
-        }
-      }
-    }
-
+    // Nota: la invariante "un VIEWER de Calidad no debe quedarse sin categorias"
+    // se aplica en el flujo de gestion de categorias (replaceUserCategoriesById),
+    // no aqui: el rol ya no determina acceso a modulos (Fase 5) y forzar una
+    // categoria de Calidad a un VIEWER de RH/HELPDESK seria incorrecto.
     const client = await pool.connect();
 
     try {
@@ -537,11 +454,6 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
-      const assignedModules =
-        rawModuleCodes !== undefined
-          ? await syncUserModuleAccess(client, userId, effectiveModuleCodes, effectiveRole)
-          : await listUserModuleAccess(userId, effectiveRole);
-
       await client.query('COMMIT');
 
     await logUserAudit(req.user?.id, `USER_UPDATE:${userId}`, req.ip);
@@ -550,18 +462,11 @@ export const updateUserById = async (req: AuthRequest, res: Response) => {
         message: 'Usuario actualizado correctamente',
         user: {
           ...result.rows[0],
-          modules: assignedModules,
+          modules: await getUserAccessibleModules(userId),
         },
       });
     } catch (transactionError: any) {
       await client.query('ROLLBACK');
-
-      if (transactionError?.code === 'INVALID_MODULE_CODES') {
-        return res.status(400).json({
-          message: `Uno o mas modulos no existen o estan inactivos. Valores permitidos: ${allowedModuleCodes.join(', ')}`,
-        });
-      }
-
       throw transactionError;
     } finally {
       client.release();

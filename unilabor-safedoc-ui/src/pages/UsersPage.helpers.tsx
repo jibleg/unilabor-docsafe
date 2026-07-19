@@ -1,4 +1,4 @@
-import type { ManagedUser, ModuleAccess, ModuleCode } from '../types/models';
+import type { ManagedUser } from '../types/models';
 import { normalizeRole } from '../utils/roles';
 
 // Re-export para compatibilidad: el confirm basado en toast vive en utils/confirm.
@@ -19,7 +19,6 @@ export interface UserFormState {
   email: string;
   role: RoleValue;
   categoryIds: number[];
-  moduleCodes: ModuleCode[];
 }
 
 export const EMPTY_FORM: UserFormState = {
@@ -27,38 +26,7 @@ export const EMPTY_FORM: UserFormState = {
   email: '',
   role: 'VIEWER',
   categoryIds: [],
-  moduleCodes: ['QUALITY'],
 };
-
-export const FALLBACK_MODULE_OPTIONS: ModuleAccess[] = [
-  {
-    code: 'QUALITY',
-    name: 'Documentos de Calidad',
-    description: 'Gestión documental institucional',
-    icon: 'shield-check',
-    role: 'ADMIN',
-    is_active: true,
-    sort_order: 10,
-  },
-  {
-    code: 'RH',
-    name: 'Recursos Humanos',
-    description: 'Expediente digital del colaborador',
-    icon: 'users',
-    role: 'ADMIN',
-    is_active: true,
-    sort_order: 20,
-  },
-  {
-    code: 'HELPDESK',
-    name: 'Gestión de Activos',
-    description: 'Inventario ISO 15189, mantenimiento, calibración y mesa de ayuda',
-    icon: 'life-buoy',
-    role: 'ADMIN',
-    is_active: true,
-    sort_order: 30,
-  },
-];
 
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

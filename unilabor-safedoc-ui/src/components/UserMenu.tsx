@@ -8,7 +8,13 @@ import { confirmAction } from '../utils/confirm';
 import type { ModuleCode } from '../types/models';
 
 const profilePath = (moduleCode: ModuleCode): string =>
-  moduleCode === 'RH' ? '/rh/profile' : moduleCode === 'HELPDESK' ? '/helpdesk/profile' : '/quality/profile';
+  moduleCode === 'RH'
+    ? '/rh/profile'
+    : moduleCode === 'HELPDESK'
+      ? '/helpdesk/profile'
+      : moduleCode === 'ADMIN'
+        ? '/admin/profile'
+        : '/quality/profile';
 
 /**
  * Menu de usuario del header: avatar + nombre + dropdown con Perfil, Cambiar de

@@ -56,7 +56,6 @@ describe('user.schema', () => {
     if (r.success) {
       expect(r.data.role).toBe('ADMIN');
       expect(r.data.category_ids).toEqual([2, 3]);
-      expect(r.data.module_codes).toEqual(['QUALITY']); // default
     }
   });
 
@@ -66,14 +65,14 @@ describe('user.schema', () => {
     ).toBe(false);
   });
 
-  it('createUserSchema exige categoria para VIEWER en QUALITY', () => {
+  it('createUserSchema ya no acopla VIEWER a categorias (esa regla vive en el flujo de categorias)', () => {
     const r = createUserSchema.safeParse({
       email: 'a@b.mx',
       full_name: 'V',
       role: 'VIEWER',
       category_ids: [],
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 });
 

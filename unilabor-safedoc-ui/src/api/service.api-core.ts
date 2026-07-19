@@ -182,13 +182,6 @@ export const createUser = async (payload: CreateUserPayload): Promise<ManagedUse
   };
 };
 
-export const fetchModuleCatalog = async (): Promise<ModuleAccess[]> => {
-  const response = await api.get('/users/modules/catalog');
-  return getArrayFromPayload(response.data, ['modules', 'items', 'results'])
-    .map(normalizeModuleAccess)
-    .filter((moduleAccess): moduleAccess is ModuleAccess => moduleAccess !== null);
-};
-
 export const updateUserById = async (
   userId: string,
   payload: UpdateUserPayload,

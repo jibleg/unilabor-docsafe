@@ -1,5 +1,5 @@
 import { useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import type { Category, ModuleAccess, ModuleCode } from '../../types/models';
+import type { Category } from '../../types/models';
 import {
   ROLE_OPTIONS,
   normalizeRoleValue,
@@ -14,13 +14,9 @@ interface UserFormModalProps {
   form: UserFormState;
   setForm: Dispatch<SetStateAction<UserFormState>>;
   onUpdateRole: (role: RoleValue) => void;
-  onToggleModule: (moduleCode: ModuleCode) => void;
   onToggleCategory: (categoryId: number) => void;
-  moduleOptions: ModuleAccess[];
   categories: Category[];
-  loadingModules: boolean;
   loadingCategories: boolean;
-  modulesHelpText: string;
   showCredentialsNote?: boolean;
   submitting: boolean;
   submitLabel: string;
@@ -44,13 +40,9 @@ export const UserFormModal = ({
   form,
   setForm,
   onUpdateRole,
-  onToggleModule,
   onToggleCategory,
-  moduleOptions,
   categories,
-  loadingModules,
   loadingCategories,
-  modulesHelpText,
   showCredentialsNote = false,
   submitting,
   submitLabel,
@@ -71,8 +63,8 @@ export const UserFormModal = ({
   }, [categories, categorySearch]);
 
   const categoriesHelpText =
-    form.role === 'VIEWER' && form.moduleCodes.includes('QUALITY')
-      ? 'El usuario VIEWER debe tener al menos una categoría para visualizar documentos.'
+    form.role === 'VIEWER'
+      ? 'Un usuario VIEWER de Calidad requiere al menos una categoría para visualizar documentos.'
       : 'La asignación de categorías es opcional para este rol.';
 
   const tabBaseClassName =
@@ -95,7 +87,7 @@ export const UserFormModal = ({
               onClick={() => setActiveTab('info')}
               className={`${tabBaseClassName} ${activeTab === 'info' ? tabActiveClassName : tabIdleClassName}`}
             >
-              Empleado y módulos
+              Empleado
             </button>
             <button
               type="button"
@@ -154,32 +146,13 @@ export const UserFormModal = ({
 
               <div className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-3">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                  Módulos habilitados
+                  Acceso a módulos
                 </p>
-                <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">{modulesHelpText}</p>
-
-                {loadingModules ? (
-                  <p className="text-xs text-[var(--unilabor-neutral)]">Cargando módulos...</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {moduleOptions.map((moduleOption) => {
-                      const selected = form.moduleCodes.includes(moduleOption.code);
-                      return (
-                        <label key={moduleOption.code} className={optionClassName}>
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => onToggleModule(moduleOption.code)}
-                            className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] bg-white text-[var(--color-brand-500)]"
-                          />
-                          <span className={selected ? 'font-semibold text-[var(--color-brand-700)]' : ''}>
-                            {moduleOption.name}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
+                <p className="text-xs text-[var(--unilabor-neutral)]">
+                  El acceso a módulos (Calidad, RH, Activos) se otorga asignando roles en{' '}
+                  <span className="font-semibold text-[var(--color-brand-700)]">Roles y permisos</span>.
+                  El rol aquí definido solo gobierna el alcance de categorías de Calidad.
+                </p>
               </div>
 
               {showCredentialsNote && (

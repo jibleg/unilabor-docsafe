@@ -3,7 +3,12 @@ import type { ModuleAccess, ModuleCode } from '../types/models';
 export const normalizeModuleCode = (value?: string | null): ModuleCode | null => {
   const normalizedValue = String(value ?? '').trim().toUpperCase();
 
-  if (normalizedValue === 'QUALITY' || normalizedValue === 'RH' || normalizedValue === 'HELPDESK') {
+  if (
+    normalizedValue === 'QUALITY' ||
+    normalizedValue === 'RH' ||
+    normalizedValue === 'HELPDESK' ||
+    normalizedValue === 'ADMIN'
+  ) {
     return normalizedValue;
   }
 
@@ -17,6 +22,10 @@ export const getModuleHomePath = (moduleCode: ModuleCode): string => {
 
   if (moduleCode === 'HELPDESK') {
     return '/helpdesk/dashboard';
+  }
+
+  if (moduleCode === 'ADMIN') {
+    return '/admin';
   }
 
   return '/quality/dashboard';

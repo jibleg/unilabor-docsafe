@@ -7,18 +7,18 @@ vi.mock('../config/db', () => ({
 vi.mock('bcrypt', () => ({
   default: { compare: vi.fn() },
 }));
-vi.mock('../services/module-access.service', () => ({
-  listUserModuleAccess: vi.fn(),
+vi.mock('../services/permission.service', () => ({
+  getUserAccessSnapshot: vi.fn(),
 }));
 
 import pool from '../config/db';
 import bcrypt from 'bcrypt';
-import { listUserModuleAccess } from '../services/module-access.service';
+import { getUserAccessSnapshot } from '../services/permission.service';
 import { login } from './auth.controller';
 
 const mockedQuery = vi.mocked(pool.query);
 const mockedCompare = vi.mocked(bcrypt.compare);
-const mockedModules = vi.mocked(listUserModuleAccess);
+const mockedSnapshot = vi.mocked(getUserAccessSnapshot);
 
 const buildRes = () => {
   const res: any = {
@@ -40,7 +40,7 @@ beforeEach(() => {
   process.env.JWT_SECRET = 'test-secret';
   mockedQuery.mockReset();
   mockedCompare.mockReset();
-  mockedModules.mockReset();
+  mockedSnapshot.mockReset();
 });
 
 describe('login', () => {
@@ -79,9 +79,12 @@ describe('login', () => {
       } as any)
       .mockResolvedValueOnce({ rows: [] } as any); // logAuthAudit insert
     mockedCompare.mockResolvedValueOnce(true as any);
-    mockedModules.mockResolvedValueOnce([
-      { code: 'HELPDESK', name: 'Mesa de Ayuda', description: null, icon: null, role: 'ADMIN', is_active: true, sort_order: 30 },
-    ] as any);
+    mockedSnapshot.mockResolvedValueOnce({
+      permissions: ['HELPDESK.ASSETS.READ'],
+      modules: [
+        { code: 'HELPDESK', name: 'Mesa de Ayuda', description: null, icon: null, role: 'ADMIN', is_active: true, sort_order: 30 },
+      ],
+    } as any);
 
     const res = buildRes();
     await login({ body: { email: 'admin@test.mx', password: 'good' }, ip: '127.0.0.1' } as any, res);

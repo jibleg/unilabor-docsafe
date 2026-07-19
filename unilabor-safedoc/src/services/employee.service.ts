@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import type { PoolClient } from 'pg';
 import pool from '../config/db';
-import { listUserModuleAccess } from './module-access.service';
+import { getUserAccessibleModules } from './permission.service';
 import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
 import type { EmployeeRecord, EmployeeSummary, LinkableUser } from '../types';
 import {
@@ -47,7 +47,7 @@ const mapEmployeeRow = async (row: any): Promise<EmployeeRecord> => {
           email: String(row.user_email),
           full_name: String(row.user_full_name),
           role: String(row.user_role).toUpperCase() as LinkableUser['role'],
-          modules: await listUserModuleAccess(String(row.user_id), row.user_role),
+          modules: await getUserAccessibleModules(String(row.user_id)),
         }
       : null;
 
@@ -484,7 +484,7 @@ export const listLinkableUsers = async (): Promise<LinkableUser[]> => {
       email: String(row.email),
       full_name: String(row.full_name),
       role: String(row.role).toUpperCase() as LinkableUser['role'],
-      modules: await listUserModuleAccess(String(row.id), row.role),
+      modules: await getUserAccessibleModules(String(row.id)),
     })),
   );
 };

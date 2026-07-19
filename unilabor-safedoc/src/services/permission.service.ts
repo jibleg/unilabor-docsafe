@@ -2,12 +2,11 @@ import pool from '../config/db';
 import type { ModuleAccess, ModuleCode, UserRole } from '../types';
 
 // -----------------------------------------------------------------------------
-// Resolver RBAC (Fase 1). Lee las tablas nuevas (roles/permissions/
-// role_permissions/user_roles) y calcula los permisos efectivos y los modulos
-// accesibles de un usuario. Se usa en superficies NUEVAS (requirePermission,
-// GET /auth/me/access, campo permissions del login); no reemplaza aun a los
-// guards legacy (authorizeModuleAccess/authorizeModuleRole). Ver
-// module-access.service.ts para el modelo legacy.
+// Resolver RBAC. Lee las tablas roles/permissions/role_permissions/user_roles y
+// calcula los permisos efectivos y los modulos accesibles (con rol efectivo
+// derivado) de un usuario. Unica fuente de verdad de autorizacion tras la
+// Fase 5: alimenta requirePermission, el login (permissions + availableModules)
+// y GET /auth/me/access. El modelo legacy user_module_roles fue deprecado.
 // -----------------------------------------------------------------------------
 
 export interface UserAccessSnapshot {
