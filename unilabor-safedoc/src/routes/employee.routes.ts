@@ -32,7 +32,13 @@ router.get(
   requirePermission('RH.EMPLOYEES.READ'),
   listLinkableUsersController,
 );
-router.get('/', requirePermission('RH.EMPLOYEES.READ'), listEmployeesController);
+// La LISTA de empleados es directorio de referencia que el modulo de Activos
+// (HELPDESK) necesita para asignar responsables en activos, movimientos,
+// mantenimiento y calibracion. Se permite tambien a quien puede ver activos
+// (HELPDESK.ASSETS.READ): los nombres de responsables ya son visibles en los
+// activos, asi que no expone datos nuevos. El detalle sensible (expediente,
+// documentos, evaluaciones) sigue restringido a RH en sus propios endpoints.
+router.get('/', requirePermission(['RH.EMPLOYEES.READ', 'HELPDESK.ASSETS.READ']), listEmployeesController);
 router.get('/:id', requirePermission('RH.EMPLOYEES.READ'), getEmployeeByIdController);
 router.get(
   '/:id/document-access',
