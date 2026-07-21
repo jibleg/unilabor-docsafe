@@ -1199,3 +1199,58 @@ export interface EvaluationAssignment {
   created_at?: string;
   updated_at?: string;
 }
+
+// --- RH: acuse de lectura y firma autografa (RH-ACK) -------------------------
+
+export type AcknowledgementStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'read'
+  | 'signed'
+  | 'expired'
+  | 'cancelled';
+
+export interface InstitutionalDocument {
+  id: number;
+  title: string;
+  description: string | null;
+  file_size: number;
+  mime_type: string;
+  sha256: string;
+  pages_total: number;
+  target_document_type_id: number;
+  is_active: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+  target_document_type_name?: string;
+  uploaded_by_name?: string | null;
+  acknowledgement_count?: number;
+  signed_count?: number;
+}
+
+export interface DocumentAcknowledgement {
+  id: number;
+  institutional_document_id: number;
+  employee_id: number;
+  status: AcknowledgementStatus;
+  available_at: string | null;
+  deadline_at: string | null;
+  started_at: string | null;
+  read_completed_at: string | null;
+  signed_at: string | null;
+  pages_total: number;
+  /** Solo paginas que ya cumplieron la permanencia minima. */
+  pages_seen: number[];
+  pages_seen_count: number;
+  active_seconds: number;
+  min_seconds_per_page: number;
+  current_page: number | null;
+  current_page_seconds: number;
+  signed_document_id: number | null;
+  source_sha256: string | null;
+  signed_sha256: string | null;
+  created_at: string | null;
+  document_title?: string;
+  employee_name?: string;
+  employee_code?: string | null;
+}

@@ -74,7 +74,26 @@ const createWatermarkDataUrl = (name: string, date: string): string => {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 };
 
-export const PdfSafeViewer = ({ fileUrl }: { fileUrl: string }) => {
+/**
+ * Instrumentacion opcional de lectura (RH-ACK-02). Cuando se pasa `tracking`, el
+ * visor late cada `intervalSeconds` mientras la pestania esta visible y con foco,
+ * reportando UNICAMENTE la pagina actual: el tiempo lo mide el servidor.
+ *
+ * Es opcional a proposito — este visor lo comparten Calidad, Gestion de Activos
+ * y RH, y sin la prop el comportamiento es exactamente el de antes.
+ */
+export interface PdfReadingTracking {
+  onHeartbeat: (page: number) => void | Promise<void>;
+  intervalSeconds?: number;
+}
+
+export const PdfSafeViewer = ({
+  fileUrl,
+  tracking,
+}: {
+  fileUrl: string;
+  tracking?: PdfReadingTracking;
+}) => {
   const token = useAuthStore((state) => state.token);
   const user = useAuthStore((state) => state.user);
   const [numPages, setNumPages] = useState(0);
@@ -201,6 +220,39 @@ export const PdfSafeViewer = ({ fileUrl }: { fileUrl: string }) => {
       window.removeEventListener('resize', fitToWidth);
     };
   }, [expanded, fitToWidth]);
+
+  // Latido de lectura. Solo corre con la pestania visible Y la ventana enfocada:
+  // dejar el documento abierto en segundo plano no debe contar como lectura.
+  // La pagina viva va por ref para no reiniciar el intervalo en cada cambio.
+  const heartbeatRef = useRef(tracking?.onHeartbeat);
+  heartbeatRef.current = tracking?.onHeartbeat;
+  const pageNumberRef = useRef(pageNumber);
+  pageNumberRef.current = pageNumber;
+
+  const trackingEnabled = Boolean(tracking);
+  const heartbeatMs = (tracking?.intervalSeconds ?? 4) * 1000;
+
+  useEffect(() => {
+    if (!trackingEnabled || numPages === 0) {
+      return;
+    }
+
+    let inFlight = false;
+    const beat = async () => {
+      if (inFlight || document.hidden || !document.hasFocus()) {
+        return;
+      }
+      inFlight = true;
+      try {
+        await heartbeatRef.current?.(pageNumberRef.current);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const id = window.setInterval(beat, heartbeatMs);
+    return () => window.clearInterval(id);
+  }, [trackingEnabled, heartbeatMs, numPages]);
 
   const canGoBack = pageNumber > 1;
   const canGoForward = numPages > 0 && pageNumber < numPages;

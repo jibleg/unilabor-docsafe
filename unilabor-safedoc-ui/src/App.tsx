@@ -88,6 +88,21 @@ const MyExpedientPage = lazy(() =>
 const MyEvaluationsPage = lazy(() =>
   import('./pages/MyEvaluationsPage').then((module) => ({ default: module.MyEvaluationsPage })),
 );
+const MyAcknowledgementsPage = lazy(() =>
+  import('./pages/MyAcknowledgementsPage').then((module) => ({
+    default: module.MyAcknowledgementsPage,
+  })),
+);
+const RhInstitutionalDocumentsPage = lazy(() =>
+  import('./pages/RhInstitutionalDocumentsPage').then((module) => ({
+    default: module.RhInstitutionalDocumentsPage,
+  })),
+);
+const RhAcknowledgementsPage = lazy(() =>
+  import('./pages/RhAcknowledgementsPage').then((module) => ({
+    default: module.RhAcknowledgementsPage,
+  })),
+);
 const TakeEvaluationPage = lazy(() =>
   import('./pages/TakeEvaluationPage').then((module) => ({ default: module.TakeEvaluationPage })),
 );
@@ -303,6 +318,30 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR', 'VIEWER']} redirectTo="/rh">
               <MyExpedientPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="institutional-documents"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <RhInstitutionalDocumentsPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="acknowledgements"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+              <RhAcknowledgementsPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="my-acknowledgements"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR', 'VIEWER']} redirectTo="/rh">
+              <MyAcknowledgementsPage />
             </RoleGate>
           }
         />

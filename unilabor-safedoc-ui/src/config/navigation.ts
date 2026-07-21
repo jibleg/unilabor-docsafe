@@ -15,7 +15,9 @@ import {
   LayoutDashboard,
   LifeBuoy,
   Move,
+  PenLine,
   ShieldCheck,
+  Signature,
   Tags,
   UserCircle2,
   Users,
@@ -86,6 +88,8 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: Users, label: 'Colaboradores', path: '/rh/employees', permission: 'RH.EMPLOYEES.READ' },
         { icon: FileText, label: 'Expedientes', path: '/rh/expedients', permission: 'RH.EMPLOYEE_DOCS.READ' },
         { icon: AlertTriangle, label: 'Alertas', path: '/rh/alerts', permission: 'RH.ALERTS.READ' },
+        { icon: FileText, label: 'Documentos institucionales', path: '/rh/institutional-documents', permission: 'RH.ACKNOWLEDGEMENTS.MANAGE' },
+        { icon: Signature, label: 'Seguimiento de acuses', path: '/rh/acknowledgements', permission: 'RH.ACKNOWLEDGEMENTS.MANAGE' },
       ],
     },
     {
@@ -112,6 +116,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       items: [
         { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', permission: 'RH.SELF.EXPEDIENT' },
         { icon: GraduationCap, label: 'Mis evaluaciones', path: '/rh/my-evaluations', permission: 'RH.SELF.EVALUATIONS', badge: 'pendingEvaluations' },
+        { icon: PenLine, label: 'Por leer y firmar', path: '/rh/my-acknowledgements', permission: 'RH.SELF.ACKNOWLEDGEMENTS' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
       ],
     },

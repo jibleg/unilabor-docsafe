@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
+import { safeUnlink } from '../utils/file-storage';
+import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image';
 import { withTransaction } from '../utils/transaction';
 import { generateAssetCode, getHelpdeskAssetById } from './helpdesk-asset.service';
 import { createLifecycleEvent } from './helpdesk-lifecycle.service';
@@ -82,29 +84,11 @@ const normalizeOptionalText = (value: unknown): string | null => {
 };
 
 const writeSignatureImage = (dataUrl: string): string => {
-  const raw = dataUrl.trim();
-  const match = /^data:image\/png;base64,(.+)$/i.exec(raw);
-  const base64 = (match && match[1]) || raw;
-  const buffer = Buffer.from(base64, 'base64');
-  if (buffer.length < 100) {
+  const buffer = decodeSignaturePng(dataUrl);
+  if (!buffer) {
     return fail('HELPDESK_MOVEMENT_INVALID_SIGNATURE', 'La firma electronica es invalida o esta vacia.');
   }
-  const dir = process.env.DIRECTORY_UPLOAD_SIGNATURE || 'uploads/signatures';
-  fs.mkdirSync(dir, { recursive: true });
-  const filePath = path.join(dir, `SIGN-MOV-${Date.now()}-${Math.round(Math.random() * 1e9)}.png`);
-  fs.writeFileSync(filePath, buffer);
-  return filePath;
-};
-
-const safeUnlink = (filePath: string | null | undefined) => {
-  if (!filePath) {
-    return;
-  }
-  try {
-    fs.unlinkSync(filePath);
-  } catch {
-    // archivo inexistente: nada que hacer
-  }
+  return writeSignaturePng(buffer, 'SIGN-MOV');
 };
 
 const mapMovementRow = (row: any): AssetMovementRecord => ({

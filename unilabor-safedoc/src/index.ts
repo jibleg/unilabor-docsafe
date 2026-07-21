@@ -10,6 +10,7 @@ import employeeRoutes from './routes/employee.routes';
 import documentStructureRoutes from './routes/document-structure.routes';
 import employeeDocumentRoutes from './routes/employee-document.routes';
 import employeeAlertRoutes from './routes/employee-alert.routes';
+import rhAcknowledgementRoutes from './routes/rh-acknowledgement.routes';
 import trainingRoutes from './routes/training.routes';
 import evaluationAssignmentRoutes from './routes/evaluation-assignment.routes';
 import evaluationGradingRoutes from './routes/evaluation-grading.routes';
@@ -18,6 +19,7 @@ import adminRoutes from './routes/admin.routes';
 import { assertRequiredEnv } from './config/env';
 import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
 import { startServiceReminderScheduler } from './services/helpdesk-service-scheduler.service';
+import { startAcknowledgementScheduler } from './services/rh-acknowledgement-scheduler.service';
 
 dotenv.config();
 
@@ -53,6 +55,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/rh/document-structure', documentStructureRoutes);
 app.use('/api/rh', employeeDocumentRoutes);
 app.use('/api/rh', employeeAlertRoutes);
+app.use('/api/rh', rhAcknowledgementRoutes);
 app.use('/api/rh/trainings', trainingRoutes);
 app.use('/api/rh/evaluations', evaluationGradingRoutes);
 app.use('/api/rh', evaluationAssignmentRoutes);
@@ -94,4 +97,6 @@ app.listen(PORT, () => {
   startEvaluationScheduler();
   // Scheduler de recordatorios de servicio (mantenimiento + calibracion). Guardado por env.
   startServiceReminderScheduler();
+  // Scheduler de acuses de lectura (recordatorios + vencimientos). Guardado por env.
+  startAcknowledgementScheduler();
 });
