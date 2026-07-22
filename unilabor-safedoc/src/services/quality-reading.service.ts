@@ -581,3 +581,22 @@ export const listAssignableAreas = async (): Promise<Array<{ area: string; total
 
   return result.rows.map((row) => ({ area: String(row.area), total: Number(row.total) }));
 };
+
+/**
+ * Marca como vencidas las lecturas cuyo plazo ya paso. Idempotente: solo toca
+ * las que siguen en curso, nunca una firmada (que es evidencia).
+ */
+export const expireOverdueReadings = async (): Promise<number> => {
+  if (!(await tablesExist())) {
+    return 0;
+  }
+
+  const result = await pool.query(
+    `UPDATE public.quality_reading_acknowledgements
+        SET status = 'expired', updated_at = NOW()
+      WHERE status IN ('pending', 'in_progress', 'read')
+        AND deadline_at < NOW()
+      RETURNING id;`,
+  );
+  return result.rowCount ?? 0;
+};

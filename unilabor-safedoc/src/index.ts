@@ -21,6 +21,7 @@ import { assertRequiredEnv } from './config/env';
 import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
 import { startServiceReminderScheduler } from './services/helpdesk-service-scheduler.service';
 import { startAcknowledgementScheduler } from './services/rh-acknowledgement-scheduler.service';
+import { startQualityReadingScheduler } from './services/quality-reading-scheduler.service';
 
 dotenv.config();
 
@@ -101,4 +102,5 @@ app.listen(PORT, () => {
   startServiceReminderScheduler();
   // Scheduler de acuses de lectura (recordatorios + vencimientos). Guardado por env.
   startAcknowledgementScheduler();
+  startQualityReadingScheduler();
 });
