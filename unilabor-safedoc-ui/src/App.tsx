@@ -321,28 +321,31 @@ function App() {
             </RoleGate>
           }
         />
+        {/* Acuses: el guard va por permiso RBAC, el mismo que exige el backend
+            (requirePermission). Con RoleGate la pagina abria y el backend luego
+            rechazaba, dejando al usuario frente a un error sin explicacion. */}
         <Route
           path="institutional-documents"
           element={
-            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+            <PermissionGate permission="RH.ACKNOWLEDGEMENTS.MANAGE" redirectTo="/rh">
               <RhInstitutionalDocumentsPage />
-            </RoleGate>
+            </PermissionGate>
           }
         />
         <Route
           path="acknowledgements"
           element={
-            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/rh">
+            <PermissionGate permission="RH.ACKNOWLEDGEMENTS.MANAGE" redirectTo="/rh">
               <RhAcknowledgementsPage />
-            </RoleGate>
+            </PermissionGate>
           }
         />
         <Route
           path="my-acknowledgements"
           element={
-            <RoleGate allowedRoles={['ADMIN', 'EDITOR', 'VIEWER']} redirectTo="/rh">
+            <PermissionGate permission="RH.SELF.ACKNOWLEDGEMENTS" redirectTo="/rh">
               <MyAcknowledgementsPage />
-            </RoleGate>
+            </PermissionGate>
           }
         />
         <Route

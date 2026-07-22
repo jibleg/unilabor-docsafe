@@ -116,7 +116,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       items: [
         { icon: FileText, label: 'Mi expediente', path: '/rh/my-expedient', permission: 'RH.SELF.EXPEDIENT' },
         { icon: GraduationCap, label: 'Mis evaluaciones', path: '/rh/my-evaluations', permission: 'RH.SELF.EVALUATIONS', badge: 'pendingEvaluations' },
-        { icon: PenLine, label: 'Por leer y firmar', path: '/rh/my-acknowledgements', permission: 'RH.SELF.ACKNOWLEDGEMENTS' },
+        { icon: PenLine, label: 'Sala de lectura', path: '/rh/my-acknowledgements', permission: 'RH.SELF.ACKNOWLEDGEMENTS' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
       ],
     },

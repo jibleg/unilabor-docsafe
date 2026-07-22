@@ -59,6 +59,7 @@ export const MyAcknowledgementsPage = () => {
   const [active, setActive] = useState<DocumentAcknowledgement | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Evita spamear el toast de "ya puedes firmar" en cada latido.
   const announcedReadRef = useRef(false);
@@ -67,8 +68,18 @@ export const MyAcknowledgementsPage = () => {
     setLoading(true);
     try {
       setItems(await listMyAcknowledgements());
-    } catch {
-      toast.error('No se pudieron cargar tus documentos por acusar.');
+      setLoadError(null);
+    } catch (error) {
+      // El servidor distingue "no tienes expediente" de "sin permiso"; tragarse
+      // su mensaje dejaba al lector sin saber a quien pedirle ayuda. Ademas se
+      // limpia la lista: si no, el estado vacio miente con "no tienes pendientes".
+      const message = getApiErrorMessage(
+        error,
+        'No se pudieron cargar tus documentos por acusar.',
+      );
+      setItems([]);
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -169,7 +180,21 @@ export const MyAcknowledgementsPage = () => {
         <p className="text-sm text-[var(--unilabor-neutral)]">Cargando…</p>
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && loadError && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50/80 px-5 py-6 text-center">
+          <AlertTriangle className="mx-auto text-rose-500" size={28} />
+          <p className="mt-2 text-sm font-medium text-rose-800">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="mt-3 rounded-full border border-rose-300 px-4 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && items.length === 0 && (
         <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/92 px-5 py-8 text-center">
           <CheckCircle2 className="mx-auto text-emerald-500" size={28} />
           <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">

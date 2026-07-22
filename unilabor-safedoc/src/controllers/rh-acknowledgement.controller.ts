@@ -53,13 +53,23 @@ const ERROR_STATUS: Record<string, number> = {
   EMPLOYEE_PROFILE_NOT_FOUND: 404,
 };
 
+// Codigos que nacen fuera del dominio del acuse: no traen `publicMessage`, y sin
+// esto el lector solo ve "no se pudo completar" sin saber a quien pedirle ayuda.
+const ERROR_MESSAGE: Record<string, string> = {
+  EMPLOYEE_PROFILE_NOT_FOUND:
+    'Tu cuenta aun no esta vinculada a un expediente de colaborador. Pide a RH que la vincule.',
+};
+
 const mapError = (res: Response, error: any): Response | null => {
   const status = ERROR_STATUS[error?.code];
   if (!status) {
     return null;
   }
   return res.status(status).json({
-    message: error?.publicMessage || 'No se pudo completar la operacion sobre el acuse.',
+    message:
+      error?.publicMessage ||
+      ERROR_MESSAGE[error?.code] ||
+      'No se pudo completar la operacion sobre el acuse.',
     code: error.code,
   });
 };
