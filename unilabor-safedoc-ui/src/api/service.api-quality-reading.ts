@@ -4,6 +4,7 @@ import type {
   AssignableArea,
   MyReading,
   ReadingAssignment,
+  RepublishCandidate,
   ReadingPublication,
   ReadingPublicationStatus,
 } from '../types/models';
@@ -96,4 +97,23 @@ export const signMyReading = async (
 ): Promise<MyReading> => {
   const response = await api.post(`/quality/me/readings/${readingId}/sign`, { signature });
   return response.data as MyReading;
+};
+
+// --- Re-lectura por version nueva (SL-06) -----------------------------------
+
+export const listRepublishCandidates = async (): Promise<RepublishCandidate[]> => {
+  const response = await api.get('/quality/readings/republish-candidates');
+  return getArrayFromPayload(response.data, ['candidates', 'items', 'results']) as
+    RepublishCandidate[];
+};
+
+export const republishForNewVersion = async (
+  previousPublicationId: number,
+  payload: { deadline_hours?: number; include_unsigned?: boolean } = {},
+): Promise<{ publication: ReadingPublication; created: ReadingAssignment[] }> => {
+  const response = await api.post(
+    `/quality/readings/${previousPublicationId}/republish`,
+    payload,
+  );
+  return response.data as { publication: ReadingPublication; created: ReadingAssignment[] };
 };

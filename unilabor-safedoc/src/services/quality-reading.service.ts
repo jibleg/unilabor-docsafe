@@ -600,3 +600,139 @@ export const expireOverdueReadings = async (): Promise<number> => {
   );
   return result.rowCount ?? 0;
 };
+
+// ---------------------------------------------------------------------------
+// Re-lectura por version nueva (SL-06)
+// ---------------------------------------------------------------------------
+
+export interface RepublishCandidate {
+  publication_id: number;
+  previous_document_id: string;
+  previous_title: string;
+  new_document_id: string;
+  new_title: string;
+  signed_readers: number;
+  assigned_readers: number;
+  closed_at: string | null;
+}
+
+/**
+ * Publicaciones cuyo documento fuente fue reemplazado por una version nueva
+ * VIGENTE que todavia no se ha publicado a lectura.
+ *
+ * Se PROPONEN, no se republican solas: reemplazar un documento no siempre
+ * obliga a que todos vuelvan a firmarlo, y una correccion menor no deberia
+ * disparar una ronda de lecturas. La decision es de Calidad.
+ */
+export const listRepublishCandidates = async (): Promise<RepublishCandidate[]> => {
+  await assertTables();
+
+  const result = await pool.query(
+    `SELECT
+       p.id AS publication_id,
+       p.document_id AS previous_document_id,
+       p.title_snapshot AS previous_title,
+       p.closed_at,
+       nd.id AS new_document_id,
+       nd.title AS new_title,
+       COUNT(a.id) FILTER (WHERE a.status = 'signed')::int AS signed_readers,
+       COUNT(a.id) FILTER (WHERE a.status <> 'cancelled')::int AS assigned_readers
+     FROM public.quality_reading_publications p
+     INNER JOIN public.documents d ON d.id = p.document_id
+     INNER JOIN public.documents nd ON nd.id = d.replaced_by_document_id
+     LEFT JOIN public.quality_reading_acknowledgements a ON a.publication_id = p.id
+     WHERE nd.status = 'active'
+       AND NOT EXISTS (
+         SELECT 1 FROM public.quality_reading_publications p2 WHERE p2.document_id = nd.id
+       )
+     GROUP BY p.id, nd.id, nd.title
+     ORDER BY p.published_at DESC;`,
+  );
+
+  return result.rows.map((row) => ({
+    publication_id: Number(row.publication_id),
+    previous_document_id: String(row.previous_document_id),
+    previous_title: String(row.previous_title),
+    new_document_id: String(row.new_document_id),
+    new_title: String(row.new_title),
+    signed_readers: Number(row.signed_readers ?? 0),
+    assigned_readers: Number(row.assigned_readers ?? 0),
+    closed_at: row.closed_at ? toIsoDateTime(row.closed_at) : null,
+  }));
+};
+
+export interface RepublishPayload {
+  deadline_hours?: number;
+  min_seconds_per_page?: number;
+  /** Incluir tambien a quien tenia la lectura asignada pero no la firmo. */
+  include_unsigned?: boolean;
+}
+
+/**
+ * Abre la ronda de lectura de la version nueva y le asigna a los lectores de la
+ * anterior. Por defecto solo a quienes FIRMARON: son los que tienen una
+ * obligacion demostrada sobre ese documento.
+ */
+export const republishForNewVersion = async (
+  previousPublicationId: number,
+  payload: RepublishPayload,
+  userId: string,
+): Promise<{
+  publication: PublicationRecord;
+  created: ReadingRecord[];
+  skipped_user_ids: string[];
+}> => {
+  await assertTables();
+
+  const candidates = await listRepublishCandidates();
+  const candidate = candidates.find((item) => item.publication_id === previousPublicationId);
+  if (!candidate) {
+    return fail(
+      'QUALITY_READING_NO_NEW_VERSION',
+      'Esta publicacion no tiene una version nueva vigente pendiente de publicar.',
+    );
+  }
+
+  const readers = await pool.query(
+    `SELECT DISTINCT user_id
+       FROM public.quality_reading_acknowledgements
+      WHERE publication_id = $1
+        AND status ${payload.include_unsigned ? "<> 'cancelled'" : "= 'signed'"};`,
+    [previousPublicationId],
+  );
+
+  const userIds = readers.rows.map((row) => String(row.user_id));
+  if (userIds.length === 0) {
+    return fail(
+      'QUALITY_READING_NO_READERS',
+      'La publicacion anterior no tiene lectores que trasladar a la version nueva.',
+    );
+  }
+
+  const publication = await publishReading(
+    {
+      document_id: candidate.new_document_id,
+      ...(payload.deadline_hours !== undefined ? { deadline_hours: payload.deadline_hours } : {}),
+      ...(payload.min_seconds_per_page !== undefined
+        ? { min_seconds_per_page: payload.min_seconds_per_page }
+        : {}),
+    },
+    userId,
+  );
+
+  const assignment = await assignReaders(
+    publication.id,
+    {
+      mode: 'users',
+      user_ids: userIds,
+      ...(payload.deadline_hours !== undefined ? { deadline_hours: payload.deadline_hours } : {}),
+    },
+    userId,
+  );
+
+  return {
+    publication: (await getPublicationById(publication.id)) ?? publication,
+    created: assignment.created,
+    skipped_user_ids: assignment.skipped_user_ids,
+  };
+};

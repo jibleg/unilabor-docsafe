@@ -9,7 +9,9 @@ import {
   listAssignableAreas,
   listPublications,
   listReaders,
+  listRepublishCandidates,
   publishReading,
+  republishForNewVersion,
   type PublicationStatus,
 } from '../services/quality-reading.service';
 
@@ -33,6 +35,7 @@ const ERROR_STATUS: Record<string, number> = {
   QUALITY_READING_CLOSED: 409,
   QUALITY_READING_NO_READERS: 400,
   QUALITY_READING_ALREADY_SIGNED: 409,
+  QUALITY_READING_NO_NEW_VERSION: 409,
 };
 
 const mapError = (res: Response, error: any): Response | null => {
@@ -221,5 +224,55 @@ export const listAssignableAreasController = async (_req: AuthRequest, res: Resp
   } catch (error) {
     console.error('Error listando areas asignables:', error);
     return res.status(500).json({ message: 'No se pudieron consultar las areas.' });
+  }
+};
+
+export const listRepublishCandidatesController = async (_req: AuthRequest, res: Response) => {
+  try {
+    return res.json(await listRepublishCandidates());
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) {
+      return mapped;
+    }
+    console.error('Error listando documentos con version nueva:', error);
+    return res.status(500).json({ message: 'No se pudieron consultar las versiones nuevas.' });
+  }
+};
+
+export const republishController = async (req: AuthRequest, res: Response) => {
+  const publicationId = parsePositiveInt(req.params.id);
+  if (!publicationId) {
+    return res.status(400).json({ message: 'ID de publicacion invalido.' });
+  }
+
+  const user = req.user;
+  if (!user?.id) {
+    return res.status(401).json({ message: 'Sesion invalida o expirada.' });
+  }
+
+  try {
+    const result = await republishForNewVersion(publicationId, req.body ?? {}, user.id);
+    await registerAuditEvent({
+      user_id: user.id,
+      action: 'QUALITY_READING_REPUBLISH',
+      module_code: 'QUALITY',
+      ip_address: req.ip ?? null,
+      entity_type: 'quality_reading_publication',
+      entity_id: result.publication.id,
+      metadata: {
+        previous_publication_id: publicationId,
+        readers: result.created.length,
+        include_unsigned: Boolean(req.body?.include_unsigned),
+      },
+    });
+    return res.status(201).json(result);
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) {
+      return mapped;
+    }
+    console.error('Error republicando la version nueva:', error);
+    return res.status(500).json({ message: 'No se pudo publicar la version nueva.' });
   }
 };

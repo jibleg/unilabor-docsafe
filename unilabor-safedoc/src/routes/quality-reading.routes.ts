@@ -6,7 +6,9 @@ import {
   getPublicationController,
   listAssignableAreasController,
   listPublicationsController,
+  listRepublishCandidatesController,
   publishReadingController,
+  republishController,
 } from '../controllers/quality-reading.controller';
 import {
   downloadSignedCopyController,
@@ -21,6 +23,7 @@ import { validate } from '../middlewares/validate.middleware';
 import {
   assignReadersSchema,
   publishReadingSchema,
+  republishSchema,
   readingProgressSchema,
   signReadingSchema,
 } from '../schemas/quality-reading.schema';
@@ -46,7 +49,17 @@ router.post(
 
 router.get('/readings/areas', manageReading, listAssignableAreasController);
 
+// Antes de /readings/:id para no ser opacada por el parametro.
+router.get('/readings/republish-candidates', manageReading, listRepublishCandidatesController);
+
 router.get('/readings/:id', manageReading, getPublicationController);
+
+router.post(
+  '/readings/:id/republish',
+  manageReading,
+  validate(republishSchema),
+  republishController,
+);
 
 router.post(
   '/readings/:id/readers',

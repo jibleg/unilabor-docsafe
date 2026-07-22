@@ -5,9 +5,10 @@ Calidad**. El responsable de Calidad (o de RH) toma un documento **vigente** del
 lo publica a lectura y asigna lectores; cada lector debe recorrerlo completo antes de
 poder firmarlo, y la copia firmada queda como evidencia **en el repositorio de Calidad**.
 
-Estado: **SL-01 a SL-05 implementados y verificados en local** (2026-07-22). El ciclo
-completo funciona: publicar → asignar → leer con gate → firmar → evidencia en Calidad,
-con recordatorios y vencimientos automáticos. Pendiente SL-06 (re-lectura por versión).
+Estado: **MÓDULO COMPLETO — SL-01 a SL-06 implementados y verificados en local**
+(2026-07-22). Ciclo completo: publicar → asignar → leer con gate → firmar → evidencia en
+Calidad, con recordatorios, vencimientos automáticos y re-lectura al publicarse una
+versión nueva. **Pendiente: deploy a producción y validación en navegador.**
 Fecha de diseño: 2026-07-22.
 
 ---
@@ -238,7 +239,7 @@ cambio de comportamiento en el motor de RH debe salir en rojo.
 | **SL-03** ✅ | Publicar a lectura (solo documentos `active`, sella sha256 + páginas) y asignar lectores en las 3 formas. Tablero de seguimiento. | Calidad publica un documento y asigna a todos; el tablero muestra el avance. |
 | **SL-04** ✅ | Sala de lectura del colaborador: visor instrumentado, gate de lectura, firma, copia firmada al repositorio de evidencias de Calidad. | Un lector completa el ciclo y su PDF firmado queda descargable desde el tablero. |
 | **SL-05** ✅ | Recordatorios (≤24 h) y vencimientos automáticos, reusando el scheduler. | Cron corriendo; un acuse vencido pasa a `expired` solo. |
-| **SL-06** | Re-lectura por versión: al reemplazarse un documento, se cierra su publicación y se ofrece republicar la nueva versión a los mismos lectores. | Reemplazar un documento propone la nueva ronda con un clic. |
+| **SL-06** ✅ | Re-lectura por versión: al reemplazarse un documento, se cierra su publicación y se ofrece republicar la nueva versión a los mismos lectores. | Reemplazar un documento propone la nueva ronda con un clic. |
 
 SL-06 es el diferenciador: convierte la sala de lectura en control de documentos real,
 no en un archivero de firmas.

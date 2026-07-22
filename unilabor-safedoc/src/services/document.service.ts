@@ -3,6 +3,7 @@ import path from 'path';
 import pool from '../config/db';
 import { UserRole } from '../types';
 import * as categoryService from './category.service';
+import { closePublicationsForReplacedDocument } from './quality-reading-hooks.service';
 import {
   PaginatedResult,
   PaginationInput,
@@ -431,6 +432,12 @@ export const replaceDocumentWithNewVersion = async (
       'INSERT INTO access_logs (user_id, document_id, action, ip_address) VALUES ($1, $2, $3, $4)',
       [uploaded_by, previous_document_id, 'SUPERSEDE', ip]
     );
+
+    // La version anterior deja de ser vigente: su publicacion en la sala de
+    // lectura se cierra en la misma transaccion, para que nadie siga leyendo y
+    // firmando un documento que el SGC acaba de reemplazar. Las lecturas ya
+    // firmadas se conservan intactas como evidencia historica.
+    await closePublicationsForReplacedDocument(client, String(previous_document_id));
 
     await client.query(
       'INSERT INTO access_logs (user_id, document_id, action, ip_address) VALUES ($1, $2, $3, $4)',

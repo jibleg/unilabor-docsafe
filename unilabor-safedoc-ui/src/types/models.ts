@@ -1328,3 +1328,15 @@ export interface MyReading {
   current_page: number | null;
   has_signed_copy: boolean;
 }
+
+/** Publicación cuyo documento del SGC ya tiene una versión nueva vigente. */
+export interface RepublishCandidate {
+  publication_id: number;
+  previous_document_id: string;
+  previous_title: string;
+  new_document_id: string;
+  new_title: string;
+  signed_readers: number;
+  assigned_readers: number;
+  closed_at: string | null;
+}

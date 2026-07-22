@@ -19,7 +19,9 @@ import {
   getReadingPublication,
   listAssignableAreas,
   listReadingPublications,
+  listRepublishCandidates,
   publishReading,
+  republishForNewVersion,
   type AssignReadersPayload,
 } from '../api/service.api-quality-reading';
 import type {
@@ -28,6 +30,7 @@ import type {
   ReadingAssignment,
   ReadingPublication,
   ReadingPublicationStatus,
+  RepublishCandidate,
 } from '../types/models';
 import {
   READER_STATUS_LABEL,
@@ -78,11 +81,17 @@ export const QualityReadingRoomPage = () => {
   const [assignArea, setAssignArea] = useState('');
   const [assigning, setAssigning] = useState(false);
 
+  const [candidates, setCandidates] = useState<RepublishCandidate[]>([]);
+  const [republishing, setRepublishing] = useState<number | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setPublications(await listReadingPublications(filter === 'all' ? undefined : filter));
       setLoadError(null);
+      // Documentos que ya tienen version nueva vigente sin publicar. Se
+      // proponen; republicar es decision de Calidad, no automatico.
+      setCandidates(await listRepublishCandidates());
     } catch (error) {
       const message = getApiErrorMessage(error, 'No se pudo cargar la sala de lectura.');
       setPublications([]);
@@ -195,6 +204,30 @@ export const QualityReadingRoomPage = () => {
     }
   };
 
+  const handleRepublish = async (candidate: RepublishCandidate) => {
+    const confirmed = await confirmAction(
+      'Publicar la versión nueva',
+      `Se abrirá la lectura de "${candidate.new_title}" y se asignará a los ${candidate.signed_readers} lector(es) que firmaron la versión anterior. Las firmas de la versión anterior se conservan.`,
+      'Publicar',
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setRepublishing(candidate.publication_id);
+    try {
+      const result = await republishForNewVersion(candidate.publication_id);
+      toast.success(
+        `"${result.publication.title_snapshot}" publicado a ${result.created.length} lector(es).`,
+      );
+      await load();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo publicar la versión nueva.'));
+    } finally {
+      setRepublishing(null);
+    }
+  };
+
   const handleClose = async (publication: ReadingPublication) => {
     const confirmed = await confirmAction(
       'Cerrar publicación',
@@ -258,6 +291,49 @@ export const QualityReadingRoomPage = () => {
           </button>
         ))}
       </div>
+
+      {candidates.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <RefreshCw size={16} className="text-amber-700" />
+            <h2 className="text-sm font-bold text-amber-900">
+              Documentos con versión nueva sin publicar
+            </h2>
+          </div>
+          <p className="mt-1 text-xs text-amber-800">
+            El documento fue reemplazado en el SGC y su lectura anterior se cerró sola. Quienes ya
+            firmaron conservan su constancia; publica la nueva ronda si deben leer la versión vigente.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {candidates.map((candidate) => (
+              <li
+                key={candidate.publication_id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white/80 px-4 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-[var(--color-brand-700)]">
+                    {candidate.new_title}
+                  </p>
+                  <p className="truncate text-xs text-[var(--unilabor-neutral)]">
+                    Reemplaza a "{candidate.previous_title}" · {candidate.signed_readers} firmaron la
+                    versión anterior
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={republishing === candidate.publication_id}
+                  onClick={() => void handleRepublish(candidate)}
+                  className="rounded-full bg-amber-600 px-4 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                >
+                  {republishing === candidate.publication_id
+                    ? 'Publicando…'
+                    : 'Publicar nueva ronda'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {loading && <p className="text-sm text-[var(--unilabor-neutral)]">Cargando…</p>}
 

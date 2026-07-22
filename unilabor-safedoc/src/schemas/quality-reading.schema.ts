@@ -46,3 +46,11 @@ export const signReadingSchema = z
     signature: z.string().min(1, 'La firma autografa es obligatoria.'),
   })
   .passthrough();
+
+export const republishSchema = z
+  .object({
+    deadline_hours: z.number().int().min(1).max(8760).optional(),
+    min_seconds_per_page: z.number().int().min(1).max(120).optional(),
+    include_unsigned: z.boolean().optional(),
+  })
+  .passthrough();
