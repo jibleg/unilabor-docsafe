@@ -6,6 +6,7 @@ import { toIsoDateTime } from '../utils/date-serialization';
 import { safeUnlink, sha256Buffer } from '../utils/file-storage';
 import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image';
 import { withTransaction, type Queryable } from '../utils/transaction';
+import { creditReadingHeartbeat, isValidPage } from './reading/reading-progress.engine';
 import { resolveInstitutionalDocumentPath } from './rh-institutional-document.service';
 import { buildSignedAcknowledgementPdf } from './rh-acknowledgement-pdf.service';
 
@@ -248,31 +249,30 @@ export const registerReadingProgress = async (
     }
 
     const pagesTotal = Number(row.pages_total);
-    if (!Number.isInteger(page) || page < 1 || page > pagesTotal) {
+    if (!isValidPage(page, pagesTotal)) {
       return fail('RH_ACK_INVALID_PAGE', 'La pagina reportada no existe en el documento.');
     }
 
-    const minSeconds = Number(row.min_seconds_per_page);
-    const previousPage = row.current_page === null ? null : Number(row.current_page);
-    const samePage = previousPage === page;
+    // La contabilidad vive en el motor compartido (reading-progress.engine),
+    // que es puro y esta cubierto por pruebas propias.
+    const progress = creditReadingHeartbeat(
+      {
+        pages_total: pagesTotal,
+        min_seconds_per_page: Number(row.min_seconds_per_page),
+        current_page: row.current_page === null ? null : Number(row.current_page),
+        current_page_seconds: Number(row.current_page_seconds),
+        active_seconds: Number(row.active_seconds),
+        pages_seen: Array.isArray(row.pages_seen) ? row.pages_seen.map(Number) : [],
+        last_progress_at: row.last_progress_at ?? null,
+      },
+      page,
+      { maxCreditSeconds: MAX_HEARTBEAT_CREDIT_SECONDS },
+    );
 
-    // Credito real transcurrido, medido por el servidor.
-    const lastProgressAt = row.last_progress_at ? new Date(row.last_progress_at).getTime() : null;
-    const elapsedSeconds =
-      samePage && lastProgressAt !== null
-        ? Math.max(0, Math.min(Math.floor((Date.now() - lastProgressAt) / 1000), MAX_HEARTBEAT_CREDIT_SECONDS))
-        : 0;
-
-    const currentPageSeconds = (samePage ? Number(row.current_page_seconds) : 0) + elapsedSeconds;
-    const activeSeconds = Number(row.active_seconds) + elapsedSeconds;
-
-    const pagesSeen: number[] = Array.isArray(row.pages_seen) ? row.pages_seen.map(Number) : [];
-    if (currentPageSeconds >= minSeconds && !pagesSeen.includes(page)) {
-      pagesSeen.push(page);
-    }
-
-    const completed = pagesSeen.length >= pagesTotal;
-    const nextStatus = completed ? 'read' : 'in_progress';
+    const { current_page_seconds: currentPageSeconds, active_seconds: activeSeconds } = progress;
+    const pagesSeen = progress.pages_seen;
+    const completed = progress.completed;
+    const nextStatus = progress.status;
 
     const updated = await client.query(
       `UPDATE public.rh_document_acknowledgements
@@ -296,7 +296,7 @@ export const registerReadingProgress = async (
         page,
         currentPageSeconds,
         activeSeconds,
-        pagesSeen.sort((a, b) => a - b),
+        pagesSeen,
         completed,
       ],
     );

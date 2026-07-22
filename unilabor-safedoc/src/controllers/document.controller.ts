@@ -5,6 +5,10 @@ import { AuthRequest } from '../types';
 import * as categoryService from '../services/category.service';
 import { registerAuditEvent } from '../services/audit.service';
 import * as documentService from '../services/document.service';
+import {
+  buildDocumentInUseMessage,
+  getDocumentReadingUsage,
+} from '../services/quality-reading.service';
 
 const parsePositiveInt = (rawValue: unknown): number | null => {
   const parsed = Number.parseInt(String(rawValue ?? ''), 10);
@@ -304,6 +308,18 @@ export const deleteDocument = async (req: AuthRequest, res: Response) => {
 
     if (!canManageDocument) {
       return res.status(403).json({ message: 'No tienes permiso para eliminar este documento' });
+    }
+
+    // Guarda de la sala de lectura: este borrado ademas hace `unlink` del PDF
+    // fisico, asi que un documento publicado a lectura no puede eliminarse sin
+    // dejar las lecturas en curso sin fuente y las firmas sin forma de
+    // re-verificar su sha256 de origen.
+    const readingUsage = await getDocumentReadingUsage(documentId);
+    if (readingUsage.publications > 0) {
+      return res.status(409).json({
+        message: buildDocumentInUseMessage(readingUsage),
+        code: 'QUALITY_DOCUMENT_IN_READING_ROOM',
+      });
     }
 
     await pool.query(

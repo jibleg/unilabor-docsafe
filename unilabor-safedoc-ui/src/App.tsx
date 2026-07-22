@@ -166,9 +166,30 @@ function App() {
           </ModuleGuard>
         }
       >
-        <Route path="dashboard" element={<DashboardHome />} />
+        {/* Dashboard y repositorio exigen el permiso que ya filtra el sidebar y
+            que el backend pide en sus endpoints. Sin esto, un lector de la sala
+            de lectura (que entra a Calidad con solo QUALITY.SELF.READING) las
+            abriria y las veria rotas: el backend le responde 403.
+            El redirectTo es explicito a proposito: el destino por defecto de
+            Calidad es /quality/dashboard, o sea esta misma ruta, y con el gate
+            puesto eso seria un bucle de redireccion. */}
+        <Route
+          path="dashboard"
+          element={
+            <PermissionGate permission="QUALITY.DOCUMENTS.READ" redirectTo="/quality/profile">
+              <DashboardHome />
+            </PermissionGate>
+          }
+        />
         <Route path="profile" element={<ProfilePage />} />
-        <Route path="documents" element={<DocumentsPage />} />
+        <Route
+          path="documents"
+          element={
+            <PermissionGate permission="QUALITY.DOCUMENTS.READ" redirectTo="/quality/profile">
+              <DocumentsPage />
+            </PermissionGate>
+          }
+        />
         <Route
           path="categories"
           element={
