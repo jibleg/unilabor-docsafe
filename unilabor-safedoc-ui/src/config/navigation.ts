@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   BarChart3,
+  BookOpen,
   Building2,
   CalendarClock,
   CalendarDays,
@@ -49,6 +50,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/quality/dashboard', permission: 'QUALITY.DOCUMENTS.READ' },
         { icon: FileText, label: 'Documentos', path: '/quality/documents', permission: 'QUALITY.DOCUMENTS.READ' },
+        { icon: BookOpen, label: 'Sala de lectura', path: '/quality/reading-room', permission: 'QUALITY.READING.MANAGE' },
       ],
     },
     {

@@ -98,6 +98,11 @@ const RhInstitutionalDocumentsPage = lazy(() =>
     default: module.RhInstitutionalDocumentsPage,
   })),
 );
+const QualityReadingRoomPage = lazy(() =>
+  import('./pages/QualityReadingRoomPage').then((module) => ({
+    default: module.QualityReadingRoomPage,
+  })),
+);
 const RhAcknowledgementsPage = lazy(() =>
   import('./pages/RhAcknowledgementsPage').then((module) => ({
     default: module.RhAcknowledgementsPage,
@@ -195,6 +200,14 @@ function App() {
           element={
             <PermissionGate permission="QUALITY.CATEGORIES.WRITE" redirectTo="/quality/dashboard">
               <CategoriesPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="reading-room"
+          element={
+            <PermissionGate permission="QUALITY.READING.MANAGE" redirectTo="/quality/profile">
+              <QualityReadingRoomPage />
             </PermissionGate>
           }
         />

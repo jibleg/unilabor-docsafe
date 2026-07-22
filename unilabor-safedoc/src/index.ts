@@ -15,6 +15,7 @@ import trainingRoutes from './routes/training.routes';
 import evaluationAssignmentRoutes from './routes/evaluation-assignment.routes';
 import evaluationGradingRoutes from './routes/evaluation-grading.routes';
 import helpdeskRoutes from './routes/helpdesk.routes';
+import qualityReadingRoutes from './routes/quality-reading.routes';
 import adminRoutes from './routes/admin.routes';
 import { assertRequiredEnv } from './config/env';
 import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
@@ -59,6 +60,7 @@ app.use('/api/rh', rhAcknowledgementRoutes);
 app.use('/api/rh/trainings', trainingRoutes);
 app.use('/api/rh/evaluations', evaluationGradingRoutes);
 app.use('/api/rh', evaluationAssignmentRoutes);
+app.use('/api/quality', qualityReadingRoutes);
 app.use('/api/helpdesk', helpdeskRoutes);
 app.use('/api/admin', adminRoutes);
 

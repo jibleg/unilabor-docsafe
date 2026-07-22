@@ -1254,3 +1254,56 @@ export interface DocumentAcknowledgement {
   employee_name?: string;
   employee_code?: string | null;
 }
+
+// --- Sala de Lectura (Calidad) ----------------------------------------------
+// El documento fuente es SIEMPRE un documento vigente del SGC; la publicacion
+// sella su huella y numero de paginas al abrirse.
+
+export type ReadingPublicationStatus = 'open' | 'closed';
+
+export interface ReadingPublication {
+  id: number;
+  document_id: string;
+  document_title: string;
+  title_snapshot: string;
+  source_sha256: string;
+  pages_total: number;
+  min_seconds_per_page: number;
+  default_deadline_hours: number;
+  instructions: string | null;
+  status: ReadingPublicationStatus;
+  published_by_user_id: string | null;
+  published_by_name: string | null;
+  published_at: string | null;
+  closed_at: string | null;
+  readers_total: number;
+  readers_signed: number;
+  readers_read: number;
+  readers_in_progress: number;
+  readers_expired: number;
+}
+
+export interface ReadingAssignment {
+  id: number;
+  publication_id: number;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  employee_id: number | null;
+  employee_area: string | null;
+  status: AcknowledgementStatus;
+  assigned_at: string | null;
+  deadline_at: string | null;
+  started_at: string | null;
+  read_completed_at: string | null;
+  signed_at: string | null;
+  pages_total: number;
+  pages_seen_count: number;
+  min_seconds_per_page: number;
+  active_seconds: number;
+}
+
+export interface AssignableArea {
+  area: string;
+  total: number;
+}
