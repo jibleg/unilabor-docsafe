@@ -98,6 +98,11 @@ const RhInstitutionalDocumentsPage = lazy(() =>
     default: module.RhInstitutionalDocumentsPage,
   })),
 );
+const QualityMyReadingsPage = lazy(() =>
+  import('./pages/QualityMyReadingsPage').then((module) => ({
+    default: module.QualityMyReadingsPage,
+  })),
+);
 const QualityReadingRoomPage = lazy(() =>
   import('./pages/QualityReadingRoomPage').then((module) => ({
     default: module.QualityReadingRoomPage,
@@ -208,6 +213,14 @@ function App() {
           element={
             <PermissionGate permission="QUALITY.READING.MANAGE" redirectTo="/quality/profile">
               <QualityReadingRoomPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="my-readings"
+          element={
+            <PermissionGate permission="QUALITY.SELF.READING" redirectTo="/quality/profile">
+              <QualityMyReadingsPage />
             </PermissionGate>
           }
         />

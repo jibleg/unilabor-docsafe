@@ -5,8 +5,9 @@ Calidad**. El responsable de Calidad (o de RH) toma un documento **vigente** del
 lo publica a lectura y asigna lectores; cada lector debe recorrerlo completo antes de
 poder firmarlo, y la copia firmada queda como evidencia **en el repositorio de Calidad**.
 
-Estado: **SL-01, SL-02 y SL-03 implementados y verificados en local** (2026-07-22).
-Pendientes SL-04 (sala del lector), SL-05 (recordatorios) y SL-06 (re-lectura por versión).
+Estado: **SL-01 a SL-04 implementados y verificados en local** (2026-07-22). El ciclo
+completo funciona: publicar → asignar → leer con gate → firmar → evidencia en Calidad.
+Pendientes SL-05 (recordatorios) y SL-06 (re-lectura por versión).
 Fecha de diseño: 2026-07-22.
 
 ---
@@ -235,7 +236,7 @@ cambio de comportamiento en el motor de RH debe salir en rojo.
 | **SL-01** ✅ | Migración (2 tablas), permisos, roles `QUALITY_READING_MANAGER` y `QUALITY_READER`. **Guarda de integridad**: bloquear con 409 el borrado de un documento con publicaciones (hace técnica la regla "no se borra ningún documento"). Gate de `/quality/documents` y `/quality/dashboard` con `QUALITY.DOCUMENTS.READ`. | Un lector con solo `QUALITY.SELF.READING` entra a Calidad y no ve nada más. Intentar borrar un documento publicado devuelve 409. |
 | **SL-02** ✅ | Extracción del motor a piezas compartidas; RH las consume. Sin cambio funcional. | Tests de RH verdes; acuses de RH intactos en prod. |
 | **SL-03** ✅ | Publicar a lectura (solo documentos `active`, sella sha256 + páginas) y asignar lectores en las 3 formas. Tablero de seguimiento. | Calidad publica un documento y asigna a todos; el tablero muestra el avance. |
-| **SL-04** | Sala de lectura del colaborador: visor instrumentado, gate de lectura, firma, copia firmada al repositorio de evidencias de Calidad. | Un lector completa el ciclo y su PDF firmado queda descargable desde el tablero. |
+| **SL-04** ✅ | Sala de lectura del colaborador: visor instrumentado, gate de lectura, firma, copia firmada al repositorio de evidencias de Calidad. | Un lector completa el ciclo y su PDF firmado queda descargable desde el tablero. |
 | **SL-05** | Recordatorios (≤24 h) y vencimientos automáticos, reusando el scheduler. | Cron corriendo; un acuse vencido pasa a `expired` solo. |
 | **SL-06** | Re-lectura por versión: al reemplazarse un documento, se cierra su publicación y se ofrece republicar la nueva versión a los mismos lectores. | Reemplazar un documento propone la nueva ronda con un clic. |
 

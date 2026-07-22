@@ -61,7 +61,10 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
     },
     {
       title: 'Mi espacio',
-      items: [{ icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' }],
+      items: [
+        { icon: PenLine, label: 'Mis lecturas', path: '/quality/my-readings', permission: 'QUALITY.SELF.READING' },
+        { icon: UserCircle2, label: 'Mi perfil', path: '/quality/profile' },
+      ],
     },
   ],
   ADMIN: [

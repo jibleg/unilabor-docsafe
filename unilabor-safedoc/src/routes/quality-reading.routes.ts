@@ -8,9 +8,22 @@ import {
   listPublicationsController,
   publishReadingController,
 } from '../controllers/quality-reading.controller';
+import {
+  downloadSignedCopyController,
+  getMyReadingController,
+  listMyReadingsController,
+  registerReadingProgressController,
+  signReadingController,
+  viewMyReadingSourceController,
+} from '../controllers/quality-reading-self.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { assignReadersSchema, publishReadingSchema } from '../schemas/quality-reading.schema';
+import {
+  assignReadersSchema,
+  publishReadingSchema,
+  readingProgressSchema,
+  signReadingSchema,
+} from '../schemas/quality-reading.schema';
 
 const router = Router();
 
@@ -45,5 +58,34 @@ router.post(
 router.post('/readings/:id/close', manageReading, closePublicationController);
 
 router.delete('/readings/:id/readers/:readingId', manageReading, cancelReadingController);
+
+// El gestor puede consultar la evidencia firmada de cualquier lector.
+router.get(
+  '/readings/:id/readers/:readingId/signed',
+  manageReading,
+  downloadSignedCopyController({ manage: true }),
+);
+
+// --- Sala de lectura del colaborador ----------------------------------------
+const selfReading = requirePermission('QUALITY.SELF.READING');
+
+router.get('/me/readings', selfReading, listMyReadingsController);
+router.get('/me/readings/:id', selfReading, getMyReadingController);
+router.get('/me/readings/:id/view', selfReading, viewMyReadingSourceController);
+router.get('/me/readings/:id/signed', selfReading, downloadSignedCopyController());
+
+router.post(
+  '/me/readings/:id/progress',
+  selfReading,
+  validate(readingProgressSchema),
+  registerReadingProgressController,
+);
+
+router.post(
+  '/me/readings/:id/sign',
+  selfReading,
+  validate(signReadingSchema),
+  signReadingController,
+);
 
 export default router;

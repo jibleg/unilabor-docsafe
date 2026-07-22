@@ -2,6 +2,7 @@ import api from './axios';
 import { getArrayFromPayload } from './service.shared';
 import type {
   AssignableArea,
+  MyReading,
   ReadingAssignment,
   ReadingPublication,
   ReadingPublicationStatus,
@@ -68,4 +69,31 @@ export const cancelReadingAssignment = async (
   readingId: number,
 ): Promise<void> => {
   await api.delete(`/quality/readings/${publicationId}/readers/${readingId}`);
+};
+
+// --- Sala de lectura del colaborador ----------------------------------------
+
+export const listMyReadings = async (): Promise<MyReading[]> => {
+  const response = await api.get('/quality/me/readings');
+  return getArrayFromPayload(response.data, ['readings', 'items', 'results']) as MyReading[];
+};
+
+/**
+ * Latido del visor. Solo reporta la pagina: el tiempo lo mide el servidor, asi
+ * que aqui no hay nada que "ayudar" a acumular.
+ */
+export const reportReadingProgress = async (
+  readingId: number,
+  page: number,
+): Promise<MyReading> => {
+  const response = await api.post(`/quality/me/readings/${readingId}/progress`, { page });
+  return response.data as MyReading;
+};
+
+export const signMyReading = async (
+  readingId: number,
+  signature: string,
+): Promise<MyReading> => {
+  const response = await api.post(`/quality/me/readings/${readingId}/sign`, { signature });
+  return response.data as MyReading;
 };

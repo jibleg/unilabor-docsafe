@@ -31,3 +31,18 @@ export const assignReadersSchema = z
       deadline_hours: z.number().int().min(1).max(8760).optional(),
     }),
   ]);
+
+// El progreso NO acepta segundos a proposito: si el cliente pudiera reportar
+// tiempo, bastaria un POST con un numero grande para saltarse el gate. El
+// servidor mide con su propio reloj.
+export const readingProgressSchema = z
+  .object({
+    page: z.coerce.number().int().min(1, 'La pagina reportada es invalida.'),
+  })
+  .strict();
+
+export const signReadingSchema = z
+  .object({
+    signature: z.string().min(1, 'La firma autografa es obligatoria.'),
+  })
+  .passthrough();

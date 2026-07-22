@@ -1307,3 +1307,24 @@ export interface AssignableArea {
   area: string;
   total: number;
 }
+
+/** Una lectura del SGC asignada a mí, tal como la ve el lector. */
+export interface MyReading {
+  id: number;
+  publication_id: number;
+  document_id: string;
+  document_title: string;
+  instructions: string | null;
+  status: AcknowledgementStatus;
+  deadline_at: string | null;
+  started_at: string | null;
+  read_completed_at: string | null;
+  signed_at: string | null;
+  pages_total: number;
+  pages_seen: number[];
+  pages_seen_count: number;
+  min_seconds_per_page: number;
+  active_seconds: number;
+  current_page: number | null;
+  has_signed_copy: boolean;
+}
