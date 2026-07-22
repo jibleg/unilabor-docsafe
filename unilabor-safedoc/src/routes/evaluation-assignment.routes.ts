@@ -18,14 +18,24 @@ import { submitEvaluationSchema } from '../schemas/training.schema';
  */
 const router = Router();
 
-router.use(verifyToken, requirePermission('RH.SELF.EVALUATIONS'));
+// El permiso va POR RUTA, no en un `router.use` sin prefijo: varios routers
+// comparten el montaje /api/rh y un guard general aqui alcanzaria tambien a los
+// que se monten despues.
+router.use(verifyToken);
+
+const selfEvaluations = requirePermission('RH.SELF.EVALUATIONS');
 
 // Las rutas mas especificas van antes del parametro :id para no ser opacadas.
-router.get('/me/evaluations/pending-count', myPendingEvaluationsCountController);
-router.get('/me/evaluations', listMyEvaluationsController);
-router.get('/me/evaluations/:id', getMyEvaluationDetailController);
-router.post('/me/evaluations/:id/start', startMyEvaluationController);
-router.post('/me/evaluations/:id/submit', validate(submitEvaluationSchema), submitMyEvaluationController);
-router.post('/me/evaluations/:id/request-late', requestLateAuthorizationController);
+router.get('/me/evaluations/pending-count', selfEvaluations, myPendingEvaluationsCountController);
+router.get('/me/evaluations', selfEvaluations, listMyEvaluationsController);
+router.get('/me/evaluations/:id', selfEvaluations, getMyEvaluationDetailController);
+router.post('/me/evaluations/:id/start', selfEvaluations, startMyEvaluationController);
+router.post(
+  '/me/evaluations/:id/submit',
+  selfEvaluations,
+  validate(submitEvaluationSchema),
+  submitMyEvaluationController,
+);
+router.post('/me/evaluations/:id/request-late', selfEvaluations, requestLateAuthorizationController);
 
 export default router;
