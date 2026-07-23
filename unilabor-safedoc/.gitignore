@@ -33,3 +33,4 @@ storage/pdfs/*
 
 # Local helper kept outside version control
 /index.ts
+tsconfig.tsbuildinfo
