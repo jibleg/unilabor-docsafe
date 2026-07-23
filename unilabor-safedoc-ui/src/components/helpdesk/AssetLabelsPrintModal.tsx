@@ -1,43 +1,18 @@
 import { useMemo } from 'react';
-import JsBarcode from 'jsbarcode';
 import { Loader2, Printer, X } from 'lucide-react';
+import {
+  LABEL_PRINT_STYLES,
+  buildBarcodeDataUrl,
+  renderLabelHtml,
+  type AssetLabelData,
+} from './assetLabel';
 
-export interface AssetLabelData {
-  assetCode: string;
-  name: string;
-  brand?: string | null;
-  model?: string | null;
-}
+export type { AssetLabelData };
 
 interface AssetLabelsPrintModalProps {
   assets: AssetLabelData[];
   onClose: () => void;
 }
-
-const escapeHtml = (value: string): string =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
-const buildBarcode = (assetCode: string): string => {
-  const canvas = document.createElement('canvas');
-  try {
-    JsBarcode(canvas, assetCode, {
-      format: 'CODE128',
-      displayValue: true,
-      fontSize: 16,
-      height: 55,
-      margin: 6,
-      textMargin: 2,
-      font: 'monospace',
-    });
-    return canvas.toDataURL('image/png');
-  } catch {
-    return '';
-  }
-};
 
 // Impresión en lote: una etiqueta 50 × 25 mm por página, en una sola corrida.
 // Reutiliza el mismo formato Code128 de la etiqueta individual (AssetLabelModal).
@@ -46,7 +21,7 @@ export const AssetLabelsPrintModal = ({ assets, onClose }: AssetLabelsPrintModal
     () =>
       assets.map((asset) => ({
         ...asset,
-        dataUrl: buildBarcode(asset.assetCode),
+        dataUrl: buildBarcodeDataUrl(asset.assetCode),
       })),
     [assets],
   );
@@ -63,32 +38,14 @@ export const AssetLabelsPrintModal = ({ assets, onClose }: AssetLabelsPrintModal
       return;
     }
     const labelsHtml = printable
-      .map((label) => {
-        const subtitle = [label.brand, label.model].filter(Boolean).join(' · ');
-        return `<div class="label">
-    <div class="name">${escapeHtml(label.name)}</div>
-    ${subtitle ? `<div class="sub">${escapeHtml(subtitle)}</div>` : ''}
-    <img src="${label.dataUrl}" alt="${escapeHtml(label.assetCode)}" />
-  </div>`;
-      })
+      .map((label) => renderLabelHtml(label, label.dataUrl))
       .join('\n');
 
     printWindow.document.write(`<!DOCTYPE html>
 <html><head><meta charset="utf-8" /><title>Etiquetas (${printable.length})</title>
-<style>
-  @page { size: 50mm 25mm; margin: 0; }
-  html, body { margin: 0; padding: 0; }
-  .label {
-    width: 50mm; height: 25mm; box-sizing: border-box; padding: 1mm;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-family: Arial, Helvetica, sans-serif; text-align: center;
-    page-break-after: always; break-after: page;
-  }
+<style>${LABEL_PRINT_STYLES}
+  .label { page-break-after: always; break-after: page; }
   .label:last-child { page-break-after: auto; break-after: auto; }
-  .name { font-size: 7pt; font-weight: 700; line-height: 1.05; max-width: 48mm;
-    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
-  .sub { font-size: 5.5pt; color: #333; line-height: 1; }
-  img { max-width: 48mm; max-height: 14mm; margin-top: 0.4mm; }
 </style></head>
 <body>
   ${labelsHtml}

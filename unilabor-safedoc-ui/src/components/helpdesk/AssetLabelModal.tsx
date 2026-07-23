@@ -1,6 +1,11 @@
 import { useMemo } from 'react';
-import JsBarcode from 'jsbarcode';
 import { Printer, X } from 'lucide-react';
+import {
+  LABEL_PRINT_STYLES,
+  buildBarcodeDataUrl,
+  codeFontSizePt,
+  renderLabelHtml,
+} from './assetLabel';
 
 interface AssetLabelModalProps {
   assetCode: string;
@@ -10,31 +15,9 @@ interface AssetLabelModalProps {
   onClose: () => void;
 }
 
-const escapeHtml = (value: string): string =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
 export const AssetLabelModal = ({ assetCode, name, brand, model, onClose }: AssetLabelModalProps) => {
-  const { dataUrl, error } = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    try {
-      JsBarcode(canvas, assetCode, {
-        format: 'CODE128',
-        displayValue: true,
-        fontSize: 16,
-        height: 55,
-        margin: 6,
-        textMargin: 2,
-        font: 'monospace',
-      });
-      return { dataUrl: canvas.toDataURL('image/png'), error: false };
-    } catch {
-      return { dataUrl: '', error: true };
-    }
-  }, [assetCode]);
+  const dataUrl = useMemo(() => buildBarcodeDataUrl(assetCode), [assetCode]);
+  const error = !dataUrl;
 
   const handlePrint = () => {
     if (!dataUrl) {
@@ -44,28 +27,11 @@ export const AssetLabelModal = ({ assetCode, name, brand, model, onClose }: Asse
     if (!printWindow) {
       return;
     }
-    const subtitle = [brand, model].filter(Boolean).join(' · ');
     printWindow.document.write(`<!DOCTYPE html>
-<html><head><meta charset="utf-8" /><title>Etiqueta ${escapeHtml(assetCode)}</title>
-<style>
-  @page { size: 50mm 25mm; margin: 0; }
-  html, body { margin: 0; padding: 0; }
-  .label {
-    width: 50mm; height: 25mm; box-sizing: border-box; padding: 1mm;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    font-family: Arial, Helvetica, sans-serif; text-align: center;
-  }
-  .name { font-size: 7pt; font-weight: 700; line-height: 1.05; max-width: 48mm;
-    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
-  .sub { font-size: 5.5pt; color: #333; line-height: 1; }
-  img { max-width: 48mm; max-height: 14mm; margin-top: 0.4mm; }
-</style></head>
+<html><head><meta charset="utf-8" /><title>Etiqueta ${assetCode}</title>
+<style>${LABEL_PRINT_STYLES}</style></head>
 <body>
-  <div class="label">
-    <div class="name">${escapeHtml(name)}</div>
-    ${subtitle ? `<div class="sub">${escapeHtml(subtitle)}</div>` : ''}
-    <img src="${dataUrl}" alt="${escapeHtml(assetCode)}" />
-  </div>
+  ${renderLabelHtml({ assetCode, name, brand, model }, dataUrl)}
   <script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close();},400);};</script>
 </body></html>`);
     printWindow.document.close();
@@ -81,15 +47,23 @@ export const AssetLabelModal = ({ assetCode, name, brand, model, onClose }: Asse
           </button>
         </div>
         <div className="space-y-4 p-5">
+          {/* La vista previa respeta la jerarquia de la impresion: el codigo
+              manda, el nombre acompana. */}
           <div className="flex flex-col items-center rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(248,251,253,0.96)] p-4 text-center">
-            <p className="text-sm font-bold text-[var(--unilabor-ink)]">{name}</p>
-            {(brand || model) ? (
-              <p className="text-xs text-[var(--unilabor-neutral)]">{[brand, model].filter(Boolean).join(' · ')}</p>
-            ) : null}
+            <p
+              className="font-extrabold leading-none tracking-tight text-[var(--unilabor-ink)]"
+              style={{ fontSize: `${codeFontSizePt(assetCode) * 1.6}px` }}
+            >
+              {assetCode}
+            </p>
             {error ? (
               <p className="mt-3 text-sm text-[#b02a2a]">No se pudo generar el codigo de barras.</p>
-            ) : dataUrl ? (
-              <img src={dataUrl} alt={assetCode} className="mt-2 max-w-full" />
+            ) : (
+              <img src={dataUrl} alt={assetCode} className="mt-2 max-h-16 max-w-full" />
+            )}
+            <p className="mt-1 text-xs font-semibold text-[var(--unilabor-ink)]">{name}</p>
+            {(brand || model) ? (
+              <p className="text-[11px] text-[var(--unilabor-neutral)]">{[brand, model].filter(Boolean).join(' · ')}</p>
             ) : null}
           </div>
           <p className="text-center text-xs text-[var(--unilabor-neutral)]">
@@ -99,9 +73,10 @@ export const AssetLabelModal = ({ assetCode, name, brand, model, onClose }: Asse
             type="button"
             onClick={handlePrint}
             disabled={!dataUrl}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-3 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
           >
-            <Printer size={16} /> Imprimir etiqueta
+            <Printer size={16} />
+            Imprimir etiqueta
           </button>
         </div>
       </div>

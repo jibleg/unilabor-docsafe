@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreVertical } from 'lucide-react';
+import { MENU_WIDTH, VIEWPORT_MARGIN, resolveMenuPosition } from './actionsMenuPosition';
 
 export interface ActionMenuItem {
   key: string;
@@ -10,8 +11,6 @@ export interface ActionMenuItem {
   danger?: boolean;
   disabled?: boolean;
 }
-
-const MENU_WIDTH = 200;
 
 export const ActionsMenu = ({ items }: { items: ActionMenuItem[] }) => {
   const [open, setOpen] = useState(false);
@@ -41,10 +40,29 @@ export const ActionsMenu = ({ items }: { items: ActionMenuItem[] }) => {
     };
   }, [open]);
 
+  // Se reposiciona con el menu ya en el DOM: antes de pintarlo no se conoce su
+  // alto, que depende de cuantas acciones tenga la fila.
+  useLayoutEffect(() => {
+    if (!open || !menuRef.current || !buttonRef.current) {
+      return;
+    }
+    const menuRect = menuRef.current.getBoundingClientRect();
+    const buttonRect = buttonRef.current.getBoundingClientRect();
+    const next = resolveMenuPosition(buttonRect, menuRect.height, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+
+    setPos((current) =>
+      current.top === next.top && current.left === next.left ? current : next,
+    );
+  }, [open]);
+
   const toggle = () => {
     if (!open && buttonRef.current) {
+      // Posicion tentativa; el efecto de arriba la corrige si no cabe.
       const rect = buttonRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, left: Math.max(8, rect.right - MENU_WIDTH) });
+      setPos({ top: rect.bottom + 4, left: Math.max(VIEWPORT_MARGIN, rect.right - MENU_WIDTH) });
     }
     setOpen((current) => !current);
   };
@@ -64,8 +82,14 @@ export const ActionsMenu = ({ items }: { items: ActionMenuItem[] }) => {
         ? createPortal(
             <div
               ref={menuRef}
-              style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH }}
-              className="z-50 overflow-hidden rounded-xl border border-[rgba(0,65,106,0.12)] bg-white py-1 shadow-2xl shadow-[rgba(0,65,106,0.18)]"
+              style={{
+                position: 'fixed',
+                top: pos.top,
+                left: pos.left,
+                width: MENU_WIDTH,
+                maxHeight: `calc(100vh - ${VIEWPORT_MARGIN * 2}px)`,
+              }}
+              className="z-50 overflow-y-auto rounded-xl border border-[rgba(0,65,106,0.12)] bg-white py-1 shadow-2xl shadow-[rgba(0,65,106,0.18)]"
             >
               {items.map((item) => (
                 <button
