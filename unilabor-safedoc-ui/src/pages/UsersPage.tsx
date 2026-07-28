@@ -16,7 +16,7 @@ import {
 } from '../api/service';
 import type { Category, ManagedUser } from '../types/models';
 import { useAuthStore } from '../store/useAuthStore';
-import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+import { notifyError, notifySuccess, notifyWarning, notifyWarningPersistent } from '../utils/notify';
 
 import { UserFormModal } from '../components/admin/UserFormModal';
 import {
@@ -329,8 +329,14 @@ export const UsersPage = () => {
 
     setResettingId(user.id);
     try {
-      await resetUserPassword(user.id);
-      notifySuccess('Contraseña temporal enviada por correo. El cambio será obligatorio al iniciar sesión.');
+      const result = await resetUserPassword(user.id);
+      if (result.emailSent) {
+        notifySuccess('Contraseña temporal enviada por correo. El cambio será obligatorio al iniciar sesión.');
+      } else {
+        notifyWarningPersistent(
+          `No se pudo enviar el correo. Comunica esta contraseña temporal manualmente a "${user.full_name}": ${result.temporaryPassword}`,
+        );
+      }
       await loadUsers();
     } catch (requestError) {
       notifyError(getApiErrorMessage(requestError, 'No se pudo resetear la contraseña del usuario'));

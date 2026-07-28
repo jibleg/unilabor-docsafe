@@ -221,9 +221,20 @@ export const updateUserCategories = async (
   });
 };
 
-export const resetUserPassword = async (userId: string): Promise<void> => {
+export interface ResetUserPasswordResult {
+  message: string;
+  emailSent: boolean;
+  temporaryPassword: string;
+}
+
+export const resetUserPassword = async (userId: string): Promise<ResetUserPasswordResult> => {
   const encodedId = encodeURIComponent(userId);
-  await api.patch(`/users/${encodedId}/reset-password`);
+  const response = await api.patch(`/users/${encodedId}/reset-password`);
+  return {
+    message: response.data?.message ?? '',
+    emailSent: Boolean(response.data?.emailSent),
+    temporaryPassword: response.data?.temporaryPassword ?? '',
+  };
 };
 
 export const listEmployees = async (): Promise<Employee[]> => {
