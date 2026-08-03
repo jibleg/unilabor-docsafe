@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { hasAnyRole } from '../utils/roles';
 import { Pagination } from '../components/Pagination';
+import { Tooltip } from '../components/Tooltip';
 import type { Category, Document, DocumentStatus } from '../types/models';
 import type { ListDocumentsOptions } from '../api/service';
 import { fetchDocumentCategories, getApiErrorMessage, updateDocumentStatusById } from '../api/service';
@@ -587,10 +588,22 @@ export const DocumentsPage = () => {
                   )}
                 </div>
 
-                <h3 className="truncate text-base font-bold text-[var(--color-brand-700)]">{doc.title}</h3>
-                <p className="mt-2 line-clamp-2 text-sm text-[var(--unilabor-neutral)]">
-                  {doc.description || 'Sin descripción'}
-                </p>
+                <Tooltip
+                  className="block w-full"
+                  content={
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-bold text-white">{doc.title}</p>
+                      <p className="text-xs leading-5 text-[rgba(255,255,255,0.75)]">
+                        {doc.description || 'Sin descripción'}
+                      </p>
+                    </div>
+                  }
+                >
+                  <h3 className="truncate text-base font-bold text-[var(--color-brand-700)]">{doc.title}</h3>
+                  <p className="mt-2 line-clamp-2 text-sm text-[var(--unilabor-neutral)]">
+                    {doc.description || 'Sin descripción'}
+                  </p>
+                </Tooltip>
 
                 {(doc.replaced_by_document_id || doc.replaces_document_id) && (
                   <div className="mt-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.9)] px-3 py-2 text-xs text-[var(--unilabor-ink)]">
