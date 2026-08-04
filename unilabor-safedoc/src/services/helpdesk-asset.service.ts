@@ -705,12 +705,13 @@ const getCatalogCode = async (tableName: string, id: number | null | undefined):
   return code ? String(code).trim().toUpperCase() : null;
 };
 
-// Codigo compuesto UNIDAD-AREA-CATEGORIA-NNN. El consecutivo NNN es POR AREA
-// (1..N): todos los activos de una misma area comparten un unico correlativo,
-// sin importar la categoria (dos activos de la misma area con distinta categoria
-// llevan numeros consecutivos, no reinician por categoria). El contador es
-// atomico (counter table con scope por area) y se siembra desde el MAX existente
-// del area para no colisionar con codigos preservados de la importacion.
+// Codigo compuesto UNIDAD-AREA-CATEGORIA-NNN. El consecutivo NNN es POR
+// UNIDAD+AREA (1..N): todos los activos de una misma unidad y area comparten
+// un unico correlativo, sin importar la categoria (dos activos de la misma
+// unidad+area con distinta categoria llevan numeros consecutivos, no reinician
+// por categoria). El contador es atomico (counter table con scope por
+// unidad+area) y se siembra desde el MAX existente de esa unidad+area para no
+// colisionar con codigos preservados de la importacion.
 export const generateAssetCode = async (
   unitId: number | null | undefined,
   areaId: number | null | undefined,
@@ -728,16 +729,18 @@ export const generateAssetCode = async (
     throw error;
   }
 
-  // Scope del contador = el area (namespaced para no chocar con contadores
-  // legacy por combinacion UNIDAD-AREA-CATEGORIA). La semilla lee el MAX del
-  // sufijo numerico entre los activos existentes de ESA area (por area_id).
-  const scopeKey = `AREA:${areaCode}`;
+  // Scope del contador = unidad+area (las areas son un catalogo global
+  // compartido entre unidades, asi que scopear solo por area mezclaba el
+  // consecutivo de distintas unidades). La semilla lee el MAX del sufijo
+  // numerico entre los activos existentes de ESA unidad+area.
+  const scopeKey = `UNIT_AREA:${unitCode}:${areaCode}`;
   const result = await pool.query(
     `
       WITH seed AS (
         SELECT COALESCE(MAX((regexp_replace(asset_code, '^.*-', ''))::int), 0) AS maxn
         FROM public.helpdesk_assets
-        WHERE area_id = $2
+        WHERE unit_id = $2
+          AND area_id = $3
           AND parent_asset_id IS NULL
           AND asset_code ~ '-[0-9]+$'
       )
@@ -748,7 +751,7 @@ export const generateAssetCode = async (
             updated_at = NOW()
       RETURNING last_value;
     `,
-    [scopeKey, areaId],
+    [scopeKey, unitId, areaId],
   );
 
   const next = Number(result.rows[0]?.last_value ?? 1);

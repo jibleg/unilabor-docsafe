@@ -84,7 +84,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_helpdesk_lifecycle_event_types_code
   ON public.helpdesk_lifecycle_event_types (UPPER(code));
 
 -- --- Consecutivos para el codigo de inventario autogenerado ---
--- scope_key = 'UNIDAD-AREA-CLASIFICACION' (codigos), contador independiente por combinacion.
+-- scope_key = 'UNIT_AREA:<codigo_unidad>:<codigo_area>', contador independiente
+-- por combinacion unidad+area (la categoria NO reinicia el consecutivo).
+-- Ver generateAssetCode en helpdesk-asset.service.ts.
 CREATE TABLE IF NOT EXISTS public.helpdesk_asset_code_counters (
   scope_key TEXT PRIMARY KEY,
   last_value INTEGER NOT NULL DEFAULT 0,
