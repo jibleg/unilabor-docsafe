@@ -259,8 +259,8 @@ export const PdfSafeViewer = ({
 
   return (
     <div
-      className={`relative overflow-hidden border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] shadow-inner shadow-[rgba(0,65,106,0.08)] ${
-        expanded ? 'fixed inset-0 z-[60] h-screen w-screen rounded-none' : 'h-[80vh] rounded-xl'
+      className={`overflow-hidden border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] shadow-inner shadow-[rgba(0,65,106,0.08)] ${
+        expanded ? 'fixed inset-0 z-[60] h-screen w-screen rounded-none' : 'relative h-[80vh] rounded-xl'
       }`}
       onContextMenu={(event) => event.preventDefault()}
       onDragStart={(event) => event.preventDefault()}
