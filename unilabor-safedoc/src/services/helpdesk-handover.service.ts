@@ -111,8 +111,12 @@ const normalizeOptionalText = (value: unknown): string | null => {
 // --- Activos pendientes de entrega para un area ---
 // Un activo esta pendiente si NO forma parte de ningun acta FIRMADA (bloqueo
 // total: una vez entregado no vuelve a estar disponible salvo que el acta se anule).
+// Si se indica responsibleUserId, solo devuelve los activos cuyo "Responsable
+// tecnico" (helpdesk_assets.responsible_employee_id) corresponde a ese usuario
+// (via employees.user_id) — evita entregar activos de otro responsable del area.
 export const listAssetsPendingHandover = async (
   areaId: number,
+  responsibleUserId?: string | null,
 ): Promise<HelpdeskAssetRecord[]> => {
   await assertHandoverTables();
   const result = await pool.query(
@@ -120,6 +124,13 @@ export const listAssetsPendingHandover = async (
       ${buildAssetQuery()}
       WHERE a.is_active = TRUE
         AND a.area_id = $1
+        AND (
+          $2::uuid IS NULL
+          OR EXISTS (
+            SELECT 1 FROM public.employees e
+            WHERE e.id = a.responsible_employee_id AND e.user_id = $2::uuid
+          )
+        )
         AND NOT EXISTS (
           SELECT 1
           FROM public.helpdesk_handover_items hi
@@ -128,7 +139,7 @@ export const listAssetsPendingHandover = async (
         )
       ORDER BY a.asset_code ASC, a.name ASC;
     `,
-    [areaId],
+    [areaId, responsibleUserId ?? null],
   );
   return result.rows.map(mapAssetRow);
 };

@@ -40,9 +40,18 @@ export const getHelpdeskHandover = async (handoverId: number): Promise<HelpdeskH
   return normalizeHelpdeskHandover(asRecord(payload)?.handover ?? payload);
 };
 
-// Activos del area pendientes de entrega (sin acta firmada).
-export const listHandoverPendingAssets = async (areaId: number): Promise<HelpdeskAsset[]> => {
-  const response = await api.get('/helpdesk/handovers/pending-assets', { params: { area_id: areaId } });
+// Activos del area pendientes de entrega (sin acta firmada). Si se pasa
+// responsibleUserId, el backend solo devuelve los activos cuyo "Responsable
+// tecnico" corresponde a ese usuario.
+export const listHandoverPendingAssets = async (
+  areaId: number,
+  responsibleUserId?: string | null,
+): Promise<HelpdeskAsset[]> => {
+  const params: Record<string, string | number> = { area_id: areaId };
+  if (responsibleUserId) {
+    params.responsible_user_id = responsibleUserId;
+  }
+  const response = await api.get('/helpdesk/handovers/pending-assets', { params });
   return getArrayFromPayload(response.data, ['assets', 'items', 'results'])
     .map(normalizeHelpdeskAsset)
     .filter((asset): asset is HelpdeskAsset => asset !== null);

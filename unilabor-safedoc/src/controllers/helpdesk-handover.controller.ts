@@ -82,9 +82,10 @@ export const listHandoverPendingAssetsController = async (req: AuthRequest, res:
   if (!areaId) {
     return res.status(400).json({ message: 'El area es obligatoria para listar los pendientes.' });
   }
+  const responsibleUserId = getText(req.query.responsible_user_id);
 
   try {
-    const assets = await listAssetsPendingHandover(areaId);
+    const assets = await listAssetsPendingHandover(areaId, responsibleUserId);
     return res.json({ assets });
   } catch (error: any) {
     const mapped = mapHandoverError(res, error);

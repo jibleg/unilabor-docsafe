@@ -239,6 +239,38 @@ export const createAssetMovement = async (
         }
       }
 
+      // Alinea el "Responsable técnico" del activo (helpdesk_assets.responsible_employee_id)
+      // con el responsable que firma el movimiento. El formulario solo permite elegir
+      // responsables ya registrados como responsables del área destino en Estructura
+      // organizacional, así que el empleado resuelto siempre es válido para esa área.
+      if (payload.responsible_user_id) {
+        const employeeLookup = await client.query(
+          `SELECT id FROM public.employees WHERE user_id = $1 AND is_active = TRUE LIMIT 1;`,
+          [payload.responsible_user_id],
+        );
+        const resolvedEmployeeId = employeeLookup.rows[0]?.id ? Number(employeeLookup.rows[0].id) : null;
+        if (resolvedEmployeeId) {
+          await client.query(
+            `
+              UPDATE public.helpdesk_assets
+              SET responsible_employee_id = $1, updated_by_user_id = $2, updated_at = NOW()
+              WHERE id = $3;
+            `,
+            [resolvedEmployeeId, userId ?? null, assetId],
+          );
+          if (orgChanged && payload.include_components) {
+            await client.query(
+              `
+                UPDATE public.helpdesk_assets
+                SET responsible_employee_id = $1, updated_by_user_id = $2, updated_at = NOW()
+                WHERE parent_asset_id = $3 AND is_active = TRUE;
+              `,
+              [resolvedEmployeeId, userId ?? null, assetId],
+            );
+          }
+        }
+      }
+
       await client.query(
         `
           INSERT INTO public.helpdesk_asset_history (asset_id, action, summary, previous_values, new_values, created_by_user_id)

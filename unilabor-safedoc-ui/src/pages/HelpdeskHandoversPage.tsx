@@ -437,10 +437,10 @@ const HandoverWizard = ({
       .map((candidate) => ({ value: candidate.id, label: candidate.full_name, hint: candidate.email }));
   }, [structure.areas, structure.users, areaId]);
 
-  const loadPending = useCallback(async (numericArea: number) => {
+  const loadPending = useCallback(async (numericArea: number, responsibleUserId?: string | null) => {
     setLoadingAssets(true);
     try {
-      setPendingAssets(await listHandoverPendingAssets(numericArea));
+      setPendingAssets(await listHandoverPendingAssets(numericArea, responsibleUserId));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron cargar los activos pendientes.'));
     } finally {
@@ -476,6 +476,12 @@ const HandoverWizard = ({
     setResponsibleId(value);
     const candidate = structure.users.find((item) => item.id === value);
     setReceiverName(candidate?.full_name ?? '');
+    setSelected(new Set());
+    setMeta({});
+    const numericArea = Number(areaId);
+    if (numericArea) {
+      void loadPending(numericArea, value || null);
+    }
   };
 
   const toggleAsset = (assetId: number) => {
@@ -669,7 +675,8 @@ const HandoverWizard = ({
                     <span className="inline-flex items-center gap-2 text-[var(--unilabor-neutral)]"><Loader2 size={14} className="animate-spin" /> Cargando pendientes…</span>
                   ) : (
                     <>
-                      <strong className="text-[var(--color-brand-700)]">{pendingAssets.length}</strong> activo(s) pendiente(s) de entrega en esta área.
+                      <strong className="text-[var(--color-brand-700)]">{pendingAssets.length}</strong> activo(s) pendiente(s) de entrega
+                      {responsibleId ? ' de este responsable' : ' en esta área'}.
                     </>
                   )}
                 </p>
