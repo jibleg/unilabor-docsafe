@@ -13,6 +13,7 @@
     "migrate:prod": "node dist/scripts/migrate.js migrate",
     "migrate:status:prod": "node dist/scripts/migrate.js status",
     "import:inventory": "ts-node src/scripts/import-inventory.ts",
+    "export:assets-report": "ts-node src/scripts/export-assets-report.ts",
     "hash-password": "node scripts/hash-password.js"
   },
   "keywords": [],
@@ -25,6 +26,7 @@
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.7.0",
@@ -45,7 +47,6 @@
     "@types/node": "^25.5.2",
     "@types/nodemailer": "^8.0.0",
     "@types/pg": "^8.20.0",
-    "exceljs": "^4.4.0",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2",
