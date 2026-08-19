@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, FlaskConical, LifeBuoy, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Building2, FlaskConical, LifeBuoy, ShieldCheck, Truck } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import type { ModuleAccess, ModuleCode } from '../types/models';
@@ -36,6 +36,11 @@ const moduleVisuals: Record<
     eyebrow: 'Módulo Administración',
     name: 'Administración del sistema',
     description: 'Gestión de usuarios, roles y permisos, y consulta de la bitácora de auditoría.',
+  },
+  PROVIDERS: {
+    icon: Truck,
+    eyebrow: 'Módulo Proveedores',
+    description: 'Gestión documental de contratos y convenios con proveedores: vigencia, derogación y trazabilidad.',
   },
 };
 

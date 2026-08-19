@@ -27,9 +27,11 @@ router.get(
   requirePermission('RH.EMPLOYEES.READ'),
   getEmployeeSummaryController,
 );
+// Directorio de USUARIOS del sistema (no expedientes de empleado) usado para
+// elegir destinatarios de notificaciones en otros modulos (Proveedores).
 router.get(
   '/linkable-users',
-  requirePermission('RH.EMPLOYEES.READ'),
+  requirePermission(['RH.EMPLOYEES.READ', 'PROVIDERS.CONFIG.MANAGE']),
   listLinkableUsersController,
 );
 // La LISTA de empleados es directorio de referencia que el modulo de Activos

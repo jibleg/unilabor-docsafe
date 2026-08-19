@@ -118,7 +118,11 @@ export const normalizeModuleAccess = (input: unknown): ModuleAccess | null => {
   const name = getString(source, ['name']);
 
   if (
-    (code !== 'QUALITY' && code !== 'RH' && code !== 'HELPDESK' && code !== 'ADMIN') ||
+    (code !== 'QUALITY' &&
+      code !== 'RH' &&
+      code !== 'HELPDESK' &&
+      code !== 'ADMIN' &&
+      code !== 'PROVIDERS') ||
     !name ||
     !role
   ) {

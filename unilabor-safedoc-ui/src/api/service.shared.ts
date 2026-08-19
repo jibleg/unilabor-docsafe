@@ -267,6 +267,57 @@ export interface ListDocumentsOptions {
   expiry_date?: string;
 }
 
+// --- Modulo Proveedores ---
+export interface ProviderPayload {
+  name: string;
+  description?: string | null;
+  rfc?: string | null;
+  contact?: string | null;
+  website?: string | null;
+  address_street?: string | null;
+  address_neighborhood?: string | null;
+  address_city?: string | null;
+  address_state?: string | null;
+  address_zip?: string | null;
+  address_country?: string | null;
+  notes?: string | null;
+}
+
+export interface ProviderContactPayload {
+  name: string;
+  position?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  is_primary?: boolean;
+}
+
+export interface ProviderDocumentCategoryPayload {
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  sort_order?: number | null;
+}
+
+export interface ProviderDocumentUploadPayload {
+  category_id: number;
+  title: string;
+  description?: string | null;
+  document_date?: string | null;
+  effective_from?: string | null;
+  expiry_date?: string | null;
+  file: File;
+}
+
+export interface ProviderDocumentReplacePayload {
+  category_id?: number | null;
+  title?: string | null;
+  description?: string | null;
+  document_date?: string | null;
+  effective_from?: string | null;
+  expiry_date?: string | null;
+  file: File;
+}
+
 export const asRecord = (value: unknown): Record<string, unknown> | null => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null;

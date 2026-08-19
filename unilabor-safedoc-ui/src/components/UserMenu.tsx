@@ -14,7 +14,9 @@ const profilePath = (moduleCode: ModuleCode): string =>
       ? '/helpdesk/profile'
       : moduleCode === 'ADMIN'
         ? '/admin/profile'
-        : '/quality/profile';
+        : moduleCode === 'PROVIDERS'
+          ? '/providers/profile'
+          : '/quality/profile';
 
 /**
  * Menu de usuario del header: avatar + nombre + dropdown con Perfil, Cambiar de

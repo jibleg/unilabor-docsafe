@@ -1,4 +1,4 @@
-export type ModuleCode = 'QUALITY' | 'RH' | 'HELPDESK' | 'ADMIN';
+export type ModuleCode = 'QUALITY' | 'RH' | 'HELPDESK' | 'ADMIN' | 'PROVIDERS';
 
 export interface ModuleAccess {
   code: ModuleCode;
@@ -1339,4 +1339,75 @@ export interface RepublishCandidate {
   signed_readers: number;
   assigned_readers: number;
   closed_at: string | null;
+}
+
+// --- Modulo Proveedores: gestion documental de contratos/convenios ---------
+
+// Mismo catalogo que ya alimenta el combo "Proveedor" de Activos
+// (helpdesk_suppliers); Proveedores tiene su propia alta/edicion.
+export interface ProviderSummary {
+  id: number;
+  name: string;
+  description: string | null;
+  rfc: string | null;
+  contact: string | null;
+  website: string | null;
+  address_street: string | null;
+  address_neighborhood: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_zip: string | null;
+  address_country: string | null;
+  notes: string | null;
+  is_active: boolean;
+}
+
+export interface ProviderContact {
+  id: number;
+  provider_id: number;
+  name: string;
+  position: string | null;
+  phone: string | null;
+  email: string | null;
+  is_primary: boolean;
+}
+
+export interface ProviderDocumentCategory {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export type ProviderDocumentStatus = 'active' | 'inactive' | 'superseded';
+
+export interface ProviderDocument {
+  id: number;
+  provider_id: number;
+  provider_name: string | null;
+  category_id: number;
+  category_name: string | null;
+  title: string;
+  description: string | null;
+  file_path: string;
+  file_size: number;
+  uploaded_by: string | null;
+  uploaded_by_name: string | null;
+  document_date: string | null;
+  effective_from: string | null;
+  expiry_date: string | null;
+  status: ProviderDocumentStatus;
+  replaces_document_id: number | null;
+  replaced_by_document_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProviderNotificationRecipient {
+  id: number;
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
 }

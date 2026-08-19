@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   BarChart3,
+  Bell,
   BookOpen,
   Building2,
   CalendarClock,
@@ -20,6 +21,7 @@ import {
   ShieldCheck,
   Signature,
   Tags,
+  Truck,
   UserCircle2,
   Users,
   Wrench,
@@ -156,6 +158,22 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: Wrench, label: 'Catálogos', path: '/helpdesk/catalogs', permission: 'HELPDESK.CATALOGS.MANAGE' },
         { icon: Building2, label: 'Estructura', path: '/helpdesk/org-structure', permission: 'HELPDESK.ORG.MANAGE' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
+      ],
+    },
+  ],
+  PROVIDERS: [
+    {
+      items: [
+        { icon: Truck, label: 'Proveedores', path: '/providers', permission: 'PROVIDERS.CATALOG.READ' },
+      ],
+    },
+    {
+      title: 'Configuración',
+      items: [
+        { icon: Building2, label: 'Catálogo de proveedores', path: '/providers/catalog', permission: 'PROVIDERS.CATALOG.MANAGE' },
+        { icon: Tags, label: 'Categorías de documento', path: '/providers/categories', permission: 'PROVIDERS.CATALOG.MANAGE' },
+        { icon: Bell, label: 'Alertas de vencimiento', path: '/providers/config', permission: 'PROVIDERS.CONFIG.MANAGE' },
+        { icon: UserCircle2, label: 'Mi perfil', path: '/providers/profile' },
       ],
     },
   ],

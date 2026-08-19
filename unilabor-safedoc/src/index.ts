@@ -17,11 +17,13 @@ import evaluationGradingRoutes from './routes/evaluation-grading.routes';
 import helpdeskRoutes from './routes/helpdesk.routes';
 import qualityReadingRoutes from './routes/quality-reading.routes';
 import adminRoutes from './routes/admin.routes';
+import providerRoutes from './routes/provider.routes';
 import { assertRequiredEnv } from './config/env';
 import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
 import { startServiceReminderScheduler } from './services/helpdesk-service-scheduler.service';
 import { startAcknowledgementScheduler } from './services/rh-acknowledgement-scheduler.service';
 import { startQualityReadingScheduler } from './services/quality-reading-scheduler.service';
+import { startProviderDocumentReminderScheduler } from './services/provider-document-scheduler.service';
 
 dotenv.config();
 
@@ -64,6 +66,7 @@ app.use('/api/rh', evaluationAssignmentRoutes);
 app.use('/api/quality', qualityReadingRoutes);
 app.use('/api/helpdesk', helpdeskRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/providers', providerRoutes);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -103,4 +106,6 @@ app.listen(PORT, () => {
   // Scheduler de acuses de lectura (recordatorios + vencimientos). Guardado por env.
   startAcknowledgementScheduler();
   startQualityReadingScheduler();
+  // Scheduler de alertas de vencimiento de documentos de proveedor. Guardado por env.
+  startProviderDocumentReminderScheduler();
 });

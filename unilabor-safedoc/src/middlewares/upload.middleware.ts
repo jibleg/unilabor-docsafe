@@ -29,6 +29,30 @@ export const upload = multer({
   },
 });
 
+const providerDocumentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const uploadDir = process.env.DIRECTORY_UPLOAD_PROVIDER_DOCUMENTS || 'uploads/provider-documents';
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `PROVIDER-${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
+});
+
+export const uploadProviderDocument = multer({
+  storage: providerDocumentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos PDF'));
+    }
+  },
+});
+
 const avatarStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     const uploadDir = process.env.DIRECTORY_UPLOAD_AVATAR || 'uploads/avatars';

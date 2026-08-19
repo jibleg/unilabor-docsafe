@@ -11,6 +11,7 @@ import { QualityLayout } from './layouts/QualityLayout';
 import { RhLayout } from './layouts/RhLayout';
 import { HelpdeskLayout } from './layouts/HelpdeskLayout';
 import { AdminLayout } from './layouts/AdminLayout';
+import { ProvidersLayout } from './layouts/ProvidersLayout';
 import 'react-toastify/dist/ReactToastify.css';
 
 const AuditPage = lazy(() => import('./pages/AuditPage').then((module) => ({ default: module.AuditPage })));
@@ -150,6 +151,21 @@ const RhPracticalCapturePage = lazy(() =>
   import('./pages/RhPracticalCapturePage').then((module) => ({ default: module.RhPracticalCapturePage })),
 );
 const UsersPage = lazy(() => import('./pages/UsersPage').then((module) => ({ default: module.UsersPage })));
+const ProvidersListPage = lazy(() =>
+  import('./pages/ProvidersListPage').then((module) => ({ default: module.ProvidersListPage })),
+);
+const ProviderDetailPage = lazy(() =>
+  import('./pages/ProviderDetailPage').then((module) => ({ default: module.ProviderDetailPage })),
+);
+const ProvidersCatalogPage = lazy(() =>
+  import('./pages/ProvidersCatalogPage').then((module) => ({ default: module.ProvidersCatalogPage })),
+);
+const ProviderCategoriesPage = lazy(() =>
+  import('./pages/ProviderCategoriesPage').then((module) => ({ default: module.ProviderCategoriesPage })),
+);
+const ProviderConfigPage = lazy(() =>
+  import('./pages/ProviderConfigPage').then((module) => ({ default: module.ProviderConfigPage })),
+);
 
 const RouteFallback = () => (
   <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-600">
@@ -527,6 +543,43 @@ function App() {
             <RoleGate allowedRoles={['ADMIN']} redirectTo="/helpdesk/dashboard">
               <HelpdeskOrgStructurePage />
             </RoleGate>
+          }
+        />
+        <Route path="profile" element={<ProfilePage />} />
+      </Route>
+
+      <Route
+        path="/providers"
+        element={
+          <ModuleGuard moduleCode="PROVIDERS">
+            <ProvidersLayout />
+          </ModuleGuard>
+        }
+      >
+        <Route index element={<ProvidersListPage />} />
+        <Route path=":id" element={<ProviderDetailPage />} />
+        <Route
+          path="catalog"
+          element={
+            <PermissionGate permission="PROVIDERS.CATALOG.MANAGE" redirectTo="/providers">
+              <ProvidersCatalogPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="categories"
+          element={
+            <PermissionGate permission="PROVIDERS.CATALOG.MANAGE" redirectTo="/providers">
+              <ProviderCategoriesPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="config"
+          element={
+            <PermissionGate permission="PROVIDERS.CONFIG.MANAGE" redirectTo="/providers">
+              <ProviderConfigPage />
+            </PermissionGate>
           }
         />
         <Route path="profile" element={<ProfilePage />} />
