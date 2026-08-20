@@ -92,6 +92,12 @@ export const mapProviderDocumentError = (res: Response, error: any) => {
     return res.status(400).json({ message: 'El proveedor o la categoria seleccionada no existe.' });
   }
 
+  if (error?.code === 'PROVIDER_DOCUMENT_HAS_HISTORY') {
+    return res.status(409).json({
+      message: 'No se puede eliminar: el documento forma parte de una cadena de versiones. Puedes desactivarlo en su lugar.',
+    });
+  }
+
   return null;
 };
 

@@ -206,6 +206,16 @@ export const replaceProviderDocument = async (
   };
 };
 
+export const deactivateProviderDocument = async (documentId: number): Promise<ProviderDocument> => {
+  const response = await api.post(`/providers/documents/${documentId}/deactivate`);
+  const data = asRecord(unwrapPayload(response.data));
+  return (data?.document ?? unwrapPayload(response.data)) as ProviderDocument;
+};
+
+export const deleteProviderDocument = async (documentId: number): Promise<void> => {
+  await api.delete(`/providers/documents/${documentId}`);
+};
+
 // Descarga protegida (blob), mismo patron que el visor de evidencias de Activos.
 export const getProviderDocumentBlobUrl = async (documentId: number): Promise<string> => {
   const response = await api.get(`/providers/documents/${documentId}/view`, { responseType: 'blob' });

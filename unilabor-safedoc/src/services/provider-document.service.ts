@@ -163,8 +163,8 @@ export const findProviderDocumentById = async (
   return row ? mapDocumentRow(row) : null;
 };
 
-// Documentos vigentes de un proveedor (uno por categoria, en general). Para
-// ver el historico completo de una categoria se camina replaces_document_id
+// Documentos vigentes de un proveedor (puede haber varios por categoria). Para
+// ver el historico completo de un documento se camina replaces_document_id
 // desde el vigente (getProviderDocumentHistory).
 export const listActiveProviderDocuments = async (
   providerId: number,
@@ -231,6 +231,44 @@ export const getProviderDocumentHistory = async (
   return Array.from(chain.values()).sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
+};
+
+export const deactivateProviderDocument = async (
+  documentId: number,
+): Promise<ProviderDocumentRecord | null> => {
+  const existing = await findProviderDocumentById(documentId);
+  if (!existing) {
+    return null;
+  }
+
+  await pool.query(
+    `UPDATE public.provider_documents SET status = 'inactive', updated_at = NOW() WHERE id = $1;`,
+    [documentId],
+  );
+
+  return findProviderDocumentById(documentId);
+};
+
+// Borrado DEFINITIVO. Un documento que forma parte de una cadena de versiones
+// (fue reemplazado o reemplaza a otro) no se puede eliminar para no romper la
+// trazabilidad documental; en ese caso se debe desactivar en su lugar.
+export const deleteProviderDocument = async (
+  documentId: number,
+): Promise<{ file_path: string } | null> => {
+  const existing = await findProviderDocumentById(documentId);
+  if (!existing) {
+    return null;
+  }
+
+  if (existing.replaces_document_id || existing.replaced_by_document_id) {
+    const error = new Error('PROVIDER_DOCUMENT_HAS_HISTORY');
+    (error as any).code = 'PROVIDER_DOCUMENT_HAS_HISTORY';
+    throw error;
+  }
+
+  await pool.query('DELETE FROM public.provider_documents WHERE id = $1;', [documentId]);
+
+  return { file_path: existing.file_path };
 };
 
 export const replaceProviderDocumentWithNewVersion = async (

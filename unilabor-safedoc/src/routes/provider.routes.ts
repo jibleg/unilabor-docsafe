@@ -15,6 +15,8 @@ import {
   updateProviderDocumentCategoryController,
 } from '../controllers/provider-catalog.controller';
 import {
+  deactivateProviderDocumentController,
+  deleteProviderDocumentController,
   getProviderDocumentController,
   listProviderDocumentsController,
   replaceProviderDocumentController,
@@ -117,5 +119,7 @@ router.patch(
   validate(replaceProviderDocumentSchema),
   replaceProviderDocumentController,
 );
+router.post('/documents/:id/deactivate', documentsWrite, deactivateProviderDocumentController);
+router.delete('/documents/:id', documentsWrite, deleteProviderDocumentController);
 
 export default router;

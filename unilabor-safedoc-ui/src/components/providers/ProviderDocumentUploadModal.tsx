@@ -3,6 +3,7 @@ import { Loader2, UploadCloud } from 'lucide-react';
 import type { ProviderDocument, ProviderDocumentCategory, ProviderSummary } from '../../types/models';
 
 export interface ProviderDocumentUploadSubmitPayload {
+  category_id: number;
   title: string;
   description: string;
   document_date: string;
@@ -14,7 +15,7 @@ export interface ProviderDocumentUploadSubmitPayload {
 interface ProviderDocumentUploadModalProps {
   isOpen: boolean;
   provider: ProviderSummary | null;
-  category: ProviderDocumentCategory | null;
+  categories: ProviderDocumentCategory[];
   currentDocument?: ProviderDocument | null;
   saving: boolean;
   onClose: () => void;
@@ -24,12 +25,14 @@ interface ProviderDocumentUploadModalProps {
 export const ProviderDocumentUploadModal = ({
   isOpen,
   provider,
-  category,
+  categories,
   currentDocument,
   saving,
   onClose,
   onSubmit,
 }: ProviderDocumentUploadModalProps) => {
+  const isReplace = Boolean(currentDocument);
+  const [categoryId, setCategoryId] = useState<number | ''>('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [documentDate, setDocumentDate] = useState('');
@@ -38,16 +41,16 @@ export const ProviderDocumentUploadModal = ({
   const [file, setFile] = useState<File | null>(null);
   const [lastSync, setLastSync] = useState<{
     doc: ProviderDocument | null | undefined;
-    category: ProviderDocumentCategory | null;
     open: boolean;
-  }>({ doc: currentDocument, category, open: isOpen });
+  }>({ doc: currentDocument, open: isOpen });
 
-  // Reinicia el formulario al abrir el modal o al cambiar de documento/categoria,
+  // Reinicia el formulario al abrir el modal o al cambiar de documento,
   // durante el render (en vez de un efecto que llama setState).
-  if (lastSync.doc !== currentDocument || lastSync.category !== category || lastSync.open !== isOpen) {
-    setLastSync({ doc: currentDocument, category, open: isOpen });
+  if (lastSync.doc !== currentDocument || lastSync.open !== isOpen) {
+    setLastSync({ doc: currentDocument, open: isOpen });
     if (isOpen) {
-      setTitle(currentDocument?.title ?? category?.name ?? '');
+      setCategoryId(currentDocument?.category_id ?? '');
+      setTitle(currentDocument?.title ?? '');
       setDescription(currentDocument?.description ?? '');
       setDocumentDate(currentDocument?.document_date ?? '');
       setEffectiveFrom(currentDocument?.effective_from ?? '');
@@ -56,9 +59,12 @@ export const ProviderDocumentUploadModal = ({
     }
   }
 
-  if (!isOpen || !provider || !category) {
+  if (!isOpen || !provider) {
     return null;
   }
+
+  const selectedCategory = categories.find((item) => item.id === categoryId) ?? null;
+  const canSubmit = isReplace || categoryId !== '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
@@ -71,12 +77,36 @@ export const ProviderDocumentUploadModal = ({
             {currentDocument ? 'Reemplazar documento' : 'Cargar documento'}
           </h2>
           <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-            {provider.name} | {category.name}
+            {provider.name}
+            {currentDocument ? ` | ${currentDocument.category_name ?? ''}` : selectedCategory ? ` | ${selectedCategory.name}` : ''}
           </p>
         </div>
 
         <div className="space-y-5 px-6 py-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                Categoría
+              </label>
+              {isReplace ? (
+                <div className="flex min-h-[44px] items-center rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(239,245,250,0.72)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)]">
+                  {currentDocument?.category_name ?? 'Sin categoría'}
+                </div>
+              ) : (
+                <select
+                  value={categoryId}
+                  onChange={(event) => setCategoryId(event.target.value ? Number(event.target.value) : '')}
+                  className="w-full rounded-2xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+                >
+                  <option value="">Selecciona una categoría</option>
+                  {categories.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                 Título
@@ -88,21 +118,22 @@ export const ProviderDocumentUploadModal = ({
                 placeholder="Título del documento"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                Archivo PDF
-              </label>
-              <label className="flex min-h-[52px] cursor-pointer items-center justify-between rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-[rgba(239,245,250,0.72)] px-4 py-3 text-sm text-[var(--unilabor-ink)] transition hover:border-[var(--color-brand-300)]">
-                <span className="truncate pr-3">{file ? file.name : 'Selecciona el PDF del documento'}</span>
-                <UploadCloud size={18} className="text-[var(--color-brand-500)]" />
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                />
-              </label>
-            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+              Archivo PDF
+            </label>
+            <label className="flex min-h-[52px] cursor-pointer items-center justify-between rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-[rgba(239,245,250,0.72)] px-4 py-3 text-sm text-[var(--unilabor-ink)] transition hover:border-[var(--color-brand-300)]">
+              <span className="truncate pr-3">{file ? file.name : 'Selecciona el PDF del documento'}</span>
+              <UploadCloud size={18} className="text-[var(--color-brand-500)]" />
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
           </div>
 
           <div>
@@ -172,9 +203,10 @@ export const ProviderDocumentUploadModal = ({
           </button>
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || !canSubmit || !title.trim() || (!isReplace && !file)}
             onClick={() =>
               void onSubmit({
+                category_id: isReplace ? (currentDocument?.category_id as number) : (categoryId as number),
                 title,
                 description,
                 document_date: documentDate,

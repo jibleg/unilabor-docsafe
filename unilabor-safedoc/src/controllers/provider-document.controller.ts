@@ -3,6 +3,8 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { getProviderById } from '../services/provider-catalog.service';
 import {
+  deactivateProviderDocument,
+  deleteProviderDocument,
   findProviderDocumentById,
   getProviderDocumentHistory,
   listActiveProviderDocuments,
@@ -211,6 +213,61 @@ export const replaceProviderDocumentController = async (req: AuthRequest, res: R
 
     console.error('Error reemplazando documento de proveedor:', error);
     return res.status(500).json({ message: 'No se pudo reemplazar el documento.' });
+  }
+};
+
+export const deactivateProviderDocumentController = async (req: AuthRequest, res: Response) => {
+  const user = req.user;
+  const documentId = getNumberId(req.params.id);
+  if (!documentId) {
+    return res.status(400).json({ message: 'ID de documento invalido.' });
+  }
+
+  try {
+    const document = await deactivateProviderDocument(documentId);
+    if (!document) {
+      return res.status(404).json({ message: 'Documento no encontrado.' });
+    }
+
+    await logProviderAudit(user?.id, 'PROVIDER_DOCUMENT_DEACTIVATE', req.ip, documentId);
+
+    return res.json({ message: 'Documento desactivado correctamente.', document });
+  } catch (error: any) {
+    const mappedError = mapProviderDocumentError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error desactivando documento de proveedor:', error);
+    return res.status(500).json({ message: 'No se pudo desactivar el documento.' });
+  }
+};
+
+export const deleteProviderDocumentController = async (req: AuthRequest, res: Response) => {
+  const user = req.user;
+  const documentId = getNumberId(req.params.id);
+  if (!documentId) {
+    return res.status(400).json({ message: 'ID de documento invalido.' });
+  }
+
+  try {
+    const removed = await deleteProviderDocument(documentId);
+    if (!removed) {
+      return res.status(404).json({ message: 'Documento no encontrado.' });
+    }
+
+    await removeUploadedFileIfExists(removed.file_path);
+    await logProviderAudit(user?.id, 'PROVIDER_DOCUMENT_DELETE', req.ip, documentId);
+
+    return res.json({ message: 'Documento eliminado definitivamente.' });
+  } catch (error: any) {
+    const mappedError = mapProviderDocumentError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error eliminando documento de proveedor:', error);
+    return res.status(500).json({ message: 'No se pudo eliminar el documento.' });
   }
 };
 

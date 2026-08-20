@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock3, Eye, FileWarning, RefreshCw, UploadCloud, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  Clock3,
+  Eye,
+  FileWarning,
+  Plus,
+  PowerOff,
+  RefreshCw,
+  Trash2,
+  UploadCloud,
+  X,
+} from 'lucide-react';
 import { getApiErrorMessage } from '../api/service';
 import {
+  deactivateProviderDocument,
+  deleteProviderDocument,
   getProviderDocument,
   getProviderDocumentBlobUrl,
   listProviderDocumentCategories,
@@ -12,6 +25,7 @@ import {
 } from '../api/service.api-providers';
 import type { ProviderDocument, ProviderDocumentCategory, ProviderSummary } from '../types/models';
 import { notifyError, notifySuccess } from '../utils/notify';
+import { confirmAction } from '../utils/confirm';
 import { useHasPermission } from '../utils/permissions';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import {
@@ -21,6 +35,18 @@ import {
 import { ProviderDocumentHistoryModal } from '../components/providers/ProviderDocumentHistoryModal';
 
 const REMINDER_WINDOW_DAYS = 30;
+
+const STATUS_LABEL: Record<string, string> = {
+  active: 'Vigente',
+  superseded: 'Derogado',
+  inactive: 'Inactivo',
+};
+
+const STATUS_CLASS: Record<string, string> = {
+  active: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  superseded: 'border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.12)] text-[var(--color-brand-700)]',
+  inactive: 'border-rose-200 bg-rose-50 text-rose-700',
+};
 
 const formatDisplayDate = (value?: string | null): string => {
   if (!value) {
@@ -56,11 +82,13 @@ export const ProviderDetailPage = () => {
   const [categories, setCategories] = useState<ProviderDocumentCategory[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const [categoryFilter, setCategoryFilter] = useState<number | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'superseded' | 'inactive'>('all');
+
   const [uploadState, setUploadState] = useState<{
     open: boolean;
-    category: ProviderDocumentCategory | null;
     currentDocument: ProviderDocument | null;
-  }>({ open: false, category: null, currentDocument: null });
+  }>({ open: false, currentDocument: null });
   const [saving, setSaving] = useState(false);
 
   const [historyState, setHistoryState] = useState<{
@@ -79,7 +107,7 @@ export const ProviderDetailPage = () => {
     setLoading(true);
     try {
       const [documentsResponse, categoriesResponse] = await Promise.all([
-        listProviderDocuments(providerId),
+        listProviderDocuments(providerId, { all: true }),
         listProviderDocumentCategories(),
       ]);
       setProvider(documentsResponse.provider);
@@ -96,30 +124,26 @@ export const ProviderDetailPage = () => {
     void loadData();
   }, [loadData]);
 
-  const documentByCategory = useMemo(() => {
-    const map = new Map<number, ProviderDocument>();
-    for (const document of documents) {
-      map.set(document.category_id, document);
-    }
-    return map;
-  }, [documents]);
+  const filteredDocuments = useMemo(() => {
+    return documents
+      .filter((document) => categoryFilter === 'all' || document.category_id === categoryFilter)
+      .filter((document) => statusFilter === 'all' || document.status === statusFilter)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [documents, categoryFilter, statusFilter]);
 
-  const openUpload = (category: ProviderDocumentCategory, currentDocument: ProviderDocument | null) => {
-    setUploadState({ open: true, category, currentDocument });
+  const openUpload = (currentDocument: ProviderDocument | null) => {
+    setUploadState({ open: true, currentDocument });
   };
 
   const closeUpload = () => {
     if (saving) {
       return;
     }
-    setUploadState({ open: false, category: null, currentDocument: null });
+    setUploadState({ open: false, currentDocument: null });
   };
 
   const handleUploadSubmit = async (payload: ProviderDocumentUploadSubmitPayload) => {
-    const { category, currentDocument } = uploadState;
-    if (!category) {
-      return;
-    }
+    const { currentDocument } = uploadState;
     if (!payload.file && !currentDocument) {
       notifyError('Debes seleccionar un archivo PDF.');
       return;
@@ -133,7 +157,7 @@ export const ProviderDetailPage = () => {
           return;
         }
         await replaceProviderDocument(currentDocument.id, {
-          category_id: category.id,
+          category_id: payload.category_id,
           title: payload.title,
           description: payload.description,
           document_date: payload.document_date || null,
@@ -144,7 +168,7 @@ export const ProviderDetailPage = () => {
         notifySuccess('Documento reemplazado. La versión anterior quedó derogada.');
       } else {
         await uploadProviderDocument(providerId, {
-          category_id: category.id,
+          category_id: payload.category_id,
           title: payload.title,
           description: payload.description,
           document_date: payload.document_date || null,
@@ -154,7 +178,7 @@ export const ProviderDetailPage = () => {
         });
         notifySuccess('Documento cargado correctamente.');
       }
-      setUploadState({ open: false, category: null, currentDocument: null });
+      setUploadState({ open: false, currentDocument: null });
       await loadData();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo guardar el documento.'));
@@ -163,10 +187,11 @@ export const ProviderDetailPage = () => {
     }
   };
 
-  const openHistory = async (category: ProviderDocumentCategory, currentDocument: ProviderDocument) => {
+  const openHistory = async (document: ProviderDocument) => {
+    const category = categories.find((item) => item.id === document.category_id) ?? null;
     setHistoryState({ open: true, category, documents: [], loading: true });
     try {
-      const { history } = await getProviderDocument(currentDocument.id);
+      const { history } = await getProviderDocument(document.id);
       setHistoryState({ open: true, category, documents: history, loading: false });
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar la trazabilidad del documento.'));
@@ -184,6 +209,46 @@ export const ProviderDetailPage = () => {
       setSelectedPdfUrl(url);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo abrir el documento.'));
+    }
+  };
+
+  const handleDeactivate = async (document: ProviderDocument) => {
+    const confirmed = await confirmAction(
+      `Desactivar: ${document.title}`,
+      'El documento dejará de figurar como vigente. Podrás seguir consultándolo en el histórico.',
+      'Desactivar',
+      'primary',
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deactivateProviderDocument(document.id);
+      notifySuccess('Documento desactivado correctamente.');
+      await loadData();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo desactivar el documento.'));
+    }
+  };
+
+  const handleDelete = async (document: ProviderDocument) => {
+    const confirmed = await confirmAction(
+      `Eliminar: ${document.title}`,
+      'Esta acción borra el documento y su archivo de forma definitiva. No se puede deshacer.',
+      'Eliminar',
+      'danger',
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteProviderDocument(document.id);
+      notifySuccess('Documento eliminado definitivamente.');
+      await loadData();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo eliminar el documento.'));
     }
   };
 
@@ -210,37 +275,97 @@ export const ProviderDetailPage = () => {
             {provider?.contact ? ` · Contacto: ${provider.contact}` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadData()}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Recargar
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void loadData()}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            Recargar
+          </button>
+          {canWrite ? (
+            <button
+              type="button"
+              onClick={() => openUpload(null)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+            >
+              <Plus size={16} />
+              Agregar documento
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 px-5 py-3 shadow-sm shadow-[rgba(0,65,106,0.06)]">
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+            Categoría
+          </label>
+          <select
+            value={categoryFilter}
+            onChange={(event) =>
+              setCategoryFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))
+            }
+            className="rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-1.5 text-sm text-[var(--unilabor-ink)] outline-none"
+          >
+            <option value="all">Todas</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+            Estado
+          </label>
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+            className="rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-1.5 text-sm text-[var(--unilabor-ink)] outline-none"
+          >
+            <option value="all">Todos</option>
+            <option value="active">Vigente</option>
+            <option value="superseded">Derogado</option>
+            <option value="inactive">Inactivo</option>
+          </select>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
         {loading ? (
           <div className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">Cargando documentos...</div>
-        ) : categories.length === 0 ? (
+        ) : filteredDocuments.length === 0 ? (
           <div className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
-            No hay categorías de documento configuradas.
+            {documents.length === 0
+              ? 'No hay documentos cargados para este proveedor.'
+              : 'No hay documentos que coincidan con los filtros seleccionados.'}
           </div>
         ) : (
           <div className="divide-y divide-[rgba(0,65,106,0.08)]">
-            {categories.map((category) => {
-              const currentDocument = documentByCategory.get(category.id) ?? null;
-              const remaining = daysUntil(currentDocument?.expiry_date ?? null);
+            {filteredDocuments.map((document) => {
+              const remaining = document.status === 'active' ? daysUntil(document.expiry_date) : null;
               const isExpired = remaining !== null && remaining < 0;
               const isExpiringSoon = remaining !== null && remaining >= 0 && remaining <= REMINDER_WINDOW_DAYS;
 
               return (
-                <div key={category.id} className="flex flex-col gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div
+                  key={document.id}
+                  className="flex flex-col gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between"
+                >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-bold text-[var(--color-brand-700)]">{category.name}</p>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${STATUS_CLASS[document.status] ?? STATUS_CLASS.inactive}`}
+                      >
+                        {STATUS_LABEL[document.status] ?? document.status}
+                      </span>
+                      <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
+                        {document.category_name ?? 'Sin categoría'}
+                      </span>
                       {isExpired ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-rose-700">
                           <FileWarning size={12} /> Vencido
@@ -251,57 +376,61 @@ export const ProviderDetailPage = () => {
                         </span>
                       ) : null}
                     </div>
-                    {currentDocument ? (
-                      <>
-                        <p className="mt-1 truncate text-sm text-[var(--unilabor-ink)]">{currentDocument.title}</p>
-                        <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
-                          Vigencia desde {formatDisplayDate(currentDocument.effective_from)} · Vence{' '}
-                          {formatDisplayDate(currentDocument.expiry_date)}
-                        </p>
-                      </>
-                    ) : (
-                      <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">Sin documento cargado</p>
-                    )}
+                    <p className="mt-1 truncate text-sm font-bold text-[var(--color-brand-700)]">{document.title}</p>
+                    {document.description ? (
+                      <p className="mt-1 truncate text-sm text-[var(--unilabor-ink)]">{document.description}</p>
+                    ) : null}
+                    <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
+                      Documento: {formatDisplayDate(document.document_date)} · Vigencia desde{' '}
+                      {formatDisplayDate(document.effective_from)} · Vence {formatDisplayDate(document.expiry_date)}
+                    </p>
                   </div>
 
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    {currentDocument ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleView(document)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                    >
+                      <Eye size={14} />
+                      Ver
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void openHistory(document)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                    >
+                      <Clock3 size={14} />
+                      Histórico
+                    </button>
+                    {canWrite && document.status === 'active' ? (
                       <>
                         <button
                           type="button"
-                          onClick={() => void handleView(currentDocument)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                          onClick={() => openUpload(document)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
                         >
-                          <Eye size={14} />
-                          Ver
+                          <UploadCloud size={14} />
+                          Reemplazar
                         </button>
                         <button
                           type="button"
-                          onClick={() => void openHistory(category, currentDocument)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                          onClick={() => void handleDeactivate(document)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
                         >
-                          <Clock3 size={14} />
-                          Histórico
+                          <PowerOff size={14} />
+                          Desactivar
                         </button>
-                        {canWrite ? (
-                          <button
-                            type="button"
-                            onClick={() => openUpload(category, currentDocument)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
-                          >
-                            <UploadCloud size={14} />
-                            Reemplazar
-                          </button>
-                        ) : null}
                       </>
-                    ) : canWrite ? (
+                    ) : null}
+                    {canWrite ? (
                       <button
                         type="button"
-                        onClick={() => openUpload(category, null)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+                        onClick={() => void handleDelete(document)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
                       >
-                        <UploadCloud size={14} />
-                        Cargar
+                        <Trash2 size={14} />
+                        Eliminar
                       </button>
                     ) : null}
                   </div>
@@ -315,7 +444,7 @@ export const ProviderDetailPage = () => {
       <ProviderDocumentUploadModal
         isOpen={uploadState.open}
         provider={provider}
-        category={uploadState.category}
+        categories={categories}
         currentDocument={uploadState.currentDocument}
         saving={saving}
         onClose={closeUpload}
