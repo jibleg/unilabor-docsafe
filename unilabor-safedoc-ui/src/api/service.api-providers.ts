@@ -25,6 +25,7 @@ import type {
 // --- Catalogo: proveedores ---------------------------------------------------
 export interface ProviderListQuery extends PageQuery {
   includeInactive?: boolean;
+  classificationId?: number | null;
 }
 
 export const listProvidersPaginated = async (
@@ -33,6 +34,9 @@ export const listProvidersPaginated = async (
   const params = buildPageParams(query);
   if (query.includeInactive) {
     params.includeInactive = 'true';
+  }
+  if (query.classificationId) {
+    params.classificationId = String(query.classificationId);
   }
   const response = await api.get('/providers/catalog/providers', { params });
   const data = getArrayFromPayload(response.data, ['providers', 'data']) as ProviderSummary[];

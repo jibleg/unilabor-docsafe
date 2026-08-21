@@ -3,16 +3,16 @@ import { registerAuditEvent } from '../services/audit.service';
 
 export { getText, getOptionalDate, getNumberId } from './controller-shared-utils';
 
-export const mapProviderCatalogError = (res: Response, error: any) => {
-  if (error?.code === 'PROVIDER_CATEGORY_NAME_REQUIRED') {
+export const mapClientCatalogError = (res: Response, error: any) => {
+  if (error?.code === 'CLIENT_CATEGORY_NAME_REQUIRED') {
     return res.status(400).json({ message: 'El nombre de la categoria es obligatorio.' });
   }
 
-  if (error?.code === 'PROVIDER_CATEGORY_CODE_REQUIRED') {
+  if (error?.code === 'CLIENT_CATEGORY_CODE_REQUIRED') {
     return res.status(400).json({ message: 'El codigo de la categoria es obligatorio.' });
   }
 
-  if (error?.code === 'PROVIDER_CATEGORY_SORT_ORDER_INVALID') {
+  if (error?.code === 'CLIENT_CATEGORY_SORT_ORDER_INVALID') {
     return res.status(400).json({ message: 'El orden debe ser un numero entero igual o mayor a cero.' });
   }
 
@@ -23,52 +23,52 @@ export const mapProviderCatalogError = (res: Response, error: any) => {
   return null;
 };
 
-export const mapProviderError = (res: Response, error: any) => {
-  if (error?.code === 'PROVIDER_NAME_REQUIRED') {
-    return res.status(400).json({ message: 'El nombre del proveedor es obligatorio.' });
+export const mapClientError = (res: Response, error: any) => {
+  if (error?.code === 'CLIENT_NAME_REQUIRED') {
+    return res.status(400).json({ message: 'El nombre del cliente es obligatorio.' });
   }
 
-  if (error?.code === 'PROVIDER_NOT_FOUND') {
-    return res.status(404).json({ message: 'Proveedor no encontrado.' });
+  if (error?.code === 'CLIENT_NOT_FOUND') {
+    return res.status(404).json({ message: 'Cliente no encontrado.' });
   }
 
-  if (error?.code === 'PROVIDER_CONTACT_NAME_REQUIRED') {
+  if (error?.code === 'CLIENT_CONTACT_NAME_REQUIRED') {
     return res.status(400).json({ message: 'El nombre del contacto es obligatorio.' });
   }
 
-  if (error?.code === 'PROVIDER_CLASSIFICATION_INVALID') {
+  if (error?.code === 'CLIENT_CLASSIFICATION_INVALID') {
     return res
       .status(400)
-      .json({ message: 'La clasificacion seleccionada no existe o no es del tipo Proveedor.' });
+      .json({ message: 'La clasificacion seleccionada no existe o no es del tipo Cliente.' });
   }
 
   if (error?.code === '23505') {
-    return res.status(409).json({ message: 'Ya existe un proveedor con ese nombre.' });
+    return res.status(409).json({ message: 'Ya existe un cliente con ese nombre.' });
   }
 
   return null;
 };
 
-export const mapProviderDocumentError = (res: Response, error: any) => {
-  if (error?.code === 'PROVIDER_DOCUMENT_NOT_FOUND') {
+export const mapClientDocumentError = (res: Response, error: any) => {
+  if (error?.code === 'CLIENT_DOCUMENT_NOT_FOUND') {
     return res.status(404).json({ message: 'Documento no encontrado.' });
   }
 
-  if (error?.code === 'PROVIDER_DOCUMENT_NOT_ACTIVE' || error?.code === 'PROVIDER_DOCUMENT_ALREADY_SUPERSEDED') {
+  if (error?.code === 'CLIENT_DOCUMENT_NOT_ACTIVE' || error?.code === 'CLIENT_DOCUMENT_ALREADY_SUPERSEDED') {
     return res.status(409).json({
       message: 'El documento ya no esta vigente y no puede reemplazarse nuevamente.',
     });
   }
 
-  if (error?.code === 'PROVIDER_NOT_FOUND') {
-    return res.status(404).json({ message: 'Proveedor no encontrado.' });
+  if (error?.code === 'CLIENT_NOT_FOUND') {
+    return res.status(404).json({ message: 'Cliente no encontrado.' });
   }
 
   if (error?.code === '23503') {
-    return res.status(400).json({ message: 'El proveedor o la categoria seleccionada no existe.' });
+    return res.status(400).json({ message: 'El cliente o la categoria seleccionada no existe.' });
   }
 
-  if (error?.code === 'PROVIDER_DOCUMENT_HAS_HISTORY') {
+  if (error?.code === 'CLIENT_DOCUMENT_HAS_HISTORY') {
     return res.status(409).json({
       message: 'No se puede eliminar: el documento forma parte de una cadena de versiones. Puedes desactivarlo en su lugar.',
     });
@@ -77,12 +77,12 @@ export const mapProviderDocumentError = (res: Response, error: any) => {
   return null;
 };
 
-export const logProviderAudit = async (
+export const logClientAudit = async (
   userId: string | undefined,
   action: string,
   ipAddress: string | undefined,
   entityId: number,
-  entityType = 'provider_document',
+  entityType = 'client_document',
 ) => {
   if (!userId) {
     return;

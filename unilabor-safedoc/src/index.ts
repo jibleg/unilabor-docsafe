@@ -18,12 +18,15 @@ import helpdeskRoutes from './routes/helpdesk.routes';
 import qualityReadingRoutes from './routes/quality-reading.routes';
 import adminRoutes from './routes/admin.routes';
 import providerRoutes from './routes/provider.routes';
+import classificationRoutes from './routes/classification.routes';
+import clientRoutes from './routes/client.routes';
 import { assertRequiredEnv } from './config/env';
 import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
 import { startServiceReminderScheduler } from './services/helpdesk-service-scheduler.service';
 import { startAcknowledgementScheduler } from './services/rh-acknowledgement-scheduler.service';
 import { startQualityReadingScheduler } from './services/quality-reading-scheduler.service';
 import { startProviderDocumentReminderScheduler } from './services/provider-document-scheduler.service';
+import { startClientDocumentReminderScheduler } from './services/client-document-scheduler.service';
 
 dotenv.config();
 
@@ -67,6 +70,8 @@ app.use('/api/quality', qualityReadingRoutes);
 app.use('/api/helpdesk', helpdeskRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/providers', providerRoutes);
+app.use('/api/providers/classifications', classificationRoutes);
+app.use('/api/providers/clients', clientRoutes);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -108,4 +113,6 @@ app.listen(PORT, () => {
   startQualityReadingScheduler();
   // Scheduler de alertas de vencimiento de documentos de proveedor. Guardado por env.
   startProviderDocumentReminderScheduler();
+  // Scheduler de alertas de vencimiento de documentos de cliente. Guardado por env.
+  startClientDocumentReminderScheduler();
 });

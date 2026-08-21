@@ -39,7 +39,8 @@ const moduleVisuals: Record<
   },
   PROVIDERS: {
     icon: Truck,
-    eyebrow: 'Módulo Proveedores',
+    eyebrow: 'Módulo de Acuerdos',
+    name: 'Acuerdos con los Proveedores',
     description: 'Gestión documental de contratos y convenios con proveedores: vigencia, derogación y trazabilidad.',
   },
 };

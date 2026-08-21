@@ -4,22 +4,22 @@ import { sendGenericNotification } from './notification.service';
 
 /**
  * Scheduler in-process (node-cron) de alertas de vencimiento de documentos de
- * proveedor (contratos, convenios, polizas, etc.). A diferencia de los
- * recordatorios de mantenimiento/calibracion (que avisan al operador y
- * responsable del ACTIVO), aqui el destinatario es una lista configurable de
- * usuarios (`provider_notification_recipients`), porque un contrato no tiene
- * un responsable individual capturado. Idempotente via `reminder_sent_at`.
+ * cliente (contratos, convenios, polizas, etc.). Espejo de
+ * `provider-document-scheduler.service.ts`: el destinatario es una lista
+ * configurable de usuarios (`client_notification_recipients`), porque un
+ * contrato no tiene un responsable individual capturado. Idempotente via
+ * `reminder_sent_at`.
  *
  * Env:
- *   PROVIDER_DOCUMENT_REMINDER_ENABLED=false  -> deshabilita
- *   PROVIDER_DOCUMENT_REMINDER_CRON            -> expresion cron (default diario 08:00)
- *   PROVIDER_DOCUMENT_REMINDER_DAYS            -> ventana de aviso en dias (default 30)
+ *   CLIENT_DOCUMENT_REMINDER_ENABLED=false  -> deshabilita
+ *   CLIENT_DOCUMENT_REMINDER_CRON            -> expresion cron (default diario 08:30)
+ *   CLIENT_DOCUMENT_REMINDER_DAYS            -> ventana de aviso en dias (default 30)
  */
 
 export const DEFAULT_REMINDER_WINDOW_DAYS = 30;
 
 export const getReminderWindowDays = (): number => {
-  const raw = Number(process.env.PROVIDER_DOCUMENT_REMINDER_DAYS);
+  const raw = Number(process.env.CLIENT_DOCUMENT_REMINDER_DAYS);
   return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_REMINDER_WINDOW_DAYS;
 };
 
@@ -40,7 +40,7 @@ interface ReminderRecipient {
 const getRecipients = async (): Promise<ReminderRecipient[]> => {
   const result = await pool.query(`
     SELECT u.full_name, u.email
-    FROM public.provider_notification_recipients r
+    FROM public.client_notification_recipients r
     INNER JOIN public.users u ON u.id = r.user_id;
   `);
 
@@ -50,15 +50,15 @@ const getRecipients = async (): Promise<ReminderRecipient[]> => {
 };
 
 /** Procesa los recordatorios pendientes. Devuelve cuantos documentos avisó. */
-export const processProviderDocumentReminders = async (): Promise<number> => {
+export const processClientDocumentReminders = async (): Promise<number> => {
   const windowDays = getReminderWindowDays();
 
   const candidates = await pool.query(
     `
-      SELECT d.id, d.title, d.expiry_date, s.name AS provider_name, c.name AS category_name
-      FROM public.provider_documents d
-      INNER JOIN public.helpdesk_suppliers s ON s.id = d.provider_id
-      LEFT JOIN public.provider_document_categories c ON c.id = d.category_id
+      SELECT d.id, d.title, d.expiry_date, cl.name AS client_name, cat.name AS category_name
+      FROM public.client_documents d
+      INNER JOIN public.clients cl ON cl.id = d.client_id
+      LEFT JOIN public.client_document_categories cat ON cat.id = d.category_id
       WHERE d.status = 'active'
         AND d.reminder_sent_at IS NULL
         AND d.expiry_date IS NOT NULL
@@ -82,17 +82,17 @@ export const processProviderDocumentReminders = async (): Promise<number> => {
   for (const row of candidates.rows) {
     const date = formatDate(row.expiry_date);
     const categoryLabel = row.category_name ? ` (${row.category_name})` : '';
-    const subject = `Vencimiento de documento de proveedor: ${row.provider_name} — ${date}`;
+    const subject = `Vencimiento de documento de cliente: ${row.client_name} — ${date}`;
 
     for (const recipient of recipients) {
       const emailBody =
         `Hola ${recipient.name},\n` +
-        `El documento "${row.title}"${categoryLabel} del proveedor ${row.provider_name} vence el ${date}.\n` +
-        `Revisa su renovacion o reemplazo en el modulo Acuerdos con los Proveedores de SafeDoc.`;
-      await sendGenericNotification({ email: recipient.email, phone: null }, subject, emailBody, '', 'provider_document_reminder');
+        `El documento "${row.title}"${categoryLabel} del cliente ${row.client_name} vence el ${date}.\n` +
+        `Revisa su renovacion o reemplazo en el modulo Acuerdos con los Clientes de SafeDoc.`;
+      await sendGenericNotification({ email: recipient.email, phone: null }, subject, emailBody, '', 'client_document_reminder');
     }
 
-    await pool.query('UPDATE public.provider_documents SET reminder_sent_at = NOW() WHERE id = $1;', [row.id]);
+    await pool.query('UPDATE public.client_documents SET reminder_sent_at = NOW() WHERE id = $1;', [row.id]);
     notified += 1;
   }
 
@@ -103,27 +103,27 @@ let scheduledTask: ReturnType<typeof cron.schedule> | null = null;
 
 /**
  * Arranca el scheduler in-process de alertas de vencimiento de documentos de
- * proveedor (default diario 08:00). Guardado por
- * PROVIDER_DOCUMENT_REMINDER_ENABLED=false. Arranque defensivo: una falla al
- * programar el cron NO tumba la API.
+ * cliente (default diario 08:30, para no chocar con el de proveedores en el
+ * mismo minuto). Guardado por CLIENT_DOCUMENT_REMINDER_ENABLED=false. Arranque
+ * defensivo: una falla al programar el cron NO tumba la API.
  */
-export const startProviderDocumentReminderScheduler = (): void => {
-  if (process.env.PROVIDER_DOCUMENT_REMINDER_ENABLED === 'false') {
-    console.log('Scheduler de alertas de documentos de proveedor deshabilitado (PROVIDER_DOCUMENT_REMINDER_ENABLED=false).');
+export const startClientDocumentReminderScheduler = (): void => {
+  if (process.env.CLIENT_DOCUMENT_REMINDER_ENABLED === 'false') {
+    console.log('Scheduler de alertas de documentos de cliente deshabilitado (CLIENT_DOCUMENT_REMINDER_ENABLED=false).');
     return;
   }
   if (scheduledTask) {
     return;
   }
-  const expression = process.env.PROVIDER_DOCUMENT_REMINDER_CRON || '0 8 * * *';
+  const expression = process.env.CLIENT_DOCUMENT_REMINDER_CRON || '30 8 * * *';
   try {
     scheduledTask = cron.schedule(expression, () => {
-      void processProviderDocumentReminders().catch((error) => {
-        console.error('Error en el ciclo del scheduler de alertas de documentos de proveedor:', error);
+      void processClientDocumentReminders().catch((error) => {
+        console.error('Error en el ciclo del scheduler de alertas de documentos de cliente:', error);
       });
     });
-    console.log(`Scheduler de alertas de documentos de proveedor activo (cron "${expression}").`);
+    console.log(`Scheduler de alertas de documentos de cliente activo (cron "${expression}").`);
   } catch (error) {
-    console.error('No se pudo iniciar el scheduler de alertas de documentos de proveedor; la API continua sin el:', error);
+    console.error('No se pudo iniciar el scheduler de alertas de documentos de cliente; la API continua sin el:', error);
   }
 };

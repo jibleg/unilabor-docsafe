@@ -281,6 +281,7 @@ export interface ProviderPayload {
   address_zip?: string | null;
   address_country?: string | null;
   notes?: string | null;
+  classification_id?: number | null;
 }
 
 export interface ProviderContactPayload {
@@ -309,6 +310,66 @@ export interface ProviderDocumentUploadPayload {
 }
 
 export interface ProviderDocumentReplacePayload {
+  category_id?: number | null;
+  title?: string | null;
+  description?: string | null;
+  document_date?: string | null;
+  effective_from?: string | null;
+  expiry_date?: string | null;
+  file: File;
+}
+
+// --- Clasificacion: catalogo compartido entre Proveedores y Clientes -------
+export interface ClassificationPayload {
+  type: 'PROVIDER' | 'CLIENT';
+  name: string;
+  description?: string | null;
+  sort_order?: number | null;
+}
+
+// --- Modulo Clientes: mirror de Proveedores ---------------------------------
+export interface ClientPayload {
+  name: string;
+  description?: string | null;
+  rfc?: string | null;
+  contact?: string | null;
+  website?: string | null;
+  address_street?: string | null;
+  address_neighborhood?: string | null;
+  address_city?: string | null;
+  address_state?: string | null;
+  address_zip?: string | null;
+  address_country?: string | null;
+  notes?: string | null;
+  classification_id?: number | null;
+}
+
+export interface ClientContactPayload {
+  name: string;
+  position?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  is_primary?: boolean;
+}
+
+export interface ClientDocumentCategoryPayload {
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  sort_order?: number | null;
+}
+
+export interface ClientDocumentUploadPayload {
+  category_id: number;
+  title: string;
+  description?: string | null;
+  document_date?: string | null;
+  effective_from?: string | null;
+  expiry_date?: string | null;
+  file: File;
+}
+
+export interface ClientDocumentReplacePayload {
   category_id?: number | null;
   title?: string | null;
   description?: string | null;

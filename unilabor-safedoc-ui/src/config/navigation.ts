@@ -15,6 +15,7 @@ import {
   KeyRound,
   Laptop,
   LayoutDashboard,
+  Layers,
   LifeBuoy,
   Move,
   PenLine,
@@ -163,16 +164,32 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
   ],
   PROVIDERS: [
     {
+      title: 'Acuerdos',
       items: [
-        { icon: Truck, label: 'Proveedores', path: '/providers', permission: 'PROVIDERS.CATALOG.READ' },
+        { icon: Truck, label: 'De proveedores', path: '/providers', permission: 'PROVIDERS.CATALOG.READ' },
+        { icon: Truck, label: 'De clientes', path: '/providers/clients', permission: 'PROVIDERS.CLIENTS.CATALOG.READ' },
+      ],
+    },
+    {
+      title: 'Proveedores',
+      items: [
+        { icon: Building2, label: 'Proveedores', path: '/providers/catalog', permission: 'PROVIDERS.CATALOG.MANAGE' },
+        { icon: Tags, label: 'Categorías', path: '/providers/categories', permission: 'PROVIDERS.CATALOG.MANAGE' },
+        { icon: Bell, label: 'Alertas', path: '/providers/config', permission: 'PROVIDERS.CONFIG.MANAGE' },
+      ],
+    },
+    {
+      title: 'Clientes',
+      items: [
+        { icon: Building2, label: 'Clientes', path: '/providers/clients/catalog', permission: 'PROVIDERS.CLIENTS.CATALOG.MANAGE' },
+        { icon: Tags, label: 'Categorías', path: '/providers/clients/categories', permission: 'PROVIDERS.CLIENTS.CATALOG.MANAGE' },
+        { icon: Bell, label: 'Alertas', path: '/providers/clients/config', permission: 'PROVIDERS.CLIENTS.CONFIG.MANAGE' },
       ],
     },
     {
       title: 'Configuración',
       items: [
-        { icon: Building2, label: 'Catálogo de proveedores', path: '/providers/catalog', permission: 'PROVIDERS.CATALOG.MANAGE' },
-        { icon: Tags, label: 'Categorías de documento', path: '/providers/categories', permission: 'PROVIDERS.CATALOG.MANAGE' },
-        { icon: Bell, label: 'Alertas de vencimiento', path: '/providers/config', permission: 'PROVIDERS.CONFIG.MANAGE' },
+        { icon: Layers, label: 'Clasificación', path: '/providers/classifications', permission: 'PROVIDERS.CLASSIFICATIONS.MANAGE' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/providers/profile' },
       ],
     },

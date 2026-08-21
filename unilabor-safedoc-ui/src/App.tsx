@@ -166,6 +166,24 @@ const ProviderCategoriesPage = lazy(() =>
 const ProviderConfigPage = lazy(() =>
   import('./pages/ProviderConfigPage').then((module) => ({ default: module.ProviderConfigPage })),
 );
+const ClientsListPage = lazy(() =>
+  import('./pages/ClientsListPage').then((module) => ({ default: module.ClientsListPage })),
+);
+const ClientDetailPage = lazy(() =>
+  import('./pages/ClientDetailPage').then((module) => ({ default: module.ClientDetailPage })),
+);
+const ClientsCatalogPage = lazy(() =>
+  import('./pages/ClientsCatalogPage').then((module) => ({ default: module.ClientsCatalogPage })),
+);
+const ClientCategoriesPage = lazy(() =>
+  import('./pages/ClientCategoriesPage').then((module) => ({ default: module.ClientCategoriesPage })),
+);
+const ClientConfigPage = lazy(() =>
+  import('./pages/ClientConfigPage').then((module) => ({ default: module.ClientConfigPage })),
+);
+const ClassificationsPage = lazy(() =>
+  import('./pages/ClassificationsPage').then((module) => ({ default: module.ClassificationsPage })),
+);
 
 const RouteFallback = () => (
   <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-600">
@@ -579,6 +597,54 @@ function App() {
           element={
             <PermissionGate permission="PROVIDERS.CONFIG.MANAGE" redirectTo="/providers">
               <ProviderConfigPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="clients"
+          element={
+            <PermissionGate permission="PROVIDERS.CLIENTS.CATALOG.READ" redirectTo="/providers">
+              <ClientsListPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="clients/:id"
+          element={
+            <PermissionGate permission="PROVIDERS.CLIENTS.DOCUMENTS.READ" redirectTo="/providers/clients">
+              <ClientDetailPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="clients/catalog"
+          element={
+            <PermissionGate permission="PROVIDERS.CLIENTS.CATALOG.MANAGE" redirectTo="/providers/clients">
+              <ClientsCatalogPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="clients/categories"
+          element={
+            <PermissionGate permission="PROVIDERS.CLIENTS.CATALOG.MANAGE" redirectTo="/providers/clients">
+              <ClientCategoriesPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="clients/config"
+          element={
+            <PermissionGate permission="PROVIDERS.CLIENTS.CONFIG.MANAGE" redirectTo="/providers/clients">
+              <ClientConfigPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="classifications"
+          element={
+            <PermissionGate permission="PROVIDERS.CLASSIFICATIONS.MANAGE" redirectTo="/providers">
+              <ClassificationsPage />
             </PermissionGate>
           }
         />

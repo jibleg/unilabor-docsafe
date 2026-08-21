@@ -9,14 +9,13 @@ import {
   type PaginationInput,
 } from '../utils/pagination';
 
-// Proveedores: el modulo Proveedores NO duplica el catalogo, lee el mismo
-// `helpdesk_suppliers` que ya alimenta el combo "Proveedor" de Activos.
-export interface ProviderSummary {
+// Clientes: catalogo PROPIO (tabla `clients`), a diferencia de Proveedores no
+// se comparte con Activos ni con ningun otro modulo.
+export interface ClientSummary {
   id: number;
   name: string;
   description: string | null;
   rfc: string | null;
-  contact: string | null;
   website: string | null;
   address_street: string | null;
   address_neighborhood: string | null;
@@ -29,18 +28,17 @@ export interface ProviderSummary {
   is_active: boolean;
 }
 
-const PROVIDER_COLUMNS = `
-  id, name, description, rfc, contact, website,
+const CLIENT_COLUMNS = `
+  id, name, description, rfc, website,
   address_street, address_neighborhood, address_city, address_state, address_zip, address_country,
   notes, classification_id, is_active
 `;
 
-const mapProviderRow = (row: any): ProviderSummary => ({
+const mapClientRow = (row: any): ClientSummary => ({
   id: Number(row.id),
   name: String(row.name),
   description: row.description ? String(row.description) : null,
   rfc: row.rfc ? String(row.rfc) : null,
-  contact: row.contact ? String(row.contact) : null,
   website: row.website ? String(row.website) : null,
   address_street: row.address_street ? String(row.address_street) : null,
   address_neighborhood: row.address_neighborhood ? String(row.address_neighborhood) : null,
@@ -53,23 +51,22 @@ const mapProviderRow = (row: any): ProviderSummary => ({
   is_active: Boolean(row.is_active),
 });
 
-export interface ProviderListOptions extends PaginationInput {
+export interface ClientListOptions extends PaginationInput {
   search?: unknown;
   includeInactive?: boolean;
   classificationId?: number | null;
 }
 
-const PROVIDER_SEARCH_COLUMNS = ['name', 'rfc'];
+const CLIENT_SEARCH_COLUMNS = ['name', 'rfc'];
 
-// Paginacion server-side opt-in (mismo contrato/utilidad que listEmployees):
-// sin page/limit el cliente sigue recibiendo todas las filas en una sola
-// "pagina", para no romper llamadas existentes que no pidieron paginar.
-export const listProviders = async (
-  options: ProviderListOptions = {},
-): Promise<PaginatedResult<ProviderSummary>> => {
+// Paginacion server-side opt-in (mismo contrato que Proveedores): sin
+// page/limit el cliente sigue recibiendo todas las filas en una sola "pagina".
+export const listClients = async (
+  options: ClientListOptions = {},
+): Promise<PaginatedResult<ClientSummary>> => {
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
-  const search = buildIlikeSearch(PROVIDER_SEARCH_COLUMNS, options.search, 0);
+  const search = buildIlikeSearch(CLIENT_SEARCH_COLUMNS, options.search, 0);
 
   const filters = options.includeInactive ? [] : ['is_active = TRUE'];
   if (search.clause) {
@@ -87,47 +84,46 @@ export const listProviders = async (
 
   const dataResult = await pool.query(
     `
-      SELECT ${PROVIDER_COLUMNS}
-      FROM public.helpdesk_suppliers
+      SELECT ${CLIENT_COLUMNS}
+      FROM public.clients
       ${whereClause}
       ORDER BY is_active DESC, name ASC
       ${limitSql};
     `,
     dataValues,
   );
-  const data = dataResult.rows.map(mapProviderRow);
+  const data = dataResult.rows.map(mapClientRow);
 
   if (!paginate) {
     return buildPaginatedResult(data, data.length, 1, data.length || 1);
   }
 
   const countResult = await pool.query(
-    `SELECT COUNT(*)::int AS total FROM public.helpdesk_suppliers ${whereClause};`,
+    `SELECT COUNT(*)::int AS total FROM public.clients ${whereClause};`,
     values,
   );
   return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };
 
-export const getProviderById = async (providerId: number): Promise<ProviderSummary | null> => {
+export const getClientById = async (clientId: number): Promise<ClientSummary | null> => {
   const result = await pool.query(
     `
-      SELECT ${PROVIDER_COLUMNS}
-      FROM public.helpdesk_suppliers
+      SELECT ${CLIENT_COLUMNS}
+      FROM public.clients
       WHERE id = $1
       LIMIT 1;
     `,
-    [providerId],
+    [clientId],
   );
 
   const row = result.rows[0];
-  return row ? mapProviderRow(row) : null;
+  return row ? mapClientRow(row) : null;
 };
 
-export interface ProviderPayload {
+export interface ClientPayload {
   name: string;
   description?: string | null;
   rfc?: string | null;
-  contact?: string | null;
   website?: string | null;
   address_street?: string | null;
   address_neighborhood?: string | null;
@@ -138,152 +134,6 @@ export interface ProviderPayload {
   notes?: string | null;
   classification_id?: number | null;
 }
-
-const normalizeProviderName = (value: unknown): string => {
-  const normalizedValue = normalizeOptionalText(value);
-  if (!normalizedValue) {
-    const error = new Error('PROVIDER_NAME_REQUIRED');
-    (error as any).code = 'PROVIDER_NAME_REQUIRED';
-    throw error;
-  }
-
-  return normalizedValue;
-};
-
-// Escribe en `helpdesk_suppliers`, el mismo catalogo que usa Activos — el
-// modulo Proveedores gana alta/edicion propia (antes solo lectura, gap
-// conocido) sin tocar como Activos lo consume.
-export const createProvider = async (payload: ProviderPayload): Promise<ProviderSummary> => {
-  const name = normalizeProviderName(payload.name);
-  const description = normalizeOptionalText(payload.description);
-  const rfc = normalizeOptionalText(payload.rfc);
-  const contact = normalizeOptionalText(payload.contact);
-  const website = normalizeOptionalText(payload.website);
-  const addressStreet = normalizeOptionalText(payload.address_street);
-  const addressNeighborhood = normalizeOptionalText(payload.address_neighborhood);
-  const addressCity = normalizeOptionalText(payload.address_city);
-  const addressState = normalizeOptionalText(payload.address_state);
-  const addressZip = normalizeOptionalText(payload.address_zip);
-  const addressCountry = normalizeOptionalText(payload.address_country);
-  const notes = normalizeOptionalText(payload.notes);
-  const classificationId = payload.classification_id ?? null;
-
-  await assertClassificationType(classificationId, 'PROVIDER');
-
-  const result = await pool.query(
-    `
-      INSERT INTO public.helpdesk_suppliers (
-        name, description, rfc, contact, website,
-        address_street, address_neighborhood, address_city, address_state, address_zip, address_country,
-        notes, classification_id
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      RETURNING id;
-    `,
-    [
-      name, description, rfc, contact, website,
-      addressStreet, addressNeighborhood, addressCity, addressState, addressZip, addressCountry,
-      notes, classificationId,
-    ],
-  );
-
-  const created = await getProviderById(Number(result.rows[0]?.id));
-  if (!created) {
-    const error = new Error('PROVIDER_CREATE_FAILED');
-    (error as any).code = 'PROVIDER_CREATE_FAILED';
-    throw error;
-  }
-
-  return created;
-};
-
-export const updateProvider = async (
-  providerId: number,
-  payload: ProviderPayload,
-): Promise<ProviderSummary | null> => {
-  const existing = await getProviderById(providerId);
-  if (!existing) {
-    return null;
-  }
-
-  const name = normalizeProviderName(payload.name);
-  const description = normalizeOptionalText(payload.description);
-  const rfc = normalizeOptionalText(payload.rfc);
-  const contact = normalizeOptionalText(payload.contact);
-  const website = normalizeOptionalText(payload.website);
-  const addressStreet = normalizeOptionalText(payload.address_street);
-  const addressNeighborhood = normalizeOptionalText(payload.address_neighborhood);
-  const addressCity = normalizeOptionalText(payload.address_city);
-  const addressState = normalizeOptionalText(payload.address_state);
-  const addressZip = normalizeOptionalText(payload.address_zip);
-  const addressCountry = normalizeOptionalText(payload.address_country);
-  const notes = normalizeOptionalText(payload.notes);
-  const classificationId = payload.classification_id ?? null;
-
-  await assertClassificationType(classificationId, 'PROVIDER');
-
-  await pool.query(
-    `
-      UPDATE public.helpdesk_suppliers
-      SET name = $1, description = $2, rfc = $3, contact = $4, website = $5,
-          address_street = $6, address_neighborhood = $7, address_city = $8, address_state = $9,
-          address_zip = $10, address_country = $11, notes = $12, classification_id = $13, updated_at = NOW()
-      WHERE id = $14;
-    `,
-    [
-      name, description, rfc, contact, website,
-      addressStreet, addressNeighborhood, addressCity, addressState, addressZip, addressCountry,
-      notes, classificationId, providerId,
-    ],
-  );
-
-  return getProviderById(providerId);
-};
-
-export const deactivateProvider = async (providerId: number): Promise<ProviderSummary | null> => {
-  const existing = await getProviderById(providerId);
-  if (!existing) {
-    return null;
-  }
-
-  await pool.query(
-    `
-      UPDATE public.helpdesk_suppliers
-      SET is_active = FALSE, updated_at = NOW()
-      WHERE id = $1;
-    `,
-    [providerId],
-  );
-
-  return getProviderById(providerId);
-};
-
-// --- Categorias de documento (clasificacion, catalogo administrable) -------
-
-export interface ProviderDocumentCategory {
-  id: number;
-  code: string;
-  name: string;
-  description: string | null;
-  is_active: boolean;
-  sort_order: number;
-}
-
-export interface ProviderDocumentCategoryPayload {
-  code?: string | null;
-  name: string;
-  description?: string | null;
-  sort_order?: number | null;
-}
-
-const mapCategoryRow = (row: any): ProviderDocumentCategory => ({
-  id: Number(row.id),
-  code: String(row.code),
-  name: String(row.name),
-  description: row.description ? String(row.description) : null,
-  is_active: Boolean(row.is_active),
-  sort_order: Number(row.sort_order ?? 0),
-});
 
 const normalizeOptionalText = (value: unknown): string | null => {
   if (typeof value !== 'string') {
@@ -297,8 +147,8 @@ const normalizeOptionalText = (value: unknown): string | null => {
 const normalizeRequiredText = (value: unknown): string => {
   const normalizedValue = normalizeOptionalText(value);
   if (!normalizedValue) {
-    const error = new Error('PROVIDER_CATEGORY_NAME_REQUIRED');
-    (error as any).code = 'PROVIDER_CATEGORY_NAME_REQUIRED';
+    const error = new Error('CLIENT_CATEGORY_NAME_REQUIRED');
+    (error as any).code = 'CLIENT_CATEGORY_NAME_REQUIRED';
     throw error;
   }
 
@@ -308,8 +158,8 @@ const normalizeRequiredText = (value: unknown): string => {
 const normalizeRequiredCode = (value: unknown): string => {
   const normalizedValue = normalizeOptionalText(value);
   if (!normalizedValue) {
-    const error = new Error('PROVIDER_CATEGORY_CODE_REQUIRED');
-    (error as any).code = 'PROVIDER_CATEGORY_CODE_REQUIRED';
+    const error = new Error('CLIENT_CATEGORY_CODE_REQUIRED');
+    (error as any).code = 'CLIENT_CATEGORY_CODE_REQUIRED';
     throw error;
   }
 
@@ -323,34 +173,175 @@ const normalizeSortOrder = (value: unknown): number => {
 
   const parsedValue = Number(value);
   if (!Number.isFinite(parsedValue) || parsedValue < 0 || !Number.isInteger(parsedValue)) {
-    const error = new Error('PROVIDER_CATEGORY_SORT_ORDER_INVALID');
-    (error as any).code = 'PROVIDER_CATEGORY_SORT_ORDER_INVALID';
+    const error = new Error('CLIENT_CATEGORY_SORT_ORDER_INVALID');
+    (error as any).code = 'CLIENT_CATEGORY_SORT_ORDER_INVALID';
     throw error;
   }
 
   return parsedValue;
 };
 
-export const listProviderDocumentCategories = async (
+const normalizeClientName = (value: unknown): string => {
+  const normalizedValue = normalizeOptionalText(value);
+  if (!normalizedValue) {
+    const error = new Error('CLIENT_NAME_REQUIRED');
+    (error as any).code = 'CLIENT_NAME_REQUIRED';
+    throw error;
+  }
+
+  return normalizedValue;
+};
+
+export const createClient = async (payload: ClientPayload): Promise<ClientSummary> => {
+  const name = normalizeClientName(payload.name);
+  const description = normalizeOptionalText(payload.description);
+  const rfc = normalizeOptionalText(payload.rfc);
+  const website = normalizeOptionalText(payload.website);
+  const addressStreet = normalizeOptionalText(payload.address_street);
+  const addressNeighborhood = normalizeOptionalText(payload.address_neighborhood);
+  const addressCity = normalizeOptionalText(payload.address_city);
+  const addressState = normalizeOptionalText(payload.address_state);
+  const addressZip = normalizeOptionalText(payload.address_zip);
+  const addressCountry = normalizeOptionalText(payload.address_country);
+  const notes = normalizeOptionalText(payload.notes);
+  const classificationId = payload.classification_id ?? null;
+
+  await assertClassificationType(classificationId, 'CLIENT');
+
+  const result = await pool.query(
+    `
+      INSERT INTO public.clients (
+        name, description, rfc, website,
+        address_street, address_neighborhood, address_city, address_state, address_zip, address_country,
+        notes, classification_id
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING id;
+    `,
+    [
+      name, description, rfc, website,
+      addressStreet, addressNeighborhood, addressCity, addressState, addressZip, addressCountry,
+      notes, classificationId,
+    ],
+  );
+
+  const created = await getClientById(Number(result.rows[0]?.id));
+  if (!created) {
+    const error = new Error('CLIENT_CREATE_FAILED');
+    (error as any).code = 'CLIENT_CREATE_FAILED';
+    throw error;
+  }
+
+  return created;
+};
+
+export const updateClient = async (
+  clientId: number,
+  payload: ClientPayload,
+): Promise<ClientSummary | null> => {
+  const existing = await getClientById(clientId);
+  if (!existing) {
+    return null;
+  }
+
+  const name = normalizeClientName(payload.name);
+  const description = normalizeOptionalText(payload.description);
+  const rfc = normalizeOptionalText(payload.rfc);
+  const website = normalizeOptionalText(payload.website);
+  const addressStreet = normalizeOptionalText(payload.address_street);
+  const addressNeighborhood = normalizeOptionalText(payload.address_neighborhood);
+  const addressCity = normalizeOptionalText(payload.address_city);
+  const addressState = normalizeOptionalText(payload.address_state);
+  const addressZip = normalizeOptionalText(payload.address_zip);
+  const addressCountry = normalizeOptionalText(payload.address_country);
+  const notes = normalizeOptionalText(payload.notes);
+  const classificationId = payload.classification_id ?? null;
+
+  await assertClassificationType(classificationId, 'CLIENT');
+
+  await pool.query(
+    `
+      UPDATE public.clients
+      SET name = $1, description = $2, rfc = $3, website = $4,
+          address_street = $5, address_neighborhood = $6, address_city = $7, address_state = $8,
+          address_zip = $9, address_country = $10, notes = $11, classification_id = $12, updated_at = NOW()
+      WHERE id = $13;
+    `,
+    [
+      name, description, rfc, website,
+      addressStreet, addressNeighborhood, addressCity, addressState, addressZip, addressCountry,
+      notes, classificationId, clientId,
+    ],
+  );
+
+  return getClientById(clientId);
+};
+
+export const deactivateClient = async (clientId: number): Promise<ClientSummary | null> => {
+  const existing = await getClientById(clientId);
+  if (!existing) {
+    return null;
+  }
+
+  await pool.query(
+    `
+      UPDATE public.clients
+      SET is_active = FALSE, updated_at = NOW()
+      WHERE id = $1;
+    `,
+    [clientId],
+  );
+
+  return getClientById(clientId);
+};
+
+// --- Categorias de documento de cliente (clasificacion, catalogo administrable) ---
+
+export interface ClientDocumentCategory {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface ClientDocumentCategoryPayload {
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  sort_order?: number | null;
+}
+
+const mapCategoryRow = (row: any): ClientDocumentCategory => ({
+  id: Number(row.id),
+  code: String(row.code),
+  name: String(row.name),
+  description: row.description ? String(row.description) : null,
+  is_active: Boolean(row.is_active),
+  sort_order: Number(row.sort_order ?? 0),
+});
+
+export const listClientDocumentCategories = async (
   includeInactive = false,
-): Promise<ProviderDocumentCategory[]> => {
+): Promise<ClientDocumentCategory[]> => {
   const whereClause = includeInactive ? '' : 'WHERE is_active = TRUE';
   const result = await pool.query(`
     SELECT id, code, name, description, is_active, sort_order
-    FROM public.provider_document_categories
+    FROM public.client_document_categories
     ${whereClause}
     ORDER BY is_active DESC, sort_order ASC, name ASC;
   `);
   return result.rows.map(mapCategoryRow);
 };
 
-export const getProviderDocumentCategoryById = async (
+export const getClientDocumentCategoryById = async (
   categoryId: number,
-): Promise<ProviderDocumentCategory | null> => {
+): Promise<ClientDocumentCategory | null> => {
   const result = await pool.query(
     `
       SELECT id, code, name, description, is_active, sort_order
-      FROM public.provider_document_categories
+      FROM public.client_document_categories
       WHERE id = $1
       LIMIT 1;
     `,
@@ -361,9 +352,9 @@ export const getProviderDocumentCategoryById = async (
   return row ? mapCategoryRow(row) : null;
 };
 
-export const createProviderDocumentCategory = async (
-  payload: ProviderDocumentCategoryPayload,
-): Promise<ProviderDocumentCategory> => {
+export const createClientDocumentCategory = async (
+  payload: ClientDocumentCategoryPayload,
+): Promise<ClientDocumentCategory> => {
   const code = normalizeRequiredCode(payload.code);
   const name = normalizeRequiredText(payload.name);
   const description = normalizeOptionalText(payload.description);
@@ -371,28 +362,28 @@ export const createProviderDocumentCategory = async (
 
   const result = await pool.query(
     `
-      INSERT INTO public.provider_document_categories (code, name, description, sort_order)
+      INSERT INTO public.client_document_categories (code, name, description, sort_order)
       VALUES ($1, $2, $3, $4)
       RETURNING id;
     `,
     [code, name, description, sortOrder],
   );
 
-  const created = await getProviderDocumentCategoryById(Number(result.rows[0]?.id));
+  const created = await getClientDocumentCategoryById(Number(result.rows[0]?.id));
   if (!created) {
-    const error = new Error('PROVIDER_CATEGORY_CREATE_FAILED');
-    (error as any).code = 'PROVIDER_CATEGORY_CREATE_FAILED';
+    const error = new Error('CLIENT_CATEGORY_CREATE_FAILED');
+    (error as any).code = 'CLIENT_CATEGORY_CREATE_FAILED';
     throw error;
   }
 
   return created;
 };
 
-export const updateProviderDocumentCategory = async (
+export const updateClientDocumentCategory = async (
   categoryId: number,
-  payload: ProviderDocumentCategoryPayload,
-): Promise<ProviderDocumentCategory | null> => {
-  const existing = await getProviderDocumentCategoryById(categoryId);
+  payload: ClientDocumentCategoryPayload,
+): Promise<ClientDocumentCategory | null> => {
+  const existing = await getClientDocumentCategoryById(categoryId);
   if (!existing) {
     return null;
   }
@@ -404,54 +395,54 @@ export const updateProviderDocumentCategory = async (
 
   await pool.query(
     `
-      UPDATE public.provider_document_categories
+      UPDATE public.client_document_categories
       SET code = $1, name = $2, description = $3, sort_order = $4, updated_at = NOW()
       WHERE id = $5;
     `,
     [code, name, description, sortOrder, categoryId],
   );
 
-  return getProviderDocumentCategoryById(categoryId);
+  return getClientDocumentCategoryById(categoryId);
 };
 
-export const deactivateProviderDocumentCategory = async (
+export const deactivateClientDocumentCategory = async (
   categoryId: number,
-): Promise<ProviderDocumentCategory | null> => {
-  const existing = await getProviderDocumentCategoryById(categoryId);
+): Promise<ClientDocumentCategory | null> => {
+  const existing = await getClientDocumentCategoryById(categoryId);
   if (!existing) {
     return null;
   }
 
   await pool.query(
     `
-      UPDATE public.provider_document_categories
+      UPDATE public.client_document_categories
       SET is_active = FALSE, updated_at = NOW()
       WHERE id = $1;
     `,
     [categoryId],
   );
 
-  return getProviderDocumentCategoryById(categoryId);
+  return getClientDocumentCategoryById(categoryId);
 };
 
 // Borrado DEFINITIVO. Solo procede sin dependencias: la FK de
-// `provider_documents.category_id` (ON DELETE RESTRICT) hace que Postgres
+// `client_documents.category_id` (ON DELETE RESTRICT) hace que Postgres
 // rechace con 23503 si algun documento la usa; el controller lo traduce a "en uso".
-export const deleteProviderDocumentCategory = async (categoryId: number): Promise<boolean> => {
-  const existing = await getProviderDocumentCategoryById(categoryId);
+export const deleteClientDocumentCategory = async (categoryId: number): Promise<boolean> => {
+  const existing = await getClientDocumentCategoryById(categoryId);
   if (!existing) {
     return false;
   }
 
-  await pool.query('DELETE FROM public.provider_document_categories WHERE id = $1;', [categoryId]);
+  await pool.query('DELETE FROM public.client_document_categories WHERE id = $1;', [categoryId]);
   return true;
 };
 
-// --- Contactos del proveedor -------------------------------------------------
+// --- Contactos del cliente ---------------------------------------------------
 
-export interface ProviderContact {
+export interface ClientContact {
   id: number;
-  provider_id: number;
+  client_id: number;
   name: string;
   position: string | null;
   phone: string | null;
@@ -459,7 +450,7 @@ export interface ProviderContact {
   is_primary: boolean;
 }
 
-export interface ProviderContactPayload {
+export interface ClientContactPayload {
   name: string;
   position?: string | null;
   phone?: string | null;
@@ -467,9 +458,9 @@ export interface ProviderContactPayload {
   is_primary?: boolean;
 }
 
-const mapContactRow = (row: any): ProviderContact => ({
+const mapContactRow = (row: any): ClientContact => ({
   id: Number(row.id),
-  provider_id: Number(row.provider_id),
+  client_id: Number(row.client_id),
   name: String(row.name),
   position: row.position ? String(row.position) : null,
   phone: row.phone ? String(row.phone) : null,
@@ -480,32 +471,32 @@ const mapContactRow = (row: any): ProviderContact => ({
 const normalizeContactName = (value: unknown): string => {
   const normalizedValue = normalizeOptionalText(value);
   if (!normalizedValue) {
-    const error = new Error('PROVIDER_CONTACT_NAME_REQUIRED');
-    (error as any).code = 'PROVIDER_CONTACT_NAME_REQUIRED';
+    const error = new Error('CLIENT_CONTACT_NAME_REQUIRED');
+    (error as any).code = 'CLIENT_CONTACT_NAME_REQUIRED';
     throw error;
   }
 
   return normalizedValue;
 };
 
-export const listProviderContacts = async (providerId: number): Promise<ProviderContact[]> => {
+export const listClientContacts = async (clientId: number): Promise<ClientContact[]> => {
   const result = await pool.query(
     `
-      SELECT id, provider_id, name, position, phone, email, is_primary
-      FROM public.provider_contacts
-      WHERE provider_id = $1
+      SELECT id, client_id, name, position, phone, email, is_primary
+      FROM public.client_contacts
+      WHERE client_id = $1
       ORDER BY is_primary DESC, name ASC;
     `,
-    [providerId],
+    [clientId],
   );
   return result.rows.map(mapContactRow);
 };
 
-export const getProviderContactById = async (contactId: number): Promise<ProviderContact | null> => {
+export const getClientContactById = async (contactId: number): Promise<ClientContact | null> => {
   const result = await pool.query(
     `
-      SELECT id, provider_id, name, position, phone, email, is_primary
-      FROM public.provider_contacts
+      SELECT id, client_id, name, position, phone, email, is_primary
+      FROM public.client_contacts
       WHERE id = $1
       LIMIT 1;
     `,
@@ -517,12 +508,12 @@ export const getProviderContactById = async (contactId: number): Promise<Provide
 };
 
 // Marcar un contacto como principal quita el flag a cualquier otro del mismo
-// proveedor en la misma transaccion (el indice unico parcial solo permite uno
+// cliente en la misma transaccion (el indice unico parcial solo permite uno
 // activo a la vez; si no se libera antes, el INSERT/UPDATE choca con 23505).
-export const createProviderContact = async (
-  providerId: number,
-  payload: ProviderContactPayload,
-): Promise<ProviderContact> => {
+export const createClientContact = async (
+  clientId: number,
+  payload: ClientContactPayload,
+): Promise<ClientContact> => {
   const name = normalizeContactName(payload.name);
   const position = normalizeOptionalText(payload.position);
   const phone = normalizeOptionalText(payload.phone);
@@ -533,38 +524,38 @@ export const createProviderContact = async (
   try {
     await client.query('BEGIN');
 
-    const providerResult = await client.query(
-      'SELECT id FROM public.helpdesk_suppliers WHERE id = $1 LIMIT 1 FOR UPDATE;',
-      [providerId],
+    const clientResult = await client.query(
+      'SELECT id FROM public.clients WHERE id = $1 LIMIT 1 FOR UPDATE;',
+      [clientId],
     );
-    if (!providerResult.rows[0]) {
-      const error = new Error('PROVIDER_NOT_FOUND');
-      (error as any).code = 'PROVIDER_NOT_FOUND';
+    if (!clientResult.rows[0]) {
+      const error = new Error('CLIENT_NOT_FOUND');
+      (error as any).code = 'CLIENT_NOT_FOUND';
       throw error;
     }
 
     if (isPrimary) {
       await client.query(
-        'UPDATE public.provider_contacts SET is_primary = FALSE, updated_at = NOW() WHERE provider_id = $1 AND is_primary = TRUE;',
-        [providerId],
+        'UPDATE public.client_contacts SET is_primary = FALSE, updated_at = NOW() WHERE client_id = $1 AND is_primary = TRUE;',
+        [clientId],
       );
     }
 
     const insertResult = await client.query(
       `
-        INSERT INTO public.provider_contacts (provider_id, name, position, phone, email, is_primary)
+        INSERT INTO public.client_contacts (client_id, name, position, phone, email, is_primary)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id;
       `,
-      [providerId, name, position, phone, email, isPrimary],
+      [clientId, name, position, phone, email, isPrimary],
     );
 
     await client.query('COMMIT');
 
-    const created = await getProviderContactById(Number(insertResult.rows[0]?.id));
+    const created = await getClientContactById(Number(insertResult.rows[0]?.id));
     if (!created) {
-      const error = new Error('PROVIDER_CONTACT_CREATE_FAILED');
-      (error as any).code = 'PROVIDER_CONTACT_CREATE_FAILED';
+      const error = new Error('CLIENT_CONTACT_CREATE_FAILED');
+      (error as any).code = 'CLIENT_CONTACT_CREATE_FAILED';
       throw error;
     }
     return created;
@@ -576,10 +567,10 @@ export const createProviderContact = async (
   }
 };
 
-export const updateProviderContact = async (
+export const updateClientContact = async (
   contactId: number,
-  payload: ProviderContactPayload,
-): Promise<ProviderContact | null> => {
+  payload: ClientContactPayload,
+): Promise<ClientContact | null> => {
   const name = normalizeContactName(payload.name);
   const position = normalizeOptionalText(payload.position);
   const phone = normalizeOptionalText(payload.phone);
@@ -591,7 +582,7 @@ export const updateProviderContact = async (
     await client.query('BEGIN');
 
     const existingResult = await client.query(
-      'SELECT id, provider_id FROM public.provider_contacts WHERE id = $1 LIMIT 1 FOR UPDATE;',
+      'SELECT id, client_id FROM public.client_contacts WHERE id = $1 LIMIT 1 FOR UPDATE;',
       [contactId],
     );
     const existing = existingResult.rows[0];
@@ -602,14 +593,14 @@ export const updateProviderContact = async (
 
     if (isPrimary) {
       await client.query(
-        'UPDATE public.provider_contacts SET is_primary = FALSE, updated_at = NOW() WHERE provider_id = $1 AND is_primary = TRUE AND id <> $2;',
-        [existing.provider_id, contactId],
+        'UPDATE public.client_contacts SET is_primary = FALSE, updated_at = NOW() WHERE client_id = $1 AND is_primary = TRUE AND id <> $2;',
+        [existing.client_id, contactId],
       );
     }
 
     await client.query(
       `
-        UPDATE public.provider_contacts
+        UPDATE public.client_contacts
         SET name = $1, position = $2, phone = $3, email = $4, is_primary = $5, updated_at = NOW()
         WHERE id = $6;
       `,
@@ -617,7 +608,7 @@ export const updateProviderContact = async (
     );
 
     await client.query('COMMIT');
-    return getProviderContactById(contactId);
+    return getClientContactById(contactId);
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -626,12 +617,12 @@ export const updateProviderContact = async (
   }
 };
 
-export const deleteProviderContact = async (contactId: number): Promise<boolean> => {
-  const existing = await getProviderContactById(contactId);
+export const deleteClientContact = async (contactId: number): Promise<boolean> => {
+  const existing = await getClientContactById(contactId);
   if (!existing) {
     return false;
   }
 
-  await pool.query('DELETE FROM public.provider_contacts WHERE id = $1;', [contactId]);
+  await pool.query('DELETE FROM public.client_contacts WHERE id = $1;', [contactId]);
   return true;
 };

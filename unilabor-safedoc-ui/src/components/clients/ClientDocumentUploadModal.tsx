@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Loader2, UploadCloud } from 'lucide-react';
-import type { ProviderDocument, ProviderDocumentCategory, ProviderSummary } from '../../types/models';
+import type { ClientDocument, ClientDocumentCategory, ClientSummary } from '../../types/models';
 
-export interface ProviderDocumentUploadSubmitPayload {
+export interface ClientDocumentUploadSubmitPayload {
   category_id: number;
   title: string;
   description: string;
@@ -12,25 +12,25 @@ export interface ProviderDocumentUploadSubmitPayload {
   file: File | null;
 }
 
-interface ProviderDocumentUploadModalProps {
+interface ClientDocumentUploadModalProps {
   isOpen: boolean;
-  provider: ProviderSummary | null;
-  categories: ProviderDocumentCategory[];
-  currentDocument?: ProviderDocument | null;
+  client: ClientSummary | null;
+  categories: ClientDocumentCategory[];
+  currentDocument?: ClientDocument | null;
   saving: boolean;
   onClose: () => void;
-  onSubmit: (payload: ProviderDocumentUploadSubmitPayload) => Promise<void>;
+  onSubmit: (payload: ClientDocumentUploadSubmitPayload) => Promise<void>;
 }
 
-export const ProviderDocumentUploadModal = ({
+export const ClientDocumentUploadModal = ({
   isOpen,
-  provider,
+  client,
   categories,
   currentDocument,
   saving,
   onClose,
   onSubmit,
-}: ProviderDocumentUploadModalProps) => {
+}: ClientDocumentUploadModalProps) => {
   const isReplace = Boolean(currentDocument);
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [title, setTitle] = useState('');
@@ -40,7 +40,7 @@ export const ProviderDocumentUploadModal = ({
   const [expiryDate, setExpiryDate] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [lastSync, setLastSync] = useState<{
-    doc: ProviderDocument | null | undefined;
+    doc: ClientDocument | null | undefined;
     open: boolean;
   }>({ doc: currentDocument, open: isOpen });
 
@@ -59,7 +59,7 @@ export const ProviderDocumentUploadModal = ({
     }
   }
 
-  if (!isOpen || !provider) {
+  if (!isOpen || !client) {
     return null;
   }
 
@@ -77,7 +77,7 @@ export const ProviderDocumentUploadModal = ({
             {currentDocument ? 'Reemplazar documento' : 'Cargar documento'}
           </h2>
           <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-            {provider.name}
+            {client.name}
             {currentDocument ? ` | ${currentDocument.category_name ?? ''}` : selectedCategory ? ` | ${selectedCategory.name}` : ''}
           </p>
         </div>

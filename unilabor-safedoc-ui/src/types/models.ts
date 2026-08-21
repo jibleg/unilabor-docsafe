@@ -1360,6 +1360,7 @@ export interface ProviderSummary {
   address_country: string | null;
   notes: string | null;
   is_active: boolean;
+  classification_id: number | null;
 }
 
 export interface ProviderContact {
@@ -1406,6 +1407,89 @@ export interface ProviderDocument {
 }
 
 export interface ProviderNotificationRecipient {
+  id: number;
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
+// --- Clasificacion: catalogo compartido entre Proveedores y Clientes -------
+export type ClassificationType = 'PROVIDER' | 'CLIENT';
+
+export interface Classification {
+  id: number;
+  type: ClassificationType;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Modulo Clientes: mirror de Proveedores (mismo patron de vigencia) -----
+export interface ClientSummary {
+  id: number;
+  name: string;
+  description: string | null;
+  rfc: string | null;
+  contact: string | null;
+  website: string | null;
+  address_street: string | null;
+  address_neighborhood: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_zip: string | null;
+  address_country: string | null;
+  notes: string | null;
+  is_active: boolean;
+  classification_id: number | null;
+}
+
+export interface ClientContact {
+  id: number;
+  client_id: number;
+  name: string;
+  position: string | null;
+  phone: string | null;
+  email: string | null;
+  is_primary: boolean;
+}
+
+export interface ClientDocumentCategory {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export type ClientDocumentStatus = 'active' | 'inactive' | 'superseded';
+
+export interface ClientDocument {
+  id: number;
+  client_id: number;
+  client_name: string | null;
+  category_id: number;
+  category_name: string | null;
+  title: string;
+  description: string | null;
+  file_path: string;
+  file_size: number;
+  uploaded_by: string | null;
+  uploaded_by_name: string | null;
+  document_date: string | null;
+  effective_from: string | null;
+  expiry_date: string | null;
+  status: ClientDocumentStatus;
+  replaces_document_id: number | null;
+  replaced_by_document_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientNotificationRecipient {
   id: number;
   user_id: string;
   full_name: string | null;

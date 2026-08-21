@@ -2,26 +2,26 @@ import { useCallback, useEffect, useState } from 'react';
 import { Edit3, EyeOff, Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
 import { getApiErrorMessage } from '../api/service';
 import {
-  createProviderCatalog,
-  createProviderContact,
-  deactivateProviderCatalog,
-  deleteProviderContact,
-  listProviderContacts,
-  listProvidersPaginated,
-  updateProviderCatalog,
-  updateProviderContact,
-} from '../api/service.api-providers';
+  createClientCatalog,
+  createClientContact,
+  deactivateClientCatalog,
+  deleteClientContact,
+  listClientContacts,
+  listClientsPaginated,
+  updateClientCatalog,
+  updateClientContact,
+} from '../api/service.api-clients';
 import { listClassifications } from '../api/service.api-classifications';
-import type { Classification, ProviderContact, ProviderSummary } from '../types/models';
+import type { ClientContact, ClientSummary, Classification } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { confirmAction } from '../utils/confirm';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
 import { SearchableSelect } from '../components/SearchableSelect';
 
-type ProviderModalTab = 'general' | 'address' | 'contacts';
+type ClientModalTab = 'general' | 'address' | 'contacts';
 
-interface ProviderFormState {
+interface ClientFormState {
   name: string;
   description: string;
   rfc: string;
@@ -44,7 +44,7 @@ interface ContactFormState {
   is_primary: boolean;
 }
 
-const EMPTY_FORM: ProviderFormState = {
+const EMPTY_FORM: ClientFormState = {
   name: '',
   description: '',
   rfc: '',
@@ -67,7 +67,7 @@ const EMPTY_CONTACT_FORM: ContactFormState = {
   is_primary: false,
 };
 
-const TABS: { key: ProviderModalTab; label: string }[] = [
+const TABS: { key: ClientModalTab; label: string }[] = [
   { key: 'general', label: 'Datos generales' },
   { key: 'address', label: 'Domicilio' },
   { key: 'contacts', label: 'Contactos' },
@@ -77,21 +77,21 @@ const inputClass =
   'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]';
 const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]';
 
-export const ProvidersCatalogPage = () => {
+export const ClientsCatalogPage = () => {
   const [classificationFilter, setClassificationFilter] = useState('');
 
   const {
-    items: providers,
+    items: clients,
     pagination,
     page,
     setPage,
     search: query,
     setSearch: setQuery,
     loading,
-    reload: loadProviders,
-  } = usePaginatedList<ProviderSummary>(
+    reload: loadClients,
+  } = usePaginatedList<ClientSummary>(
     (q) =>
-      listProvidersPaginated({
+      listClientsPaginated({
         page: q.page,
         limit: q.limit,
         search: q.search,
@@ -101,36 +101,36 @@ export const ProvidersCatalogPage = () => {
     {
       pageSize: 20,
       filters: { classificationId: classificationFilter },
-      onError: (error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar los proveedores.')),
+      onError: (error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar los clientes.')),
     },
   );
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<ProviderModalTab>('general');
-  const [editingProvider, setEditingProvider] = useState<ProviderSummary | null>(null);
-  const [form, setForm] = useState<ProviderFormState>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [busyId, setBusyId] = useState<number | null>(null);
 
   const [classifications, setClassifications] = useState<Classification[]>([]);
 
   useEffect(() => {
-    listClassifications({ type: 'PROVIDER', includeInactive: false })
+    listClassifications({ type: 'CLIENT', includeInactive: false })
       .then(setClassifications)
       .catch((error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar las clasificaciones.')));
   }, []);
 
-  const [contacts, setContacts] = useState<ProviderContact[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ClientModalTab>('general');
+  const [editingClient, setEditingClient] = useState<ClientSummary | null>(null);
+  const [form, setForm] = useState<ClientFormState>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const [contacts, setContacts] = useState<ClientContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [contactForm, setContactForm] = useState<ContactFormState>(EMPTY_CONTACT_FORM);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
   const [savingContact, setSavingContact] = useState(false);
   const [busyContactId, setBusyContactId] = useState<number | null>(null);
 
-  const loadContacts = useCallback(async (providerId: number) => {
+  const loadContacts = useCallback(async (clientId: number) => {
     setLoadingContacts(true);
     try {
-      const data = await listProviderContacts(providerId);
+      const data = await listClientContacts(clientId);
       setContacts(data);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron cargar los contactos.'));
@@ -140,7 +140,7 @@ export const ProvidersCatalogPage = () => {
   }, []);
 
   const openCreateModal = () => {
-    setEditingProvider(null);
+    setEditingClient(null);
     setForm(EMPTY_FORM);
     setContacts([]);
     setContactForm(EMPTY_CONTACT_FORM);
@@ -149,27 +149,27 @@ export const ProvidersCatalogPage = () => {
     setIsModalOpen(true);
   };
 
-  const openEditModal = (provider: ProviderSummary) => {
-    setEditingProvider(provider);
+  const openEditModal = (client: ClientSummary) => {
+    setEditingClient(client);
     setForm({
-      name: provider.name,
-      description: provider.description ?? '',
-      rfc: provider.rfc ?? '',
-      website: provider.website ?? '',
-      notes: provider.notes ?? '',
-      classification_id: provider.classification_id ?? '',
-      address_street: provider.address_street ?? '',
-      address_neighborhood: provider.address_neighborhood ?? '',
-      address_city: provider.address_city ?? '',
-      address_state: provider.address_state ?? '',
-      address_zip: provider.address_zip ?? '',
-      address_country: provider.address_country ?? '',
+      name: client.name,
+      description: client.description ?? '',
+      rfc: client.rfc ?? '',
+      website: client.website ?? '',
+      notes: client.notes ?? '',
+      classification_id: client.classification_id ?? '',
+      address_street: client.address_street ?? '',
+      address_neighborhood: client.address_neighborhood ?? '',
+      address_city: client.address_city ?? '',
+      address_state: client.address_state ?? '',
+      address_zip: client.address_zip ?? '',
+      address_country: client.address_country ?? '',
     });
     setContactForm(EMPTY_CONTACT_FORM);
     setEditingContactId(null);
     setActiveTab('general');
     setIsModalOpen(true);
-    void loadContacts(provider.id);
+    void loadContacts(client.id);
   };
 
   const closeModal = () => {
@@ -177,7 +177,7 @@ export const ProvidersCatalogPage = () => {
       return;
     }
     setIsModalOpen(false);
-    setEditingProvider(null);
+    setEditingClient(null);
     setForm(EMPTY_FORM);
     setContacts([]);
     setContactForm(EMPTY_CONTACT_FORM);
@@ -187,7 +187,7 @@ export const ProvidersCatalogPage = () => {
   const submitForm = async () => {
     const name = form.name.trim();
     if (!name) {
-      notifyWarning('El nombre del proveedor es obligatorio.');
+      notifyWarning('El nombre del cliente es obligatorio.');
       return;
     }
 
@@ -208,31 +208,31 @@ export const ProvidersCatalogPage = () => {
 
     setSaving(true);
     try {
-      if (editingProvider) {
-        await updateProviderCatalog(editingProvider.id, payload);
-        notifySuccess('Proveedor actualizado correctamente.');
+      if (editingClient) {
+        await updateClientCatalog(editingClient.id, payload);
+        notifySuccess('Cliente actualizado correctamente.');
         closeModal();
-        loadProviders();
+        loadClients();
       } else {
-        const created = await createProviderCatalog(payload);
-        notifySuccess('Proveedor creado correctamente. Ya puedes agregarle contactos.');
-        loadProviders();
+        const created = await createClientCatalog(payload);
+        notifySuccess('Cliente creado correctamente. Ya puedes agregarle contactos.');
+        loadClients();
         // Se queda en el modal, ahora en modo edicion, para poder agregar
-        // contactos de inmediato (necesitan el id del proveedor ya creado).
-        setEditingProvider(created);
+        // contactos de inmediato (necesitan el id del cliente ya creado).
+        setEditingClient(created);
         setActiveTab('contacts');
       }
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo guardar el proveedor.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo guardar el cliente.'));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeactivate = async (provider: ProviderSummary) => {
+  const handleDeactivate = async (client: ClientSummary) => {
     const confirmed = await confirmAction(
-      `Desactivar: ${provider.name}`,
-      'Dejará de estar disponible para nuevos documentos y para asignarse en Activos. Los documentos y registros existentes no se ven afectados.',
+      `Desactivar: ${client.name}`,
+      'Dejará de estar disponible para nuevos documentos. Los documentos y registros existentes no se ven afectados.',
       'Desactivar',
       'primary',
     );
@@ -240,13 +240,13 @@ export const ProvidersCatalogPage = () => {
       return;
     }
 
-    setBusyId(provider.id);
+    setBusyId(client.id);
     try {
-      await deactivateProviderCatalog(provider.id);
-      notifySuccess('Proveedor desactivado correctamente.');
-      loadProviders();
+      await deactivateClientCatalog(client.id);
+      notifySuccess('Cliente desactivado correctamente.');
+      loadClients();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo desactivar el proveedor.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo desactivar el cliente.'));
     } finally {
       setBusyId(null);
     }
@@ -257,7 +257,7 @@ export const ProvidersCatalogPage = () => {
     setContactForm(EMPTY_CONTACT_FORM);
   };
 
-  const openEditContact = (contact: ProviderContact) => {
+  const openEditContact = (contact: ClientContact) => {
     setEditingContactId(contact.id);
     setContactForm({
       name: contact.name,
@@ -269,7 +269,7 @@ export const ProvidersCatalogPage = () => {
   };
 
   const submitContactForm = async () => {
-    if (!editingProvider) {
+    if (!editingClient) {
       return;
     }
     const name = contactForm.name.trim();
@@ -289,14 +289,14 @@ export const ProvidersCatalogPage = () => {
     setSavingContact(true);
     try {
       if (editingContactId) {
-        await updateProviderContact(editingContactId, payload);
+        await updateClientContact(editingContactId, payload);
         notifySuccess('Contacto actualizado correctamente.');
       } else {
-        await createProviderContact(editingProvider.id, payload);
+        await createClientContact(editingClient.id, payload);
         notifySuccess('Contacto agregado correctamente.');
       }
       openAddContact();
-      await loadContacts(editingProvider.id);
+      await loadContacts(editingClient.id);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo guardar el contacto.'));
     } finally {
@@ -304,8 +304,8 @@ export const ProvidersCatalogPage = () => {
     }
   };
 
-  const handleDeleteContact = async (contact: ProviderContact) => {
-    if (!editingProvider) {
+  const handleDeleteContact = async (contact: ClientContact) => {
+    if (!editingClient) {
       return;
     }
     const confirmed = await confirmAction(
@@ -320,12 +320,12 @@ export const ProvidersCatalogPage = () => {
 
     setBusyContactId(contact.id);
     try {
-      await deleteProviderContact(contact.id);
+      await deleteClientContact(contact.id);
       notifySuccess('Contacto eliminado correctamente.');
       if (editingContactId === contact.id) {
         openAddContact();
       }
-      await loadContacts(editingProvider.id);
+      await loadContacts(editingClient.id);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo eliminar el contacto.'));
     } finally {
@@ -337,10 +337,8 @@ export const ProvidersCatalogPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Catálogo de proveedores</h1>
-          <p className="text-sm text-[var(--unilabor-neutral)]">
-            Alta y edición de proveedores. Es el mismo catálogo que usa Activos para asignar responsables de equipo.
-          </p>
+          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Catálogo de clientes</h1>
+          <p className="text-sm text-[var(--unilabor-neutral)]">Alta y edición del catálogo de clientes.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -349,11 +347,11 @@ export const ProvidersCatalogPage = () => {
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
           >
             <Plus size={16} />
-            Nuevo proveedor
+            Nuevo cliente
           </button>
           <button
             type="button"
-            onClick={() => loadProviders()}
+            onClick={() => loadClients()}
             disabled={loading}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -390,7 +388,7 @@ export const ProvidersCatalogPage = () => {
         <table className="w-full text-left">
           <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
             <tr>
-              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Proveedor</th>
+              <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Cliente</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">RFC</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Ciudad</th>
               <th className="px-6 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Estado</th>
@@ -400,51 +398,51 @@ export const ProvidersCatalogPage = () => {
           <tbody className="divide-y divide-[rgba(0,65,106,0.08)]">
             {loading ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-[var(--unilabor-neutral)]">Cargando proveedores...</td>
+                <td colSpan={5} className="p-10 text-center text-[var(--unilabor-neutral)]">Cargando clientes...</td>
               </tr>
-            ) : providers.length === 0 ? (
+            ) : clients.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-10 text-center text-[var(--unilabor-neutral)]">No hay proveedores para mostrar.</td>
+                <td colSpan={5} className="p-10 text-center text-[var(--unilabor-neutral)]">No hay clientes para mostrar.</td>
               </tr>
             ) : (
-              providers.map((provider) => {
-                const isBusy = busyId === provider.id;
+              clients.map((client) => {
+                const isBusy = busyId === client.id;
                 return (
-                  <tr key={provider.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
+                  <tr key={client.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
                     <td className="px-6 py-4">
-                      <p className="text-sm font-semibold text-[var(--color-brand-700)]">{provider.name}</p>
-                      {provider.description ? (
-                        <p className="mt-0.5 text-xs text-[var(--unilabor-neutral)]">{provider.description}</p>
+                      <p className="text-sm font-semibold text-[var(--color-brand-700)]">{client.name}</p>
+                      {client.description ? (
+                        <p className="mt-0.5 text-xs text-[var(--unilabor-neutral)]">{client.description}</p>
                       ) : null}
                     </td>
-                    <td className="px-6 py-4 text-sm text-[var(--unilabor-neutral)]">{provider.rfc || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-[var(--unilabor-neutral)]">{provider.address_city || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--unilabor-neutral)]">{client.rfc || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--unilabor-neutral)]">{client.address_city || '—'}</td>
                     <td className="px-6 py-4">
                       <span
                         className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                          provider.is_active
+                          client.is_active
                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                             : 'border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.12)] text-[var(--color-brand-700)]'
                         }`}
                       >
-                        {provider.is_active ? 'Activo' : 'Inactivo'}
+                        {client.is_active ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => openEditModal(provider)}
+                          onClick={() => openEditModal(client)}
                           disabled={isBusy}
                           className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <Edit3 size={14} />
                           Editar
                         </button>
-                        {provider.is_active ? (
+                        {client.is_active ? (
                           <button
                             type="button"
-                            onClick={() => void handleDeactivate(provider)}
+                            onClick={() => void handleDeactivate(client)}
                             disabled={isBusy}
                             className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
                           >
@@ -475,20 +473,20 @@ export const ProvidersCatalogPage = () => {
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
             <div className="border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
               <h2 className="text-base font-bold text-[var(--color-brand-700)]">
-                {editingProvider ? 'Editar proveedor' : 'Nuevo proveedor'}
+                {editingClient ? 'Editar cliente' : 'Nuevo cliente'}
               </h2>
             </div>
 
             <div className="flex gap-1 border-b border-[rgba(0,65,106,0.08)] px-4 pt-2">
               {TABS.map((tab) => {
-                const disabled = tab.key === 'contacts' && !editingProvider;
+                const disabled = tab.key === 'contacts' && !editingClient;
                 return (
                   <button
                     key={tab.key}
                     type="button"
                     onClick={() => !disabled && setActiveTab(tab.key)}
                     disabled={disabled}
-                    title={disabled ? 'Guarda el proveedor primero para agregar contactos' : undefined}
+                    title={disabled ? 'Guarda el cliente primero para agregar contactos' : undefined}
                     className={`rounded-t-lg px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       activeTab === tab.key
                         ? 'border-b-2 border-[var(--color-brand-500)] text-[var(--color-brand-700)]'
@@ -511,7 +509,7 @@ export const ProvidersCatalogPage = () => {
                         value={form.name}
                         onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                         className={inputClass}
-                        placeholder="Ejemplo: Suministros Médicos SA de CV"
+                        placeholder="Ejemplo: Laboratorios Clínicos SA de CV"
                       />
                     </div>
                     <div>
@@ -520,7 +518,7 @@ export const ProvidersCatalogPage = () => {
                         value={form.rfc}
                         onChange={(event) => setForm((current) => ({ ...current, rfc: event.target.value }))}
                         className={inputClass}
-                        placeholder="Ejemplo: SME010101AB1"
+                        placeholder="Ejemplo: LCL010101AB1"
                       />
                     </div>
                     <div>
@@ -569,7 +567,7 @@ export const ProvidersCatalogPage = () => {
                       onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
                       rows={2}
                       className={inputClass}
-                      placeholder="Observaciones internas sobre este proveedor"
+                      placeholder="Observaciones internas sobre este cliente"
                     />
                   </div>
                 </div>
@@ -633,7 +631,7 @@ export const ProvidersCatalogPage = () => {
                 </div>
               ) : null}
 
-              {activeTab === 'contacts' && editingProvider ? (
+              {activeTab === 'contacts' && editingClient ? (
                 <div className="space-y-4">
                   <div className="overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)]">
                     {loadingContacts ? (
@@ -761,7 +759,7 @@ export const ProvidersCatalogPage = () => {
                 disabled={saving}
                 className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {editingProvider ? 'Cerrar' : 'Cancelar'}
+                {editingClient ? 'Cerrar' : 'Cancelar'}
               </button>
               <button
                 type="button"
@@ -769,7 +767,7 @@ export const ProvidersCatalogPage = () => {
                 disabled={saving}
                 className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {saving ? 'Guardando...' : 'Guardar proveedor'}
+                {saving ? 'Guardando...' : 'Guardar cliente'}
               </button>
             </div>
           </div>

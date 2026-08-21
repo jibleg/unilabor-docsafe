@@ -1,27 +1,27 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, RefreshCw, Search, Truck } from 'lucide-react';
+import { Building2, ChevronRight, RefreshCw, Search } from 'lucide-react';
 import { getApiErrorMessage } from '../api/service';
-import { listProvidersPaginated } from '../api/service.api-providers';
-import type { ProviderSummary } from '../types/models';
+import { listClientsPaginated } from '../api/service.api-clients';
+import type { ClientSummary } from '../types/models';
 import { notifyError } from '../utils/notify';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
 
-export const ProvidersListPage = () => {
+export const ClientsListPage = () => {
   const {
-    items: providers,
+    items: clients,
     pagination,
     page,
     setPage,
     search: query,
     setSearch: setQuery,
     loading,
-    reload: loadProviders,
-  } = usePaginatedList<ProviderSummary>(
-    (q) => listProvidersPaginated({ page: q.page, limit: q.limit, search: q.search }),
+    reload: loadClients,
+  } = usePaginatedList<ClientSummary>(
+    (q) => listClientsPaginated({ page: q.page, limit: q.limit, search: q.search }),
     {
       pageSize: 20,
-      onError: (error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar los proveedores.')),
+      onError: (error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar los clientes.')),
     },
   );
 
@@ -29,14 +29,14 @@ export const ProvidersListPage = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Acuerdos con los Proveedores</h1>
+          <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Acuerdos con los Clientes</h1>
           <p className="text-sm text-[var(--unilabor-neutral)]">
-            Gestión documental de contratos, convenios y pólizas por proveedor.
+            Gestión documental de contratos, convenios y pólizas por cliente.
           </p>
         </div>
         <button
           type="button"
-          onClick={() => loadProviders()}
+          onClick={() => loadClients()}
           disabled={loading}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -60,28 +60,28 @@ export const ProvidersListPage = () => {
 
       <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
         {loading ? (
-          <div className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">Cargando proveedores...</div>
-        ) : providers.length === 0 ? (
+          <div className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">Cargando clientes...</div>
+        ) : clients.length === 0 ? (
           <div className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
-            No hay proveedores para mostrar. El catálogo se administra desde Configuración &gt; Catálogo de proveedores.
+            No hay clientes para mostrar. El catálogo se administra desde Configuración &gt; Clientes.
           </div>
         ) : (
           <div className="divide-y divide-[rgba(0,65,106,0.08)]">
-            {providers.map((provider) => (
+            {clients.map((client) => (
               <Link
-                key={provider.id}
-                to={`/providers/${provider.id}`}
+                key={client.id}
+                to={`/providers/clients/${client.id}`}
                 className="flex items-center justify-between gap-4 px-6 py-4 transition hover:bg-[rgba(191,212,230,0.22)]"
               >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(191,212,230,0.26)] text-[var(--color-brand-700)]">
-                    <Truck size={18} />
+                    <Building2 size={18} />
                   </span>
                   <div>
-                    <p className="text-sm font-bold text-[var(--color-brand-700)]">{provider.name}</p>
+                    <p className="text-sm font-bold text-[var(--color-brand-700)]">{client.name}</p>
                     <p className="text-xs text-[var(--unilabor-neutral)]">
-                      {provider.rfc ? `RFC: ${provider.rfc}` : 'Sin RFC registrado'}
-                      {provider.contact ? ` · ${provider.contact}` : ''}
+                      {client.rfc ? `RFC: ${client.rfc}` : 'Sin RFC registrado'}
+                      {client.contact ? ` · ${client.contact}` : ''}
                     </p>
                   </div>
                 </div>

@@ -122,7 +122,7 @@ const logDocumentAudit = async (
     ip_address: ipAddress ?? null,
     module_code: 'QUALITY',
     entity_type: 'document',
-    entity_id: documentId ? Number(documentId) : null,
+    entity_id: null,
     document_id: documentId ?? null,
   });
 };
