@@ -22,6 +22,7 @@ import {
 } from '../api/service';
 import type { Employee, HelpdeskAsset, HelpdeskTicket, HelpdeskTicketCatalogs } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+import { SignaturePad } from '../components/helpdesk/SignaturePad';
 
 interface TicketFormState {
   asset_id: string;
@@ -84,6 +85,7 @@ export const HelpdeskMyPortalPage = () => {
   const [selectedTicket, setSelectedTicket] = useState<HelpdeskTicket | null>(null);
   const [form, setForm] = useState<TicketFormState>(EMPTY_FORM);
   const [comment, setComment] = useState('');
+  const [confirmSignature, setConfirmSignature] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -131,6 +133,7 @@ export const HelpdeskMyPortalPage = () => {
 
   const selectTicket = async (ticket: HelpdeskTicket) => {
     setSelectedTicket(ticket);
+    setConfirmSignature(null);
     try {
       const detailed = await fetchMyHelpdeskTicketById(ticket.id);
       setSelectedTicket(detailed ?? ticket);
@@ -183,11 +186,18 @@ export const HelpdeskMyPortalPage = () => {
     if (!selectedTicket) {
       return;
     }
+    if (!confirmSignature) {
+      notifyWarning('Firma tu confirmación de funcionamiento antes de continuar.');
+      return;
+    }
 
     setSaving(true);
     try {
-      const updated = await confirmMyHelpdeskTicketFunctionality(selectedTicket.id);
+      const updated = await confirmMyHelpdeskTicketFunctionality(selectedTicket.id, {
+        requester_signature: confirmSignature,
+      });
       setSelectedTicket(updated ?? selectedTicket);
+      setConfirmSignature(null);
       notifySuccess('Funcionamiento confirmado correctamente.');
       await loadData();
     } catch (error) {
@@ -412,15 +422,25 @@ export const HelpdeskMyPortalPage = () => {
                   Agregar comentario
                 </button>
                 {selectedTicket.solved_at && !selectedTicket.return_to_operation_at ? (
-                  <button
-                    type="button"
-                    onClick={() => void handleConfirmFunctionality()}
-                    disabled={saving}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
-                  >
-                    {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    Confirmar funcionamiento
-                  </button>
+                  <div className="space-y-2 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.72)] p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                      Confirma que el equipo quedó funcionando y firma tu conformidad
+                    </p>
+                    <SignaturePad
+                      label="Firma de conformidad"
+                      hint="Tu firma confirma que el equipo/servicio quedó funcionando correctamente."
+                      onChange={setConfirmSignature}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleConfirmFunctionality()}
+                      disabled={saving || !confirmSignature}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
+                    >
+                      {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                      Confirmar funcionamiento
+                    </button>
+                  </div>
                 ) : null}
               </div>
             </div>

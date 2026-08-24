@@ -487,6 +487,50 @@ export const listTicketComments = async (
   }));
 };
 
+export interface HelpdeskTicketHistoryRecord {
+  id: number;
+  ticket_id: number;
+  action: string;
+  summary: string;
+  previous_values: unknown;
+  new_values: unknown;
+  created_by_user_id: string | null;
+  created_by_name: string | null;
+  created_at?: string | undefined;
+}
+
+// Expone helpdesk_ticket_history (TCK-05): se escribe correctamente en cada
+// mutation desde el Sprint 15, pero hasta ahora no habia forma de consultarlo
+// fuera de la base de datos.
+export const listTicketHistory = async (ticketId: number): Promise<HelpdeskTicketHistoryRecord[]> => {
+  await assertTicketsTable();
+
+  const result = await pool.query(
+    `
+      SELECT
+        h.*,
+        u.full_name AS created_by_name
+      FROM public.helpdesk_ticket_history h
+      LEFT JOIN public.users u ON u.id = h.created_by_user_id
+      WHERE h.ticket_id = $1
+      ORDER BY h.created_at DESC, h.id DESC;
+    `,
+    [ticketId],
+  );
+
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    ticket_id: Number(row.ticket_id),
+    action: String(row.action),
+    summary: String(row.summary),
+    previous_values: row.previous_values ?? null,
+    new_values: row.new_values ?? null,
+    created_by_user_id: row.created_by_user_id ? String(row.created_by_user_id) : null,
+    created_by_name: row.created_by_name ? String(row.created_by_name) : null,
+    created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
+  }));
+};
+
 export const getHelpdeskTicketById = async (
   ticketId: number,
   includeInternalComments = true,

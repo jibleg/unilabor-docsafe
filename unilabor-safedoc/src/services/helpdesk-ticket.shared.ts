@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
 import type { Queryable } from '../utils/transaction';
@@ -16,17 +18,48 @@ export interface HelpdeskTicketPayload {
   operational_impact?: string | null;
   affects_results?: boolean;
   due_at?: string | null;
+  request_channel?: string | null;
 }
 
+// Bitacora de llamada obligatoria cuando support_channel = 'REMOTE_PHONE': el
+// area usuaria levanta el soporte por telefono y el proveedor asesora al
+// responsable tecnico in situ tambien por telefono, sin documento de
+// evidencia posible. Estos campos sustituyen esa evidencia.
 export interface HelpdeskTicketSolutionPayload {
   solved_at: string;
   solution_summary: string;
   equipment_status_after_solution_id?: number | null;
+  support_channel?: string | null;
+  provider_name?: string | null;
+  provider_contact?: string | null;
+  onsite_responsible_employee_id?: number | null;
+  call_at?: string | null;
 }
 
 export interface HelpdeskTicketReturnPayload {
   return_to_operation_at: string;
   equipment_status_after_solution_id?: number | null;
+}
+
+export interface HelpdeskTicketAssignPayload {
+  assigned_employee_id: number;
+}
+
+export interface HelpdeskTicketStatusChangePayload {
+  status_code: string;
+}
+
+export interface HelpdeskTicketClosePayload {
+  closure_notes: string;
+  closer_signature: string;
+}
+
+export interface HelpdeskTicketConfirmFunctionalityPayload {
+  requester_signature: string;
+}
+
+export interface HelpdeskTicketCancelPayload {
+  cancellation_reason: string;
 }
 
 export interface HelpdeskTicketIsoRiskPayload {
@@ -85,9 +118,27 @@ export interface HelpdeskTicketRecord extends HelpdeskTicketPayload {
   technical_released_at?: string | null;
   quality_document_id?: string | null;
   operational_lock?: boolean;
+  support_channel?: string | null;
+  provider_name?: string | null;
+  provider_contact?: string | null;
+  onsite_responsible_employee_id?: number | null;
+  call_at?: string | null;
+  closed_at?: string | null;
+  closed_by_user_id?: string | null;
+  closure_notes?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by_user_id?: string | null;
+  cancellation_reason?: string | null;
   is_active: boolean;
   created_at?: string | undefined;
   updated_at?: string | undefined;
+  onsite_responsible_employee?: {
+    id: number;
+    employee_code: string;
+    full_name: string;
+    area: string | null;
+    position: string | null;
+  } | null;
   asset?: {
     id: number;
     asset_code: string;
@@ -227,6 +278,23 @@ export const mapCatalog = (
   };
 };
 
+export const mapOptionalEmployee = (row: any, idKey: string, aliasPrefix: string) => {
+  const id = Number(row[idKey]);
+  const fullName = row[`${aliasPrefix}_name`];
+
+  if (!Number.isFinite(id) || id <= 0 || typeof fullName !== 'string') {
+    return null;
+  }
+
+  return {
+    id,
+    employee_code: String(row[`${aliasPrefix}_code`] ?? ''),
+    full_name: fullName,
+    area: row[`${aliasPrefix}_area`] ? String(row[`${aliasPrefix}_area`]) : null,
+    position: row[`${aliasPrefix}_position`] ? String(row[`${aliasPrefix}_position`]) : null,
+  };
+};
+
 export const mapEmployee = (row: any, prefix: 'requester' | 'assigned') => {
   const id = Number(row[`${prefix}_employee_id`]);
   const fullName = row[`${prefix}_employee_name`];
@@ -285,9 +353,22 @@ export const mapTicketRow = (row: any): HelpdeskTicketRecord => ({
   technical_released_at: row.technical_released_at ? toIsoDateTime(row.technical_released_at) : null,
   quality_document_id: row.quality_document_id ? String(row.quality_document_id) : null,
   operational_lock: Boolean(row.operational_lock),
+  request_channel: row.request_channel ? String(row.request_channel) : 'PORTAL',
+  support_channel: row.support_channel ? String(row.support_channel) : null,
+  provider_name: row.provider_name ? String(row.provider_name) : null,
+  provider_contact: row.provider_contact ? String(row.provider_contact) : null,
+  onsite_responsible_employee_id: row.onsite_responsible_employee_id ? Number(row.onsite_responsible_employee_id) : null,
+  call_at: row.call_at ? toIsoDateTime(row.call_at) : null,
+  closed_at: row.closed_at ? toIsoDateTime(row.closed_at) : null,
+  closed_by_user_id: row.closed_by_user_id ? String(row.closed_by_user_id) : null,
+  closure_notes: row.closure_notes ? String(row.closure_notes) : null,
+  cancelled_at: row.cancelled_at ? toIsoDateTime(row.cancelled_at) : null,
+  cancelled_by_user_id: row.cancelled_by_user_id ? String(row.cancelled_by_user_id) : null,
+  cancellation_reason: row.cancellation_reason ? String(row.cancellation_reason) : null,
   is_active: Boolean(row.is_active),
   created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
   updated_at: row.updated_at ? toIsoDateTime(row.updated_at) : undefined,
+  onsite_responsible_employee: mapOptionalEmployee(row, 'onsite_responsible_employee_id', 'onsite_responsible_employee'),
   asset: row.asset_id
     ? {
         id: Number(row.asset_id),
@@ -348,7 +429,11 @@ export const buildTicketQuery = () => `
     ae.employee_code AS assigned_employee_code,
     ae.full_name AS assigned_employee_name,
     ae.area AS assigned_employee_area,
-    ae.position AS assigned_employee_position
+    ae.position AS assigned_employee_position,
+    oe.employee_code AS onsite_responsible_employee_code,
+    oe.full_name AS onsite_responsible_employee_name,
+    oe.area AS onsite_responsible_employee_area,
+    oe.position AS onsite_responsible_employee_position
   FROM public.helpdesk_tickets t
   LEFT JOIN public.helpdesk_assets a ON a.id = t.asset_id
   LEFT JOIN public.helpdesk_operational_statuses aos ON aos.id = a.operational_status_id
@@ -358,6 +443,7 @@ export const buildTicketQuery = () => `
   LEFT JOIN public.helpdesk_operational_statuses esas ON esas.id = t.equipment_status_after_solution_id
   LEFT JOIN public.employees re ON re.id = t.requester_employee_id
   LEFT JOIN public.employees ae ON ae.id = t.assigned_employee_id
+  LEFT JOIN public.employees oe ON oe.id = t.onsite_responsible_employee_id
 `;
 
 export const getDefaultStatusId = async (): Promise<number | null> => {
@@ -494,6 +580,93 @@ export const generateTicketCode = async (): Promise<string> => {
   const result = await pool.query(`SELECT nextval('public.helpdesk_ticket_code_seq') AS next_id;`);
   const nextId = Number(result.rows[0]?.next_id ?? 0);
   return `HD-${String(nextId).padStart(6, '0')}`;
+};
+
+// Grafo de transiciones permitidas entre los estados "de trabajo" de un ticket
+// (antes del PATCH generico, cualquier status_id era valido). SOLVED/VALIDATED
+// se alcanzan solo via /solve y /validate-return (con sus propias reglas de
+// negocio); CLOSED/CANCELLED solo via /close y /cancel. Mantener en sync con
+// el seed de helpdesk_ticket_statuses (sql/20260421_helpdesk_tickets.sql).
+export const TICKET_WORKING_STATUS_TRANSITIONS: Record<string, string[]> = {
+  NEW: ['IN_REVIEW', 'ASSIGNED'],
+  IN_REVIEW: ['ASSIGNED'],
+  ASSIGNED: ['IN_PROGRESS'],
+  IN_PROGRESS: ['WAITING_PARTS', 'WAITING_PROVIDER'],
+  WAITING_PARTS: ['IN_PROGRESS'],
+  WAITING_PROVIDER: ['IN_PROGRESS'],
+};
+
+export const TICKET_TERMINAL_STATUS_CODES = ['CLOSED', 'CANCELLED'];
+
+export const createTicketError = (code: string, publicMessage?: string): Error => {
+  const error = new Error(code);
+  (error as any).code = code;
+  if (publicMessage) {
+    (error as any).publicMessage = publicMessage;
+  }
+  return error;
+};
+
+export const getTicketStatusCode = async (statusId: number | null | undefined): Promise<string | null> => {
+  if (!statusId) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `SELECT code FROM public.helpdesk_ticket_statuses WHERE id = $1 LIMIT 1;`,
+    [statusId],
+  );
+
+  return result.rows[0]?.code ? String(result.rows[0].code) : null;
+};
+
+export const countTicketDocuments = async (ticketId: number): Promise<number> => {
+  const result = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM public.helpdesk_ticket_documents WHERE ticket_id = $1;`,
+    [ticketId],
+  );
+
+  return Number(result.rows[0]?.total ?? 0);
+};
+
+// Evidencia de la intervencion exigida antes de cerrar: al menos un documento
+// adjunto (TCK-03), o -si la atencion fue 100% telefonica- la bitacora de
+// llamada completa (support_channel REMOTE_PHONE + los 4 campos capturados
+// en /solve). Nunca se permite cerrar sin ninguna de las dos.
+export const ticketHasClosureEvidence = async (ticket: HelpdeskTicketRecord): Promise<boolean> => {
+  const documentCount = await countTicketDocuments(ticket.id);
+  if (documentCount > 0) {
+    return true;
+  }
+
+  if (ticket.support_channel !== 'REMOTE_PHONE') {
+    return false;
+  }
+
+  return Boolean(
+    ticket.provider_name && ticket.provider_contact && ticket.onsite_responsible_employee_id && ticket.call_at,
+  );
+};
+
+// Rutas de firma NUNCA se exponen en mapTicketRow/la respuesta JSON del
+// ticket (mismo criterio que Movimientos): solo se resuelven aqui para el
+// endpoint de vista, que sirve el PNG con su propio control de acceso.
+export const resolveTicketSignaturePath = async (
+  ticketId: number,
+  party: 'requester' | 'closer',
+): Promise<string | null> => {
+  const column = party === 'requester' ? 'requester_signature_path' : 'closer_signature_path';
+  const result = await pool.query(
+    `SELECT ${column} AS p FROM public.helpdesk_tickets WHERE id = $1 LIMIT 1;`,
+    [ticketId],
+  );
+  const storedPath = result.rows[0]?.p ? String(result.rows[0].p) : null;
+  if (!storedPath) {
+    return null;
+  }
+
+  const absolutePath = path.isAbsolute(storedPath) ? storedPath : path.join(process.cwd(), storedPath);
+  return fs.existsSync(absolutePath) ? absolutePath : null;
 };
 
 export const recordTicketHistory = async (

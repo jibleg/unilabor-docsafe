@@ -1,7 +1,15 @@
+import { useMemo } from 'react';
 import { LifeBuoy, Loader2 } from 'lucide-react';
 import { CatalogSelect } from '../components/CatalogSelect';
+import { SearchableSelect } from '../components/SearchableSelect';
 import type { Employee, HelpdeskAsset, HelpdeskTicketCatalogs } from '../types/models';
-import type { TicketFormState } from './HelpdeskTicketsPage.helpers';
+import { REQUEST_CHANNEL_OPTIONS, type TicketFormState } from './HelpdeskTicketsPage.helpers';
+
+const assetOptions = (assets: HelpdeskAsset[]) =>
+  assets.map((asset) => ({ value: String(asset.id), label: asset.name, hint: asset.asset_code }));
+
+const employeeOptions = (employees: Employee[]) =>
+  employees.map((employee) => ({ value: String(employee.id), label: employee.full_name, hint: employee.employee_code }));
 
 interface TicketFormModalProps {
   open: boolean;
@@ -28,6 +36,9 @@ export const TicketFormModal = ({
   onCancel,
   onSave,
 }: TicketFormModalProps) => {
+  const assetSelectOptions = useMemo(() => assetOptions(assets), [assets]);
+  const employeeSelectOptions = useMemo(() => employeeOptions(employees), [employees]);
+
   if (!open) {
     return null;
   }
@@ -61,58 +72,62 @@ export const TicketFormModal = ({
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                 Activo relacionado
               </span>
-              <select
+              <SearchableSelect
                 value={form.asset_id}
-                onChange={(event) => setField('asset_id', event.target.value)}
+                onChange={(value) => setField('asset_id', value)}
+                options={assetSelectOptions}
+                placeholder="Selecciona un activo"
+                emptyLabel="Sin activo"
+                searchPlaceholder="Buscar activo por nombre o código..."
+              />
+            </label>
+
+            <CatalogSelect label="Tipo de solicitud" value={form.request_type_id} options={catalogs.request_types} onChange={(value) => setField('request_type_id', value)} />
+            <CatalogSelect label="Prioridad" value={form.priority_id} options={catalogs.ticket_priorities} onChange={(value) => setField('priority_id', value)} />
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                Canal de solicitud
+              </span>
+              <select
+                value={form.request_channel}
+                onChange={(event) => setField('request_channel', event.target.value)}
                 className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
               >
-                <option value="">Sin activo</option>
-                {assets.map((asset) => (
-                  <option key={asset.id} value={asset.id}>
-                    {asset.asset_code} - {asset.name}
+                {REQUEST_CHANNEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
             </label>
 
-            <CatalogSelect label="Tipo de solicitud" value={form.request_type_id} options={catalogs.request_types} onChange={(value) => setField('request_type_id', value)} />
-            <CatalogSelect label="Prioridad" value={form.priority_id} options={catalogs.ticket_priorities} onChange={(value) => setField('priority_id', value)} />
-            <CatalogSelect label="Estado" value={form.status_id} options={catalogs.ticket_statuses} onChange={(value) => setField('status_id', value)} />
-
             <label className="block">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                 Colaborador solicitante
               </span>
-              <select
+              <SearchableSelect
                 value={form.requester_employee_id}
-                onChange={(event) => setField('requester_employee_id', event.target.value)}
-                className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-              >
-                <option value="">Sin solicitante</option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.employee_code} - {employee.full_name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setField('requester_employee_id', value)}
+                options={employeeSelectOptions}
+                placeholder="Selecciona un colaborador"
+                emptyLabel="Sin solicitante"
+                searchPlaceholder="Buscar colaborador por nombre o código..."
+              />
             </label>
 
             <label className="block">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
                 Responsable
               </span>
-              <select
+              <SearchableSelect
                 value={form.assigned_employee_id}
-                onChange={(event) => setField('assigned_employee_id', event.target.value)}
-                className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-              >
-                <option value="">Sin responsable</option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.employee_code} - {employee.full_name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setField('assigned_employee_id', value)}
+                options={employeeSelectOptions}
+                placeholder="Selecciona un responsable"
+                emptyLabel="Sin responsable"
+                searchPlaceholder="Buscar responsable por nombre o código..."
+              />
             </label>
 
             <label className="block">

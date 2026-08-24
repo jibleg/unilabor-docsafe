@@ -532,6 +532,18 @@ export interface HelpdeskTicket {
   technical_released_at?: string | null;
   quality_document_id?: string | null;
   operational_lock?: boolean;
+  request_channel?: string;
+  support_channel?: string | null;
+  provider_name?: string | null;
+  provider_contact?: string | null;
+  onsite_responsible_employee_id?: number | null;
+  call_at?: string | null;
+  closed_at?: string | null;
+  closed_by_user_id?: string | null;
+  closure_notes?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by_user_id?: string | null;
+  cancellation_reason?: string | null;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -542,7 +554,31 @@ export interface HelpdeskTicket {
   equipment_status_after_solution?: HelpdeskCatalogItem | null;
   requester_employee?: HelpdeskAssetEmployee | null;
   assigned_employee?: HelpdeskAssetEmployee | null;
+  onsite_responsible_employee?: HelpdeskAssetEmployee | null;
   comments?: HelpdeskTicketComment[];
+}
+
+export interface HelpdeskTicketDocument {
+  id: number;
+  ticket_id: number;
+  title: string;
+  document_kind: string | null;
+  file_path: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by_user_id: string | null;
+  uploaded_by_name: string | null;
+  created_at?: string;
+}
+
+export interface HelpdeskTicketHistoryEntry {
+  id: number;
+  ticket_id: number;
+  action: string;
+  summary: string;
+  created_by_user_id: string | null;
+  created_by_name: string | null;
+  created_at?: string;
 }
 
 export interface HelpdeskMaintenanceFrequency extends HelpdeskCatalogItem {

@@ -111,6 +111,36 @@ export const uploadAvatar = multer({
   },
 });
 
+// Evidencia de intervencion de tickets Helpdesk (foto de la reparacion,
+// reporte de proveedor, refaccion usada): PDF o imagen, a diferencia del resto
+// de `upload.middleware.ts` que es PDF-only.
+const ticketDocumentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const uploadDir = process.env.DIRECTORY_UPLOAD_TICKET_DOCUMENTS || 'uploads/ticket-documents';
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `TICKET-EVID-${uniqueSuffix}${path.extname(file.originalname).toLowerCase()}`);
+  },
+});
+
+const allowedTicketDocumentMimeTypes = new Set(['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+
+export const uploadTicketDocument = multer({
+  storage: ticketDocumentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (allowedTicketDocumentMimeTypes.has(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new Error('Solo se permiten archivos PDF o imagenes JPG, PNG o WEBP'));
+  },
+});
+
 // Imagenes (logo / firmas) de las constancias de capacitacion.
 const certificateImageStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {

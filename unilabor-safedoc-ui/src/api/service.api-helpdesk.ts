@@ -5,6 +5,11 @@ import type {
   HelpdeskTicketReturnPayload,
   HelpdeskTicketIsoRiskPayload,
   HelpdeskTicketTechnicalReleasePayload,
+  HelpdeskTicketAssignPayload,
+  HelpdeskTicketStatusChangePayload,
+  HelpdeskTicketClosePayload,
+  HelpdeskTicketCancelPayload,
+  HelpdeskTicketConfirmFunctionalityPayload,
   HelpdeskCatalogAdminPayload,
   HelpdeskMaintenancePlanPayload,
   HelpdeskMaintenanceOrderReschedulePayload,
@@ -42,6 +47,8 @@ import type {
   HelpdeskAssetSummary,
   HelpdeskCatalogs,
   HelpdeskTicket,
+  HelpdeskTicketDocument,
+  HelpdeskTicketHistoryEntry,
   HelpdeskTicketCatalogs,
   HelpdeskTicketStats,
   HelpdeskMaintenanceCatalogs,
@@ -365,9 +372,57 @@ export const addMyHelpdeskTicketComment = async (
 
 export const confirmMyHelpdeskTicketFunctionality = async (
   ticketId: number,
+  payload: HelpdeskTicketConfirmFunctionalityPayload,
 ): Promise<HelpdeskTicket | null> => {
-  const response = await api.post(`/helpdesk/me/tickets/${ticketId}/confirm-functionality`);
+  const response = await api.post(`/helpdesk/me/tickets/${ticketId}/confirm-functionality`, payload);
   return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const listTicketDocuments = async (ticketId: number): Promise<HelpdeskTicketDocument[]> => {
+  const response = await api.get(`/helpdesk/tickets/${ticketId}/documents`);
+  return getArrayFromPayload(response.data, ['documents']) as HelpdeskTicketDocument[];
+};
+
+export interface UploadTicketDocumentFields {
+  title: string;
+  document_kind?: string | null;
+}
+
+export const uploadTicketDocument = async (
+  ticketId: number,
+  file: File,
+  fields: UploadTicketDocumentFields,
+): Promise<HelpdeskTicketDocument | null> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('title', fields.title);
+  if (fields.document_kind) formData.append('document_kind', fields.document_kind);
+
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/documents`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return (asRecord(unwrapPayload(response.data))?.document as HelpdeskTicketDocument) ?? null;
+};
+
+export const fetchTicketDocumentUrl = async (documentId: number): Promise<string> => {
+  const response = await api.get(`/helpdesk/ticket-documents/${documentId}/view`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
+};
+
+export const fetchTicketHistory = async (ticketId: number): Promise<HelpdeskTicketHistoryEntry[]> => {
+  const response = await api.get(`/helpdesk/tickets/${ticketId}/history`);
+  return getArrayFromPayload(response.data, ['history']) as HelpdeskTicketHistoryEntry[];
+};
+
+export const fetchTicketSignatureUrl = async (
+  ticketId: number,
+  party: 'requester' | 'closer',
+): Promise<string> => {
+  const response = await api.get(`/helpdesk/tickets/${ticketId}/signature`, {
+    params: { party },
+    responseType: 'blob',
+  });
+  return URL.createObjectURL(response.data as Blob);
 };
 
 export const solveHelpdeskTicket = async (
@@ -375,6 +430,38 @@ export const solveHelpdeskTicket = async (
   payload: HelpdeskTicketSolutionPayload,
 ): Promise<HelpdeskTicket | null> => {
   const response = await api.post(`/helpdesk/tickets/${ticketId}/solve`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const assignHelpdeskTicket = async (
+  ticketId: number,
+  payload: HelpdeskTicketAssignPayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/assign`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const changeHelpdeskTicketWorkingStatus = async (
+  ticketId: number,
+  payload: HelpdeskTicketStatusChangePayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/status`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const closeHelpdeskTicket = async (
+  ticketId: number,
+  payload: HelpdeskTicketClosePayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/close`, payload);
+  return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
+};
+
+export const cancelHelpdeskTicket = async (
+  ticketId: number,
+  payload: HelpdeskTicketCancelPayload,
+): Promise<HelpdeskTicket | null> => {
+  const response = await api.post(`/helpdesk/tickets/${ticketId}/cancel`, payload);
   return normalizeHelpdeskTicket(asRecord(unwrapPayload(response.data))?.ticket ?? unwrapPayload(response.data));
 };
 

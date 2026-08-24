@@ -79,6 +79,9 @@ const HelpdeskMyPortalPage = lazy(() =>
 const HelpdeskTicketsPage = lazy(() =>
   import('./pages/HelpdeskTicketsPage').then((module) => ({ default: module.HelpdeskTicketsPage })),
 );
+const HelpdeskTicketDetailPage = lazy(() =>
+  import('./pages/HelpdeskTicketDetailPage').then((module) => ({ default: module.HelpdeskTicketDetailPage })),
+);
 const LoginPage = lazy(() => import('./pages/Login').then((module) => ({ default: module.LoginPage })));
 const ModuleSelectorPage = lazy(() =>
   import('./pages/ModuleSelectorPage').then((module) => ({ default: module.ModuleSelectorPage })),
@@ -504,6 +507,14 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
               <HelpdeskTicketsPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="tickets/:id"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskTicketDetailPage />
             </RoleGate>
           }
         />

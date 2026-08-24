@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Eye,
+  LifeBuoy,
   Loader2,
   PackagePlus,
   Wrench,
@@ -258,6 +259,18 @@ export const HelpdeskAssetExpedientPage = () => {
                             className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"
                           >
                             <Eye size={12} /> Ver acta/reporte
+                          </button>
+                        ) : null}
+                        {ev.ticket_id ? (
+                          <button
+                            type="button"
+                            onClick={(clickEvent) => {
+                              clickEvent.stopPropagation();
+                              navigate(`/helpdesk/tickets/${ev.ticket_id}`);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"
+                          >
+                            <LifeBuoy size={12} /> Ver solicitud de soporte
                           </button>
                         ) : null}
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-500)]">

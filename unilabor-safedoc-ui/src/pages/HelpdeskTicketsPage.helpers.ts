@@ -15,6 +15,34 @@ export const EMPTY_TICKET_STATS: HelpdeskTicketStats = {
   affects_results: 0,
 };
 
+// Grafo de transiciones de trabajo permitidas (espejo de
+// helpdesk-ticket.shared.ts en el backend, que es la fuente de verdad y
+// vuelve a validar cada transicion). Solo sirve para habilitar/deshabilitar
+// botones en la UI; mantener en sync.
+export const TICKET_WORKING_STATUS_TRANSITIONS: Record<string, string[]> = {
+  NEW: ['IN_REVIEW', 'ASSIGNED'],
+  IN_REVIEW: ['ASSIGNED'],
+  ASSIGNED: ['IN_PROGRESS'],
+  IN_PROGRESS: ['WAITING_PARTS', 'WAITING_PROVIDER'],
+  WAITING_PARTS: ['IN_PROGRESS'],
+  WAITING_PROVIDER: ['IN_PROGRESS'],
+};
+
+export const TICKET_TERMINAL_STATUS_CODES = ['CLOSED', 'CANCELLED'];
+
+export const REQUEST_CHANNEL_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'PORTAL', label: 'Portal de autoservicio' },
+  { value: 'PHONE', label: 'Llamada telefonica' },
+  { value: 'EMAIL', label: 'Correo electrónico' },
+  { value: 'IN_PERSON', label: 'Presencial' },
+];
+
+export const SUPPORT_CHANNEL_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'ON_SITE', label: 'Atención en sitio' },
+  { value: 'REMOTE_PHONE', label: 'Asistencia telefónica del proveedor' },
+  { value: 'REMOTE_OTHER', label: 'Remota (otro medio)' },
+];
+
 export interface TicketFormState {
   asset_id: string;
   request_type_id: string;
@@ -27,12 +55,31 @@ export interface TicketFormState {
   operational_impact: string;
   affects_results: boolean;
   due_at: string;
+  request_channel: string;
 }
 
 export interface SolutionFormState {
   solved_at: string;
   solution_summary: string;
   equipment_status_after_solution_id: string;
+  support_channel: string;
+  provider_name: string;
+  provider_contact: string;
+  onsite_responsible_employee_id: string;
+  call_at: string;
+}
+
+export interface AssignFormState {
+  assigned_employee_id: string;
+}
+
+export interface CloseFormState {
+  closure_notes: string;
+  closer_signature: string | null;
+}
+
+export interface CancelFormState {
+  cancellation_reason: string;
 }
 
 export interface ReturnFormState {
@@ -75,12 +122,31 @@ export const EMPTY_FORM: TicketFormState = {
   operational_impact: '',
   affects_results: false,
   due_at: '',
+  request_channel: 'PORTAL',
 };
 
 export const EMPTY_SOLUTION_FORM: SolutionFormState = {
   solved_at: '',
   solution_summary: '',
   equipment_status_after_solution_id: '',
+  support_channel: 'ON_SITE',
+  provider_name: '',
+  provider_contact: '',
+  onsite_responsible_employee_id: '',
+  call_at: '',
+};
+
+export const EMPTY_ASSIGN_FORM: AssignFormState = {
+  assigned_employee_id: '',
+};
+
+export const EMPTY_CLOSE_FORM: CloseFormState = {
+  closure_notes: '',
+  closer_signature: null,
+};
+
+export const EMPTY_CANCEL_FORM: CancelFormState = {
+  cancellation_reason: '',
 };
 
 export const EMPTY_RETURN_FORM: ReturnFormState = {
@@ -164,6 +230,7 @@ export const toFormState = (ticket: HelpdeskTicket): TicketFormState => ({
   operational_impact: ticket.operational_impact ?? '',
   affects_results: ticket.affects_results,
   due_at: ticket.due_at ? ticket.due_at.slice(0, 16) : '',
+  request_channel: ticket.request_channel ?? 'PORTAL',
 });
 
 export const toPayload = (form: TicketFormState): HelpdeskTicketPayload => ({
@@ -178,4 +245,5 @@ export const toPayload = (form: TicketFormState): HelpdeskTicketPayload => ({
   operational_impact: form.operational_impact.trim() || null,
   affects_results: form.affects_results,
   due_at: form.due_at || null,
+  request_channel: form.request_channel,
 });

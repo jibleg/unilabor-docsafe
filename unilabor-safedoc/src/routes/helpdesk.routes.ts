@@ -3,6 +3,11 @@ import {
   addHelpdeskTicketCommentController,
   addMaintenanceScheduleController,
   addMyHelpdeskTicketCommentController,
+  assignHelpdeskTicketController,
+  cancelHelpdeskTicketController,
+  changeHelpdeskTicketWorkingStatusController,
+  closeHelpdeskTicketController,
+  viewHelpdeskTicketSignatureController,
   closeMaintenanceOrderController,
   confirmMyHelpdeskTicketFunctionalityController,
   createHelpdeskAssetController,
@@ -22,6 +27,7 @@ import {
   getHelpdeskOrgStructureController,
   getHelpdeskSummaryController,
   getHelpdeskTicketByIdController,
+  getHelpdeskTicketHistoryController,
   getMyHelpdeskTicketByIdController,
   listHelpdeskCatalogAdminDataController,
   listHelpdeskAssetsController,
@@ -61,6 +67,11 @@ import {
   helpdeskTicketSolveSchema,
   helpdeskTicketTechnicalReleaseSchema,
   helpdeskTicketValidateReturnSchema,
+  helpdeskTicketAssignSchema,
+  helpdeskTicketStatusChangeSchema,
+  helpdeskTicketCloseSchema,
+  helpdeskTicketCancelSchema,
+  helpdeskTicketConfirmFunctionalitySchema,
   maintenanceOrderCloseSchema,
   maintenanceOrderRescheduleSchema,
   maintenancePlanSchema,
@@ -100,6 +111,11 @@ import {
   viewAssetDocumentController,
 } from '../controllers/helpdesk-asset-document.controller';
 import {
+  listTicketDocumentsController,
+  uploadTicketDocumentController,
+  viewTicketDocumentController,
+} from '../controllers/helpdesk-ticket-document.controller';
+import {
   createHandoverController,
   deleteHandoverController,
   getHandoverByIdController,
@@ -115,7 +131,7 @@ import {
   listAssetMovementsController,
   viewMovementSignatureController,
 } from '../controllers/helpdesk-asset-movement.controller';
-import { upload } from '../middlewares/upload.middleware';
+import { upload, uploadTicketDocument } from '../middlewares/upload.middleware';
 
 const router = Router();
 
@@ -161,6 +177,7 @@ router.post(
 router.post(
   '/me/tickets/:id/confirm-functionality',
   requirePermission('HELPDESK.SELF.TICKETS'),
+  validate(helpdeskTicketConfirmFunctionalitySchema),
   confirmMyHelpdeskTicketFunctionalityController,
 );
 router.get(
@@ -406,6 +423,11 @@ router.get(
   requirePermission('HELPDESK.TICKETS.READ'),
   getHelpdeskTicketByIdController,
 );
+router.get(
+  '/tickets/:id/history',
+  requirePermission('HELPDESK.TICKETS.READ'),
+  getHelpdeskTicketHistoryController,
+);
 router.post(
   '/tickets',
   requirePermission('HELPDESK.TICKETS.WRITE'),
@@ -425,28 +447,57 @@ router.post(
   addHelpdeskTicketCommentController,
 );
 router.post(
+  '/tickets/:id/assign',
+  requirePermission('HELPDESK.TICKETS.ASSIGN'),
+  validate(helpdeskTicketAssignSchema),
+  assignHelpdeskTicketController,
+);
+router.post(
+  '/tickets/:id/status',
+  requirePermission('HELPDESK.TICKETS.ASSIGN'),
+  validate(helpdeskTicketStatusChangeSchema),
+  changeHelpdeskTicketWorkingStatusController,
+);
+router.post(
   '/tickets/:id/iso-risk',
-  requirePermission('HELPDESK.TICKETS.WRITE'),
+  requirePermission('HELPDESK.TICKETS.ISO_RISK'),
   validate(helpdeskTicketIsoRiskSchema),
   evaluateHelpdeskTicketIsoRiskController,
 );
 router.post(
   '/tickets/:id/technical-release',
-  requirePermission('HELPDESK.TICKETS.WRITE'),
+  requirePermission('HELPDESK.TICKETS.TECHNICAL_RELEASE'),
   validate(helpdeskTicketTechnicalReleaseSchema),
   releaseHelpdeskTicketTechnicallyController,
 );
 router.post(
   '/tickets/:id/solve',
-  requirePermission('HELPDESK.TICKETS.WRITE'),
+  requirePermission('HELPDESK.TICKETS.SOLVE'),
   validate(helpdeskTicketSolveSchema),
   solveHelpdeskTicketController,
 );
 router.post(
   '/tickets/:id/validate-return',
-  requirePermission('HELPDESK.TICKETS.WRITE'),
+  requirePermission('HELPDESK.TICKETS.VALIDATE_RETURN'),
   validate(helpdeskTicketValidateReturnSchema),
   validateHelpdeskTicketReturnController,
+);
+router.get(
+  '/tickets/:id/signature',
+  requirePermission('HELPDESK.TICKETS.READ'),
+  viewHelpdeskTicketSignatureController,
+);
+router.post(
+  '/tickets/:id/close',
+  requirePermission('HELPDESK.TICKETS.CLOSE'),
+  validate(helpdeskTicketCloseSchema),
+  closeHelpdeskTicketController,
+);
+router.post(
+  '/tickets/:id/cancel',
+  requirePermission('HELPDESK.TICKETS.CLOSE'),
+  validate(helpdeskTicketCancelSchema),
+  cancelHelpdeskTicketController,
 );
 router.get(
   '/assets',
@@ -552,6 +603,24 @@ router.get(
   '/asset-documents/:documentId/view',
   requirePermission('HELPDESK.ASSETS.READ'),
   viewAssetDocumentController,
+);
+
+// --- Evidencia documental de tickets (PDF o imagen; TCK-03) ---
+router.get(
+  '/tickets/:id/documents',
+  requirePermission('HELPDESK.TICKETS.READ'),
+  listTicketDocumentsController,
+);
+router.post(
+  '/tickets/:id/documents',
+  requirePermission('HELPDESK.TICKETS.WRITE'),
+  uploadTicketDocument.single('file'),
+  uploadTicketDocumentController,
+);
+router.get(
+  '/ticket-documents/:documentId/view',
+  requirePermission('HELPDESK.TICKETS.READ'),
+  viewTicketDocumentController,
 );
 
 export default router;

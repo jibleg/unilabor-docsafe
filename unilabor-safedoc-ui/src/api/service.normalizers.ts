@@ -714,6 +714,21 @@ export const normalizeHelpdeskTicket = (input: unknown): HelpdeskTicket | null =
     technical_released_at: getString(source, ['technical_released_at', 'technicalReleasedAt']) || null,
     quality_document_id: getString(source, ['quality_document_id', 'qualityDocumentId']) || null,
     operational_lock: getBoolean(source, ['operational_lock', 'operationalLock'], false),
+    request_channel: getString(source, ['request_channel', 'requestChannel'], 'PORTAL'),
+    support_channel: getString(source, ['support_channel', 'supportChannel']) || null,
+    provider_name: getString(source, ['provider_name', 'providerName']) || null,
+    provider_contact: getString(source, ['provider_contact', 'providerContact']) || null,
+    onsite_responsible_employee_id: getNullableNumber(
+      source,
+      ['onsite_responsible_employee_id', 'onsiteResponsibleEmployeeId'],
+    ),
+    call_at: getString(source, ['call_at', 'callAt']) || null,
+    closed_at: getString(source, ['closed_at', 'closedAt']) || null,
+    closed_by_user_id: getString(source, ['closed_by_user_id', 'closedByUserId']) || null,
+    closure_notes: getString(source, ['closure_notes', 'closureNotes']) || null,
+    cancelled_at: getString(source, ['cancelled_at', 'cancelledAt']) || null,
+    cancelled_by_user_id: getString(source, ['cancelled_by_user_id', 'cancelledByUserId']) || null,
+    cancellation_reason: getString(source, ['cancellation_reason', 'cancellationReason']) || null,
     is_active: getBoolean(source, ['is_active', 'isActive'], true),
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),
@@ -733,6 +748,9 @@ export const normalizeHelpdeskTicket = (input: unknown): HelpdeskTicket | null =
     ),
     requester_employee: normalizeHelpdeskAssetEmployee(source.requester_employee ?? source.requesterEmployee),
     assigned_employee: normalizeHelpdeskAssetEmployee(source.assigned_employee ?? source.assignedEmployee),
+    onsite_responsible_employee: normalizeHelpdeskAssetEmployee(
+      source.onsite_responsible_employee ?? source.onsiteResponsibleEmployee,
+    ),
     comments: getArrayFromPayload(source.comments ?? [], ['comments'])
       .map(normalizeHelpdeskTicketComment)
       .filter((comment): comment is HelpdeskTicketComment => comment !== null),

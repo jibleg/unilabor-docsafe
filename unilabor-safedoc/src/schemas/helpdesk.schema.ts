@@ -128,6 +128,37 @@ export const helpdeskTicketValidateReturnSchema = z
   })
   .passthrough();
 
+export const helpdeskTicketAssignSchema = z
+  .object({
+    assigned_employee_id: requiredPositiveId('El responsable a asignar es obligatorio'),
+  })
+  .passthrough();
+
+export const helpdeskTicketStatusChangeSchema = z
+  .object({
+    status_code: requiredText('El estado destino es obligatorio'),
+  })
+  .passthrough();
+
+export const helpdeskTicketCloseSchema = z
+  .object({
+    closure_notes: requiredText('Las notas de cierre son obligatorias'),
+    closer_signature: requiredText('La firma del responsable que cierra es obligatoria'),
+  })
+  .passthrough();
+
+export const helpdeskTicketCancelSchema = z
+  .object({
+    cancellation_reason: requiredText('El motivo de cancelacion es obligatorio'),
+  })
+  .passthrough();
+
+export const helpdeskTicketConfirmFunctionalitySchema = z
+  .object({
+    requester_signature: requiredText('Firma tu confirmacion de funcionamiento'),
+  })
+  .passthrough();
+
 // --- Catalogos (catalog-admin) ---
 // name es obligatorio siempre; las reglas condicionales (code, sort_order,
 // response_hours, interval_months segun catalogKey) las valida el controller.

@@ -89,17 +89,44 @@ export interface HelpdeskTicketPayload {
   operational_impact?: string | null;
   affects_results?: boolean;
   due_at?: string | null;
+  request_channel?: string | null;
 }
 
 export interface HelpdeskTicketSolutionPayload {
   solved_at: string;
   solution_summary: string;
   equipment_status_after_solution_id?: number | null;
+  support_channel?: string | null;
+  provider_name?: string | null;
+  provider_contact?: string | null;
+  onsite_responsible_employee_id?: number | null;
+  call_at?: string | null;
 }
 
 export interface HelpdeskTicketReturnPayload {
   return_to_operation_at: string;
   equipment_status_after_solution_id?: number | null;
+}
+
+export interface HelpdeskTicketAssignPayload {
+  assigned_employee_id: number;
+}
+
+export interface HelpdeskTicketStatusChangePayload {
+  status_code: string;
+}
+
+export interface HelpdeskTicketClosePayload {
+  closure_notes: string;
+  closer_signature: string;
+}
+
+export interface HelpdeskTicketCancelPayload {
+  cancellation_reason: string;
+}
+
+export interface HelpdeskTicketConfirmFunctionalityPayload {
+  requester_signature: string;
 }
 
 export interface HelpdeskTicketIsoRiskPayload {

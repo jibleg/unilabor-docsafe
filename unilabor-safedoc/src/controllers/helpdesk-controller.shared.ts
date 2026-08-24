@@ -8,6 +8,11 @@ import type {
   HelpdeskTicketReturnPayload,
   HelpdeskTicketIsoRiskPayload,
   HelpdeskTicketTechnicalReleasePayload,
+  HelpdeskTicketAssignPayload,
+  HelpdeskTicketStatusChangePayload,
+  HelpdeskTicketClosePayload,
+  HelpdeskTicketCancelPayload,
+  HelpdeskTicketConfirmFunctionalityPayload,
 } from '../services/helpdesk-ticket.service';
 import type {
   HelpdeskMaintenancePlanPayload,
@@ -85,6 +90,24 @@ export const mapHelpdeskError = (res: Response, error: any) => {
     });
   }
 
+  if (error?.code === 'HELPDESK_TICKET_INVALID_SIGNATURE') {
+    return res.status(409).json({
+      message: error.publicMessage ?? 'La firma electronica es invalida o esta vacia.',
+    });
+  }
+
+  if (error?.code === 'HELPDESK_TICKET_EVIDENCE_REQUIRED' || error?.code === 'HELPDESK_TICKET_PHONE_LOG_INCOMPLETE') {
+    return res.status(409).json({
+      message: error.publicMessage ?? 'Falta evidencia de la intervencion para continuar.',
+    });
+  }
+
+  if (error?.code === 'HELPDESK_TICKET_STATUS_NOT_FOUND') {
+    return res.status(409).json({
+      message: 'El estado destino no existe en el catalogo de tickets.',
+    });
+  }
+
   if (
     error?.code === 'HELPDESK_TICKET_INVALID_STATE' ||
     error?.code === 'HELPDESK_MAINTENANCE_ORDER_INVALID_STATE' ||
@@ -99,6 +122,10 @@ export const mapHelpdeskError = (res: Response, error: any) => {
 
   if (error?.code === 'HELPDESK_ASSET_NOT_FOUND') {
     return res.status(404).json({ message: 'Activo no encontrado.' });
+  }
+
+  if (error?.code === 'HELPDESK_TICKET_NOT_FOUND') {
+    return res.status(404).json({ message: 'Solicitud no encontrada.' });
   }
 
   if (
@@ -256,6 +283,7 @@ export const getTicketPayload = (body: any): HelpdeskTicketPayload | null => {
     operational_impact: getText(body?.operational_impact),
     affects_results: getBoolean(body?.affects_results),
     due_at: getText(body?.due_at),
+    request_channel: getText(body?.request_channel),
   };
 };
 
@@ -271,7 +299,58 @@ export const getTicketSolutionPayload = (body: any): HelpdeskTicketSolutionPaylo
     solved_at: solvedAt,
     solution_summary: solutionSummary,
     equipment_status_after_solution_id: getNumberId(body?.equipment_status_after_solution_id),
+    support_channel: getText(body?.support_channel),
+    provider_name: getText(body?.provider_name),
+    provider_contact: getText(body?.provider_contact),
+    onsite_responsible_employee_id: getNumberId(body?.onsite_responsible_employee_id),
+    call_at: getText(body?.call_at),
   };
+};
+
+export const getTicketAssignPayload = (body: any): HelpdeskTicketAssignPayload | null => {
+  const assignedEmployeeId = getNumberId(body?.assigned_employee_id);
+  if (!assignedEmployeeId) {
+    return null;
+  }
+
+  return { assigned_employee_id: assignedEmployeeId };
+};
+
+export const getTicketStatusChangePayload = (body: any): HelpdeskTicketStatusChangePayload | null => {
+  const statusCode = getText(body?.status_code);
+  if (!statusCode) {
+    return null;
+  }
+
+  return { status_code: statusCode };
+};
+
+export const getTicketClosePayload = (body: any): HelpdeskTicketClosePayload | null => {
+  const closureNotes = getText(body?.closure_notes);
+  const closerSignature = getText(body?.closer_signature);
+  if (!closureNotes || !closerSignature) {
+    return null;
+  }
+
+  return { closure_notes: closureNotes, closer_signature: closerSignature };
+};
+
+export const getTicketConfirmFunctionalityPayload = (body: any): HelpdeskTicketConfirmFunctionalityPayload | null => {
+  const requesterSignature = getText(body?.requester_signature);
+  if (!requesterSignature) {
+    return null;
+  }
+
+  return { requester_signature: requesterSignature };
+};
+
+export const getTicketCancelPayload = (body: any): HelpdeskTicketCancelPayload | null => {
+  const cancellationReason = getText(body?.cancellation_reason);
+  if (!cancellationReason) {
+    return null;
+  }
+
+  return { cancellation_reason: cancellationReason };
 };
 
 export const getTicketReturnPayload = (body: any): HelpdeskTicketReturnPayload | null => {

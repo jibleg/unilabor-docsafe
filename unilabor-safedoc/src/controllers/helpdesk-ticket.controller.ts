@@ -6,6 +6,10 @@ import { getPreventiveDueCount } from '../services/helpdesk-maintenance.service'
 import {
   addHelpdeskTicketComment,
   addMyHelpdeskTicketComment,
+  assignHelpdeskTicket,
+  cancelHelpdeskTicket,
+  changeHelpdeskTicketWorkingStatus,
+  closeHelpdeskTicket,
   confirmMyHelpdeskTicketFunctionality,
   createHelpdeskTicket,
   createMyHelpdeskTicket,
@@ -16,9 +20,11 @@ import {
   getHelpdeskTicketStats,
   getMyHelpdeskTicketById,
   listHelpdeskTicketCatalogs,
+  listTicketHistory,
   listHelpdeskTickets,
   listMyHelpdeskTickets,
   releaseHelpdeskTicketTechnically,
+  resolveTicketSignaturePath,
   solveHelpdeskTicket,
   updateHelpdeskTicket,
   validateHelpdeskTicketReturn,
@@ -33,6 +39,11 @@ import {
   getTicketReturnPayload,
   getTicketIsoRiskPayload,
   getTicketTechnicalReleasePayload,
+  getTicketAssignPayload,
+  getTicketStatusChangePayload,
+  getTicketClosePayload,
+  getTicketCancelPayload,
+  getTicketConfirmFunctionalityPayload,
   logHelpdeskAudit,
 } from './helpdesk-controller.shared';
 
@@ -197,8 +208,13 @@ export const confirmMyHelpdeskTicketFunctionalityController = async (req: AuthRe
     return res.status(400).json({ message: 'ID de ticket invalido.' });
   }
 
+  const payload = getTicketConfirmFunctionalityPayload(req.body);
+  if (!payload) {
+    return res.status(400).json({ message: 'Firma tu confirmacion de funcionamiento.' });
+  }
+
   try {
-    const ticket = await confirmMyHelpdeskTicketFunctionality(ticketId, req.user.id);
+    const ticket = await confirmMyHelpdeskTicketFunctionality(ticketId, payload, req.user.id);
     if (!ticket) {
       return res.status(404).json({ message: 'Solicitud no encontrada.' });
     }
@@ -500,6 +516,189 @@ export const solveHelpdeskTicketController = async (req: AuthRequest, res: Respo
 
     console.error('Error registrando solucion Helpdesk:', error);
     return res.status(500).json({ message: 'No se pudo registrar la solucion tecnica.' });
+  }
+};
+
+export const viewHelpdeskTicketSignatureController = async (req: AuthRequest, res: Response) => {
+  const ticketId = getNumberId(req.params.id);
+  if (!ticketId) {
+    return res.status(400).json({ message: 'ID de ticket invalido.' });
+  }
+  const party = req.query.party === 'closer' ? 'closer' : 'requester';
+
+  try {
+    const absolutePath = await resolveTicketSignaturePath(ticketId, party);
+    if (!absolutePath) {
+      return res.status(404).json({ message: 'Firma no encontrada.' });
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.sendFile(absolutePath);
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error visualizando firma del ticket Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo visualizar la firma.' });
+  }
+};
+
+export const getHelpdeskTicketHistoryController = async (req: AuthRequest, res: Response) => {
+  const ticketId = getNumberId(req.params.id);
+  if (!ticketId) {
+    return res.status(400).json({ message: 'ID de ticket invalido.' });
+  }
+
+  try {
+    const history = await listTicketHistory(ticketId);
+    return res.json({ history });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error obteniendo historial de ticket Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo obtener el historial de la solicitud.' });
+  }
+};
+
+export const assignHelpdeskTicketController = async (req: AuthRequest, res: Response) => {
+  const ticketId = getNumberId(req.params.id);
+  if (!ticketId) {
+    return res.status(400).json({ message: 'ID de ticket invalido.' });
+  }
+
+  const payload = getTicketAssignPayload(req.body);
+  if (!payload) {
+    return res.status(400).json({ message: 'El responsable a asignar es obligatorio.' });
+  }
+
+  try {
+    const ticket = await assignHelpdeskTicket(ticketId, payload, req.user?.id ?? null);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Solicitud no encontrada.' });
+    }
+
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_TICKET_ASSIGN:${ticketId}`, req.ip, ticketId, 'helpdesk_ticket');
+
+    return res.json({
+      message: 'Responsable asignado correctamente.',
+      ticket,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error asignando ticket Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo asignar el responsable.' });
+  }
+};
+
+export const changeHelpdeskTicketWorkingStatusController = async (req: AuthRequest, res: Response) => {
+  const ticketId = getNumberId(req.params.id);
+  if (!ticketId) {
+    return res.status(400).json({ message: 'ID de ticket invalido.' });
+  }
+
+  const payload = getTicketStatusChangePayload(req.body);
+  if (!payload) {
+    return res.status(400).json({ message: 'El estado destino es obligatorio.' });
+  }
+
+  try {
+    const ticket = await changeHelpdeskTicketWorkingStatus(ticketId, payload, req.user?.id ?? null);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Solicitud no encontrada.' });
+    }
+
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_TICKET_STATUS_CHANGE:${ticketId}`, req.ip, ticketId, 'helpdesk_ticket');
+
+    return res.json({
+      message: 'Estado del ticket actualizado correctamente.',
+      ticket,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error moviendo estado de ticket Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar el estado del ticket.' });
+  }
+};
+
+export const closeHelpdeskTicketController = async (req: AuthRequest, res: Response) => {
+  const ticketId = getNumberId(req.params.id);
+  if (!ticketId) {
+    return res.status(400).json({ message: 'ID de ticket invalido.' });
+  }
+
+  const payload = getTicketClosePayload(req.body);
+  if (!payload) {
+    return res.status(400).json({ message: 'Las notas de cierre son obligatorias.' });
+  }
+
+  try {
+    const ticket = await closeHelpdeskTicket(ticketId, payload, req.user?.id ?? null);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Solicitud no encontrada.' });
+    }
+
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_TICKET_CLOSE:${ticketId}`, req.ip, ticketId, 'helpdesk_ticket');
+
+    return res.json({
+      message: 'Ticket cerrado correctamente.',
+      ticket,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error cerrando ticket Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo cerrar el ticket.' });
+  }
+};
+
+export const cancelHelpdeskTicketController = async (req: AuthRequest, res: Response) => {
+  const ticketId = getNumberId(req.params.id);
+  if (!ticketId) {
+    return res.status(400).json({ message: 'ID de ticket invalido.' });
+  }
+
+  const payload = getTicketCancelPayload(req.body);
+  if (!payload) {
+    return res.status(400).json({ message: 'El motivo de cancelacion es obligatorio.' });
+  }
+
+  try {
+    const ticket = await cancelHelpdeskTicket(ticketId, payload, req.user?.id ?? null);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Solicitud no encontrada.' });
+    }
+
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_TICKET_CANCEL:${ticketId}`, req.ip, ticketId, 'helpdesk_ticket');
+
+    return res.json({
+      message: 'Ticket cancelado correctamente.',
+      ticket,
+    });
+  } catch (error: any) {
+    const mappedError = mapHelpdeskError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error cancelando ticket Helpdesk:', error);
+    return res.status(500).json({ message: 'No se pudo cancelar el ticket.' });
   }
 };
 

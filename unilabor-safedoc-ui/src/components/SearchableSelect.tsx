@@ -83,13 +83,23 @@ export const SearchableSelect = ({
     };
   }, [open]);
 
+  // Alto estimado del menu (barra de busqueda + lista max-h-60), usado solo
+  // para decidir si abre hacia abajo o hacia arriba.
+  const ESTIMATED_MENU_HEIGHT = 300;
+
   const openMenu = () => {
     if (disabled) {
       return;
     }
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+      const spaceBelow = window.innerHeight - rect.bottom;
+      // El menu es position:fixed: si no cabe hacia abajo en el viewport,
+      // scrollear la pagina no lo trae a la vista (queda fuera del viewport
+      // sin importar el scroll). Se abre hacia arriba cuando hay mas espacio ahi.
+      const openUpward = spaceBelow < ESTIMATED_MENU_HEIGHT && rect.top > spaceBelow;
+      const top = openUpward ? Math.max(8, rect.top - ESTIMATED_MENU_HEIGHT - 4) : rect.bottom + 4;
+      setPos({ top, left: rect.left, width: rect.width });
       setQuery('');
     }
     setOpen((current) => !current);

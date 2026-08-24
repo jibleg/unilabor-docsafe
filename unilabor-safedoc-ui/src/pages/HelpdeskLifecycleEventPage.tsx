@@ -154,7 +154,18 @@ export const HelpdeskLifecycleEventPage = () => {
           {event.from_location ? <DetailRow label="Ubicación origen" value={event.from_location.name} /> : null}
           {event.to_location ? <DetailRow label="Ubicación destino" value={event.to_location.name} /> : null}
           {event.disposal_reason ? <DetailRow label="Motivo de baja" value={event.disposal_reason.name} /> : null}
-          {event.ticket_id ? <DetailRow label="Ticket relacionado" value={`#${event.ticket_id}`} /> : null}
+          {event.ticket_id ? (
+            <div className="flex flex-col">
+              <span className="text-xs text-[var(--unilabor-neutral)]">Ticket relacionado</span>
+              <button
+                type="button"
+                onClick={() => navigate(`/helpdesk/tickets/${event.ticket_id}`)}
+                className="text-left text-sm font-semibold text-[var(--color-brand-700)] hover:underline"
+              >
+                Ver solicitud #{event.ticket_id}
+              </button>
+            </div>
+          ) : null}
           {event.maintenance_order_id ? (
             <DetailRow label="Orden de mantenimiento" value={`#${event.maintenance_order_id}`} />
           ) : null}
