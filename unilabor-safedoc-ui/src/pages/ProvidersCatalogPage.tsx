@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Edit3, EyeOff, Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
+import { Edit3, EyeOff, Info, Plus, RefreshCw, Star, Trash2 } from 'lucide-react';
 import { getApiErrorMessage } from '../api/service';
 import {
   createProviderCatalog,
@@ -500,6 +500,13 @@ export const ProvidersCatalogPage = () => {
                 );
               })}
             </div>
+
+            {!editingProvider ? (
+              <div className="mx-4 mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                <Info size={13} />
+                El tab Contactos está deshabilitado: guarda el proveedor primero para habilitarlo.
+              </div>
+            ) : null}
 
             <div className="flex-1 overflow-y-auto px-4 py-4">
               {activeTab === 'general' ? (
