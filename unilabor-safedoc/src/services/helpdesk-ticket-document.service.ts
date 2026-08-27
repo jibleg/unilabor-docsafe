@@ -3,7 +3,12 @@ import path from 'path';
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
 import { resolveStoredDocumentPath } from './document.service';
-import { recordTicketHistory, resolveTicketSignaturePath, type HelpdeskTicketRecord } from './helpdesk-ticket.shared';
+import {
+  getRequiredEmployeeByUserId,
+  recordTicketHistory,
+  resolveTicketSignaturePath,
+  type HelpdeskTicketRecord,
+} from './helpdesk-ticket.shared';
 import { uploadAssetDocument } from './helpdesk-asset-document.service';
 import { createLifecycleEvent, setLifecycleEventGeneratedDocument } from './helpdesk-lifecycle.service';
 import { renderTicketConstanciaPdf } from './helpdesk-ticket-constancia.service';
@@ -116,6 +121,47 @@ export const uploadTicketDocument = async (
     throw error;
   }
   return created;
+};
+
+// Autoservicio (portal del colaborador): puede ver y adjuntar evidencia solo
+// de sus propias solicitudes (mismo criterio de propiedad que
+// getMyHelpdeskTicketById/addMyHelpdeskTicketComment). Devuelve null cuando
+// el ticket no existe o no le pertenece — el controller lo mapea a 404.
+const getOwnedTicketIdForEmployee = async (ticketId: number, userId: string): Promise<number | null> => {
+  const employee = await getRequiredEmployeeByUserId(userId);
+  const result = await pool.query(
+    `SELECT requester_employee_id FROM public.helpdesk_tickets WHERE id = $1 LIMIT 1;`,
+    [ticketId],
+  );
+  const requesterEmployeeId = result.rows[0]?.requester_employee_id;
+  if (!requesterEmployeeId || Number(requesterEmployeeId) !== employee.id) {
+    return null;
+  }
+  return ticketId;
+};
+
+export const listMyTicketDocuments = async (
+  ticketId: number,
+  userId: string,
+): Promise<HelpdeskTicketDocumentRecord[] | null> => {
+  const ownedTicketId = await getOwnedTicketIdForEmployee(ticketId, userId);
+  if (!ownedTicketId) {
+    return null;
+  }
+  return listTicketDocuments(ownedTicketId);
+};
+
+export const uploadMyTicketDocument = async (
+  ticketId: number,
+  userId: string,
+  file: UploadedTicketFile,
+  payload: HelpdeskTicketDocumentPayload,
+): Promise<HelpdeskTicketDocumentRecord | null> => {
+  const ownedTicketId = await getOwnedTicketIdForEmployee(ticketId, userId);
+  if (!ownedTicketId) {
+    return null;
+  }
+  return uploadTicketDocument(ownedTicketId, file, payload, userId);
 };
 
 const SUPPORT_CHANNEL_LABELS: Record<string, string> = {
@@ -264,4 +310,18 @@ export const resolveTicketDocumentPath = async (
   }
   const absolutePath = resolveStoredDocumentPath(document.file_path);
   return { document, absolutePath };
+};
+
+// Autoservicio: el colaborador solo puede ver evidencia de sus propios
+// tickets (propia o la que el staff haya adjuntado durante la reparacion).
+export const resolveMyTicketDocumentPath = async (
+  documentId: number,
+  userId: string,
+): Promise<{ document: HelpdeskTicketDocumentRecord; absolutePath: string } | null> => {
+  const resolved = await resolveTicketDocumentPath(documentId);
+  const ownedTicketId = await getOwnedTicketIdForEmployee(resolved.document.ticket_id, userId);
+  if (!ownedTicketId) {
+    return null;
+  }
+  return resolved;
 };

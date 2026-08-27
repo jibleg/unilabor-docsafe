@@ -40,7 +40,7 @@ const moduleVisuals: Record<
   PROVIDERS: {
     icon: Truck,
     eyebrow: 'Módulo de Acuerdos',
-    name: 'Acuerdos con los Proveedores',
+    name: 'Prestación de servicios',
     description: 'Gestión documental de contratos y convenios con proveedores: vigencia, derogación y trazabilidad.',
   },
 };

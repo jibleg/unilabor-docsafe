@@ -686,9 +686,10 @@ export const solveHelpdeskTicket = async (
   }
 
   const supportChannel = normalizeOptionalText(payload.support_channel);
+  let providerName: string | null = null;
   if (supportChannel === 'REMOTE_PHONE') {
     const hasCompleteCallLog =
-      normalizeOptionalText(payload.provider_name) &&
+      payload.provider_id &&
       normalizeOptionalText(payload.provider_contact) &&
       payload.onsite_responsible_employee_id &&
       normalizeOptionalText(payload.call_at);
@@ -696,9 +697,24 @@ export const solveHelpdeskTicket = async (
     if (!hasCompleteCallLog) {
       throw createTicketError(
         'HELPDESK_TICKET_PHONE_LOG_INCOMPLETE',
-        'Cuando la atencion fue por llamada telefonica, captura proveedor, contacto, responsable tecnico in situ y fecha/hora de la llamada: sustituyen la evidencia documental.',
+        'Cuando la atencion fue por llamada telefonica, captura proveedor (del catalogo), contacto, responsable tecnico in situ y fecha/hora de la llamada: sustituyen la evidencia documental.',
       );
     }
+
+    // provider_name es un snapshot de solo lectura resuelto por el backend
+    // desde el catalogo real de proveedores (helpdesk_suppliers) — el
+    // cliente ya no puede escribir texto libre aqui.
+    const providerResult = await pool.query(
+      `SELECT name FROM public.helpdesk_suppliers WHERE id = $1 AND is_active = TRUE LIMIT 1;`,
+      [payload.provider_id],
+    );
+    if (providerResult.rows.length === 0) {
+      throw createTicketError(
+        'HELPDESK_TICKET_PROVIDER_NOT_FOUND',
+        'El proveedor seleccionado no existe o esta inactivo en el catalogo.',
+      );
+    }
+    providerName = String(providerResult.rows[0].name);
   }
 
   const solvedStatusId = await getTicketStatusId('SOLVED');
@@ -713,13 +729,14 @@ export const solveHelpdeskTicket = async (
           equipment_status_after_solution_id = $3,
           status_id = COALESCE($4, status_id),
           support_channel = $5,
-          provider_name = $6,
-          provider_contact = $7,
-          onsite_responsible_employee_id = $8,
-          call_at = $9,
-          updated_by_user_id = $10,
+          provider_id = $6,
+          provider_name = $7,
+          provider_contact = $8,
+          onsite_responsible_employee_id = $9,
+          call_at = $10,
+          updated_by_user_id = $11,
           updated_at = NOW()
-        WHERE id = $11;
+        WHERE id = $12;
       `,
       [
         payload.solved_at,
@@ -727,7 +744,8 @@ export const solveHelpdeskTicket = async (
         payload.equipment_status_after_solution_id ?? null,
         solvedStatusId,
         supportChannel,
-        normalizeOptionalText(payload.provider_name),
+        supportChannel === 'REMOTE_PHONE' ? payload.provider_id : null,
+        providerName,
         normalizeOptionalText(payload.provider_contact),
         payload.onsite_responsible_employee_id ?? null,
         normalizeOptionalText(payload.call_at),

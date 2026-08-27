@@ -534,6 +534,7 @@ export interface HelpdeskTicket {
   operational_lock?: boolean;
   request_channel?: string;
   support_channel?: string | null;
+  provider_id?: number | null;
   provider_name?: string | null;
   provider_contact?: string | null;
   onsite_responsible_employee_id?: number | null;

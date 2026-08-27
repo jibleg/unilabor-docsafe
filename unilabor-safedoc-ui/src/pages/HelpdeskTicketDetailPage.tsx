@@ -163,6 +163,7 @@ export const HelpdeskTicketDetailPage = () => {
 
   const [ticketHistory, setTicketHistory] = useState<HelpdeskTicketHistoryEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [suppliers, setSuppliers] = useState<HelpdeskCatalogItem[]>([]);
 
   const loadTicket = useCallback(async () => {
     if (!ticketId) {
@@ -192,6 +193,7 @@ export const HelpdeskTicketDetailPage = () => {
         ]);
         setCatalogs(ticketCatalogData);
         setOperationalStatuses(assetCatalogData.operational_statuses);
+        setSuppliers(assetCatalogData.suppliers);
         setEmployees(employeeData);
       } catch (error) {
         notifyError(getApiErrorMessage(error, 'No se pudieron cargar los catálogos de solicitudes.'));
@@ -375,13 +377,13 @@ export const HelpdeskTicketDetailPage = () => {
     }
     if (solutionForm.support_channel === 'REMOTE_PHONE') {
       const hasCompleteCallLog =
-        solutionForm.provider_name.trim() &&
+        solutionForm.provider_id &&
         solutionForm.provider_contact.trim() &&
         solutionForm.onsite_responsible_employee_id &&
         solutionForm.call_at;
       if (!hasCompleteCallLog) {
         notifyWarning(
-          'Si la atención fue por llamada telefónica captura proveedor, contacto, responsable técnico in situ y fecha/hora de la llamada: sustituyen la evidencia documental.',
+          'Si la atención fue por llamada telefónica selecciona el proveedor (del catálogo), captura contacto, responsable técnico in situ y fecha/hora de la llamada: sustituyen la evidencia documental.',
         );
         return;
       }
@@ -393,7 +395,7 @@ export const HelpdeskTicketDetailPage = () => {
         solution_summary: solutionForm.solution_summary.trim(),
         equipment_status_after_solution_id: numericOrNull(solutionForm.equipment_status_after_solution_id),
         support_channel: solutionForm.support_channel || null,
-        provider_name: solutionForm.support_channel === 'REMOTE_PHONE' ? solutionForm.provider_name.trim() || null : null,
+        provider_id: solutionForm.support_channel === 'REMOTE_PHONE' ? numericOrNull(solutionForm.provider_id) : null,
         provider_contact:
           solutionForm.support_channel === 'REMOTE_PHONE' ? solutionForm.provider_contact.trim() || null : null,
         onsite_responsible_employee_id:
@@ -770,11 +772,13 @@ export const HelpdeskTicketDetailPage = () => {
                     <p className="text-[11px] leading-5 text-[var(--unilabor-neutral)]">
                       Sin documento de evidencia posible (soporte telefónico): estos datos sustituyen la evidencia.
                     </p>
-                    <input
-                      value={solutionForm.provider_name}
-                      onChange={(event) => setSolutionForm((current) => ({ ...current, provider_name: event.target.value }))}
+                    <SearchableSelect
+                      value={solutionForm.provider_id}
+                      onChange={(value) => setSolutionForm((current) => ({ ...current, provider_id: value }))}
+                      options={suppliers.map((supplier) => ({ value: String(supplier.id), label: supplier.name }))}
                       placeholder="Proveedor que brindó asistencia"
-                      className={fieldClass}
+                      emptyLabel="Sin seleccionar"
+                      searchPlaceholder="Buscar proveedor..."
                     />
                     <input
                       value={solutionForm.provider_contact}

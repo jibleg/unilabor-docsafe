@@ -716,6 +716,7 @@ export const normalizeHelpdeskTicket = (input: unknown): HelpdeskTicket | null =
     operational_lock: getBoolean(source, ['operational_lock', 'operationalLock'], false),
     request_channel: getString(source, ['request_channel', 'requestChannel'], 'PORTAL'),
     support_channel: getString(source, ['support_channel', 'supportChannel']) || null,
+    provider_id: getNullableNumber(source, ['provider_id', 'providerId']),
     provider_name: getString(source, ['provider_name', 'providerName']) || null,
     provider_contact: getString(source, ['provider_contact', 'providerContact']) || null,
     onsite_responsible_employee_id: getNullableNumber(

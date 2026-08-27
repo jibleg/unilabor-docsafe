@@ -111,8 +111,11 @@ import {
   viewAssetDocumentController,
 } from '../controllers/helpdesk-asset-document.controller';
 import {
+  listMyTicketDocumentsController,
   listTicketDocumentsController,
+  uploadMyTicketDocumentController,
   uploadTicketDocumentController,
+  viewMyTicketDocumentController,
   viewTicketDocumentController,
 } from '../controllers/helpdesk-ticket-document.controller';
 import {
@@ -179,6 +182,22 @@ router.post(
   requirePermission('HELPDESK.SELF.TICKETS'),
   validate(helpdeskTicketConfirmFunctionalitySchema),
   confirmMyHelpdeskTicketFunctionalityController,
+);
+router.get(
+  '/me/tickets/:id/documents',
+  requirePermission('HELPDESK.SELF.TICKETS'),
+  listMyTicketDocumentsController,
+);
+router.post(
+  '/me/tickets/:id/documents',
+  requirePermission('HELPDESK.SELF.TICKETS'),
+  uploadTicketDocument.single('file'),
+  uploadMyTicketDocumentController,
+);
+router.get(
+  '/me/ticket-documents/:documentId/view',
+  requirePermission('HELPDESK.SELF.TICKETS'),
+  viewMyTicketDocumentController,
 );
 router.get(
   '/catalogs',

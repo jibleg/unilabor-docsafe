@@ -108,6 +108,12 @@ export const mapHelpdeskError = (res: Response, error: any) => {
     });
   }
 
+  if (error?.code === 'HELPDESK_TICKET_PROVIDER_NOT_FOUND') {
+    return res.status(400).json({
+      message: error.publicMessage ?? 'El proveedor seleccionado no existe o esta inactivo en el catalogo.',
+    });
+  }
+
   if (
     error?.code === 'HELPDESK_TICKET_INVALID_STATE' ||
     error?.code === 'HELPDESK_MAINTENANCE_ORDER_INVALID_STATE' ||
@@ -300,6 +306,7 @@ export const getTicketSolutionPayload = (body: any): HelpdeskTicketSolutionPaylo
     solution_summary: solutionSummary,
     equipment_status_after_solution_id: getNumberId(body?.equipment_status_after_solution_id),
     support_channel: getText(body?.support_channel),
+    provider_id: getNumberId(body?.provider_id),
     provider_name: getText(body?.provider_name),
     provider_contact: getText(body?.provider_contact),
     onsite_responsible_employee_id: getNumberId(body?.onsite_responsible_employee_id),

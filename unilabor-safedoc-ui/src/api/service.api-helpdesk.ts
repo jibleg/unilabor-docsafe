@@ -309,6 +309,32 @@ export const listMyHelpdeskTickets = async (): Promise<HelpdeskTicket[]> => {
     .filter((ticket): ticket is HelpdeskTicket => ticket !== null);
 };
 
+export interface MyHelpdeskTicketSummary {
+  total: number;
+  open: number;
+  solved: number;
+}
+
+export interface MyHelpdeskTicketsPageResult extends PageResult<HelpdeskTicket> {
+  summary: MyHelpdeskTicketSummary;
+}
+
+export const listMyHelpdeskTicketsPaginated = async (
+  query: PageQuery = {},
+): Promise<MyHelpdeskTicketsPageResult> => {
+  const response = await api.get('/helpdesk/me/tickets', { params: buildPageParams(query) });
+  const data = getArrayFromPayload(response.data, ['tickets', 'items', 'results'])
+    .map(normalizeHelpdeskTicket)
+    .filter((ticket): ticket is HelpdeskTicket => ticket !== null);
+  const summaryRecord = asRecord(asRecord(response.data)?.summary);
+  const summary: MyHelpdeskTicketSummary = {
+    total: Number(summaryRecord?.total ?? data.length),
+    open: Number(summaryRecord?.open ?? 0),
+    solved: Number(summaryRecord?.solved ?? 0),
+  };
+  return { data, pagination: extractPagination(response.data, data.length), summary };
+};
+
 export const fetchMyHelpdeskTicketById = async (ticketId: number): Promise<HelpdeskTicket | null> => {
   const response = await api.get(`/helpdesk/me/tickets/${ticketId}`);
   const payload = unwrapPayload(response.data);
@@ -406,6 +432,32 @@ export const uploadTicketDocument = async (
 
 export const fetchTicketDocumentUrl = async (documentId: number): Promise<string> => {
   const response = await api.get(`/helpdesk/ticket-documents/${documentId}/view`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
+};
+
+export const listMyTicketDocuments = async (ticketId: number): Promise<HelpdeskTicketDocument[]> => {
+  const response = await api.get(`/helpdesk/me/tickets/${ticketId}/documents`);
+  return getArrayFromPayload(response.data, ['documents']) as HelpdeskTicketDocument[];
+};
+
+export const uploadMyTicketDocument = async (
+  ticketId: number,
+  file: File,
+  fields: UploadTicketDocumentFields,
+): Promise<HelpdeskTicketDocument | null> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('title', fields.title);
+  if (fields.document_kind) formData.append('document_kind', fields.document_kind);
+
+  const response = await api.post(`/helpdesk/me/tickets/${ticketId}/documents`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return (asRecord(unwrapPayload(response.data))?.document as HelpdeskTicketDocument) ?? null;
+};
+
+export const fetchMyTicketDocumentUrl = async (documentId: number): Promise<string> => {
+  const response = await api.get(`/helpdesk/me/ticket-documents/${documentId}/view`, { responseType: 'blob' });
   return URL.createObjectURL(response.data as Blob);
 };
 

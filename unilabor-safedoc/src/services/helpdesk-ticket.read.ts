@@ -425,21 +425,77 @@ export const getHelpdeskTicketStats = async (): Promise<HelpdeskTicketStats> => 
   };
 };
 
-export const listMyHelpdeskTickets = async (userId: string): Promise<HelpdeskTicketRecord[]> => {
+// Paginacion server-side opt-in (mismo contrato que listHelpdeskTickets): sin
+// page/limit el cliente sigue recibiendo todo el historial en una sola
+// "pagina", para no romper llamadas existentes que no pidieron paginar.
+export const listMyHelpdeskTickets = async (
+  userId: string,
+  options: PaginationInput = {},
+): Promise<PaginatedResult<HelpdeskTicketRecord>> => {
+  await assertTicketsTable();
+
+  const employee = await getRequiredEmployeeByUserId(userId);
+  const paginate = isPaginationRequested(options);
+  const { page, limit, offset } = resolvePagination(options);
+
+  const base = buildTicketQuery();
+  const limitSql = paginate ? 'LIMIT $2 OFFSET $3' : '';
+  const dataValues = paginate ? [employee.id, limit, offset] : [employee.id];
+
+  const dataResult = await pool.query(
+    `
+      ${base}
+      WHERE t.is_active = TRUE
+        AND t.requester_employee_id = $1
+      ORDER BY t.updated_at DESC, t.reported_at DESC
+      ${limitSql};
+    `,
+    dataValues,
+  );
+  const data = dataResult.rows.map(mapTicketRow);
+
+  if (!paginate) {
+    return buildPaginatedResult(data, data.length, 1, data.length || 1);
+  }
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM public.helpdesk_tickets WHERE is_active = TRUE AND requester_employee_id = $1;`,
+    [employee.id],
+  );
+  return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
+};
+
+export interface MyHelpdeskTicketSummary {
+  total: number;
+  open: number;
+  solved: number;
+}
+
+// Conteos independientes de la paginacion: la pagina actual solo trae 10-20
+// filas, pero las tarjetas de resumen del portal necesitan el total real.
+export const getMyHelpdeskTicketSummary = async (userId: string): Promise<MyHelpdeskTicketSummary> => {
   await assertTicketsTable();
 
   const employee = await getRequiredEmployeeByUserId(userId);
   const result = await pool.query(
     `
-      ${buildTicketQuery()}
-      WHERE t.is_active = TRUE
-        AND t.requester_employee_id = $1
-      ORDER BY t.updated_at DESC, t.reported_at DESC;
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE COALESCE(ts.is_closed, FALSE) = FALSE)::int AS open,
+        COUNT(*) FILTER (WHERE t.solved_at IS NOT NULL)::int AS solved
+      FROM public.helpdesk_tickets t
+      LEFT JOIN public.helpdesk_ticket_statuses ts ON ts.id = t.status_id
+      WHERE t.is_active = TRUE AND t.requester_employee_id = $1;
     `,
     [employee.id],
   );
 
-  return result.rows.map(mapTicketRow);
+  const row = result.rows[0] ?? {};
+  return {
+    total: Number(row.total ?? 0),
+    open: Number(row.open ?? 0),
+    solved: Number(row.solved ?? 0),
+  };
 };
 
 export const getMyHelpdeskTicketById = async (

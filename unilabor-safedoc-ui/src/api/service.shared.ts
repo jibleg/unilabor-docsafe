@@ -97,7 +97,7 @@ export interface HelpdeskTicketSolutionPayload {
   solution_summary: string;
   equipment_status_after_solution_id?: number | null;
   support_channel?: string | null;
-  provider_name?: string | null;
+  provider_id?: number | null;
   provider_contact?: string | null;
   onsite_responsible_employee_id?: number | null;
   call_at?: string | null;

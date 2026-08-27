@@ -30,6 +30,10 @@ export interface HelpdeskTicketSolutionPayload {
   solution_summary: string;
   equipment_status_after_solution_id?: number | null;
   support_channel?: string | null;
+  // provider_id apunta al catalogo real de proveedores (helpdesk_suppliers,
+  // el mismo que usa Activos/Proveedores); provider_name se conserva solo
+  // como snapshot de solo lectura, resuelto por el backend desde provider_id.
+  provider_id?: number | null;
   provider_name?: string | null;
   provider_contact?: string | null;
   onsite_responsible_employee_id?: number | null;
@@ -119,6 +123,7 @@ export interface HelpdeskTicketRecord extends HelpdeskTicketPayload {
   quality_document_id?: string | null;
   operational_lock?: boolean;
   support_channel?: string | null;
+  provider_id?: number | null;
   provider_name?: string | null;
   provider_contact?: string | null;
   onsite_responsible_employee_id?: number | null;
@@ -355,6 +360,7 @@ export const mapTicketRow = (row: any): HelpdeskTicketRecord => ({
   operational_lock: Boolean(row.operational_lock),
   request_channel: row.request_channel ? String(row.request_channel) : 'PORTAL',
   support_channel: row.support_channel ? String(row.support_channel) : null,
+  provider_id: row.provider_id ? Number(row.provider_id) : null,
   provider_name: row.provider_name ? String(row.provider_name) : null,
   provider_contact: row.provider_contact ? String(row.provider_contact) : null,
   onsite_responsible_employee_id: row.onsite_responsible_employee_id ? Number(row.onsite_responsible_employee_id) : null,

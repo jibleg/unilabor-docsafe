@@ -19,6 +19,7 @@ import {
   getHelpdeskTicketById,
   getHelpdeskTicketStats,
   getMyHelpdeskTicketById,
+  getMyHelpdeskTicketSummary,
   listHelpdeskTicketCatalogs,
   listTicketHistory,
   listHelpdeskTickets,
@@ -93,8 +94,11 @@ export const listMyHelpdeskTicketsController = async (req: AuthRequest, res: Res
   }
 
   try {
-    const tickets = await listMyHelpdeskTickets(req.user.id);
-    return res.json({ tickets });
+    const [result, summary] = await Promise.all([
+      listMyHelpdeskTickets(req.user.id, { page: req.query.page, limit: req.query.limit }),
+      getMyHelpdeskTicketSummary(req.user.id),
+    ]);
+    return res.json({ ...result, summary });
   } catch (error: any) {
     const mappedError = mapHelpdeskError(res, error);
     if (mappedError) {

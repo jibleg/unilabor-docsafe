@@ -63,7 +63,7 @@ export interface SolutionFormState {
   solution_summary: string;
   equipment_status_after_solution_id: string;
   support_channel: string;
-  provider_name: string;
+  provider_id: string;
   provider_contact: string;
   onsite_responsible_employee_id: string;
   call_at: string;
@@ -130,7 +130,7 @@ export const EMPTY_SOLUTION_FORM: SolutionFormState = {
   solution_summary: '',
   equipment_status_after_solution_id: '',
   support_channel: 'ON_SITE',
-  provider_name: '',
+  provider_id: '',
   provider_contact: '',
   onsite_responsible_employee_id: '',
   call_at: '',

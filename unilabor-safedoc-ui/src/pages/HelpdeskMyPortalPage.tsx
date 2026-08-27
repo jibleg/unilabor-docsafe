@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
+  FileUp,
   Laptop,
   LifeBuoy,
   Loader2,
@@ -14,15 +15,24 @@ import {
   confirmMyHelpdeskTicketFunctionality,
   createMyHelpdeskTicket,
   fetchMyHelpdeskTicketById,
+  fetchMyTicketDocumentUrl,
   getApiErrorMessage,
   listHelpdeskTicketCatalogs,
   listMyHelpdeskAssets,
-  listMyHelpdeskTickets,
+  listMyHelpdeskTicketsPaginated,
+  listMyTicketDocuments,
+  uploadMyTicketDocument,
   type HelpdeskTicketPayload,
+  type MyHelpdeskTicketSummary,
 } from '../api/service';
-import type { Employee, HelpdeskAsset, HelpdeskTicket, HelpdeskTicketCatalogs } from '../types/models';
+import type { Employee, HelpdeskAsset, HelpdeskTicket, HelpdeskTicketCatalogs, HelpdeskTicketDocument } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { SignaturePad } from '../components/helpdesk/SignaturePad';
+import { Pagination } from '../components/Pagination';
+
+const TICKETS_PAGE_SIZE = 10;
+
+const EMPTY_TICKETS_SUMMARY: MyHelpdeskTicketSummary = { total: 0, open: 0, solved: 0 };
 
 interface TicketFormState {
   asset_id: string;
@@ -88,22 +98,27 @@ export const HelpdeskMyPortalPage = () => {
   const [confirmSignature, setConfirmSignature] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [ticketDocuments, setTicketDocuments] = useState<HelpdeskTicketDocument[]>([]);
+  const [documentTitle, setDocumentTitle] = useState('');
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [savingDocument, setSavingDocument] = useState(false);
+  const [ticketsPage, setTicketsPage] = useState(1);
+  const [ticketsPagination, setTicketsPagination] = useState({ total: 0, totalPages: 1 });
+  const [ticketsSummary, setTicketsSummary] = useState<MyHelpdeskTicketSummary>(EMPTY_TICKETS_SUMMARY);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [assetData, ticketData, catalogData] = await Promise.all([
+      const [assetData, catalogData] = await Promise.all([
         listMyHelpdeskAssets(),
-        listMyHelpdeskTickets(),
         listHelpdeskTicketCatalogs(),
       ]);
 
       setEmployee(assetData.employee);
       setAssets(assetData.assets);
-      setTickets(ticketData);
       setCatalogs(catalogData);
       setSelectedAsset((current) => assetData.assets.find((asset) => asset.id === current?.id) ?? assetData.assets[0] ?? null);
-      setSelectedTicket((current) => ticketData.find((ticket) => ticket.id === current?.id) ?? ticketData[0] ?? null);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar tu portal de mesa de ayuda.'));
     } finally {
@@ -111,16 +126,35 @@ export const HelpdeskMyPortalPage = () => {
     }
   }, []);
 
+  const loadTickets = useCallback(async (pageToLoad: number) => {
+    setTicketsLoading(true);
+    try {
+      const result = await listMyHelpdeskTicketsPaginated({ page: pageToLoad, limit: TICKETS_PAGE_SIZE });
+      setTickets(result.data);
+      setTicketsPagination({ total: result.pagination.total, totalPages: result.pagination.totalPages });
+      setTicketsSummary(result.summary);
+      setSelectedTicket((current) => result.data.find((ticket) => ticket.id === current?.id) ?? current ?? result.data[0] ?? null);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar tus solicitudes.'));
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    void loadTickets(ticketsPage);
+  }, [ticketsPage, loadTickets]);
+
   const summary = useMemo(() => ({
     assets: assets.length,
-    tickets: tickets.length,
-    open: tickets.filter((ticket) => !ticket.status?.is_closed).length,
-    solved: tickets.filter((ticket) => Boolean(ticket.solved_at)).length,
-  }), [assets, tickets]);
+    tickets: ticketsSummary.total,
+    open: ticketsSummary.open,
+    solved: ticketsSummary.solved,
+  }), [assets, ticketsSummary]);
 
   const openReportFromAsset = (asset: HelpdeskAsset) => {
     setSelectedAsset(asset);
@@ -131,14 +165,65 @@ export const HelpdeskMyPortalPage = () => {
     }));
   };
 
+  const loadTicketDocuments = useCallback(async (ticketId: number) => {
+    try {
+      setTicketDocuments(await listMyTicketDocuments(ticketId));
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar las evidencias de la solicitud.'));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedTicket) {
+      void loadTicketDocuments(selectedTicket.id);
+    } else {
+      setTicketDocuments([]);
+    }
+  }, [selectedTicket?.id, loadTicketDocuments]);
+
   const selectTicket = async (ticket: HelpdeskTicket) => {
     setSelectedTicket(ticket);
     setConfirmSignature(null);
+    setDocumentTitle('');
+    setDocumentFile(null);
     try {
       const detailed = await fetchMyHelpdeskTicketById(ticket.id);
       setSelectedTicket(detailed ?? ticket);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar el detalle de la solicitud.'));
+    }
+  };
+
+  const handleUploadDocument = async () => {
+    if (!selectedTicket) return;
+    if (!documentFile) {
+      notifyWarning('Selecciona el archivo de evidencia (PDF o imagen).');
+      return;
+    }
+    if (!documentTitle.trim()) {
+      notifyWarning('Captura un título para la evidencia.');
+      return;
+    }
+    setSavingDocument(true);
+    try {
+      await uploadMyTicketDocument(selectedTicket.id, documentFile, { title: documentTitle.trim() });
+      setDocumentTitle('');
+      setDocumentFile(null);
+      notifySuccess('Evidencia cargada correctamente.');
+      await loadTicketDocuments(selectedTicket.id);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cargar la evidencia.'));
+    } finally {
+      setSavingDocument(false);
+    }
+  };
+
+  const handleViewDocument = async (documentId: number) => {
+    try {
+      const url = await fetchMyTicketDocumentUrl(documentId);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo abrir la evidencia.'));
     }
   };
 
@@ -154,7 +239,8 @@ export const HelpdeskMyPortalPage = () => {
       setSelectedTicket(created);
       setForm(EMPTY_FORM);
       notifySuccess('Solicitud registrada correctamente.');
-      await loadData();
+      setTicketsPage(1);
+      await Promise.all([loadData(), loadTickets(1)]);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo registrar tu solicitud.'));
     } finally {
@@ -174,7 +260,7 @@ export const HelpdeskMyPortalPage = () => {
       setSelectedTicket(updated ?? selectedTicket);
       setComment('');
       notifySuccess('Comentario agregado correctamente.');
-      await loadData();
+      await Promise.all([loadData(), loadTickets(ticketsPage)]);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo agregar el comentario.'));
     } finally {
@@ -199,7 +285,7 @@ export const HelpdeskMyPortalPage = () => {
       setSelectedTicket(updated ?? selectedTicket);
       setConfirmSignature(null);
       notifySuccess('Funcionamiento confirmado correctamente.');
-      await loadData();
+      await Promise.all([loadData(), loadTickets(ticketsPage)]);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo confirmar el funcionamiento.'));
     } finally {
@@ -222,10 +308,13 @@ export const HelpdeskMyPortalPage = () => {
 
         <button
           type="button"
-          onClick={() => void loadData()}
+          onClick={() => {
+            void loadData();
+            void loadTickets(ticketsPage);
+          }}
           className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
         >
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={16} className={(loading || ticketsLoading) ? 'animate-spin' : ''} />
           Recargar
         </button>
       </div>
@@ -385,6 +474,14 @@ export const HelpdeskMyPortalPage = () => {
                 </button>
               ))}
             </div>
+            <Pagination
+              page={ticketsPage}
+              totalPages={ticketsPagination.totalPages}
+              total={ticketsPagination.total}
+              pageSize={TICKETS_PAGE_SIZE}
+              onPageChange={setTicketsPage}
+              loading={ticketsLoading}
+            />
           </div>
 
           {selectedTicket ? (
@@ -398,6 +495,48 @@ export const HelpdeskMyPortalPage = () => {
                   <p className="mt-1 leading-6 text-[var(--unilabor-ink)]">{selectedTicket.solution_summary}</p>
                 </div>
               ) : null}
+
+              <div className="mt-4 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.72)] p-3">
+                <p className="text-sm font-bold text-[var(--color-brand-700)]">Evidencia</p>
+                <div className="mt-2 space-y-1.5">
+                  {ticketDocuments.length === 0 ? (
+                    <p className="text-xs text-[var(--unilabor-neutral)]">Sin evidencia adjunta todavía.</p>
+                  ) : ticketDocuments.map((document) => (
+                    <button
+                      type="button"
+                      key={document.id}
+                      onClick={() => void handleViewDocument(document.id)}
+                      className="flex w-full items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-white/90 px-3 py-1.5 text-left text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.2)]"
+                    >
+                      {document.title}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <input
+                    value={documentTitle}
+                    onChange={(event) => setDocumentTitle(event.target.value)}
+                    placeholder="Título de la evidencia (ej. Foto del equipo dañado)"
+                    className="rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/95 px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none"
+                  />
+                  <input
+                    type="file"
+                    accept="application/pdf,image/png,image/jpeg,image/webp"
+                    onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)}
+                    className="text-xs text-[var(--unilabor-neutral)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleUploadDocument()}
+                    disabled={savingDocument}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50"
+                  >
+                    {savingDocument ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
+                    Adjuntar evidencia
+                  </button>
+                </div>
+              </div>
+
               <div className="mt-4 space-y-2">
                 {(selectedTicket.comments ?? []).map((item) => (
                   <div key={item.id} className="rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-sm">
