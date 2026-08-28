@@ -69,7 +69,7 @@ const loadSignatures = async (templateId: number): Promise<CertificateSignatureR
 export const getCertificateTemplate = async (courseId: number): Promise<CertificateTemplateRecord> => {
   await loadCourse(courseId);
   const result = await pool.query(
-    `SELECT id, training_course_id, title_text, body_text, logo_path, orientation
+    `SELECT id, training_course_id, title_text, body_text, logo_path, orientation, show_folio
        FROM public.certificate_templates WHERE training_course_id = $1 LIMIT 1;`,
     [courseId],
   );
@@ -81,6 +81,7 @@ export const getCertificateTemplate = async (courseId: number): Promise<Certific
       body_text: DEFAULT_BODY,
       logo_path: null,
       orientation: 'landscape',
+      show_folio: true,
       signatures: [],
     };
   }
@@ -92,6 +93,7 @@ export const getCertificateTemplate = async (courseId: number): Promise<Certific
     body_text: String(row.body_text),
     logo_path: row.logo_path ? String(row.logo_path) : null,
     orientation: String(row.orientation) as 'landscape' | 'portrait',
+    show_folio: Boolean(row.show_folio),
     signatures: await loadSignatures(Number(row.id)),
   };
 };
@@ -101,6 +103,7 @@ export interface CertificateTemplatePayload {
   body_text?: string;
   logo_path?: string | null;
   orientation?: 'landscape' | 'portrait';
+  show_folio?: boolean;
   signatures?: Array<{ signatory_name: string; role?: string | null; signature_image_path?: string | null }>;
 }
 
@@ -115,13 +118,14 @@ export const upsertCertificateTemplate = async (
 
     const upsertResult = await client.query(
       `INSERT INTO public.certificate_templates
-         (training_course_id, title_text, body_text, logo_path, orientation)
-       VALUES ($1, COALESCE($2, $5), COALESCE($3, $6), $4, COALESCE($7, 'landscape'))
+         (training_course_id, title_text, body_text, logo_path, orientation, show_folio)
+       VALUES ($1, COALESCE($2, $5), COALESCE($3, $6), $4, COALESCE($7, 'landscape'), COALESCE($8, TRUE))
        ON CONFLICT (training_course_id) DO UPDATE
          SET title_text = COALESCE($2, public.certificate_templates.title_text),
              body_text = COALESCE($3, public.certificate_templates.body_text),
              logo_path = $4,
              orientation = COALESCE($7, public.certificate_templates.orientation),
+             show_folio = COALESCE($8, public.certificate_templates.show_folio),
              updated_at = NOW()
        RETURNING id;`,
       [
@@ -132,6 +136,7 @@ export const upsertCertificateTemplate = async (
         DEFAULT_TITLE,
         DEFAULT_BODY,
         payload.orientation ?? null,
+        payload.show_folio ?? null,
       ],
     );
     const templateId = Number(upsertResult.rows[0]?.id);
@@ -186,7 +191,7 @@ export const buildPreviewRenderInput = async (courseId: number): Promise<Certifi
     logoPath: template.logo_path,
     orientation: template.orientation,
     styleSeed: course.id,
-    referenceCode: `CP-${new Date().getFullYear()}-${String(course.id).padStart(4, '0')}`,
+    referenceCode: template.show_folio ? `CP-${new Date().getFullYear()}-${String(course.id).padStart(4, '0')}` : undefined,
     signatures: template.signatures.map((signature) => ({
       name: signature.signatory_name,
       role: signature.role,

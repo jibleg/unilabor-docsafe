@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import type { PoolClient } from 'pg';
 import pool from '../config/db';
-import { getUserAccessibleModules } from './permission.service';
+import { getUserAccessibleModules, invalidateUserPermissions } from './permission.service';
 import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
 import type { EmployeeRecord, EmployeeSummary, LinkableUser } from '../types';
 import {
@@ -281,6 +281,44 @@ export const getEmployeeByUserId = async (userId: string): Promise<EmployeeRecor
   return mapEmployeeRow(result.rows[0]);
 };
 
+/**
+ * Todo colaborador con usuario vinculado necesita, como minimo, poder leer y
+ * firmar en Sala de Lectura (permiso QUALITY.SELF.READING) — requisito real
+ * del modulo de Induccion (ver [[rh-induccion-bloque0-1-implementacion]]).
+ * Si el usuario ya tiene cualquier rol del modulo QUALITY (viewer, editor,
+ * admin, etc.) no se toca nada; solo se otorga QUALITY_VIEWER cuando no tiene
+ * ninguno. Idempotente y silencioso: nunca bloquea el alta/edicion del
+ * colaborador si falla.
+ */
+const ensureDefaultQualityAccess = async (userId: string, client: PoolClient): Promise<void> => {
+  try {
+    const result = await client.query(
+      `
+        INSERT INTO public.user_roles (user_id, role_id, is_active)
+        SELECT $1, r.id, TRUE
+          FROM public.roles r
+         WHERE UPPER(r.code) = 'QUALITY_VIEWER'
+           AND NOT EXISTS (
+             SELECT 1
+               FROM public.user_roles ur
+               INNER JOIN public.roles existing_role ON existing_role.id = ur.role_id
+              WHERE ur.user_id = $1
+                AND ur.is_active = TRUE
+                AND existing_role.module_id = r.module_id
+           )
+        ON CONFLICT (user_id, role_id) DO NOTHING
+        RETURNING id;
+      `,
+      [userId],
+    );
+    if ((result.rowCount ?? 0) > 0) {
+      invalidateUserPermissions(userId);
+    }
+  } catch (error) {
+    console.error(`No se pudo otorgar QUALITY_VIEWER por defecto al usuario ${userId}:`, error);
+  }
+};
+
 export const createEmployee = async (payload: EmployeePayload): Promise<EmployeeRecord> => {
   await assertEmployeesTable();
 
@@ -336,6 +374,9 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
     );
 
     await initializeDefaultEmployeeDocumentAccess(Number(insertResult.rows[0]?.id), null, client);
+    if (normalizedUserId) {
+      await ensureDefaultQualityAccess(normalizedUserId, client);
+    }
 
     await client.query('COMMIT');
 
@@ -419,6 +460,10 @@ export const updateEmployee = async (
         employeeId,
       ],
     );
+
+    if (resolvedUserId) {
+      await ensureDefaultQualityAccess(resolvedUserId, client);
+    }
 
     await client.query('COMMIT');
     return getEmployeeById(employeeId);

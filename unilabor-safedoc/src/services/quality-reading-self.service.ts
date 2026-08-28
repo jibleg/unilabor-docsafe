@@ -7,6 +7,7 @@ import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image'
 import { withTransaction } from '../utils/transaction';
 import { resolveStoredDocumentPath } from './document.service';
 import { buildReadingAnnexPdf } from './reading/reading-annex.pdf';
+import { refreshInductionForAcknowledgement } from './rh-induction.service';
 import {
   creditReadingHeartbeat,
   isValidPage,
@@ -260,7 +261,7 @@ export const signReading = async (
   let signedPdfPath: string | null = null;
 
   try {
-    return await withTransaction(async (client) => {
+    const result = await withTransaction(async (client) => {
       const current = await client.query(
         `SELECT a.*, p.title_snapshot, p.document_id, d.file_path, u.full_name AS user_name
            FROM public.quality_reading_acknowledgements a
@@ -371,6 +372,13 @@ export const signReading = async (
       const updated = await client.query(`${SELECT_MY_READING} WHERE a.id = $1;`, [readingId]);
       return mapRow(updated.rows[0]);
     });
+
+    // Best-effort: si este acuse pertenece a una fase de induccion de RH,
+    // revisa si con esta firma ya se completo la lectura de la fase (fuera de
+    // la transaccion de Calidad, es un modulo distinto).
+    void refreshInductionForAcknowledgement(readingId);
+
+    return result;
   } catch (error) {
     // Transaccion revertida: los archivos ya escritos no deben sobrevivir.
     safeUnlink(signaturePath);

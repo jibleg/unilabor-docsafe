@@ -930,6 +930,7 @@ export interface Document {
   uploaded_by: string;
   created_at: string;
   description?: string;
+  code?: string | null;
   category_name?: string;
   category_id?: number | null;
   publish_date?: string;
@@ -1146,6 +1147,7 @@ export interface CertificateTemplate {
   body_text: string;
   logo_path: string | null;
   orientation: 'landscape' | 'portrait';
+  show_folio: boolean;
   signatures: CertificateSignature[];
 }
 
@@ -1263,6 +1265,169 @@ export interface InstitutionalDocument {
   uploaded_by_name?: string | null;
   acknowledgement_count?: number;
   signed_count?: number;
+}
+
+// --- Induccion por puesto (REH-MAN-002 / ISO 15189 6.2) ---------------------
+
+export interface RhPositionCompetency {
+  id: number;
+  competency_text: string;
+  sort_order: number;
+}
+
+export interface RhPositionDocument {
+  id: number;
+  document_id: string;
+  title: string;
+  code: string | null;
+  sort_order: number;
+}
+
+export interface RhPosition {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  sort_order: number;
+  competencies: RhPositionCompetency[];
+  documents: RhPositionDocument[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RhEmployeePosition {
+  id: number;
+  employee_id: number;
+  position_id: number;
+  position_name: string;
+  position_code: string;
+  assigned_at: string;
+  is_active: boolean;
+  ended_at: string | null;
+}
+
+export interface RhInductionPhaseDocument {
+  id: number;
+  document_id: string;
+  title: string;
+  code: string | null;
+  sort_order: number;
+}
+
+export interface RhInductionPhase {
+  id: number;
+  phase_number: number;
+  name: string;
+  responsible_label: string;
+  responsible_name: string | null;
+  responsible_phone: string | null;
+  scope: 'INSTITUTIONAL' | 'POSITION';
+  training_course_id: number | null;
+  training_course_title: string | null;
+  documents: RhInductionPhaseDocument[];
+}
+
+export interface RhInductionProgressItem {
+  enrollment_id: number;
+  phase_id: number;
+  phase_number: number;
+  phase_name: string;
+  responsible_label: string;
+  reading_total: number;
+  reading_signed: number;
+  reading_completed_at: string | null;
+  evaluation_assignment_id: number | null;
+  evaluation_status: string | null;
+  evaluation_percentage: number | null;
+  supervisor_employee_id: number | null;
+  supervisor_name: string | null;
+  checklist_total: number;
+  checklist_completed: number;
+}
+
+export interface RhInductionPhaseEnrollmentSummary {
+  enrollment_id: number;
+  employee_id: number;
+  employee_name: string;
+  employee_code: string;
+  reading_total: number;
+  reading_signed: number;
+  reading_completed_at: string | null;
+  evaluation_status: string | null;
+  evaluation_percentage: number | null;
+  supervisor_employee_id: number | null;
+  supervisor_name: string | null;
+  checklist_total: number;
+  checklist_completed: number;
+}
+
+export interface RhInductionChecklistItem {
+  id: number;
+  phase_id: number;
+  item_text: string;
+  sort_order: number;
+}
+
+export interface RhInductionChecklistProgressItem {
+  checklist_item_id: number;
+  item_text: string;
+  sort_order: number;
+  completed_at: string | null;
+}
+
+export interface RhInductionEffectivenessReview {
+  id: number;
+  employee_id: number;
+  review_date: string;
+  method: string;
+  result_percentage: number | null;
+  performs_as_expected: boolean | null;
+  evidence_notes: string | null;
+  reviewed_by_user_id: string | null;
+  created_at: string;
+}
+
+export type RhInductionPhaseRowStatus = 'PENDIENTE' | 'EN_PROCESO' | 'APROBADA' | 'NO_APROBADA' | 'NO_DISPONIBLE';
+
+export interface RhInductionMasterRecordPhaseRow {
+  phase_number: number;
+  name: string;
+  responsible_label: string;
+  supervisor_name: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  score_percentage: number | null;
+  status: RhInductionPhaseRowStatus;
+  checklist_total: number;
+  checklist_completed: number;
+  collaborator_signature_note: string;
+  responsible_signature_note: string;
+}
+
+export type RhInductionVerdict = 'SIN_INICIAR' | 'EN_PROCESO' | 'NO_APROBADA' | 'COMPLETA_1_A_4';
+
+export interface RhInductionMasterRecord {
+  employee: {
+    id: number;
+    full_name: string;
+    employee_code: string;
+    area: string | null;
+    position: string | null;
+    active_positions: string[];
+  };
+  started_at: string | null;
+  finished_at: string | null;
+  phases: RhInductionMasterRecordPhaseRow[];
+  summary: {
+    approved_count: number;
+    not_approved_count: number;
+    pending_count: number;
+    average_score: number | null;
+    verdict: RhInductionVerdict;
+    what_next: string;
+  };
+  effectiveness_reviews: RhInductionEffectivenessReview[];
 }
 
 export interface DocumentAcknowledgement {

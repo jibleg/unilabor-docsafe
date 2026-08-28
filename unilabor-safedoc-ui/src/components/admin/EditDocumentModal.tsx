@@ -41,6 +41,7 @@ const createInitialFormData = (document: Document | null): DocumentEditorFormDat
   title: document?.title ?? '',
   category_id: document?.category_id ? String(document.category_id) : '',
   description: document?.description ?? '',
+  code: document?.code ?? '',
   publish_date: normalizeDateInputValue(document?.publish_date ?? document?.created_at),
   expiry_date: normalizeDateInputValue(document?.expiry_date),
   file: null,

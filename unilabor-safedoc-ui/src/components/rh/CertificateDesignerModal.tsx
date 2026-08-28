@@ -121,6 +121,7 @@ export const CertificateDesignerModal = ({ courseId, courseTitle, onClose }: Cer
       body_text: template.body_text,
       logo_path: template.logo_path,
       orientation: template.orientation,
+      show_folio: template.show_folio,
       signatures: template.signatures.map((s) => ({
         signatory_name: s.signatory_name,
         role: s.role,
@@ -241,6 +242,16 @@ export const CertificateDesignerModal = ({ courseId, courseTitle, onClose }: Cer
                   </p>
                 </div>
               </div>
+
+              <label className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--unilabor-ink)]">
+                <input
+                  type="checkbox"
+                  checked={template.show_folio}
+                  onChange={(e) => patch({ show_folio: e.target.checked })}
+                  className="h-4 w-4 rounded border-[rgba(0,65,106,0.18)] text-[var(--color-brand-500)]"
+                />
+                Mostrar folio en la constancia
+              </label>
 
               <div>
                 <div className="mb-2 flex items-center justify-between">

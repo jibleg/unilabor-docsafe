@@ -225,6 +225,7 @@ export interface CertificateTemplateRecord {
   body_text: string;
   logo_path: string | null;
   orientation: 'landscape' | 'portrait';
+  show_folio: boolean;
   signatures: CertificateSignatureRecord[];
 }
 

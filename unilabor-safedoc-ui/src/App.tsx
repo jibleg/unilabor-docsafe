@@ -102,6 +102,21 @@ const RhInstitutionalDocumentsPage = lazy(() =>
     default: module.RhInstitutionalDocumentsPage,
   })),
 );
+const RhPositionsPage = lazy(() =>
+  import('./pages/RhPositionsPage').then((module) => ({
+    default: module.RhPositionsPage,
+  })),
+);
+const RhInductionPage = lazy(() =>
+  import('./pages/RhInductionPage').then((module) => ({
+    default: module.RhInductionPage,
+  })),
+);
+const RhMyInductionPage = lazy(() =>
+  import('./pages/RhMyInductionPage').then((module) => ({
+    default: module.RhMyInductionPage,
+  })),
+);
 const QualityMyReadingsPage = lazy(() =>
   import('./pages/QualityMyReadingsPage').then((module) => ({
     default: module.QualityMyReadingsPage,
@@ -417,6 +432,22 @@ function App() {
           }
         />
         <Route
+          path="positions"
+          element={
+            <PermissionGate permission="RH.INDUCTION.MANAGE" redirectTo="/rh">
+              <RhPositionsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="induction"
+          element={
+            <PermissionGate permission="RH.INDUCTION.MANAGE" redirectTo="/rh">
+              <RhInductionPage />
+            </PermissionGate>
+          }
+        />
+        <Route
           path="acknowledgements"
           element={
             <PermissionGate permission="RH.ACKNOWLEDGEMENTS.MANAGE" redirectTo="/rh">
@@ -429,6 +460,14 @@ function App() {
           element={
             <PermissionGate permission="RH.SELF.ACKNOWLEDGEMENTS" redirectTo="/rh">
               <MyAcknowledgementsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="my-induction"
+          element={
+            <PermissionGate permission="RH.SELF.INDUCTION" redirectTo="/rh">
+              <RhMyInductionPage />
             </PermissionGate>
           }
         />

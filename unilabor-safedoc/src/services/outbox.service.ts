@@ -1,13 +1,13 @@
 import pool from '../config/db';
 
 /**
- * Bandeja de salida: registro unico de TODOS los envios salientes (correo y SMS)
- * para trazabilidad. Tabla `notification_log` (canal, destinatario, asunto/cuerpo,
- * plantilla/tipo, estado y error). Sin dependencias de los servicios de envio para
- * evitar ciclos de importacion.
+ * Bandeja de salida: registro unico de TODOS los envios salientes (correo, SMS
+ * y WhatsApp) para trazabilidad. Tabla `notification_log` (canal, destinatario,
+ * asunto/cuerpo, plantilla/tipo, estado y error). Sin dependencias de los
+ * servicios de envio para evitar ciclos de importacion.
  */
 
-export type OutboxChannel = 'email' | 'sms';
+export type OutboxChannel = 'email' | 'sms' | 'whatsapp';
 export type OutboxStatus = 'sent' | 'failed' | 'skipped';
 
 export interface OutboundEntry {

@@ -33,6 +33,20 @@ export const getLabsMobileConfig = ():
 };
 
 /**
+ * Credenciales de Whapi Cloud (WhatsApp) para el canal 'whatsapp' de
+ * notification.service.ts. Opcional: sin token, el envio cae a 'skipped' con
+ * WHATSAPP_NOT_CONFIGURED, mismo criterio que SMS sin configurar.
+ */
+export const getWhapiConfig = (): { token: string; apiBase: string } | null => {
+  const token = process.env.WHAPI_TOKEN?.trim();
+  if (!token) {
+    return null;
+  }
+  const apiBase = process.env.WHAPI_API_BASE?.trim() || 'https://gate.whapi.cloud';
+  return { token, apiBase };
+};
+
+/**
  * Credenciales de SparkPost (correo via API HTTP). Opcionales: si faltan, el
  * envio cae al SMTP configurado (Nodemailer) como respaldo.
  */

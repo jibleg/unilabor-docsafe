@@ -22,6 +22,7 @@ const createInitialFormData = (): DocumentEditorFormData => ({
   title: '',
   category_id: '',
   description: '',
+  code: '',
   publish_date: new Date().toISOString().split('T')[0],
   expiry_date: '',
   file: null as File | null,
@@ -83,11 +84,16 @@ export const UploadDocumentModal = ({
     data.append('category_id', formData.category_id);
 
     const normalizedDescription = formData.description.trim();
+    const normalizedCode = formData.code.trim();
     const normalizedPublishDate = formData.publish_date.trim();
     const normalizedExpiryDate = formData.expiry_date.trim();
 
     if (normalizedDescription) {
       data.append('description', normalizedDescription);
+    }
+
+    if (normalizedCode) {
+      data.append('code', normalizedCode);
     }
 
     if (normalizedPublishDate) {

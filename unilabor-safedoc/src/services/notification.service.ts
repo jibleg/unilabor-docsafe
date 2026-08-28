@@ -1,12 +1,13 @@
 import pool from '../config/db';
-import { getLabsMobileConfig } from '../config/env';
+import { getLabsMobileConfig, getWhapiConfig } from '../config/env';
 import { sendGenericEmail } from './email.service';
 import { recordOutbound } from './outbox.service';
 
 /**
- * Notificaciones del modulo de evaluaciones por canales (correo y SMS). Cada
- * canal registra su propio envio en la bandeja de salida (correo en email.service;
- * SMS aqui). `dispatch` solo registra el caso "sin destino" y devuelve si se envio.
+ * Notificaciones del modulo de evaluaciones por canales (correo, SMS y
+ * WhatsApp). Cada canal registra su propio envio en la bandeja de salida
+ * (correo en email.service; SMS/WhatsApp aqui). `dispatch` solo registra el
+ * caso "sin destino" y devuelve si se envio.
  */
 
 interface SendContext {
@@ -17,9 +18,70 @@ interface SendContext {
 }
 
 interface NotificationChannel {
-  readonly name: 'email' | 'sms';
+  readonly name: 'email' | 'sms' | 'whatsapp';
   send(recipient: string, context: SendContext): Promise<void>;
 }
+
+// Numero nacional MX de 10 digitos -> anteponer lada de pais 52 (Whapi exige
+// formato internacional sin '+'). Datos legacy con lada (>=11 digitos) se usan
+// tal cual. Mismo criterio que smsChannel.
+const toInternationalMx = (recipient: string): string => {
+  const digits = recipient.replace(/[^\d]/g, '');
+  return digits.length === 10 ? `52${digits}` : digits;
+};
+
+const whatsappChannel: NotificationChannel = {
+  name: 'whatsapp',
+  async send(recipient, context) {
+    const config = getWhapiConfig();
+    if (!config) {
+      await recordOutbound({
+        channel: 'whatsapp',
+        recipient,
+        body: context.message,
+        template: context.template,
+        assignmentId: context.assignmentId,
+        status: 'skipped',
+        error: 'WHATSAPP_NOT_CONFIGURED',
+      });
+      const error = new Error('WHATSAPP_NOT_CONFIGURED');
+      (error as any).code = 'WHATSAPP_NOT_CONFIGURED';
+      throw error;
+    }
+    try {
+      const response = await fetch(`${config.apiBase}/messages/text`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: toInternationalMx(recipient),
+          body: context.message,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Whapi HTTP ${response.status}`);
+      }
+      await recordOutbound({
+        channel: 'whatsapp',
+        recipient,
+        body: context.message,
+        template: context.template,
+        assignmentId: context.assignmentId,
+        status: 'sent',
+      });
+    } catch (error) {
+      await recordOutbound({
+        channel: 'whatsapp',
+        recipient,
+        body: context.message,
+        template: context.template,
+        assignmentId: context.assignmentId,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
+};
 
 const emailChannel: NotificationChannel = {
   name: 'email',
@@ -147,6 +209,14 @@ export const sendGenericNotification = async (
   const smsSent = await dispatch(smsChannel, recipient.phone, subject, smsBody, template, null);
   return { emailSent, smsSent };
 };
+
+/** Envio suelto por WhatsApp (Whapi Cloud), fuera del flujo de evaluaciones. */
+export const sendWhatsAppNotification = async (
+  phone: string | null,
+  message: string,
+  template: string,
+): Promise<boolean> => dispatch(whatsappChannel, phone, template, message, template, null);
+
 
 const formatDeadline = (iso: string): string =>
   new Date(iso).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' });

@@ -145,7 +145,7 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
   const file = req.file;
   const user = req.user;
   const categoryId = parsePositiveInt(req.body?.category_id);
-  const { title, description, publish_date, expiry_date } = req.body;
+  const { title, description, code, publish_date, expiry_date } = req.body;
 
   if (!user?.id || !user.role) {
     return res.status(401).json({ message: 'Sesion invalida o expirada' });
@@ -186,6 +186,7 @@ export const uploadDocument = async (req: AuthRequest, res: Response) => {
       uploaded_by: user.id,
       category_id: categoryId,
       description: description || '',
+      code: code ? String(code).trim() || null : null,
       publish_date: publish_date || new Date().toISOString().split('T')[0],
       expiry_date: expiry_date || null,
       ip: req.ip,
@@ -358,15 +359,16 @@ export const updateDocumentMetadata = async (req: AuthRequest, res: Response) =>
 
   const hasTitle = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'title');
   const hasDescription = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'description');
+  const hasCode = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'code');
   const hasPublishDate = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'publish_date');
   const hasExpiryDate = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'expiry_date');
   const hasCategoryId = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'category_id');
   const hasStatus = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'status');
 
-  if (!hasTitle && !hasDescription && !hasPublishDate && !hasExpiryDate && !hasCategoryId && !hasStatus) {
+  if (!hasTitle && !hasDescription && !hasCode && !hasPublishDate && !hasExpiryDate && !hasCategoryId && !hasStatus) {
     return res.status(400).json({
       message:
-        'Debes enviar al menos un campo para actualizar: title, description, publish_date, expiry_date, category_id o status',
+        'Debes enviar al menos un campo para actualizar: title, description, code, publish_date, expiry_date, category_id o status',
     });
   }
 
@@ -390,6 +392,14 @@ export const updateDocumentMetadata = async (req: AuthRequest, res: Response) =>
 
     values.push(description);
     updates.push(`description = $${values.length}`);
+  }
+
+  if (hasCode) {
+    const rawCode = req.body?.code;
+    const code = rawCode === null || rawCode === undefined ? null : String(rawCode).trim() || null;
+
+    values.push(code);
+    updates.push(`code = $${values.length}`);
   }
 
   if (hasPublishDate) {
@@ -537,6 +547,7 @@ export const replaceDocumentFile = async (req: AuthRequest, res: Response) => {
 
   const hasTitle = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'title');
   const hasDescription = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'description');
+  const hasCode = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'code');
   const hasPublishDate = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'publish_date');
   const hasExpiryDate = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'expiry_date');
   const hasCategoryId = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'category_id');
@@ -562,6 +573,12 @@ export const replaceDocumentFile = async (req: AuthRequest, res: Response) => {
     const rawDescription = req.body?.description;
     parsedDescription =
       rawDescription === null || rawDescription === undefined ? '' : String(rawDescription).trim();
+  }
+
+  let parsedCode: string | null = null;
+  if (hasCode) {
+    const rawCode = req.body?.code;
+    parsedCode = rawCode === null || rawCode === undefined ? null : String(rawCode).trim() || null;
   }
 
   let parsedPublishDate: string | null | undefined;
@@ -631,6 +648,7 @@ export const replaceDocumentFile = async (req: AuthRequest, res: Response) => {
       uploaded_by: user.id,
       category_id: targetCategoryId,
       description: parsedDescription ?? existingDocument.description ?? '',
+      code: hasCode ? parsedCode : existingDocument.code,
       publish_date: parsedPublishDate ?? existingDocument.publish_date ?? new Date().toISOString().slice(0, 10),
       expiry_date:
         parsedExpiryDate !== undefined ? parsedExpiryDate : (existingDocument.expiry_date ?? null),

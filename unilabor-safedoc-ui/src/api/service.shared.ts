@@ -279,6 +279,7 @@ export interface UpdateDocumentPayload {
   title: string;
   category_id: string | number;
   description?: string;
+  code?: string | null;
   publish_date?: string;
   expiry_date?: string;
   file?: File | null;

@@ -120,7 +120,9 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
     logoPath: template.logo_path,
     orientation: template.orientation,
     styleSeed: context.courseId,
-    referenceCode: `CP-${issueDate.getFullYear()}-${String(context.assignmentId).padStart(4, '0')}`,
+    referenceCode: template.show_folio
+      ? `CP-${issueDate.getFullYear()}-${String(context.assignmentId).padStart(4, '0')}`
+      : undefined,
     signatures: template.signatures,
   });
 
@@ -215,12 +217,13 @@ interface LoadedTemplate {
   body_text: string;
   logo_path: string | null;
   orientation: 'landscape' | 'portrait';
+  show_folio: boolean;
   signatures: Array<{ name: string; role: string | null; imagePath: string | null }>;
 }
 
 const loadCertificateTemplate = async (assignmentId: number): Promise<LoadedTemplate> => {
   const result = await pool.query(
-    `SELECT ct.id, ct.title_text, ct.body_text, ct.logo_path, ct.orientation
+    `SELECT ct.id, ct.title_text, ct.body_text, ct.logo_path, ct.orientation, ct.show_folio
        FROM public.certificate_templates ct
        JOIN public.evaluation_templates t ON t.training_course_id = ct.training_course_id
        JOIN public.evaluation_assignments a ON a.template_id = t.id
@@ -234,6 +237,7 @@ const loadCertificateTemplate = async (assignmentId: number): Promise<LoadedTemp
         'Se otorga la presente constancia a {{nombre}} por acreditar la capacitacion "{{capacitacion}}" con una calificacion de {{calificacion}} el {{fecha}}.',
       logo_path: null,
       orientation: 'landscape',
+      show_folio: true,
       signatures: [],
     };
   }
@@ -249,6 +253,7 @@ const loadCertificateTemplate = async (assignmentId: number): Promise<LoadedTemp
     body_text: String(row.body_text),
     logo_path: row.logo_path ? String(row.logo_path) : null,
     orientation: String(row.orientation) as 'landscape' | 'portrait',
+    show_folio: Boolean(row.show_folio),
     signatures: signaturesResult.rows.map((s) => ({
       name: String(s.signatory_name),
       role: s.role ? String(s.role) : null,

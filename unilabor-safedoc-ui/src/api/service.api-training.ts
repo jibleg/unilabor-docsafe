@@ -759,6 +759,7 @@ const normalizeCertificateTemplate = (input: unknown, courseId: number): Certifi
     body_text: getString(source ?? {}, ['body_text']),
     logo_path: getString(source ?? {}, ['logo_path']) || null,
     orientation: (getString(source ?? {}, ['orientation']) as 'landscape' | 'portrait') || 'landscape',
+    show_folio: getBoolean(source ?? {}, ['show_folio'], true),
     signatures,
   };
 };
@@ -768,6 +769,7 @@ export interface CertificateTemplatePayload {
   body_text?: string;
   logo_path?: string | null;
   orientation?: 'landscape' | 'portrait';
+  show_folio?: boolean;
   signatures?: Array<{ signatory_name: string; role?: string | null; signature_image_path?: string | null }>;
 }
 

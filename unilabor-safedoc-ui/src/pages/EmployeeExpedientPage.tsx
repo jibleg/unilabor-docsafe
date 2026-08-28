@@ -15,6 +15,8 @@ import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { EmployeeAlertsSummaryPanel } from '../components/rh/EmployeeAlertsSummaryPanel';
 import { EmployeeDocumentHistoryModal } from '../components/rh/EmployeeDocumentHistoryModal';
 import { EmployeeDocumentUploadModal } from '../components/rh/EmployeeDocumentUploadModal';
+import { EmployeeInductionHistoryPanel } from '../components/rh/EmployeeInductionHistoryPanel';
+import { EmployeePositionsPanel } from '../components/rh/EmployeePositionsPanel';
 import { EmployeeRecentMovementsPanel } from '../components/rh/EmployeeRecentMovementsPanel';
 import { ExpedientSectionCard } from '../components/rh/ExpedientSectionCard';
 import type {
@@ -405,6 +407,10 @@ export const EmployeeExpedientPage = () => {
                 logs={recentMovements}
                 loading={loadingMovements}
               />
+
+              {selectedEmployeeId ? <EmployeePositionsPanel employeeId={selectedEmployeeId} /> : null}
+
+              {selectedEmployeeId ? <EmployeeInductionHistoryPanel employeeId={selectedEmployeeId} /> : null}
 
               <div className="grid grid-cols-1 gap-6">
                 {expedient.sections.map((section) => (

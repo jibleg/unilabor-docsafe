@@ -33,8 +33,8 @@ export interface CertificateRenderInput {
   signatures: CertificateSignatureInput[];
   /** Semilla para elegir el estilo (id de la capacitacion). Determinista. */
   styleSeed?: number;
-  /** Folio/referencia para verificacion (se muestra en el pie). */
-  referenceCode?: string;
+  /** Folio/referencia para verificacion (se muestra en el pie). Omitido/undefined = sin folio (plantilla con show_folio=false). */
+  referenceCode?: string | undefined;
 }
 
 // --- Paleta de marca ---

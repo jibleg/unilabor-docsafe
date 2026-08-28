@@ -7,6 +7,7 @@ export interface DocumentEditorFormData {
   title: string;
   category_id: string;
   description: string;
+  code: string;
   publish_date: string;
   expiry_date: string;
   file: File | null;
@@ -184,6 +185,24 @@ export const DocumentEditorModal = ({
                 ))}
               </select>
               <FormFieldError id="category_id-error" message={categoryError} />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-bold uppercase text-[var(--unilabor-neutral)]">
+                Código del documento (SGC)
+              </label>
+              <input
+                type="text"
+                value={formData.code}
+                placeholder="Ej. REH-INS-001"
+                className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-[var(--unilabor-ink)] outline-none transition-all focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+                onChange={(event) =>
+                  setFormData((currentForm) => ({
+                    ...currentForm,
+                    code: event.target.value,
+                  }))
+                }
+              />
             </div>
 
             <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.95)] p-4">

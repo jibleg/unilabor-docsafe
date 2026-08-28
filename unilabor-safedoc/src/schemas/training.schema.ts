@@ -244,6 +244,7 @@ export const upsertCertificateTemplateSchema = z
     body_text: optionalText,
     logo_path: optionalText,
     orientation: z.enum(['landscape', 'portrait']).optional(),
+    show_folio: z.boolean().optional(),
     signatures: z.array(certificateSignatureSchema).max(4, 'Maximo 4 firmas').optional(),
   })
   .passthrough();

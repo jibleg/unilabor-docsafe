@@ -22,6 +22,7 @@ interface CreateDocumentInput {
   uploaded_by: string | undefined;
   category_id: number;
   description: string;
+  code?: string | null;
   publish_date: string;
   expiry_date: string | null;
   ip: string | undefined;
@@ -35,6 +36,7 @@ interface ReplaceDocumentInput {
   uploaded_by: string;
   category_id: number;
   description: string;
+  code?: string | null;
   publish_date: string;
   expiry_date: string | null;
   ip: string | undefined;
@@ -49,6 +51,7 @@ interface DocumentRecord {
   category_id: number;
   category_name: string | null;
   description: string | null;
+  code: string | null;
   publish_date: string | null;
   expiry_date: string | null;
   status: string;
@@ -69,6 +72,7 @@ export interface ManagedDocumentRecord {
   uploaded_by: string;
   category_id: number;
   description: string | null;
+  code: string | null;
   publish_date: string | null;
   expiry_date: string | null;
   status: string;
@@ -221,6 +225,7 @@ export const createDocumentWithMetadata = async (data: CreateDocumentInput): Pro
     uploaded_by,
     category_id,
     description,
+    code,
     publish_date,
     expiry_date,
     ip,
@@ -233,9 +238,9 @@ export const createDocumentWithMetadata = async (data: CreateDocumentInput): Pro
     const docQuery = `
       INSERT INTO documents (
         title, file_path, file_size, uploaded_by,
-        category_id, description, publish_date, expiry_date
+        category_id, description, code, publish_date, expiry_date
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING id;
     `;
 
@@ -246,6 +251,7 @@ export const createDocumentWithMetadata = async (data: CreateDocumentInput): Pro
       uploaded_by,
       category_id,
       description,
+      code ?? null,
       publish_date,
       expiry_date,
     ]);
@@ -282,6 +288,7 @@ export const findDocumentForManagement = async (
           uploaded_by,
           category_id,
           description,
+          code,
           publish_date,
           expiry_date,
           status,
@@ -300,6 +307,7 @@ export const findDocumentForManagement = async (
           uploaded_by,
           category_id,
           description,
+          code,
           publish_date,
           expiry_date,
           status,
@@ -332,6 +340,7 @@ export const replaceDocumentWithNewVersion = async (
     uploaded_by,
     category_id,
     description,
+    code,
     publish_date,
     expiry_date,
     ip,
@@ -381,18 +390,20 @@ export const replaceDocumentWithNewVersion = async (
           uploaded_by,
           category_id,
           description,
+          code,
           publish_date,
           expiry_date,
           status,
           replaces_document_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10)
         RETURNING
           id,
           title,
           file_path,
           category_id,
           description,
+          code,
           publish_date,
           expiry_date,
           status,
@@ -407,6 +418,7 @@ export const replaceDocumentWithNewVersion = async (
         uploaded_by,
         category_id,
         description,
+        code ?? null,
         publish_date,
         expiry_date,
         previous_document_id,
@@ -485,6 +497,7 @@ export const listDocumentsForUser = async (
       d.category_id,
       c.name AS category_name,
       d.description,
+      d.code,
       d.publish_date,
       d.expiry_date,
       d.status
@@ -663,6 +676,7 @@ export const searchDocumentsForUser = async (
       d.category_id,
       c.name AS category_name,
       d.description,
+      d.code,
       d.publish_date,
       d.expiry_date,
       d.status

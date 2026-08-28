@@ -944,12 +944,14 @@ export const createDocumentMutationPayload = (payload: UpdateDocumentPayload) =>
   const normalizedTitle = payload.title.trim();
   const normalizedCategoryId = Number(String(payload.category_id).trim());
   const normalizedDescription = payload.description?.trim() ?? '';
+  const normalizedCode = payload.code?.trim() ?? '';
   const normalizedPublishDate = payload.publish_date?.trim() ?? '';
   const normalizedExpiryDate = payload.expiry_date?.trim() ?? '';
   const normalizedStatus = payload.status?.trim() ?? '';
 
   const jsonPayload: Record<string, string | number | null> = {
     description: normalizedDescription,
+    code: normalizedCode || null,
     expiry_date: normalizedExpiryDate || null,
   };
 
@@ -980,6 +982,7 @@ export const createDocumentMutationPayload = (payload: UpdateDocumentPayload) =>
   }
 
   formData.append('description', normalizedDescription);
+  formData.append('code', normalizedCode);
 
   if (normalizedPublishDate) {
     formData.append('publish_date', normalizedPublishDate);
