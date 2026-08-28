@@ -4,7 +4,6 @@ import type { AuthRequest } from '../types';
 import {
   buildEmployeeExpedient,
   canUserAccessEmployeeDocument,
-  canUserAccessEmployeeExpedient,
   getEmployeeForAuthenticatedUser,
   listEmployeeDocumentHistory,
   listEmployeeDocuments,
@@ -139,11 +138,6 @@ export const getEmployeeExpedientController = async (req: AuthRequest, res: Resp
   }
 
   try {
-    const canAccess = await canUserAccessEmployeeExpedient(user.id, user.role, employeeId);
-    if (!canAccess) {
-      return res.status(403).json({ message: 'No tienes acceso al expediente solicitado.' });
-    }
-
     const expedient = await buildEmployeeExpedient(employeeId);
     return res.json(expedient);
   } catch (error: any) {
@@ -169,11 +163,6 @@ export const listEmployeeDocumentsController = async (req: AuthRequest, res: Res
   }
 
   try {
-    const canAccess = await canUserAccessEmployeeExpedient(user.id, user.role, employeeId);
-    if (!canAccess) {
-      return res.status(403).json({ message: 'No tienes acceso a los documentos de este expediente.' });
-    }
-
     const sectionId = parsePositiveInt(req.query.section_id);
     const documentTypeId = parsePositiveInt(req.query.document_type_id);
     const currentOnly =
@@ -242,12 +231,6 @@ export const uploadEmployeeDocumentController = async (req: AuthRequest, res: Re
   }
 
   try {
-    const canAccess = await canUserAccessEmployeeExpedient(user.id, user.role, employeeId);
-    if (!canAccess || (user.role !== 'ADMIN' && user.role !== 'EDITOR')) {
-      await removeUploadedFile(req.file.path);
-      return res.status(403).json({ message: 'No tienes permiso para cargar documentos RH.' });
-    }
-
     const payload: EmployeeDocumentPayload = {
       document_type_id: documentTypeId,
       title,
@@ -287,7 +270,7 @@ export const viewEmployeeDocumentController = async (req: AuthRequest, res: Resp
 
   try {
     const { document, absolutePath } = await resolveEmployeeDocumentPath(documentId);
-    const canAccess = await canUserAccessEmployeeDocument(user.id, user.role, documentId);
+    const canAccess = await canUserAccessEmployeeDocument(user.id, documentId);
     if (!canAccess) {
       return res.status(403).json({ message: 'No tienes acceso a este documento RH.' });
     }
@@ -348,11 +331,6 @@ export const getEmployeeDocumentHistoryController = async (req: AuthRequest, res
   }
 
   try {
-    const canAccess = await canUserAccessEmployeeExpedient(user.id, user.role, employeeId);
-    if (!canAccess) {
-      return res.status(403).json({ message: 'No tienes acceso al historial solicitado.' });
-    }
-
     const referenceKey = typeof req.query.reference_key === 'string' ? req.query.reference_key : undefined;
     const documents = await listEmployeeDocumentHistory(employeeId, documentTypeId, referenceKey);
     return res.json({ documents });

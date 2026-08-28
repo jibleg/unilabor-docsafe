@@ -7,12 +7,12 @@ import type {
   EmployeeExpedientSummary,
   EmployeeRecord,
   EmployeeExpedientTypeItem,
-  UserRole,
 } from '../types';
 import { registerAuditEvent } from './audit.service';
 import { getEmployeeById, getEmployeeByUserId } from './employee.service';
 import { resolveStoredDocumentPath } from './document.service';
 import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
+import { getUserPermissionCodes } from './permission.service';
 
 export interface EmployeeDocumentPayload {
   document_type_id: number;
@@ -298,30 +298,6 @@ const ensureDocumentTypeAssignedToEmployee = async (
     (error as any).code = 'DOCUMENT_TYPE_NOT_ASSIGNED_TO_EMPLOYEE';
     throw error;
   }
-};
-
-export const canUserAccessEmployeeExpedient = async (
-  userId: string,
-  role: UserRole,
-  employeeId: number,
-): Promise<boolean> => {
-  if (role === 'ADMIN' || role === 'EDITOR') {
-    return true;
-  }
-
-  const result = await pool.query(
-    `
-      SELECT 1
-      FROM public.employees
-      WHERE id = $1
-        AND user_id = $2
-        AND is_active = TRUE
-      LIMIT 1;
-    `,
-    [employeeId, userId],
-  );
-
-  return result.rows.length > 0;
 };
 
 export const getEmployeeForAuthenticatedUser = async (
@@ -786,7 +762,6 @@ export const resolveEmployeeDocumentPath = async (documentId: number): Promise<{
 
 export const canUserAccessEmployeeDocument = async (
   userId: string,
-  role: UserRole,
   documentId: number,
 ): Promise<boolean> => {
   const result = await pool.query(
@@ -824,7 +799,8 @@ export const canUserAccessEmployeeDocument = async (
     return false;
   }
 
-  if (role === 'ADMIN' || role === 'EDITOR') {
+  const permissions = await getUserPermissionCodes(userId);
+  if (permissions.has('RH.EMPLOYEE_DOCS.READ')) {
     return true;
   }
 
