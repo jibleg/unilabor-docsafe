@@ -69,6 +69,28 @@ export const getEmailFrom = (): { email: string; name: string } => {
 };
 
 /**
+ * Credenciales de la API de Claude (Anthropic), usadas por el banco de
+ * preguntas generado por IA del modulo de Induccion (RH). Opcional: si falta
+ * la key, el endpoint de generacion responde con un error claro en vez de
+ * fallar al arrancar el servidor.
+ *
+ * `workspaceId` es opcional y solo aplica si la key fue creada como
+ * "identity-linked" (vinculada al usuario del Console, no a un Workspace
+ * especifico) — la API de Anthropic exige entonces el header
+ * `anthropic-workspace-id` en cada peticion. Si la key ya esta vinculada a un
+ * Workspace desde su creacion, no hace falta.
+ */
+export const getAnthropicConfig = (): { apiKey: string; model: string; workspaceId: string | null } | null => {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) {
+    return null;
+  }
+  const model = process.env.QUESTION_BANK_MODEL?.trim() || 'claude-sonnet-5';
+  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID?.trim() || null;
+  return { apiKey, model, workspaceId };
+};
+
+/**
  * Valida la configuracion critica al arranque. Lanza si falta `JWT_SECRET` o si
  * conserva el valor por defecto inseguro. Llamar antes de `app.listen`.
  */

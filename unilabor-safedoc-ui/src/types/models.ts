@@ -1022,6 +1022,42 @@ export interface EvaluationTemplate {
   updated_at?: string;
 }
 
+// --- Banco de preguntas generado por IA (Induccion, RH) ---
+// Staging previo a EvaluationQuestion: RH aprueba/edita aqui antes de que una
+// pregunta se copie al arreglo real de la plantilla (ver QuestionBankPanel).
+export type QuestionBankItemStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+
+export interface QuestionBankItem {
+  id: number;
+  batch_id: number;
+  phase_id: number;
+  document_id: string | null;
+  type: EvaluationQuestionType;
+  text: string;
+  points: number;
+  options: EvaluationQuestionOption[];
+  status: QuestionBankItemStatus;
+  created_at: string;
+}
+
+export interface QuestionBankCounts {
+  single: number;
+  multiple: number;
+  boolean: number;
+  open: number;
+}
+
+export interface QuestionBankBatch {
+  id: number;
+  phase_id: number;
+  document_ids: string[];
+  model: string;
+  status: 'running' | 'completed' | 'failed';
+  error_message: string | null;
+  question_count: number;
+  created_at: string;
+}
+
 export type EvaluationAssignmentStatus =
   | 'pending'
   | 'in_progress'

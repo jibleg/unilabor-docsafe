@@ -19,7 +19,16 @@ import {
   toggleChecklistItemController,
   updatePhaseContactController,
 } from '../controllers/rh-induction.controller';
+import {
+  deleteQuestionBankItemController,
+  generateQuestionBankController,
+  listQuestionBankBatchesController,
+  listQuestionBankItemsController,
+  reviewQuestionBankItemController,
+} from '../controllers/rh-question-bank.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
 
 const router = Router();
 
@@ -49,5 +58,34 @@ router.get('/employees/:employeeId/induction/master-record', requirePermission('
 router.get('/employees/:employeeId/induction/master-record.pdf', requirePermission('RH.INDUCTION.MANAGE'), getEmployeeInductionMasterRecordPdfController);
 
 router.get('/me/induction', requirePermission('RH.SELF.INDUCTION'), getMyInductionProgressController);
+
+// Banco de preguntas generado por IA (staging: nunca escribe evaluation_questions directo).
+router.post(
+  '/induction/phases/:phaseId/question-bank/generate',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(generateQuestionBankSchema),
+  generateQuestionBankController,
+);
+router.get(
+  '/induction/phases/:phaseId/question-bank',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  listQuestionBankItemsController,
+);
+router.patch(
+  '/induction/question-bank/:itemId',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(reviewQuestionBankItemSchema),
+  reviewQuestionBankItemController,
+);
+router.delete(
+  '/induction/question-bank/:itemId',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  deleteQuestionBankItemController,
+);
+router.get(
+  '/induction/phases/:phaseId/question-bank/batches',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  listQuestionBankBatchesController,
+);
 
 export default router;

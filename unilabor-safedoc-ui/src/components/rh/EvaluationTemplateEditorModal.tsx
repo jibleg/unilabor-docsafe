@@ -6,12 +6,15 @@ import {
   replaceTemplateQuestions,
   updateEvaluationTemplate,
 } from '../../api/service';
+import { listInductionPhases } from '../../api/service.api-rh-induction';
+import { QuestionBankPanel } from './QuestionBankPanel';
 import type {
   EvaluationQuestion,
   EvaluationQuestionType,
   EvaluationSelectionMode,
   EvaluationTemplate,
   EvaluationType,
+  RhInductionPhase,
 } from '../../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
 
@@ -89,6 +92,10 @@ export const EvaluationTemplateEditorModal = ({
   const [saving, setSaving] = useState(false);
   const [template, setTemplate] = useState<EvaluationTemplate | null>(null);
   const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
+  // Fase de induccion cuya training_course_id coincide con esta plantilla (si
+  // aplica): solo entonces se ofrece el banco de preguntas con IA, ya que
+  // necesita los documentos obligatorios de la fase como fuente.
+  const [inductionPhase, setInductionPhase] = useState<RhInductionPhase | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -101,6 +108,18 @@ export const EvaluationTemplateEditorModal = ({
         }
         setTemplate(detail);
         setQuestions(detail?.questions ?? []);
+        if (detail?.training_course_id) {
+          try {
+            const phases = await listInductionPhases();
+            if (active) {
+              setInductionPhase(
+                phases.find((phase) => phase.training_course_id === detail.training_course_id) ?? null,
+              );
+            }
+          } catch {
+            // El banco IA es una mejora opcional: si no se puede resolver la fase, se omite en silencio.
+          }
+        }
       } catch (error) {
         if (active) {
           notifyError(getApiErrorMessage(error, 'No se pudo cargar la evaluación.'));
@@ -185,6 +204,14 @@ export const EvaluationTemplateEditorModal = ({
   };
   const removeQuestion = (index: number) =>
     setQuestions((current) => current.filter((_, i) => i !== index));
+
+  // A diferencia de addQuestion (boton manual, que si desplaza al final), aqui NO
+  // se hace scroll: el usuario esta revisando tarjetas dentro de la seccion
+  // "Generado con IA" y perderia el foco si el modal saltara al banco manual
+  // cada vez que hace clic en "Usar".
+  const useGeneratedQuestion = (question: EvaluationQuestion) => {
+    setQuestions((current) => [...current, question]);
+  };
 
   const hasOpenQuestions = useMemo(() => questions.some((question) => question.type === 'open'), [questions]);
   const isPractical = template?.evaluation_type === 'practical';
@@ -403,6 +430,14 @@ export const EvaluationTemplateEditorModal = ({
               <div className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2 text-xs text-[var(--color-brand-700)]">
                 Esta evaluación incluye preguntas abiertas: la calificación final requerirá la revisión de RH.
               </div>
+            )}
+
+            {!isPractical && inductionPhase && (
+              <QuestionBankPanel
+                phaseId={inductionPhase.id}
+                phaseDocuments={inductionPhase.documents}
+                onUseQuestion={useGeneratedQuestion}
+              />
             )}
 
             {/* Banco de preguntas (solo evaluaciones tipo cuestionario) */}
