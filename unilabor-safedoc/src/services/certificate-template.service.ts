@@ -1,6 +1,8 @@
 import pool from '../config/db';
 import type { CertificateSignatureRecord, CertificateTemplateRecord } from '../types';
-import type { CertificateRenderInput } from './certificate-render.service';
+import { renderCertificatePdf, type CertificateRenderInput } from './certificate-render.service';
+import { renderInductionCertificatePdf } from './certificate-render-induction.service';
+import { getInductionPhaseByCourseId } from './rh-induction.service';
 
 /**
  * CRUD de la plantilla de constancia por capacitacion y armado de los datos para
@@ -175,12 +177,40 @@ export const upsertCertificateTemplate = async (
 const formatValidity = (months: number): string =>
   months > 0 ? `${months} meses a partir de la emision` : 'Sin vencimiento';
 
-/** Arma los datos de muestra para el preliminar (mismo motor que la real). */
-export const buildPreviewRenderInput = async (courseId: number): Promise<CertificateRenderInput> => {
+/** Arma el PDF preliminar (con datos de muestra) — elige el motor de render segun
+ * si el curso es una fase de Induccion (diseno fijo) o una capacitacion normal
+ * (motor generico de 4 estilos). Mismo criterio que certificate-issuance.service.ts. */
+export const buildCertificatePreviewPdf = async (courseId: number): Promise<Buffer> => {
   const course = await loadCourse(courseId);
   const template = await getCertificateTemplate(courseId);
-  const sampleDate = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
-  return {
+  const now = new Date();
+  const sampleDate = now.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+  const referenceCode = template.show_folio ? `CP-${now.getFullYear()}-${String(course.id).padStart(4, '0')}` : undefined;
+  const signatures = template.signatures.map((signature) => ({
+    name: signature.signatory_name,
+    role: signature.role,
+    imagePath: signature.signature_image_path,
+  }));
+
+  const inductionPhase = await getInductionPhaseByCourseId(course.id);
+  if (inductionPhase) {
+    return renderInductionCertificatePdf({
+      recipientName: 'Juan Perez Ramirez',
+      position: 'Analista de Laboratorio',
+      branch: 'Matriz',
+      scoreText: '95 / 100',
+      durationText: inductionPhase.durationHours ? `${inductionPhase.durationHours} HORAS` : '8 HORAS',
+      evaluationDateText: now.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+      phaseNumber: inductionPhase.phaseNumber,
+      phaseName: inductionPhase.phaseName,
+      issueDateLong: sampleDate,
+      logoPath: template.logo_path,
+      signatures,
+      referenceCode,
+    });
+  }
+
+  const input: CertificateRenderInput = {
     recipientName: 'Juan Perez Ramirez',
     courseTitle: course.title,
     date: sampleDate,
@@ -191,11 +221,8 @@ export const buildPreviewRenderInput = async (courseId: number): Promise<Certifi
     logoPath: template.logo_path,
     orientation: template.orientation,
     styleSeed: course.id,
-    referenceCode: template.show_folio ? `CP-${new Date().getFullYear()}-${String(course.id).padStart(4, '0')}` : undefined,
-    signatures: template.signatures.map((signature) => ({
-      name: signature.signatory_name,
-      role: signature.role,
-      imagePath: signature.signature_image_path,
-    })),
+    referenceCode,
+    signatures,
   };
+  return renderCertificatePdf(input);
 };

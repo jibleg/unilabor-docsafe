@@ -32,6 +32,7 @@ export const RhPositionsPage = () => {
   const [creating, setCreating] = useState(false);
 
   const [competencyText, setCompetencyText] = useState('');
+  const [competencyCriticality, setCompetencyCriticality] = useState<'A' | 'M' | 'B'>('M');
   const [savingCompetency, setSavingCompetency] = useState(false);
 
   const [documentCode, setDocumentCode] = useState('');
@@ -101,8 +102,9 @@ export const RhPositionsPage = () => {
     }
     setSavingCompetency(true);
     try {
-      await addPositionCompetency(selectedPosition.id, competencyText.trim());
+      await addPositionCompetency(selectedPosition.id, competencyText.trim(), 0, competencyCriticality);
       setCompetencyText('');
+      setCompetencyCriticality('M');
       toast.success('Competencia agregada correctamente.');
       await load();
     } catch (error) {
@@ -246,12 +248,26 @@ export const RhPositionsPage = () => {
                   {selectedPosition.competencies.map((competency) => (
                     <div
                       key={competency.id}
-                      className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
+                      className="flex items-center justify-between gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
                     >
                       <span className="text-[var(--unilabor-ink)]">{competency.competency_text}</span>
-                      <button type="button" onClick={() => void handleDeleteCompetency(competency.id)} className="text-rose-500 hover:text-rose-700">
-                        <Trash2 size={13} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            competency.criticality === 'A'
+                              ? 'bg-rose-50 text-rose-700'
+                              : competency.criticality === 'B'
+                                ? 'bg-[rgba(151,163,172,0.14)] text-[var(--unilabor-neutral)]'
+                                : 'bg-amber-50 text-amber-700'
+                          }`}
+                          title="Criticidad (pondera la Evaluación de competencia REH-REG-003)"
+                        >
+                          {competency.criticality === 'A' ? 'Alta' : competency.criticality === 'B' ? 'Baja' : 'Media'}
+                        </span>
+                        <button type="button" onClick={() => void handleDeleteCompetency(competency.id)} className="text-rose-500 hover:text-rose-700">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -262,6 +278,16 @@ export const RhPositionsPage = () => {
                     placeholder="Ej. Manejo de espectrofotómetro"
                     className={inputClass}
                   />
+                  <select
+                    value={competencyCriticality}
+                    onChange={(event) => setCompetencyCriticality(event.target.value as 'A' | 'M' | 'B')}
+                    className={`${inputClass} w-40 shrink-0`}
+                    title="Criticidad de la competencia"
+                  >
+                    <option value="A">A — Alta (5)</option>
+                    <option value="M">M — Media (3)</option>
+                    <option value="B">B — Baja (1)</option>
+                  </select>
                   <button type="button" onClick={() => void handleAddCompetency()} disabled={savingCompetency} className={buttonClass}>
                     {savingCompetency ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                   </button>

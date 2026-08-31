@@ -2,6 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import pool from '../config/db';
 import { renderCertificatePdf } from './certificate-render.service';
+import { renderInductionCertificatePdf } from './certificate-render-induction.service';
+import {
+  getEmployeeActivePositionName,
+  getInductionPhaseByCourseId,
+  type InductionCertificatePhaseContext,
+} from './rh-induction.service';
 
 /**
  * Generacion REAL de la constancia al acreditar una evaluacion (>= passing_score)
@@ -22,10 +28,18 @@ interface IssuanceContext {
   validityMonths: number;
   percentage: number;
   issuerUserId: string;
+  submittedAt: Date | null;
+  branchName: string | null;
+  /** No-null solo cuando el curso es una fase de Induccion (diseno fijo + archivo en PROG_IND). */
+  inductionPhase: InductionCertificatePhaseContext | null;
 }
 
 const formatDate = (date: Date): string =>
   date.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+
+/** DD/MM/AAAA, para el campo "Fecha de evaluacion" de la constancia de Induccion. */
+const formatDateShort = (date: Date): string =>
+  date.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
 const addMonths = (date: Date, months: number): Date => {
   const copy = new Date(date.getTime());
@@ -37,13 +51,15 @@ const addMonths = (date: Date, months: number): Date => {
 export const issueCertificateForAssignment = async (assignmentId: number): Promise<number | null> => {
   const contextResult = await pool.query(
     `SELECT a.id, a.employee_id, a.status, a.percentage, a.certificate_document_id,
-            a.created_by_user_id,
+            a.created_by_user_id, a.submitted_at,
             e.full_name AS employee_name,
+            bu.name AS branch_name,
             c.id AS course_id, c.title AS course_title, c.certificate_validity_months
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
        JOIN public.training_courses c ON c.id = t.training_course_id
        JOIN public.employees e ON e.id = a.employee_id
+       LEFT JOIN public.helpdesk_asset_units bu ON bu.id = e.branch_id
       WHERE a.id = $1 LIMIT 1;`,
     [assignmentId],
   );
@@ -60,15 +76,32 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
     return Number(row.certificate_document_id);
   }
 
-  // Tipo documental COURSE_CERTIFICATE (catalogo base RH).
-  const typeResult = await pool.query(
-    `SELECT id FROM public.document_types WHERE code = $1 AND is_active = TRUE LIMIT 1;`,
-    [CERTIFICATE_TYPE_CODE],
-  );
-  if (typeResult.rows.length === 0) {
+  // Fase de Induccion (o null si es una capacitacion normal): decide el motor de
+  // render Y la seccion del expediente donde se archiva la constancia.
+  const inductionPhase = await getInductionPhaseByCourseId(Number(row.course_id));
+
+  // Tipo documental: las fases de Induccion se archivan en la seccion PROG_IND
+  // bajo su tipo por fase (IND_FASE_N, en orden y con el nombre de la fase); el
+  // resto sigue en COURSE_CERTIFICATE (seccion Constancias). Si el tipo por fase
+  // no existe (migracion 20260831_04 sin aplicar), cae a COURSE_CERTIFICATE para
+  // no bloquear la emision.
+  const typeCandidates = inductionPhase
+    ? [`IND_FASE_${inductionPhase.phaseNumber}`, CERTIFICATE_TYPE_CODE]
+    : [CERTIFICATE_TYPE_CODE];
+  let documentTypeId: number | null = null;
+  for (const typeCode of typeCandidates) {
+    const typeResult = await pool.query(
+      `SELECT id FROM public.document_types WHERE UPPER(code) = UPPER($1) AND is_active = TRUE LIMIT 1;`,
+      [typeCode],
+    );
+    if (typeResult.rows.length > 0) {
+      documentTypeId = Number(typeResult.rows[0].id);
+      break;
+    }
+  }
+  if (documentTypeId === null) {
     throw new Error('CERTIFICATE_DOCUMENT_TYPE_NOT_FOUND');
   }
-  const documentTypeId = Number(typeResult.rows[0].id);
 
   // Usuario emisor: quien asigno; si no, un admin activo (FK NOT NULL).
   const issuerUserId = await resolveIssuerUserId(row.created_by_user_id ? String(row.created_by_user_id) : null);
@@ -86,6 +119,9 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
     validityMonths,
     percentage: row.percentage !== null ? Number(row.percentage) : 0,
     issuerUserId,
+    submittedAt: row.submitted_at ? new Date(row.submitted_at) : null,
+    branchName: row.branch_name ? String(row.branch_name) : null,
+    inductionPhase,
   };
 
   return persistCertificate(context, documentTypeId);
@@ -108,23 +144,42 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
 
   // Plantilla de constancia del curso (o defaults si no fue disenada).
   const template = await loadCertificateTemplate(context.assignmentId);
+  const referenceCode = template.show_folio
+    ? `CP-${issueDate.getFullYear()}-${String(context.assignmentId).padStart(4, '0')}`
+    : undefined;
 
-  const pdf = await renderCertificatePdf({
-    recipientName: context.employeeName,
-    courseTitle: context.courseTitle,
-    date: formatDate(issueDate),
-    scoreText: `${context.percentage}%`,
-    validityText,
-    titleText: template.title_text,
-    bodyText: template.body_text,
-    logoPath: template.logo_path,
-    orientation: template.orientation,
-    styleSeed: context.courseId,
-    referenceCode: template.show_folio
-      ? `CP-${issueDate.getFullYear()}-${String(context.assignmentId).padStart(4, '0')}`
-      : undefined,
-    signatures: template.signatures,
-  });
+  // Las fases de Induccion usan el diseno oficial fijo (plantilla PPTX de RH)
+  // en vez del motor generico de 4 estilos rotativos.
+  const inductionPhase = context.inductionPhase;
+  const pdf = inductionPhase
+    ? await renderInductionCertificatePdf({
+        recipientName: context.employeeName,
+        position: (await getEmployeeActivePositionName(context.employeeId)) ?? '—',
+        branch: context.branchName ?? '—',
+        scoreText: `${context.percentage} / 100`,
+        durationText: inductionPhase.durationHours ? `${inductionPhase.durationHours} HORAS` : '—',
+        evaluationDateText: formatDateShort(context.submittedAt ?? issueDate),
+        phaseNumber: inductionPhase.phaseNumber,
+        phaseName: inductionPhase.phaseName,
+        issueDateLong: formatDate(issueDate),
+        logoPath: template.logo_path,
+        signatures: template.signatures,
+        referenceCode,
+      })
+    : await renderCertificatePdf({
+        recipientName: context.employeeName,
+        courseTitle: context.courseTitle,
+        date: formatDate(issueDate),
+        scoreText: `${context.percentage}%`,
+        validityText,
+        titleText: template.title_text,
+        bodyText: template.body_text,
+        logoPath: template.logo_path,
+        orientation: template.orientation,
+        styleSeed: context.courseId,
+        referenceCode,
+        signatures: template.signatures,
+      });
 
   // Guardar el PDF en el directorio de documentos (mismo patron que las subidas).
   const uploadDir = process.env.DIRECTORY_UPLOAD || 'uploads/documents';
@@ -135,7 +190,10 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
 
   const isoIssue = issueDate.toISOString().slice(0, 10);
   const isoExpiry = expiryDate ? expiryDate.toISOString().slice(0, 10) : null;
-  const title = `Constancia - ${context.courseTitle}`;
+  // Induccion: la constancia se archiva con el nombre de la fase (pedido de RH).
+  const title = inductionPhase
+    ? `Constancia Fase ${inductionPhase.phaseNumber} - ${inductionPhase.phaseName}`
+    : `Constancia - ${context.courseTitle}`;
 
   const client = await pool.connect();
   try {

@@ -3,11 +3,13 @@ import { unwrapPayload, asRecord } from './service.shared';
 import type {
   RhInductionChecklistItem,
   RhInductionChecklistProgressItem,
+  RhInductionClosure,
   RhInductionEffectivenessReview,
   RhInductionMasterRecord,
   RhInductionPhase,
   RhInductionPhaseDocument,
   RhInductionPhaseEnrollmentSummary,
+  RhInductionPhasePosition,
   RhInductionProgressItem,
 } from '../types/models';
 
@@ -26,6 +28,25 @@ export const updatePhaseContact = async (
     responsible_name: responsibleName,
     responsible_phone: responsiblePhone,
   });
+};
+
+export const updatePhaseDuration = async (phaseId: number, durationHours: number | null): Promise<void> => {
+  await api.patch(`/rh/induction/phases/${phaseId}/duration`, { duration_hours: durationHours });
+};
+
+export const listPhasePositions = async (phaseId: number): Promise<RhInductionPhasePosition[]> => {
+  const response = await api.get(`/rh/induction/phases/${phaseId}/positions`);
+  const payload = asRecord(unwrapPayload(response.data));
+  return (payload?.positions as RhInductionPhasePosition[]) ?? [];
+};
+
+export const enablePhaseForPosition = async (
+  phaseId: number,
+  positionId: number,
+): Promise<RhInductionPhasePosition> => {
+  const response = await api.post(`/rh/induction/phases/${phaseId}/positions/${positionId}/enable`);
+  const data = asRecord(unwrapPayload(response.data));
+  return data?.position as RhInductionPhasePosition;
 };
 
 export const addPhaseDocument = async (
@@ -124,6 +145,26 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
   const response = await api.get(`/rh/employees/${employeeId}/induction/master-record`);
   const payload = asRecord(unwrapPayload(response.data));
   return payload?.record as RhInductionMasterRecord;
+};
+
+export interface CloseInductionRecordPayload {
+  verdict: 'APROBADA' | 'NO_APROBADA';
+  closing_notes?: string | null;
+  collaborator_signature: string;
+  rh_signature: string;
+  area_signature: string;
+  rh_signatory_name: string;
+  area_signatory_name: string;
+  supersede?: boolean;
+}
+
+export const closeInductionRecord = async (
+  employeeId: number,
+  payload: CloseInductionRecordPayload,
+): Promise<RhInductionClosure> => {
+  const response = await api.post(`/rh/employees/${employeeId}/induction/close`, payload);
+  const data = asRecord(unwrapPayload(response.data));
+  return data?.closure as RhInductionClosure;
 };
 
 /** Descarga el reporte de avance del Formato de Induccion como blob y devuelve un object URL. */

@@ -5,12 +5,14 @@ import { getEmployeeByUserId } from '../services/employee.service';
 import {
   addPhaseDocument,
   addPhaseChecklistItem,
+  enablePhaseForPosition,
   enrollEmployeeInPhase,
   getEmployeeInductionProgress,
   listEnrollmentChecklistProgress,
   listInductionPhases,
   listPhaseChecklistItems,
   listPhaseEnrollments,
+  listPhasePositions,
   removePhaseChecklistItem,
   removePhaseDocument,
   setEnrollmentSupervisor,
@@ -19,6 +21,12 @@ import {
 import { createEffectivenessReview, listEffectivenessReviews } from '../services/rh-induction-effectiveness.service';
 import { getEmployeeInductionMasterRecord } from '../services/rh-induction-master-record.service';
 import { buildInductionMasterRecordPdf } from '../services/rh-induction-master-record.pdf';
+import {
+  closeInductionRecord,
+  getCurrentInductionClosure,
+  getCurrentInductionClosureForPdf,
+} from '../services/rh-induction-closure.service';
+import { registerAuditEvent } from '../services/audit.service';
 
 const parsePositiveInt = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -28,6 +36,10 @@ const parsePositiveInt = (value: unknown): number | null => {
 const ERROR_STATUS: Record<string, number> = {
   RH_INDUCTION_PHASE_NOT_FOUND: 404,
   RH_INDUCTION_PHASE_NOT_INSTITUTIONAL: 409,
+  RH_INDUCTION_PHASE_NOT_POSITION: 409,
+  RH_INDUCTION_POSITION_NOT_FOUND: 404,
+  RH_INDUCTION_PHASE_POSITION_NOT_ENABLED: 409,
+  RH_INDUCTION_EMPLOYEE_WITHOUT_POSITION: 409,
   RH_INDUCTION_ALREADY_ENROLLED: 409,
   RH_INDUCTION_EMPLOYEE_WITHOUT_USER: 409,
   RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS: 409,
@@ -174,6 +186,70 @@ export const updatePhaseContactController = async (req: AuthRequest, res: Respon
   } catch (error: any) {
     console.error('Error actualizando contacto de fase:', error);
     return res.status(500).json({ message: 'No se pudo actualizar el contacto de la fase.' });
+  }
+};
+
+export const listPhasePositionsController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  if (!phaseId) {
+    return res.status(400).json({ message: 'ID de fase invalido.' });
+  }
+  try {
+    return res.json({ positions: await listPhasePositions(phaseId) });
+  } catch (error: any) {
+    console.error('Error listando puestos de la fase:', error);
+    return res.status(500).json({ message: 'No se pudieron cargar los puestos de la fase.' });
+  }
+};
+
+export const enablePhaseForPositionController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  const positionId = parsePositiveInt(req.params.positionId);
+  if (!phaseId || !positionId) {
+    return res.status(400).json({ message: 'Fase o puesto invalidos.' });
+  }
+  try {
+    const enabled = await enablePhaseForPosition(phaseId, positionId, req.user?.id ?? null);
+    return res.status(201).json({
+      message: `Fase habilitada para el puesto. Diseña su evaluación en Capacitaciones (curso ${enabled.course_code}).`,
+      position: enabled,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error habilitando fase para el puesto:', error);
+    return res.status(500).json({ message: 'No se pudo habilitar la fase para el puesto.' });
+  }
+};
+
+export const updatePhaseDurationController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  if (!phaseId) {
+    return res.status(400).json({ message: 'ID de fase invalido.' });
+  }
+  const rawDuration = req.body?.duration_hours;
+  const durationHours =
+    rawDuration === null || rawDuration === undefined || rawDuration === ''
+      ? null
+      : Number(rawDuration);
+  if (durationHours !== null && (!Number.isFinite(durationHours) || durationHours <= 0)) {
+    return res.status(400).json({ message: 'La duracion debe ser un numero de horas mayor a 0.' });
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE public.rh_induction_phases
+          SET duration_hours = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING id;`,
+      [durationHours, phaseId],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Fase no encontrada.' });
+    }
+    return res.json({ message: 'Duracion de la fase actualizada correctamente.' });
+  } catch (error: any) {
+    console.error('Error actualizando duracion de fase:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar la duracion de la fase.' });
   }
 };
 
@@ -329,12 +405,62 @@ export const getEmployeeInductionMasterRecordController = async (req: AuthReques
     return res.status(400).json({ message: 'ID de colaborador invalido.' });
   }
   try {
-    return res.json({ record: await getEmployeeInductionMasterRecord(employeeId) });
+    const [record, closure] = await Promise.all([
+      getEmployeeInductionMasterRecord(employeeId),
+      getCurrentInductionClosure(employeeId),
+    ]);
+    return res.json({ record: { ...record, closure } });
   } catch (error: any) {
     const mapped = mapError(res, error);
     if (mapped) return mapped;
     console.error('Error consultando el formato de induccion consolidado:', error);
     return res.status(500).json({ message: 'No se pudo consultar el formato de induccion.' });
+  }
+};
+
+export const closeInductionRecordController = async (req: AuthRequest, res: Response) => {
+  const employeeId = parsePositiveInt(req.params.employeeId);
+  if (!employeeId) {
+    return res.status(400).json({ message: 'ID de colaborador invalido.' });
+  }
+  try {
+    const closure = await closeInductionRecord({
+      employeeId,
+      verdict: req.body.verdict,
+      closingNotes: req.body.closing_notes ?? null,
+      collaboratorSignature: req.body.collaborator_signature,
+      rhSignature: req.body.rh_signature,
+      areaSignature: req.body.area_signature,
+      rhSignatoryName: req.body.rh_signatory_name,
+      areaSignatoryName: req.body.area_signatory_name,
+      supersede: Boolean(req.body.supersede),
+      closedByUserId: req.user?.id ?? null,
+    });
+    await registerAuditEvent({
+      user_id: req.user?.id ?? null,
+      action: `RH_INDUCTION_CLOSE:${employeeId}:${closure.verdict}`,
+      ip_address: req.ip ?? null,
+      module_code: 'RH',
+      entity_type: 'induction_closure',
+      entity_id: employeeId,
+    });
+    return res.status(201).json({ message: 'Formato de Induccion cerrado y archivado en el expediente.', closure });
+  } catch (error: any) {
+    const CLOSE_ERROR_STATUS: Record<string, number> = {
+      RH_INDUCTION_ALREADY_CLOSED: 409,
+      RH_INDUCTION_CLOSE_NOT_READY: 409,
+      RH_INDUCTION_CLOSE_NOTES_REQUIRED: 400,
+      RH_INDUCTION_INVALID_SIGNATURE: 400,
+      ARCHIVE_DOCUMENT_TYPE_NOT_FOUND: 409,
+    };
+    const status = CLOSE_ERROR_STATUS[error?.code];
+    if (status) {
+      return res.status(status).json({ message: error?.publicMessage || 'No se pudo cerrar el Formato de Induccion.' });
+    }
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error cerrando el formato de induccion:', error);
+    return res.status(500).json({ message: 'No se pudo cerrar el Formato de Induccion.' });
   }
 };
 
@@ -344,8 +470,26 @@ export const getEmployeeInductionMasterRecordPdfController = async (req: AuthReq
     return res.status(400).json({ message: 'ID de colaborador invalido.' });
   }
   try {
-    const record = await getEmployeeInductionMasterRecord(employeeId);
-    const pdf = await buildInductionMasterRecordPdf(record);
+    const [record, closureForPdf] = await Promise.all([
+      getEmployeeInductionMasterRecord(employeeId),
+      getCurrentInductionClosureForPdf(employeeId),
+    ]);
+    const pdf = await buildInductionMasterRecordPdf(
+      record,
+      closureForPdf
+        ? {
+            verdictLabel: closureForPdf.closure.verdict_label,
+            closedAt: new Date(closureForPdf.closure.created_at),
+            closingNotes: closureForPdf.closure.closing_notes,
+            collaboratorName: record.employee.full_name,
+            rhSignatoryName: closureForPdf.closure.rh_signatory_name,
+            areaSignatoryName: closureForPdf.closure.area_signatory_name,
+            collaboratorSignaturePng: closureForPdf.signatures.collaborator,
+            rhSignaturePng: closureForPdf.signatures.rh,
+            areaSignaturePng: closureForPdf.signatures.area,
+          }
+        : undefined,
+    );
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="formato-induccion-${record.employee.employee_code}.pdf"`);
     return res.send(pdf);

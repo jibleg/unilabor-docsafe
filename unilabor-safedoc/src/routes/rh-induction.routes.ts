@@ -2,7 +2,9 @@ import { Router } from 'express';
 import {
   addPhaseChecklistItemController,
   addPhaseDocumentController,
+  closeInductionRecordController,
   createEffectivenessReviewController,
+  enablePhaseForPositionController,
   enrollEmployeeInPhaseController,
   getEmployeeInductionMasterRecordController,
   getEmployeeInductionMasterRecordPdfController,
@@ -13,11 +15,13 @@ import {
   listInductionPhasesController,
   listPhaseChecklistItemsController,
   listPhaseEnrollmentsController,
+  listPhasePositionsController,
   removePhaseChecklistItemController,
   removePhaseDocumentController,
   setEnrollmentSupervisorController,
   toggleChecklistItemController,
   updatePhaseContactController,
+  updatePhaseDurationController,
 } from '../controllers/rh-induction.controller';
 import {
   deleteQuestionBankItemController,
@@ -29,6 +33,7 @@ import {
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
+import { closeInductionRecordSchema } from '../schemas/rh-induction-closure.schema';
 
 const router = Router();
 
@@ -38,6 +43,10 @@ router.use(verifyToken);
 
 router.get('/induction/phases', requirePermission('RH.INDUCTION.MANAGE'), listInductionPhasesController);
 router.patch('/induction/phases/:phaseId/contact', requirePermission('RH.INDUCTION.MANAGE'), updatePhaseContactController);
+router.patch('/induction/phases/:phaseId/duration', requirePermission('RH.INDUCTION.MANAGE'), updatePhaseDurationController);
+// Fases POSITION (5-6): habilitacion por puesto (crea la training_course propia).
+router.get('/induction/phases/:phaseId/positions', requirePermission('RH.INDUCTION.MANAGE'), listPhasePositionsController);
+router.post('/induction/phases/:phaseId/positions/:positionId/enable', requirePermission('RH.INDUCTION.MANAGE'), enablePhaseForPositionController);
 router.post('/induction/phases/:phaseId/documents', requirePermission('RH.INDUCTION.MANAGE'), addPhaseDocumentController);
 router.delete('/induction/phase-documents/:phaseDocumentId', requirePermission('RH.INDUCTION.MANAGE'), removePhaseDocumentController);
 router.post('/induction/phases/:phaseId/enroll', requirePermission('RH.INDUCTION.MANAGE'), enrollEmployeeInPhaseController);
@@ -56,6 +65,13 @@ router.post('/employees/:employeeId/induction/effectiveness', requirePermission(
 
 router.get('/employees/:employeeId/induction/master-record', requirePermission('RH.INDUCTION.MANAGE'), getEmployeeInductionMasterRecordController);
 router.get('/employees/:employeeId/induction/master-record.pdf', requirePermission('RH.INDUCTION.MANAGE'), getEmployeeInductionMasterRecordPdfController);
+// Cierre formal del REH-REG-005 (3 firmas digitales + archivo en expediente).
+router.post(
+  '/employees/:employeeId/induction/close',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(closeInductionRecordSchema),
+  closeInductionRecordController,
+);
 
 router.get('/me/induction', requirePermission('RH.SELF.INDUCTION'), getMyInductionProgressController);
 

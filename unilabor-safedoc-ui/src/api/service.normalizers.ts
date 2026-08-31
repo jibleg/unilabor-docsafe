@@ -190,6 +190,8 @@ export const normalizeEmployee = (input: unknown): Employee | null => {
     phone: getString(source, ['phone']) || null,
     area: getString(source, ['area']) || null,
     position: getString(source, ['position']) || null,
+    branch_id: getNumber(source, ['branch_id'], 0) || null,
+    branch_name: getString(source, ['branch_name']) || null,
     is_active: getBoolean(source, ['is_active', 'isActive'], true),
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),

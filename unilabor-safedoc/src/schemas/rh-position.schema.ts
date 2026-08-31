@@ -12,6 +12,7 @@ export type PositionInput = z.infer<typeof positionSchema>;
 
 export const positionCompetencySchema = z.object({
   competency_text: z.string().trim().min(1, 'La competencia no puede estar vacia'),
+  criticality: z.enum(['A', 'M', 'B']).optional(),
   sort_order: z.number().int().optional(),
 });
 

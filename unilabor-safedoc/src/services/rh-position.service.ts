@@ -19,6 +19,8 @@ const throwCoded = (code: string, publicMessage?: string): never => {
 export interface RhPositionCompetency {
   id: number;
   competency_text: string;
+  /** A=5 / M=3 / B=1: pondera el item en el REH-REG-003 (Fase 7 / reevaluacion). */
+  criticality: 'A' | 'M' | 'B';
   sort_order: number;
 }
 
@@ -63,13 +65,14 @@ const mapPosition = (row: any): Omit<RhPositionRecord, 'competencies' | 'documen
 
 const loadCompetencies = async (positionId: number): Promise<RhPositionCompetency[]> => {
   const result = await pool.query(
-    `SELECT id, competency_text, sort_order FROM public.rh_position_competencies
+    `SELECT id, competency_text, criticality, sort_order FROM public.rh_position_competencies
       WHERE position_id = $1 ORDER BY sort_order ASC, id ASC;`,
     [positionId],
   );
   return result.rows.map((row) => ({
     id: Number(row.id),
     competency_text: String(row.competency_text),
+    criticality: (String(row.criticality || 'M') as 'A' | 'M' | 'B'),
     sort_order: Number(row.sort_order ?? 0),
   }));
 };
@@ -189,18 +192,24 @@ export const addPositionCompetency = async (
   positionId: number,
   competencyText: string,
   sortOrder = 0,
+  criticality: 'A' | 'M' | 'B' = 'M',
 ): Promise<RhPositionCompetency> => {
   const text = competencyText.trim();
   if (!text) {
     throwCoded('RH_POSITION_COMPETENCY_INVALID', 'La competencia no puede estar vacia.');
   }
   const result = await pool.query(
-    `INSERT INTO public.rh_position_competencies (position_id, competency_text, sort_order)
-     VALUES ($1, $2, $3) RETURNING id, competency_text, sort_order;`,
-    [positionId, text, sortOrder],
+    `INSERT INTO public.rh_position_competencies (position_id, competency_text, sort_order, criticality)
+     VALUES ($1, $2, $3, $4) RETURNING id, competency_text, criticality, sort_order;`,
+    [positionId, text, sortOrder, criticality],
   );
   const row = result.rows[0];
-  return { id: Number(row.id), competency_text: String(row.competency_text), sort_order: Number(row.sort_order ?? 0) };
+  return {
+    id: Number(row.id),
+    competency_text: String(row.competency_text),
+    criticality: String(row.criticality) as 'A' | 'M' | 'B',
+    sort_order: Number(row.sort_order ?? 0),
+  };
 };
 
 export const deletePositionCompetency = async (competencyId: number): Promise<boolean> => {

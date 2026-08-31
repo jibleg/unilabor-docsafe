@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ClipboardList, Download, Loader2, Plus } from 'lucide-react';
+import { ClipboardList, Download, FileCheck2, Loader2, Plus } from 'lucide-react';
 import { toast } from 'react-toastify';
 import {
   createEffectivenessReview,
@@ -7,6 +7,7 @@ import {
   getEmployeeInductionMasterRecordPdfUrl,
 } from '../../api/service.api-rh-induction';
 import { getApiErrorMessage } from '../../api/service.parsers';
+import { InductionClosureModal } from './InductionClosureModal';
 import type { RhInductionMasterRecord, RhInductionPhaseRowStatus } from '../../types/models';
 
 interface EmployeeInductionHistoryPanelProps {
@@ -34,6 +35,7 @@ const VERDICT_LABEL: Record<RhInductionMasterRecord['summary']['verdict'], strin
   EN_PROCESO: 'En proceso',
   NO_APROBADA: 'No aprobada',
   COMPLETA_1_A_4: 'Fases 1-4 completas',
+  COMPLETA_7_FASES: 'Inducción completa (7 fases)',
 };
 
 const formatDate = (value: string | null): string => (value ? new Date(value).toLocaleDateString('es-MX') : '—');
@@ -42,6 +44,7 @@ export const EmployeeInductionHistoryPanel = ({ employeeId }: EmployeeInductionH
   const [record, setRecord] = useState<RhInductionMasterRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [closureModal, setClosureModal] = useState<'closed' | 'open' | 'supersede'>('closed');
 
   const [showEffectivenessForm, setShowEffectivenessForm] = useState(false);
   const [reviewDate, setReviewDate] = useState('');
@@ -131,18 +134,52 @@ export const EmployeeInductionHistoryPanel = ({ employeeId }: EmployeeInductionH
             Formato de inducción
           </h3>
         </div>
-        <button
-          type="button"
-          onClick={() => void handleExportPdf()}
-          disabled={exporting}
-          className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-          Exportar PDF
-        </button>
+        <div className="flex items-center gap-2">
+          {!record.closure && (
+            <button
+              type="button"
+              onClick={() => setClosureModal('open')}
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+            >
+              <FileCheck2 size={14} />
+              Cerrar Formato de Inducción
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleExportPdf()}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Exportar PDF
+          </button>
+        </div>
       </div>
 
       <div className="space-y-5 p-5">
+        {record.closure && (
+          <div
+            className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs ${
+              record.closure.verdict === 'NO_APROBADA'
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            }`}
+          >
+            <p>
+              <span className="font-bold">Registro cerrado:</span> {record.closure.verdict_label} —{' '}
+              {formatDate(record.closure.created_at)}. El PDF firmado está archivado en el expediente (sección
+              Programa de Inducción).
+            </p>
+            <button
+              type="button"
+              onClick={() => setClosureModal('supersede')}
+              className="font-semibold underline-offset-2 hover:underline"
+            >
+              Corregir cierre
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3 text-xs text-[var(--unilabor-neutral)] sm:grid-cols-4">
           <div>
             <p className="font-semibold text-[var(--color-brand-700)]">Fases aprobadas</p>
@@ -300,6 +337,15 @@ export const EmployeeInductionHistoryPanel = ({ employeeId }: EmployeeInductionH
           ) : null}
         </div>
       </div>
+
+      {closureModal !== 'closed' && (
+        <InductionClosureModal
+          record={record}
+          supersede={closureModal === 'supersede'}
+          onClose={() => setClosureModal('closed')}
+          onClosed={() => void load()}
+        />
+      )}
     </div>
   );
 };

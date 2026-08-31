@@ -5,6 +5,7 @@ import {
   getEmployeeByIdController,
   getEmployeeDocumentAccessController,
   getEmployeeSummaryController,
+  listBranchesController,
   listEmployeesController,
   listLinkableUsersController,
   updateEmployeeDocumentAccessController,
@@ -34,6 +35,9 @@ router.get(
   requirePermission(['RH.EMPLOYEES.READ', 'PROVIDERS.CONFIG.MANAGE']),
   listLinkableUsersController,
 );
+// Catalogo de sucursales para el campo "Sucursal" del colaborador (reusa
+// helpdesk_asset_units sin acoplar RH a permisos de Helpdesk).
+router.get('/branches', requirePermission('RH.EMPLOYEES.READ'), listBranchesController);
 // La LISTA de empleados es directorio de referencia que el modulo de Activos
 // (HELPDESK) necesita para asignar responsables en activos, movimientos,
 // mantenimiento y calibracion. Se permite tambien a quien puede ver activos

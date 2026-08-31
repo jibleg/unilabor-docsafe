@@ -21,6 +21,7 @@ export interface EmployeePayload {
   phone?: string | null;
   area?: string | null;
   position?: string | null;
+  branch_id?: number | null;
 }
 
 const employeesTableExists = async (): Promise<boolean> => {
@@ -60,6 +61,8 @@ const mapEmployeeRow = async (row: any): Promise<EmployeeRecord> => {
     phone: row.phone ? String(row.phone) : null,
     area: row.area ? String(row.area) : null,
     position: row.position ? String(row.position) : null,
+    branch_id: row.branch_id ? Number(row.branch_id) : null,
+    branch_name: row.branch_name ? String(row.branch_name) : null,
     is_active: Boolean(row.is_active),
     linked_user: linkedUser,
   };
@@ -187,6 +190,8 @@ const buildEmployeeBaseQuery = () => `
     e.phone,
     e.area,
     e.position,
+    e.branch_id,
+    bu.name AS branch_name,
     e.is_active,
     e.created_at,
     e.updated_at,
@@ -195,6 +200,7 @@ const buildEmployeeBaseQuery = () => `
     u.role AS user_role
   FROM public.employees e
   LEFT JOIN public.users u ON u.id = e.user_id
+  LEFT JOIN public.helpdesk_asset_units bu ON bu.id = e.branch_id
 `;
 
 const EMPLOYEE_SEARCH_COLUMNS = [
@@ -347,7 +353,8 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
           email,
           phone,
           area,
-          position
+          position,
+          branch_id
         )
         VALUES (
           COALESCE($1::bigint, nextval(pg_get_serial_sequence('public.employees', 'id'))),
@@ -357,7 +364,8 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
           $5,
           $6,
           $7,
-          $8
+          $8,
+          $9
         )
         RETURNING id;
       `,
@@ -370,6 +378,7 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
         normalizeOptionalText(payload.phone),
         normalizeOptionalText(payload.area),
         normalizeOptionalText(payload.position),
+        payload.branch_id ?? null,
       ],
     );
 
@@ -446,8 +455,9 @@ export const updateEmployee = async (
           phone = $5,
           area = $6,
           position = $7,
+          branch_id = $8,
           updated_at = NOW()
-        WHERE id = $8;
+        WHERE id = $9;
       `,
       [
         resolvedEmployeeCode,
@@ -457,6 +467,7 @@ export const updateEmployee = async (
         payload.phone !== undefined ? normalizeOptionalText(payload.phone) : currentEmployee.phone,
         payload.area !== undefined ? normalizeOptionalText(payload.area) : currentEmployee.area,
         payload.position !== undefined ? normalizeOptionalText(payload.position) : currentEmployee.position,
+        payload.branch_id !== undefined ? payload.branch_id : currentEmployee.branch_id,
         employeeId,
       ],
     );
@@ -532,4 +543,19 @@ export const listLinkableUsers = async (): Promise<LinkableUser[]> => {
       modules: await getUserAccessibleModules(String(row.id)),
     })),
   );
+};
+
+export interface EmployeeBranch {
+  id: number;
+  name: string;
+}
+
+/** Catalogo de sucursales (reusa helpdesk_asset_units) para el campo "Sucursal" del colaborador. */
+export const listBranches = async (): Promise<EmployeeBranch[]> => {
+  const result = await pool.query(`
+    SELECT id, name FROM public.helpdesk_asset_units
+    WHERE is_active = TRUE
+    ORDER BY sort_order ASC, name ASC;
+  `);
+  return result.rows.map((row) => ({ id: Number(row.id), name: String(row.name) }));
 };

@@ -3,12 +3,27 @@ import { winAnsiSafe } from './reading/reading-annex.pdf';
 import type { RhInductionMasterRecord } from './rh-induction-master-record.service';
 
 /**
- * Reporte de avance del Formato de Induccion (REH-REG-005), en el mismo estilo
- * pdf-lib de bloques etiqueta/valor que reading-annex.pdf.ts: es un documento
- * de evidencia/auditoria, no una constancia decorativa. NO incluye las firmas
- * de cierre (RH/Coordinador de area/Colaborador): eso procede solo cuando
- * existan las 7 fases (ver rh-induction-master-record.service.ts).
+ * Formato de Induccion (REH-REG-005), en el mismo estilo pdf-lib de bloques
+ * etiqueta/valor que reading-annex.pdf.ts: es un documento de evidencia/
+ * auditoria, no una constancia decorativa. Dos modos:
+ *  - Sin `closure`: reporte de avance (estatus, sin firmas).
+ *  - Con `closure` (CR-01): REGISTRO CERRADO — encabezado oficial, dictamen y
+ *    las 3 firmas digitales embebidas (Colaborador / Coordinacion de RH /
+ *    Coordinador del area). Es la evidencia documental final del proceso.
  */
+
+/** Datos de cierre para el PDF definitivo (ver rh-induction-closure.service.ts). */
+export interface InductionClosurePdfInput {
+  verdictLabel: string;
+  closedAt: Date;
+  closingNotes: string | null;
+  collaboratorName: string;
+  rhSignatoryName: string;
+  areaSignatoryName: string;
+  collaboratorSignaturePng: Buffer;
+  rhSignaturePng: Buffer;
+  areaSignaturePng: Buffer;
+}
 
 const A4: [number, number] = [595.28, 841.89];
 const MARGIN = 56;
@@ -68,7 +83,45 @@ const drawLabelValue = (
   cursor.y = y - 6;
 };
 
-export const buildInductionMasterRecordPdf = async (record: RhInductionMasterRecord): Promise<Buffer> => {
+const formatStamp = (date: Date): string =>
+  date.toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/** Bloque de una firma embebida (imagen + linea + nombre + cargo), mismo patron que reading-annex. */
+const drawSignatureColumn = async (
+  doc: PDFDocument,
+  page: PDFPage,
+  x: number,
+  topY: number,
+  columnWidth: number,
+  png: Buffer,
+  name: string,
+  role: string,
+  fonts: { regular: PDFFont; bold: PDFFont },
+): Promise<void> => {
+  const signature = await doc.embedPng(png);
+  const box = { width: columnWidth - 16, height: 50 };
+  const scaled = signature.scaleToFit(box.width, box.height);
+  page.drawImage(signature, {
+    x: x + (box.width - scaled.width) / 2,
+    y: topY - scaled.height,
+    width: scaled.width,
+    height: scaled.height,
+  });
+  const lineY = topY - box.height - 6;
+  page.drawLine({ start: { x, y: lineY }, end: { x: x + box.width, y: lineY }, thickness: 1, color: INK });
+  const nameLines = wrapText(winAnsiSafe(name), fonts.bold, 8.5, box.width);
+  let y = lineY - 12;
+  for (const line of nameLines.slice(0, 2)) {
+    page.drawText(line, { x, y, size: 8.5, font: fonts.bold, color: INK });
+    y -= 11;
+  }
+  page.drawText(winAnsiSafe(role), { x, y, size: 7.5, font: fonts.regular, color: MUTED });
+};
+
+export const buildInductionMasterRecordPdf = async (
+  record: RhInductionMasterRecord,
+  closure?: InductionClosurePdfInput,
+): Promise<Buffer> => {
   const doc = await PDFDocument.create();
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -78,17 +131,29 @@ export const buildInductionMasterRecordPdf = async (record: RhInductionMasterRec
   let page = doc.addPage(A4);
   const cursor: Cursor = { y: A4[1] - MARGIN };
 
-  page.drawText('REPORTE DE AVANCE — FORMATO DE INDUCCIÓN (REH-REG-005)', {
+  page.drawText(closure ? 'FORMATO DE INDUCCIÓN (REH-REG-005)' : 'REPORTE DE AVANCE — FORMATO DE INDUCCIÓN (REH-REG-005)', {
     x: MARGIN,
     y: cursor.y,
     size: 13,
     font: bold,
     color: INK,
   });
+  // Encabezado oficial del registro (solo en el documento cerrado).
+  if (closure) {
+    page.drawText('Código: REH-REG-005  ·  No. de revisión: 1', {
+      x: MARGIN + contentWidth - 190,
+      y: cursor.y + 2,
+      size: 8,
+      font: regular,
+      color: MUTED,
+    });
+  }
   cursor.y -= 16;
   page.drawText(
-    'Documento de estatus; el cierre formal con firmas procede al completar las 7 fases.',
-    { x: MARGIN, y: cursor.y, size: 8, font: regular, color: MUTED },
+    closure
+      ? winAnsiSafe(`REGISTRO CERRADO — ${closure.verdictLabel} — ${formatStamp(closure.closedAt)}`)
+      : 'Documento de estatus; el cierre formal con firmas procede al completar las 7 fases.',
+    { x: MARGIN, y: cursor.y, size: closure ? 9 : 8, font: closure ? bold : regular, color: closure ? INK : MUTED },
   );
   cursor.y -= 16;
   page.drawLine({ start: { x: MARGIN, y: cursor.y }, end: { x: MARGIN + contentWidth, y: cursor.y }, thickness: 1, color: RULE });
@@ -198,6 +263,41 @@ export const buildInductionMasterRecordPdf = async (record: RhInductionMasterRec
         drawLabelValue(page, cursor, 'Evidencia objetiva', review.evidence_notes, fonts);
       }
     }
+  }
+
+  // Bloque de cierre: notas + 3 firmas digitales en columnas.
+  if (closure) {
+    page = ensureSpace(doc, page, cursor, closure.closingNotes ? 220 : 170);
+    if (closure.closingNotes) {
+      cursor.y -= 4;
+      drawLabelValue(page, cursor, 'NOTAS DEL CIERRE', closure.closingNotes, fonts);
+    }
+    cursor.y -= 6;
+    page.drawText('FIRMAS DE CIERRE', { x: MARGIN, y: cursor.y, size: 10, font: bold, color: INK });
+    cursor.y -= 14;
+
+    const columnWidth = contentWidth / 3;
+    const topY = cursor.y;
+    await drawSignatureColumn(
+      doc, page, MARGIN, topY, columnWidth,
+      closure.collaboratorSignaturePng, closure.collaboratorName, 'Colaborador', fonts,
+    );
+    await drawSignatureColumn(
+      doc, page, MARGIN + columnWidth, topY, columnWidth,
+      closure.rhSignaturePng, closure.rhSignatoryName, 'Coordinación de Recursos Humanos', fonts,
+    );
+    await drawSignatureColumn(
+      doc, page, MARGIN + columnWidth * 2, topY, columnWidth,
+      closure.areaSignaturePng, closure.areaSignatoryName, 'Coordinador del área', fonts,
+    );
+    cursor.y = topY - 110;
+    page.drawText(winAnsiSafe(`Cerrado el ${formatStamp(closure.closedAt)}. Conservar conforme al procedimiento de gestión de registros (retención: 5 años).`), {
+      x: MARGIN,
+      y: cursor.y,
+      size: 7.5,
+      font: regular,
+      color: MUTED,
+    });
   }
 
   return Buffer.from(await doc.save());

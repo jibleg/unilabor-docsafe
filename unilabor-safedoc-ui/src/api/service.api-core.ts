@@ -15,6 +15,7 @@ import { tokenRequiresPasswordChange } from '../utils/auth';
 import type {
   Category,
   Employee,
+  EmployeeBranch,
   EmployeeSummary,
   ManagedUser,
   ModuleAccess,
@@ -281,5 +282,11 @@ export const updateEmployeeById = async (employeeId: number, payload: Partial<Em
 
 export const deleteEmployeeById = async (employeeId: number): Promise<void> => {
   await api.delete(`/employees/${employeeId}`);
+};
+
+/** Catalogo de sucursales (campo "Sucursal" del colaborador). */
+export const listBranches = async (): Promise<EmployeeBranch[]> => {
+  const response = await api.get('/employees/branches');
+  return getArrayFromPayload(response.data, ['branches']) as EmployeeBranch[];
 };
 

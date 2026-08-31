@@ -5,23 +5,28 @@ import { listEmployees } from '../api/service';
 import {
   addPhaseChecklistItem,
   addPhaseDocument,
+  enablePhaseForPosition,
   enrollEmployeeInPhase,
   listEnrollmentChecklistProgress,
   listInductionPhases,
   listPhaseChecklistItems,
   listPhaseEnrollments,
+  listPhasePositions,
   removePhaseChecklistItem,
   removePhaseDocument,
   setEnrollmentSupervisor,
   toggleChecklistItem,
   updatePhaseContact,
+  updatePhaseDuration,
 } from '../api/service.api-rh-induction';
-import { lookupDocumentByCode, type DocumentLookupResult } from '../api/service.api-rh-position';
+import { listPositions, lookupDocumentByCode, type DocumentLookupResult } from '../api/service.api-rh-position';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { SearchableSelect } from '../components/SearchableSelect';
 import type {
   Employee,
   RhInductionChecklistItem,
+  RhInductionPhasePosition,
+  RhPosition,
   RhInductionChecklistProgressItem,
   RhInductionPhase,
   RhInductionPhaseEnrollmentSummary,
@@ -55,6 +60,14 @@ export const RhInductionPage = () => {
   const [responsiblePhone, setResponsiblePhone] = useState('');
   const [savingContact, setSavingContact] = useState(false);
 
+  const [durationHours, setDurationHours] = useState('');
+  const [savingDuration, setSavingDuration] = useState(false);
+
+  const [allPositions, setAllPositions] = useState<RhPosition[]>([]);
+  const [phasePositions, setPhasePositions] = useState<RhInductionPhasePosition[]>([]);
+  const [enablePositionId, setEnablePositionId] = useState('');
+  const [enablingPosition, setEnablingPosition] = useState(false);
+
   const [enrollEmployeeId, setEnrollEmployeeId] = useState('');
   const [enrollSupervisorId, setEnrollSupervisorId] = useState('');
   const [enrolling, setEnrolling] = useState(false);
@@ -72,9 +85,14 @@ export const RhInductionPage = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [phaseData, employeeData] = await Promise.all([listInductionPhases(), listEmployees()]);
+      const [phaseData, employeeData, positionData] = await Promise.all([
+        listInductionPhases(),
+        listEmployees(),
+        listPositions(),
+      ]);
       setPhases(phaseData);
       setEmployees(employeeData);
+      setAllPositions(positionData);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudieron cargar las fases de inducción.'));
     } finally {
@@ -111,11 +129,37 @@ export const RhInductionPage = () => {
     setSelectedPhaseId(phase.id);
     setResponsibleName(phase.responsible_name ?? '');
     setResponsiblePhone(phase.responsible_phone ?? '');
+    setDurationHours(phase.duration_hours !== null ? String(phase.duration_hours) : '');
     setDocumentCode('');
     setDocumentPreview(null);
     setExpandedEnrollmentId(null);
+    setPhasePositions([]);
+    setEnablePositionId('');
     void loadEnrollments(phase.id);
     void loadChecklistItems(phase.id);
+    if (phase.scope === 'POSITION' && phase.phase_number !== 7) {
+      listPhasePositions(phase.id)
+        .then(setPhasePositions)
+        .catch((error) => toast.error(getApiErrorMessage(error, 'No se pudieron cargar los puestos de la fase.')));
+    }
+  };
+
+  const handleEnablePosition = async () => {
+    if (!selectedPhase || !enablePositionId) {
+      toast.warning('Selecciona un puesto.');
+      return;
+    }
+    setEnablingPosition(true);
+    try {
+      await enablePhaseForPosition(selectedPhase.id, Number(enablePositionId));
+      toast.success('Fase habilitada para el puesto; diseña su evaluación en Capacitaciones.');
+      setEnablePositionId('');
+      setPhasePositions(await listPhasePositions(selectedPhase.id));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo habilitar la fase para el puesto.'));
+    } finally {
+      setEnablingPosition(false);
+    }
   };
 
   const handleLookupDocument = async () => {
@@ -170,6 +214,25 @@ export const RhInductionPage = () => {
       toast.error(getApiErrorMessage(error, 'No se pudo actualizar el contacto.'));
     } finally {
       setSavingContact(false);
+    }
+  };
+
+  const handleSaveDuration = async () => {
+    if (!selectedPhase) return;
+    const trimmed = durationHours.trim();
+    if (trimmed && (!Number.isFinite(Number(trimmed)) || Number(trimmed) <= 0)) {
+      toast.warning('La duración debe ser un número de horas mayor a 0.');
+      return;
+    }
+    setSavingDuration(true);
+    try {
+      await updatePhaseDuration(selectedPhase.id, trimmed ? Number(trimmed) : null);
+      toast.success('Duración de la fase actualizada correctamente.');
+      await load();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo actualizar la duración.'));
+    } finally {
+      setSavingDuration(false);
     }
   };
 
@@ -311,9 +374,11 @@ export const RhInductionPage = () => {
             <p className="rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] p-6 text-center text-sm text-[var(--unilabor-neutral)]">
               Selecciona una fase para configurarla.
             </p>
-          ) : selectedPhase.scope !== 'INSTITUTIONAL' ? (
+          ) : selectedPhase.phase_number === 7 ? (
             <p className="rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] p-6 text-center text-sm text-[var(--unilabor-neutral)]">
-              Esta fase es específica por puesto; la configuración por puesto llega en una siguiente entrega.
+              La Fase 7 (Evaluación de competencia inicial) se resuelve con el registro REH-REG-003 en la página{' '}
+              <strong>Evaluación de competencia</strong>: al cerrar la evaluación tipo "Inicial" del colaborador, su
+              resultado se refleja automáticamente en esta fase del Formato de Inducción.
             </p>
           ) : (
             <div className="space-y-6">
@@ -348,6 +413,90 @@ export const RhInductionPage = () => {
                 </div>
               </div>
 
+              <div>
+                <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
+                  Duración de la fase (horas)
+                </h3>
+                <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
+                  Se muestra en la constancia; es la misma para todos los colaboradores de esta fase.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    value={durationHours}
+                    onChange={(event) => setDurationHours(event.target.value)}
+                    placeholder="Horas (ej. 8)"
+                    className={inputClass}
+                  />
+                  <button type="button" onClick={() => void handleSaveDuration()} disabled={savingDuration} className={buttonClass}>
+                    {savingDuration ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
+                  </button>
+                </div>
+              </div>
+
+              {selectedPhase.scope === 'POSITION' && (
+                <div>
+                  <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
+                    Puestos habilitados ({phasePositions.length})
+                  </h3>
+                  <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
+                    {selectedPhase.phase_number === 5
+                      ? 'Cada puesto lleva su propio curso: el colaborador lee los documentos obligatorios de SU puesto y presenta el cuestionario del curso del puesto.'
+                      : 'Cada puesto lleva su propio curso de práctica supervisada: RH captura la calificación (0-10) en "Capacitación práctica".'}
+                  </p>
+                  <div className="space-y-1.5">
+                    {phasePositions.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
+                      >
+                        <span className="text-[var(--unilabor-ink)]">
+                          {entry.position_name}
+                          <span className="ml-2 text-xs text-[var(--unilabor-neutral)]">({entry.course_code})</span>
+                        </span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            entry.has_published_template
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          {entry.has_published_template ? 'Evaluación publicada' : 'Falta diseñar evaluación'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <select
+                      value={enablePositionId}
+                      onChange={(event) => setEnablePositionId(event.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Habilitar un puesto...</option>
+                      {allPositions
+                        .filter((position) => !phasePositions.some((entry) => entry.position_id === position.id))
+                        .map((position) => (
+                          <option key={position.id} value={position.id}>
+                            {position.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button type="button" onClick={() => void handleEnablePosition()} disabled={enablingPosition} className={buttonClass}>
+                      {enablingPosition ? <Loader2 size={14} className="animate-spin" /> : 'Habilitar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {selectedPhase.scope === 'POSITION' ? (
+                <div className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2 text-xs text-[var(--color-brand-700)]">
+                  {selectedPhase.phase_number === 5
+                    ? 'Los documentos a leer se toman automáticamente del catálogo del puesto del colaborador (Puestos → Documentos obligatorios).'
+                    : 'Esta fase no lleva lectura: al inscribir al colaborador queda lista para que RH capture la calificación práctica.'}
+                </div>
+              ) : (
               <div>
                 <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
                   Documentos obligatorios ({selectedPhase.documents.length})
@@ -394,6 +543,7 @@ export const RhInductionPage = () => {
                   </div>
                 ) : null}
               </div>
+              )}
 
               <div>
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">

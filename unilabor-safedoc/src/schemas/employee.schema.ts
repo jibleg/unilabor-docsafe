@@ -24,7 +24,7 @@ export const createEmployeeSchema = z
   })
   .passthrough();
 
-const UPDATE_EMPLOYEE_FIELDS = ['employee_code', 'user_id', 'full_name', 'email', 'phone', 'area', 'position'] as const;
+const UPDATE_EMPLOYEE_FIELDS = ['employee_code', 'user_id', 'full_name', 'email', 'phone', 'area', 'position', 'branch_id'] as const;
 
 export const updateEmployeeSchema = z
   .object({

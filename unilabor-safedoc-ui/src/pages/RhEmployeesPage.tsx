@@ -18,13 +18,14 @@ import {
   fetchEmployeeById,
   fetchEmployeeDocumentAccess,
   getApiErrorMessage,
+  listBranches,
   listEmployeesPaginated,
   listLinkableUsers,
   type EmployeePayload,
   updateEmployeeDocumentAccess,
   updateEmployeeById,
 } from '../api/service';
-import type { Employee, EmployeeDocumentAccessMatrix, LinkableUser } from '../types/models';
+import type { Employee, EmployeeBranch, EmployeeDocumentAccessMatrix, LinkableUser } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { Pagination } from '../components/Pagination';
@@ -37,6 +38,7 @@ interface EmployeeFormState {
   phone: string;
   area: string;
   position: string;
+  branch_id: string;
 }
 
 const EMPTY_FORM: EmployeeFormState = {
@@ -47,6 +49,7 @@ const EMPTY_FORM: EmployeeFormState = {
   phone: '',
   area: '',
   position: '',
+  branch_id: '',
 };
 
 const getLinkableUserOptionLabel = (user: LinkableUser): string =>
@@ -77,6 +80,7 @@ const toEmployeePayload = (form: EmployeeFormState): EmployeePayload => ({
   phone: phoneDigits(form.phone) || null,
   area: form.area.trim() || undefined,
   position: form.position.trim() || undefined,
+  branch_id: form.branch_id ? Number(form.branch_id) : null,
 });
 
 export const RhEmployeesPage = () => {
@@ -99,6 +103,7 @@ export const RhEmployeesPage = () => {
   );
   const [linkableUsers, setLinkableUsers] = useState<LinkableUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [branches, setBranches] = useState<EmployeeBranch[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -130,6 +135,12 @@ export const RhEmployeesPage = () => {
   useEffect(() => {
     void loadLinkableUsers();
   }, [loadLinkableUsers]);
+
+  useEffect(() => {
+    listBranches()
+      .then(setBranches)
+      .catch((error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar las sucursales.')));
+  }, []);
 
   const accessSummary = useMemo(() => {
     if (!documentAccess) {
@@ -198,6 +209,7 @@ export const RhEmployeesPage = () => {
       phone: formatPhoneMask(toNationalDigits(employee.phone ?? '')),
       area: employee.area ?? '',
       position: employee.position ?? '',
+      branch_id: employee.branch_id ? String(employee.branch_id) : '',
     });
     setUserSearchValue(linkedUserLabel);
     setIsEditOpen(true);
@@ -755,6 +767,23 @@ export const RhEmployeesPage = () => {
                     className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
                     placeholder="Analista, Coordinador, Responsable..."
                   />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    Sucursal
+                  </label>
+                  <select
+                    value={form.branch_id}
+                    onChange={(event) => setForm((current) => ({ ...current, branch_id: event.target.value }))}
+                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+                  >
+                    <option value="">Sin asignar</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

@@ -10,6 +10,7 @@ import {
   deactivateEmployee,
   getEmployeeById,
   getEmployeeSummary,
+  listBranches,
   listEmployees,
   listLinkableUsers,
   type EmployeePayload,
@@ -136,6 +137,17 @@ export const listLinkableUsersController = async (_req: AuthRequest, res: Respon
   }
 };
 
+/** Catalogo de sucursales (campo "Sucursal" del colaborador, reusa helpdesk_asset_units). */
+export const listBranchesController = async (_req: AuthRequest, res: Response) => {
+  try {
+    const branches = await listBranches();
+    return res.json({ branches });
+  } catch (error) {
+    console.error('Error obteniendo el catalogo de sucursales:', error);
+    return res.status(500).json({ message: 'No se pudo cargar el catalogo de sucursales.' });
+  }
+};
+
 export const getEmployeeByIdController = async (req: AuthRequest, res: Response) => {
   const employeeId = parseEmployeeId(req.params.id);
   if (!employeeId) {
@@ -254,6 +266,10 @@ export const createEmployeeController = async (req: AuthRequest, res: Response) 
       phone: getText(req.body?.phone),
       area: getText(req.body?.area),
       position: getText(req.body?.position),
+      branch_id:
+        req.body?.branch_id === null || req.body?.branch_id === undefined || req.body?.branch_id === ''
+          ? null
+          : Number(req.body.branch_id),
     });
 
     await logEmployeeAudit(req.user?.id, `RH_EMPLOYEE_CREATE:${employee.id}`, req.ip);
@@ -302,6 +318,10 @@ export const updateEmployeeController = async (req: AuthRequest, res: Response) 
   if (req.body?.position !== undefined) {
     payload.position = getText(req.body?.position);
   }
+  if (req.body?.branch_id !== undefined) {
+    const rawBranchId = req.body?.branch_id;
+    payload.branch_id = rawBranchId === null || rawBranchId === '' ? null : Number(rawBranchId);
+  }
 
   if (
       payload.employee_code === undefined &&
@@ -310,7 +330,8 @@ export const updateEmployeeController = async (req: AuthRequest, res: Response) 
       payload.email === undefined &&
       payload.phone === undefined &&
       payload.area === undefined &&
-      payload.position === undefined
+      payload.position === undefined &&
+      payload.branch_id === undefined
   ) {
     return res.status(400).json({
       message: 'Debes enviar al menos un campo para actualizar al colaborador.',

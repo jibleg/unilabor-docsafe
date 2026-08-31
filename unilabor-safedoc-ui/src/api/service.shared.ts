@@ -44,6 +44,7 @@ export interface EmployeePayload {
   phone?: string | null;
   area?: string;
   position?: string;
+  branch_id?: number | null;
 }
 
 export interface HelpdeskAssetPayload {

@@ -129,10 +129,12 @@ export const addPositionCompetencyController = async (req: AuthRequest, res: Res
     return res.status(400).json({ message: 'ID de puesto invalido.' });
   }
   try {
+    const rawCriticality = String(req.body?.criticality ?? 'M').toUpperCase();
     const competency = await addPositionCompetency(
       positionId,
       String(req.body?.competency_text ?? ''),
       Number(req.body?.sort_order ?? 0),
+      rawCriticality === 'A' || rawCriticality === 'B' ? rawCriticality : 'M',
     );
     return res.status(201).json({ message: 'Competencia agregada correctamente.', competency });
   } catch (error: any) {

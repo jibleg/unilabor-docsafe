@@ -31,6 +31,8 @@ export interface EmployeeRecord {
   phone: string | null;
   area: string | null;
   position: string | null;
+  branch_id: number | null;
+  branch_name: string | null;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

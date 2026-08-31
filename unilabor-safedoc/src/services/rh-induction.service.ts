@@ -34,6 +34,7 @@ export interface RhInductionPhase {
   scope: 'INSTITUTIONAL' | 'POSITION';
   training_course_id: number | null;
   training_course_title: string | null;
+  duration_hours: number | null;
   documents: RhInductionPhaseDocument[];
 }
 
@@ -41,7 +42,7 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
   const result = await pool.query(`
     SELECT
       p.id, p.phase_number, p.name, p.responsible_label, p.responsible_name, p.responsible_phone,
-      p.scope, p.training_course_id,
+      p.scope, p.training_course_id, p.duration_hours,
       tc.title AS training_course_title
     FROM public.rh_induction_phases p
     LEFT JOIN public.training_courses tc ON tc.id = p.training_course_id
@@ -58,9 +59,179 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
       scope: row.scope as 'INSTITUTIONAL' | 'POSITION',
       training_course_id: row.training_course_id ? Number(row.training_course_id) : null,
       training_course_title: row.training_course_title ? String(row.training_course_title) : null,
+      duration_hours: row.duration_hours !== null && row.duration_hours !== undefined ? Number(row.duration_hours) : null,
       documents: await listPhaseDocuments(Number(row.id)),
     })),
   );
+};
+
+export interface InductionCertificatePhaseContext {
+  phaseNumber: number;
+  phaseName: string;
+  durationHours: number | null;
+}
+
+/**
+ * Fase de induccion ligada a esta training_course (o null si el curso no es de
+ * induccion). Resuelve tanto los cursos institucionales (Fases 1-4, ligados
+ * directo en rh_induction_phases) como los cursos por puesto (Fases 5-6, via
+ * rh_induction_phase_positions).
+ */
+export const getInductionPhaseByCourseId = async (
+  courseId: number,
+): Promise<InductionCertificatePhaseContext | null> => {
+  const result = await pool.query(
+    `SELECT p.phase_number, p.name, p.duration_hours
+       FROM public.rh_induction_phases p
+      WHERE p.training_course_id = $1
+     UNION ALL
+     SELECT p.phase_number, p.name, p.duration_hours
+       FROM public.rh_induction_phase_positions pp
+       INNER JOIN public.rh_induction_phases p ON p.id = pp.phase_id
+      WHERE pp.training_course_id = $1
+      LIMIT 1;`,
+    [courseId],
+  );
+  if (result.rows.length === 0) {
+    return null;
+  }
+  const row = result.rows[0];
+  return {
+    phaseNumber: Number(row.phase_number),
+    phaseName: String(row.name),
+    durationHours: row.duration_hours !== null && row.duration_hours !== undefined ? Number(row.duration_hours) : null,
+  };
+};
+
+export interface RhInductionPhasePosition {
+  id: number;
+  position_id: number;
+  position_name: string;
+  position_code: string;
+  training_course_id: number;
+  course_code: string;
+  has_published_template: boolean;
+}
+
+/** Puestos habilitados para una fase POSITION (5-6), con el estado de su cuestionario. */
+export const listPhasePositions = async (phaseId: number): Promise<RhInductionPhasePosition[]> => {
+  const result = await pool.query(
+    `SELECT pp.id, pp.position_id, rp.name AS position_name, rp.code AS position_code,
+            pp.training_course_id, tc.code AS course_code,
+            EXISTS (
+              SELECT 1 FROM public.evaluation_templates t
+               WHERE t.training_course_id = pp.training_course_id
+                 AND t.status = 'published' AND t.is_active = TRUE
+            ) AS has_published_template
+       FROM public.rh_induction_phase_positions pp
+       INNER JOIN public.rh_positions rp ON rp.id = pp.position_id
+       INNER JOIN public.training_courses tc ON tc.id = pp.training_course_id
+      WHERE pp.phase_id = $1
+      ORDER BY rp.name ASC;`,
+    [phaseId],
+  );
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    position_id: Number(row.position_id),
+    position_name: String(row.position_name),
+    position_code: String(row.position_code),
+    training_course_id: Number(row.training_course_id),
+    course_code: String(row.course_code),
+    has_published_template: Boolean(row.has_published_template),
+  }));
+};
+
+/**
+ * Habilita una fase POSITION (5-6) para un puesto: crea (si no existe) la
+ * training_course propia de (fase, puesto) — sobre la que RH disena el
+ * cuestionario (Fase 5) o la evaluacion practica (Fase 6) con la UI existente
+ * de Capacitaciones — y registra el puente. Idempotente.
+ */
+export const enablePhaseForPosition = async (
+  phaseId: number,
+  positionId: number,
+  userId: string | null,
+): Promise<RhInductionPhasePosition> => {
+  const phaseResult = await pool.query(
+    `SELECT phase_number, name, scope FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
+    [phaseId],
+  );
+  if (phaseResult.rows.length === 0) {
+    throwCoded('RH_INDUCTION_PHASE_NOT_FOUND', 'La fase no existe.');
+  }
+  const phaseNumber = Number(phaseResult.rows[0].phase_number);
+  if (String(phaseResult.rows[0].scope) !== 'POSITION' || phaseNumber === 7) {
+    throwCoded(
+      'RH_INDUCTION_PHASE_NOT_POSITION',
+      'Solo las Fases 5 y 6 se habilitan por puesto (la Fase 7 usa el REH-REG-003).',
+    );
+  }
+  const positionResult = await pool.query(
+    `SELECT code, name FROM public.rh_positions WHERE id = $1 AND is_active = TRUE LIMIT 1;`,
+    [positionId],
+  );
+  if (positionResult.rows.length === 0) {
+    throwCoded('RH_INDUCTION_POSITION_NOT_FOUND', 'El puesto no existe o esta inactivo.');
+  }
+  const positionCode = String(positionResult.rows[0].code);
+  const positionName = String(positionResult.rows[0].name);
+
+  const existing = await pool.query(
+    `SELECT id FROM public.rh_induction_phase_positions WHERE phase_id = $1 AND position_id = $2 LIMIT 1;`,
+    [phaseId, positionId],
+  );
+  if (existing.rows.length === 0) {
+    await withTransaction(async (client) => {
+      const courseCode = `INDUCCION-FASE-${phaseNumber}-${positionCode.toUpperCase()}`;
+      const courseResult = await client.query(
+        `INSERT INTO public.training_courses (code, title, description, certificate_validity_months)
+         VALUES ($1, $2, $3, 0)
+         ON CONFLICT DO NOTHING
+         RETURNING id;`,
+        [
+          courseCode,
+          `Fase ${phaseNumber} - ${String(phaseResult.rows[0].name)} — ${positionName}`,
+          phaseNumber === 5
+            ? `Induccion tecnica del puesto ${positionName}: lectura de sus documentos obligatorios + cuestionario.`
+            : `Capacitacion practica supervisada del puesto ${positionName}: RH captura la calificacion (0-10).`,
+        ],
+      );
+      let courseId: number;
+      if (courseResult.rows.length > 0) {
+        courseId = Number(courseResult.rows[0].id);
+      } else {
+        const found = await client.query(`SELECT id FROM public.training_courses WHERE code = $1 LIMIT 1;`, [courseCode]);
+        courseId = Number(found.rows[0].id);
+      }
+      await client.query(
+        `INSERT INTO public.rh_induction_phase_positions (phase_id, position_id, training_course_id, created_by_user_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (phase_id, position_id) DO NOTHING;`,
+        [phaseId, positionId, courseId, userId],
+      );
+    });
+  }
+
+  const positions = await listPhasePositions(phaseId);
+  const enabled = positions.find((entry) => entry.position_id === positionId);
+  if (!enabled) {
+    return throwCoded('RH_INDUCTION_PHASE_POSITION_ENABLE_FAILED');
+  }
+  return enabled;
+};
+
+/** Puesto (catalogo rh_positions) mas reciente y activo del colaborador, para la constancia. */
+export const getEmployeeActivePositionName = async (employeeId: number): Promise<string | null> => {
+  const result = await pool.query(
+    `SELECT rp.name
+       FROM public.rh_employee_positions rep
+       INNER JOIN public.rh_positions rp ON rp.id = rep.position_id
+      WHERE rep.employee_id = $1 AND rep.is_active = TRUE
+      ORDER BY rep.assigned_at DESC
+      LIMIT 1;`,
+    [employeeId],
+  );
+  return result.rows.length > 0 ? String(result.rows[0].name) : null;
 };
 
 interface PhaseDocumentRow {
@@ -160,7 +331,13 @@ export interface RhInductionEnrollment {
   supervisor_employee_id: number | null;
 }
 
-/** Inscribe a un colaborador en una fase institucional (1-4). Idempotente. */
+/**
+ * Inscribe a un colaborador en una fase. Institucionales (1-4): documentos de
+ * la fase + cuestionario del curso de la fase. POSITION (5-6): el curso y (en
+ * Fase 5) los documentos se resuelven del PUESTO activo del colaborador —
+ * Fase 6 es practica supervisada, sin lectura (RH captura la calificacion).
+ * La Fase 7 no se inscribe aqui: su instrumento es el REH-REG-003.
+ */
 export const enrollEmployeeInPhase = async (
   employeeId: number,
   phaseId: number,
@@ -174,13 +351,70 @@ export const enrollEmployeeInPhase = async (
   if (phaseResult.rows.length === 0) {
     throwCoded('RH_INDUCTION_PHASE_NOT_FOUND', 'La fase no existe.');
   }
-  if (phaseResult.rows[0].scope !== 'INSTITUTIONAL') {
+  const phaseScope = String(phaseResult.rows[0].scope);
+  const phaseNumber = Number(phaseResult.rows[0].phase_number);
+  if (phaseScope !== 'INSTITUTIONAL' && phaseNumber === 7) {
     throwCoded(
       'RH_INDUCTION_PHASE_NOT_INSTITUTIONAL',
-      'Esta fase es especifica por puesto; aun no se puede inscribir directamente.',
+      'La Fase 7 se resuelve con la Evaluacion de competencia (REH-REG-003), no por inscripcion.',
     );
   }
-  const phaseNumber = Number(phaseResult.rows[0].phase_number);
+
+  // Fases POSITION: se resuelven contra el puesto activo del colaborador.
+  let positionCourseId: number | null = null;
+  let positionDocuments: PhaseDocumentRow[] = [];
+  if (phaseScope === 'POSITION') {
+    const positionResult = await pool.query(
+      `SELECT rep.position_id, rp.name
+         FROM public.rh_employee_positions rep
+         INNER JOIN public.rh_positions rp ON rp.id = rep.position_id
+        WHERE rep.employee_id = $1 AND rep.is_active = TRUE
+        ORDER BY rep.assigned_at DESC LIMIT 1;`,
+      [employeeId],
+    );
+    if (positionResult.rows.length === 0) {
+      throwCoded(
+        'RH_INDUCTION_EMPLOYEE_WITHOUT_POSITION',
+        'El colaborador no tiene un puesto activo asignado; asignalo en Puestos (induccion) antes de inscribirlo.',
+      );
+    }
+    const positionId = Number(positionResult.rows[0].position_id);
+    const positionName = String(positionResult.rows[0].name);
+
+    const bridgeResult = await pool.query(
+      `SELECT training_course_id FROM public.rh_induction_phase_positions
+        WHERE phase_id = $1 AND position_id = $2 LIMIT 1;`,
+      [phaseId, positionId],
+    );
+    if (bridgeResult.rows.length === 0) {
+      throwCoded(
+        'RH_INDUCTION_PHASE_POSITION_NOT_ENABLED',
+        `La Fase ${phaseNumber} no esta habilitada para el puesto "${positionName}". Habilitala primero en la fase.`,
+      );
+    }
+    positionCourseId = Number(bridgeResult.rows[0].training_course_id);
+
+    if (phaseNumber === 5) {
+      const docsResult = await pool.query(
+        `SELECT pd.document_id, d.title
+           FROM public.rh_position_documents pd
+           INNER JOIN public.documents d ON d.id = pd.document_id
+          WHERE pd.position_id = $1
+          ORDER BY pd.sort_order ASC, pd.id ASC;`,
+        [positionId],
+      );
+      if (docsResult.rows.length === 0) {
+        throwCoded(
+          'RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS',
+          `El puesto "${positionName}" no tiene documentos obligatorios configurados para la Fase 5.`,
+        );
+      }
+      positionDocuments = docsResult.rows.map((row) => ({
+        document_id: String(row.document_id),
+        title: String(row.title),
+      }));
+    }
+  }
 
   const existing = await pool.query(
     `SELECT id FROM public.rh_induction_enrollments WHERE employee_id = $1 AND phase_id = $2 LIMIT 1;`,
@@ -221,19 +455,35 @@ export const enrollEmployeeInPhase = async (
   }
   const employeeUserId = rawEmployeeUserId;
 
-  const documents = await getPhaseDocuments(phaseId);
-  if (documents.length === 0) {
-    throwCoded('RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS', 'Esta fase todavia no tiene documentos configurados.');
+  // Documentos a leer: los de la fase (institucionales) o los del puesto
+  // (Fase 5). La Fase 6 no lleva lectura: es practica supervisada.
+  let documents: PhaseDocumentRow[] = [];
+  if (phaseScope === 'INSTITUTIONAL') {
+    documents = await getPhaseDocuments(phaseId);
+    if (documents.length === 0) {
+      throwCoded('RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS', 'Esta fase todavia no tiene documentos configurados.');
+    }
+  } else if (phaseNumber === 5) {
+    documents = positionDocuments;
   }
 
   const enrollmentId = await withTransaction(async (client) => {
     const inserted = await client.query(
-      `INSERT INTO public.rh_induction_enrollments (employee_id, phase_id, enrolled_by_user_id, supervisor_employee_id)
-       VALUES ($1, $2, $3, $4) RETURNING id;`,
-      [employeeId, phaseId, userId, supervisorEmployeeId ?? null],
+      `INSERT INTO public.rh_induction_enrollments (employee_id, phase_id, enrolled_by_user_id, supervisor_employee_id, training_course_id)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id;`,
+      [employeeId, phaseId, userId, supervisorEmployeeId ?? null, positionCourseId],
     );
     return Number(inserted.rows[0].id);
   });
+
+  // Fase 6: sin lectura, queda lista de inmediato; la evaluacion practica la
+  // captura RH y el refresh la vincula al enrollment.
+  if (phaseScope === 'POSITION' && phaseNumber === 6) {
+    await pool.query(
+      `UPDATE public.rh_induction_enrollments SET reading_completed_at = NOW(), updated_at = NOW() WHERE id = $1;`,
+      [enrollmentId],
+    );
+  }
 
   for (const document of documents) {
     const publicationId = await getOrOpenPublication(document.document_id, userId);
@@ -415,7 +665,9 @@ export const toggleChecklistItem = async (
 export const refreshEnrollmentReadingStatus = async (enrollmentId: number): Promise<void> => {
   const enrollmentResult = await pool.query(
     `SELECT e.id, e.employee_id, e.phase_id, e.reading_completed_at, e.evaluation_assignment_id,
-            e.enrolled_by_user_id, p.training_course_id, p.name AS phase_name, p.responsible_label
+            e.enrolled_by_user_id,
+            COALESCE(e.training_course_id, p.training_course_id) AS training_course_id,
+            p.name AS phase_name, p.responsible_label
        FROM public.rh_induction_enrollments e
        INNER JOIN public.rh_induction_phases p ON p.id = e.phase_id
       WHERE e.id = $1 LIMIT 1;`,
@@ -437,7 +689,9 @@ export const refreshEnrollmentReadingStatus = async (enrollmentId: number): Prom
     itemsResult.rows.length > 0 &&
     itemsResult.rows.every((row) => row.acknowledgement_id && row.status === 'signed');
 
-  if (!allSigned) {
+  // Sin items solo procede si la lectura ya quedo marcada al inscribir
+  // (Fase 6, practica supervisada: no lleva lectura).
+  if (!allSigned && !(itemsResult.rows.length === 0 && enrollment.reading_completed_at)) {
     return;
   }
 
@@ -452,16 +706,35 @@ export const refreshEnrollmentReadingStatus = async (enrollmentId: number): Prom
     return;
   }
 
+  // Auto-vinculo: si ya existe una asignacion del colaborador para el curso de
+  // la fase (p. ej. la calificacion practica de Fase 6 capturada por RH, o una
+  // evaluacion asignada por fuera), se liga en vez de crear otra.
+  const existingAssignment = await pool.query(
+    `SELECT a.id FROM public.evaluation_assignments a
+       INNER JOIN public.evaluation_templates t ON t.id = a.template_id
+      WHERE t.training_course_id = $1 AND a.employee_id = $2
+      ORDER BY a.created_at DESC LIMIT 1;`,
+    [enrollment.training_course_id, enrollment.employee_id],
+  );
+  if (existingAssignment.rows.length > 0) {
+    await pool.query(
+      `UPDATE public.rh_induction_enrollments SET evaluation_assignment_id = $1, updated_at = NOW() WHERE id = $2;`,
+      [Number(existingAssignment.rows[0].id), enrollmentId],
+    );
+    return;
+  }
+
   const templateResult = await pool.query(
     `SELECT id FROM public.evaluation_templates
       WHERE training_course_id = $1 AND status = 'published' AND is_active = TRUE
+        AND evaluation_type = 'quiz'
       ORDER BY created_at DESC LIMIT 1;`,
     [enrollment.training_course_id],
   );
   if (templateResult.rows.length === 0) {
-    // El responsable de la fase todavia no publica el cuestionario: se
-    // reintenta en la proxima llamada (p. ej. al recargar el portal del
-    // colaborador o al firmar el ultimo documento pendiente).
+    // El responsable de la fase todavia no publica el cuestionario (o la fase
+    // es practica y RH aun no captura la calificacion): se reintenta en la
+    // proxima llamada.
     return;
   }
   const templateId = Number(templateResult.rows[0].id);

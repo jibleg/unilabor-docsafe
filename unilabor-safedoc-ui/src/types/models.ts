@@ -77,10 +77,17 @@ export interface Employee {
   phone?: string | null;
   area?: string | null;
   position?: string | null;
+  branch_id?: number | null;
+  branch_name?: string | null;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
   linked_user?: LinkableUser | null;
+}
+
+export interface EmployeeBranch {
+  id: number;
+  name: string;
 }
 
 export interface EmployeeSummary {
@@ -1305,9 +1312,12 @@ export interface InstitutionalDocument {
 
 // --- Induccion por puesto (REH-MAN-002 / ISO 15189 6.2) ---------------------
 
+export type RhCompetencyCriticality = 'A' | 'M' | 'B';
+
 export interface RhPositionCompetency {
   id: number;
   competency_text: string;
+  criticality: RhCompetencyCriticality;
   sort_order: number;
 }
 
@@ -1361,7 +1371,18 @@ export interface RhInductionPhase {
   scope: 'INSTITUTIONAL' | 'POSITION';
   training_course_id: number | null;
   training_course_title: string | null;
+  duration_hours: number | null;
   documents: RhInductionPhaseDocument[];
+}
+
+export interface RhInductionPhasePosition {
+  id: number;
+  position_id: number;
+  position_name: string;
+  position_code: string;
+  training_course_id: number;
+  course_code: string;
+  has_published_template: boolean;
 }
 
 export interface RhInductionProgressItem {
@@ -1441,7 +1462,22 @@ export interface RhInductionMasterRecordPhaseRow {
   responsible_signature_note: string;
 }
 
-export type RhInductionVerdict = 'SIN_INICIAR' | 'EN_PROCESO' | 'NO_APROBADA' | 'COMPLETA_1_A_4';
+export type RhInductionVerdict = 'SIN_INICIAR' | 'EN_PROCESO' | 'NO_APROBADA' | 'COMPLETA_1_A_4' | 'COMPLETA_7_FASES';
+
+export type RhInductionClosureVerdict = 'APROBADA_INSTITUCIONAL' | 'APROBADA_COMPLETA' | 'NO_APROBADA';
+
+/** Cierre formal vigente del REH-REG-005 (evidencia archivada en el expediente). */
+export interface RhInductionClosure {
+  id: number;
+  employee_id: number;
+  verdict: RhInductionClosureVerdict;
+  verdict_label: string;
+  closing_notes: string | null;
+  rh_signatory_name: string;
+  area_signatory_name: string;
+  document_id: number | null;
+  created_at: string;
+}
 
 export interface RhInductionMasterRecord {
   employee: {
@@ -1464,6 +1500,78 @@ export interface RhInductionMasterRecord {
     what_next: string;
   };
   effectiveness_reviews: RhInductionEffectivenessReview[];
+  closure?: RhInductionClosure | null;
+}
+
+// --- Evaluacion de competencia (REH-REG-003) --------------------------------
+
+export type RhCompetencySection = 'COMPETENCIA' | 'DESEMPENO' | 'CONOCIMIENTO';
+export type RhCompetencyEvaluationType = 'INICIAL' | 'PERIODICA' | 'REEVALUACION' | 'CAMBIO_PUESTO' | 'POST_CAPACITACION';
+export type RhCompetencyDictamen =
+  | 'COMPETENTE_Y_AUTORIZADO'
+  | 'COMPETENTE_CON_OBSERVACIONES'
+  | 'COMPETENTE_BAJO_SUPERVISION'
+  | 'NO_COMPETENTE';
+
+export interface RhCompetencyEvaluationItem {
+  id?: number;
+  section: RhCompetencySection;
+  item_text: string;
+  criticality: RhCompetencyCriticality;
+  method: string | null;
+  score: number | null;
+  expected_answer: string | null;
+  given_answer: string | null;
+  is_correct: boolean | null;
+  observations: string | null;
+  sort_order: number;
+}
+
+export interface RhCompetencyEvaluationAction {
+  id?: number;
+  improvement_area: string;
+  required_action: string;
+  responsible: string | null;
+  due_date: string | null;
+  follow_up: string | null;
+  sort_order: number;
+}
+
+export interface RhCompetencyEvaluationResults {
+  competency_pct: number | null;
+  performance_pct: number | null;
+  knowledge_pct: number | null;
+  final_pct: number | null;
+  veto_applied: boolean;
+  dictamen: RhCompetencyDictamen | null;
+  authorization_result: string | null;
+}
+
+export interface RhCompetencyEvaluation {
+  id: number;
+  employee_id: number;
+  employee_name: string;
+  employee_code: string;
+  position_id: number;
+  position_name: string;
+  evaluation_type: RhCompetencyEvaluationType;
+  evaluation_date: string;
+  evaluator_name: string;
+  reference_course_id: number | null;
+  reference_course_title: string | null;
+  reference_course_date: string | null;
+  status: 'DRAFT' | 'CLOSED';
+  results: RhCompetencyEvaluationResults;
+  authorized_at: string | null;
+  valid_until: string | null;
+  area_signatory_name: string | null;
+  rh_signatory_name: string | null;
+  director_signatory_name: string | null;
+  document_id: number | null;
+  closed_at: string | null;
+  created_at: string;
+  items?: RhCompetencyEvaluationItem[];
+  actions?: RhCompetencyEvaluationAction[];
 }
 
 export interface DocumentAcknowledgement {

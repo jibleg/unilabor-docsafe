@@ -9,10 +9,10 @@ import { listEffectivenessReviews, type RhInductionEffectivenessReview } from '.
  * de contenidos y el supervisor de Bloque 1.5. Para las Fases 5-7 (no
  * construidas todavia) nunca inventa datos: reporta NO_DISPONIBLE.
  *
- * La firma de cierre final (RH/Coordinador de area/Colaborador) NO se emite
- * aqui: cerrar el registro antes de que existan las 7 fases seria firmar "un
- * registro incompleto", justo lo que la hoja INSTRUCCIONES de REH-REG-005
- * prohibe. Se retoma cuando existan las Fases 5-7.
+ * El cierre formal con 3 firmas (RH/Coordinador de area/Colaborador) vive en
+ * rh-induction-closure.service.ts (CR-01): cierre por etapas etiquetado —
+ * positivo APROBADA_INSTITUCIONAL con Fases 1-4 aprobadas (APROBADA_COMPLETA
+ * cuando existan las 7), negativo en cualquier momento con motivo.
  */
 
 export type RhInductionPhaseRowStatus = 'PENDIENTE' | 'EN_PROCESO' | 'APROBADA' | 'NO_APROBADA' | 'NO_DISPONIBLE';
@@ -32,7 +32,7 @@ export interface RhInductionMasterRecordPhaseRow {
   responsible_signature_note: string;
 }
 
-export type RhInductionVerdict = 'SIN_INICIAR' | 'EN_PROCESO' | 'NO_APROBADA' | 'COMPLETA_1_A_4';
+export type RhInductionVerdict = 'SIN_INICIAR' | 'EN_PROCESO' | 'NO_APROBADA' | 'COMPLETA_1_A_4' | 'COMPLETA_7_FASES';
 
 export interface RhInductionMasterRecord {
   employee: {
@@ -72,7 +72,10 @@ const resolveStatus = (
   hasEnrollment: boolean,
   evaluationStatus: string | null,
 ): RhInductionPhaseRowStatus => {
-  if (scope !== 'INSTITUTIONAL') {
+  // Fases POSITION (5-6) sin inscripcion: NO_DISPONIBLE (dependen de que la
+  // fase este habilitada para el puesto). Ya inscritas, se resuelven igual que
+  // las institucionales. La Fase 7 se sobrescribe aparte desde el REH-REG-003.
+  if (scope !== 'INSTITUTIONAL' && !hasEnrollment) {
     return 'NO_DISPONIBLE';
   }
   if (!hasEnrollment) {
@@ -148,6 +151,30 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
     };
   });
 
+  // Fase 7 (Evaluacion de competencia inicial): su instrumento es el
+  // REH-REG-003 (rh_competency_evaluations tipo INICIAL), no el motor de
+  // evaluaciones de lectura. Si existe una cerrada, la fase deja de ser
+  // NO_DISPONIBLE y refleja su resultado real.
+  const phase7 = phases.find((phase) => phase.phase_number === 7);
+  if (phase7) {
+    const compEval = await pool.query(
+      `SELECT final_pct, dictamen, evaluation_date, closed_at
+         FROM public.rh_competency_evaluations
+        WHERE employee_id = $1 AND evaluation_type = 'INICIAL' AND status = 'CLOSED'
+        ORDER BY closed_at DESC LIMIT 1;`,
+      [employeeId],
+    );
+    if (compEval.rows.length > 0) {
+      const row = compEval.rows[0];
+      phase7.status = String(row.dictamen) !== 'NO_COMPETENTE' ? 'APROBADA' : 'NO_APROBADA';
+      phase7.score_percentage = row.final_pct !== null ? Number(row.final_pct) : null;
+      phase7.started_at = row.evaluation_date ? String(row.evaluation_date) : phase7.started_at;
+      phase7.finished_at = row.closed_at ? String(row.closed_at) : phase7.finished_at;
+      phase7.collaborator_signature_note = '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)';
+      phase7.responsible_signature_note = '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)';
+    }
+  }
+
   const institutionalPhases = phases.filter((phase) => phase.status !== 'NO_DISPONIBLE');
   const approvedCount = institutionalPhases.filter((phase) => phase.status === 'APROBADA').length;
   const notApprovedCount = institutionalPhases.filter((phase) => phase.status === 'NO_APROBADA').length;
@@ -172,9 +199,14 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
     verdict = 'NO_APROBADA';
     whatNext =
       'El responsable debe reforzar los temas necesarios y programar una nueva evaluación antes de permitir el avance a la siguiente fase.';
+  } else if (approvedCount === institutionalPhases.length && phases.every((phase) => phase.status === 'APROBADA')) {
+    // Las 7 fases (institucionales + por puesto + Fase 7/REH-REG-003) aprobadas.
+    verdict = 'COMPLETA_7_FASES';
+    whatNext =
+      'Inducción completa (7 fases). Procede el cierre del Formato de Inducción, la Carta de Asignación de Puesto y el alta en el listado de personal autorizado.';
   } else if (approvedCount === institutionalPhases.length) {
     verdict = 'COMPLETA_1_A_4';
-    whatNext = 'Fases institucionales completas. Proceda con la inducción por puesto (Fases 5-7) cuando esté disponible.';
+    whatNext = 'Fases institucionales completas. Proceda con la inducción por puesto (Fases 5-7).';
   } else {
     verdict = 'EN_PROCESO';
     whatNext = 'Continúe con la siguiente fase institucional pendiente. No se avanza de fase sin aprobar la anterior.';

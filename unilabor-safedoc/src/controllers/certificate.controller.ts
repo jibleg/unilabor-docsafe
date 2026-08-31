@@ -2,12 +2,11 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import {
-  buildPreviewRenderInput,
+  buildCertificatePreviewPdf,
   getCertificateTemplate,
   upsertCertificateTemplate,
   type CertificateTemplatePayload,
 } from '../services/certificate-template.service';
-import { renderCertificatePdf } from '../services/certificate-render.service';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -77,8 +76,7 @@ export const previewCertificateController = async (req: AuthRequest, res: Respon
     return res.status(400).json({ message: 'ID de capacitacion invalido.' });
   }
   try {
-    const input = await buildPreviewRenderInput(courseId);
-    const pdf = await renderCertificatePdf(input);
+    const pdf = await buildCertificatePreviewPdf(courseId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="constancia-preliminar.pdf"');
     res.setHeader('Cache-Control', 'no-store');

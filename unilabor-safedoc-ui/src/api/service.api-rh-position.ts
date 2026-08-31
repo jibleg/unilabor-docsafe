@@ -45,10 +45,12 @@ export const addPositionCompetency = async (
   positionId: number,
   competencyText: string,
   sortOrder = 0,
+  criticality: 'A' | 'M' | 'B' = 'M',
 ): Promise<RhPositionCompetency> => {
   const response = await api.post(`/rh/positions/${positionId}/competencies`, {
     competency_text: competencyText,
     sort_order: sortOrder,
+    criticality,
   });
   const data = asRecord(unwrapPayload(response.data));
   return data?.competency as RhPositionCompetency;

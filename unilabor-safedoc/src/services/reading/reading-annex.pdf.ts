@@ -48,8 +48,21 @@ export interface ReadingAnnexInput {
 /**
  * Las fuentes estandar de PDF usan WinAnsi, que no codifica nada fuera de
  * Latin-1: un nombre con caracteres exoticos haria fallar el render completo.
- * Los acentos y la enie caen dentro del rango y se conservan.
+ * Los acentos y la enie caen dentro del rango y se conservan; la puntuacion
+ * tipografica comun (rayas, comillas, elipsis) se transcribe a su ASCII en
+ * vez de degradar a '?'.
  */
+const TYPOGRAPHIC_FALLBACKS: Record<number, string> = {
+  0x2013: '-', // en dash
+  0x2014: '-', // em dash
+  0x2018: "'",
+  0x2019: "'",
+  0x201c: '"',
+  0x201d: '"',
+  0x2022: '·',
+  0x2026: '...',
+};
+
 export const winAnsiSafe = (value: string): string =>
   Array.from(value)
     .map((char) => {
@@ -60,7 +73,10 @@ export const winAnsiSafe = (value: string): string =>
       if (code < 32) {
         return '';
       }
-      return code <= 255 ? char : '?';
+      if (code <= 255) {
+        return char;
+      }
+      return TYPOGRAPHIC_FALLBACKS[code] ?? '?';
     })
     .join('');
 
