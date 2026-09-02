@@ -66,6 +66,19 @@ export interface DocumentLookupResult {
   code: string;
 }
 
+export interface DocumentSearchResult {
+  id: string;
+  title: string;
+  code: string | null;
+}
+
+/** Busca documentos vigentes por codigo o titulo; query vacia lista el inicio del catalogo. */
+export const searchDocuments = async (query: string): Promise<DocumentSearchResult[]> => {
+  const response = await api.get('/rh/documents/search', { params: { q: query } });
+  const data = asRecord(unwrapPayload(response.data));
+  return (data?.documents as DocumentSearchResult[]) ?? [];
+};
+
 export const lookupDocumentByCode = async (code: string): Promise<DocumentLookupResult | null> => {
   try {
     const response = await api.get('/rh/documents/lookup', { params: { code } });

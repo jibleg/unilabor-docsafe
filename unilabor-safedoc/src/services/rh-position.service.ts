@@ -233,6 +233,31 @@ export const findDocumentByCode = async (
   return { id: String(row.id), title: String(row.title), code: String(row.code) };
 };
 
+/**
+ * Lista documentos vigentes cuyo codigo o titulo contengan el texto buscado
+ * (sin distinguir mayusculas). Con query vacia devuelve el inicio del catalogo
+ * ordenado por codigo, para poder explorar sin conocer los codigos SGC.
+ */
+export const searchDocuments = async (
+  query: string,
+  limit = 20,
+): Promise<Array<{ id: string; title: string; code: string | null }>> => {
+  const term = query.trim();
+  const result = await pool.query(
+    `SELECT id, title, code FROM public.documents
+      WHERE status = 'active'
+        AND ($1 = '' OR code ILIKE '%' || $1 || '%' OR title ILIKE '%' || $1 || '%')
+      ORDER BY code NULLS LAST, title
+      LIMIT $2;`,
+    [term, limit],
+  );
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    title: String(row.title),
+    code: row.code === null ? null : String(row.code),
+  }));
+};
+
 export const addPositionDocument = async (
   positionId: number,
   documentId: string,

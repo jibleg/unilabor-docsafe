@@ -12,6 +12,7 @@ import {
   listPositionsController,
   lookupDocumentByCodeController,
   removePositionDocumentController,
+  searchDocumentsController,
   updatePositionController,
 } from '../controllers/rh-position.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
@@ -31,6 +32,7 @@ router.use(verifyToken);
 
 // --- Documentos del SGC por codigo (para ligar documentos a un puesto) ------
 router.get('/documents/lookup', requirePermission('RH.INDUCTION.MANAGE'), lookupDocumentByCodeController);
+router.get('/documents/search', requirePermission('RH.INDUCTION.MANAGE'), searchDocumentsController);
 
 // --- Catalogo de puestos -----------------------------------------------------
 router.get('/positions', requirePermission('RH.INDUCTION.MANAGE'), listPositionsController);

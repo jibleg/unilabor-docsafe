@@ -8,10 +8,10 @@ import {
   deletePosition,
   deletePositionCompetency,
   listPositions,
-  lookupDocumentByCode,
   removePositionDocument,
-  type DocumentLookupResult,
+  type DocumentSearchResult,
 } from '../api/service.api-rh-position';
+import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { confirmAction } from '../utils/confirm';
 import type { RhPosition } from '../types/models';
@@ -35,10 +35,6 @@ export const RhPositionsPage = () => {
   const [competencyCriticality, setCompetencyCriticality] = useState<'A' | 'M' | 'B'>('M');
   const [savingCompetency, setSavingCompetency] = useState(false);
 
-  const [documentCode, setDocumentCode] = useState('');
-  const [documentPreview, setDocumentPreview] = useState<DocumentLookupResult | null>(null);
-  const [lookingUp, setLookingUp] = useState(false);
-  const [savingDocument, setSavingDocument] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,34 +120,14 @@ export const RhPositionsPage = () => {
     }
   };
 
-  const handleLookupDocument = async () => {
-    if (!documentCode.trim()) return;
-    setLookingUp(true);
-    setDocumentPreview(null);
+  const handleAddDocument = async (document: DocumentSearchResult) => {
+    if (!selectedPosition) return;
     try {
-      const found = await lookupDocumentByCode(documentCode.trim());
-      if (!found) {
-        toast.warning('No existe un documento vigente con ese código.');
-      }
-      setDocumentPreview(found);
-    } finally {
-      setLookingUp(false);
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!selectedPosition || !documentPreview) return;
-    setSavingDocument(true);
-    try {
-      await addPositionDocument(selectedPosition.id, documentPreview.id);
-      setDocumentCode('');
-      setDocumentPreview(null);
+      await addPositionDocument(selectedPosition.id, document.id);
       toast.success('Documento agregado al puesto correctamente.');
       await load();
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo agregar el documento.'));
-    } finally {
-      setSavingDocument(false);
     }
   };
 
@@ -271,12 +247,12 @@ export const RhPositionsPage = () => {
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   <input
                     value={competencyText}
                     onChange={(event) => setCompetencyText(event.target.value)}
                     placeholder="Ej. Manejo de espectrofotómetro"
-                    className={inputClass}
+                    className={`${inputClass} min-w-55 flex-1`}
                   />
                   <select
                     value={competencyCriticality}
@@ -288,7 +264,7 @@ export const RhPositionsPage = () => {
                     <option value="M">M — Media (3)</option>
                     <option value="B">B — Baja (1)</option>
                   </select>
-                  <button type="button" onClick={() => void handleAddCompetency()} disabled={savingCompetency} className={buttonClass}>
+                  <button type="button" onClick={() => void handleAddCompetency()} disabled={savingCompetency} className={`${buttonClass} shrink-0`}>
                     {savingCompetency ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                   </button>
                 </div>
@@ -315,30 +291,12 @@ export const RhPositionsPage = () => {
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={documentCode}
-                    onChange={(event) => {
-                      setDocumentCode(event.target.value);
-                      setDocumentPreview(null);
-                    }}
-                    placeholder="Código del documento (ej. REH-INS-001)"
-                    className={inputClass}
+                <div className="mt-2">
+                  <DocumentSearchPicker
+                    excludeIds={selectedPosition.documents.map((document) => document.document_id)}
+                    onPick={handleAddDocument}
                   />
-                  <button type="button" onClick={() => void handleLookupDocument()} disabled={lookingUp} className={buttonClass}>
-                    {lookingUp ? <Loader2 size={14} className="animate-spin" /> : 'Buscar'}
-                  </button>
                 </div>
-                {documentPreview ? (
-                  <div className="mt-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    <span>
-                      Encontrado: <strong>{documentPreview.title}</strong>
-                    </span>
-                    <button type="button" onClick={() => void handleAddDocument()} disabled={savingDocument} className="font-semibold underline">
-                      {savingDocument ? 'Agregando...' : 'Agregar al puesto'}
-                    </button>
-                  </div>
-                ) : null}
               </div>
             </div>
           )}

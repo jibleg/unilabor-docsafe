@@ -10,6 +10,7 @@ import {
   getPositionById,
   listPositions,
   removePositionDocument,
+  searchDocuments,
   updatePosition,
 } from '../services/rh-position.service';
 import {
@@ -176,6 +177,17 @@ export const lookupDocumentByCodeController = async (req: AuthRequest, res: Resp
   } catch (error: any) {
     console.error('Error buscando documento por codigo:', error);
     return res.status(500).json({ message: 'No se pudo buscar el documento.' });
+  }
+};
+
+export const searchDocumentsController = async (req: AuthRequest, res: Response) => {
+  const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  try {
+    const documents = await searchDocuments(query);
+    return res.json({ documents });
+  } catch (error: any) {
+    console.error('Error buscando documentos:', error);
+    return res.status(500).json({ message: 'No se pudo buscar documentos.' });
   }
 };
 
