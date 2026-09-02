@@ -36,3 +36,6 @@ lerna-debug.log*
 # Local build artifacts
 .docx-build/
 unilabor-safe-20260417T1535.zip
+
+# Documentos reales descargados de produccion (SGC) para contexto de RH, nunca versionar
+storage/
