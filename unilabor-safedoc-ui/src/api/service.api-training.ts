@@ -56,6 +56,7 @@ export interface EvaluationTemplatePayload {
   evaluation_type?: EvaluationType;
   passing_score?: number;
   window_hours?: number;
+  attempt_time_limit_minutes?: number | null;
   selection_mode?: EvaluationSelectionMode;
   random_count?: number | null;
   status?: EvaluationTemplateStatus;
@@ -154,6 +155,7 @@ const normalizeTemplate = (input: unknown): EvaluationTemplate | null => {
     evaluation_type: (getString(source, ['evaluation_type']) as EvaluationType) || 'quiz',
     passing_score: getNumber(source, ['passing_score']) ?? 80,
     window_hours: getNumber(source, ['window_hours']) ?? 72,
+    attempt_time_limit_minutes: getNumber(source, ['attempt_time_limit_minutes']) ?? null,
     selection_mode: (getString(source, ['selection_mode']) as EvaluationSelectionMode) || 'all',
     random_count: getNumber(source, ['random_count']) ?? null,
     status: (getString(source, ['status']) as EvaluationTemplateStatus) || 'draft',
@@ -435,6 +437,8 @@ const normalizeTakingView = (input: unknown): EvaluationTakingView | null => {
       instructions: getString(assignment, ['instructions']) || null,
       passing_score: getNumber(assignment, ['passing_score']) ?? 80,
       window_hours: getNumber(assignment, ['window_hours']) ?? 72,
+      attempt_time_limit_minutes: getNumber(assignment, ['attempt_time_limit_minutes']) ?? null,
+      attempt_deadline_at: getString(assignment, ['attempt_deadline_at']) || null,
     },
     questions,
   };

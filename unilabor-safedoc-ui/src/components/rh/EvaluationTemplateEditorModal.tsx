@@ -269,6 +269,7 @@ export const EvaluationTemplateEditorModal = ({
         evaluation_type: 'quiz',
         passing_score: template.passing_score,
         window_hours: template.window_hours,
+        attempt_time_limit_minutes: template.attempt_time_limit_minutes,
         selection_mode: template.selection_mode,
         random_count: template.selection_mode === 'random' ? template.random_count : null,
         status: template.status,
@@ -374,12 +375,36 @@ export const EvaluationTemplateEditorModal = ({
                     />
                   </div>
                   <div>
-                    <label className={labelClass}>Ventana para responder (horas)</label>
+                    <label className={labelClass}>Plazo para presentar (horas)</label>
+                    <p className="mb-1.5 text-[11px] leading-4 text-[var(--unilabor-neutral)]">
+                      Horas que tiene el colaborador para abrir y presentar el examen desde que queda
+                      disponible (en Inducción: al completar la lectura o vencer su límite). Si se
+                      agota, el examen vence y requiere autorización extemporánea de RH.
+                    </p>
                     <input
                       type="number"
                       min={1}
                       value={template.window_hours}
                       onChange={(event) => patchTemplate({ window_hours: Number(event.target.value) })}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Duración del intento (min)</label>
+                    <p className="mb-1.5 text-[11px] leading-4 text-[var(--unilabor-neutral)]">
+                      Minutos para terminar el examen una vez que el colaborador pulsa Iniciar; al
+                      agotarse se envían automáticamente sus respuestas. Vacío = sin límite.
+                    </p>
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="Sin límite"
+                      value={template.attempt_time_limit_minutes ?? ''}
+                      onChange={(event) =>
+                        patchTemplate({
+                          attempt_time_limit_minutes: event.target.value === '' ? null : Number(event.target.value),
+                        })
+                      }
                       className={inputClass}
                     />
                   </div>

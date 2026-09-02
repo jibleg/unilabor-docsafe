@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, ArrowLeft, ArrowRight, Award, CheckCircle2, Loader2, Send } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Award, CheckCircle2, Loader2, Send, Timer } from 'lucide-react';
 import {
   getApiErrorMessage,
   getEmployeeDocumentUrl,
@@ -52,6 +52,15 @@ const buildResultMessage = (result: EvaluationSubmitResult): CongratsMessage => 
 
 const cardClass =
   'rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/92 p-5 shadow-[0_10px_28px_rgba(0,65,106,0.06)] md:p-7';
+
+const formatRemaining = (ms: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const mmss = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return hours > 0 ? `${hours}:${mmss}` : mmss;
+};
 
 export const TakeEvaluationPage = () => {
   const { id } = useParams();
@@ -152,7 +161,7 @@ export const TakeEvaluationPage = () => {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
       const payload: SubmitAnswerPayload[] = questions.map((question) => {
@@ -170,7 +179,34 @@ export const TakeEvaluationPage = () => {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [questions, getAnswer, assignmentId, refreshPendingEvaluations]);
+
+  // --- Cronómetro del intento (si la plantilla define duración límite) ---
+  const attemptDeadlineMs = view?.assignment.attempt_deadline_at
+    ? new Date(view.assignment.attempt_deadline_at).getTime()
+    : null;
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const autoSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    if (!attemptDeadlineMs || result) {
+      return;
+    }
+    const tick = () => setRemainingMs(Math.max(0, attemptDeadlineMs - Date.now()));
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [attemptDeadlineMs, result]);
+
+  useEffect(() => {
+    // Al agotarse el tiempo se envían las respuestas capturadas hasta ese
+    // momento (el backend concede 30s de gracia por latencia).
+    if (remainingMs === 0 && !result && !autoSubmittedRef.current) {
+      autoSubmittedRef.current = true;
+      notifyError('Se agotó el tiempo del intento: se enviaron tus respuestas capturadas.');
+      void handleSubmit();
+    }
+  }, [remainingMs, result, handleSubmit]);
 
   // --- Estados de carga / error ---
   if (loading) {
@@ -277,9 +313,24 @@ export const TakeEvaluationPage = () => {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-          {view?.assignment.course_title}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
+            {view?.assignment.course_title}
+          </p>
+          {remainingMs !== null ? (
+            <span
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold tabular-nums ${
+                remainingMs <= 60_000
+                  ? 'bg-rose-50 text-rose-600'
+                  : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)]'
+              }`}
+              title="Tiempo restante del intento"
+            >
+              <Timer size={14} />
+              {formatRemaining(remainingMs)}
+            </span>
+          ) : null}
+        </div>
         <h1 className="mt-1 text-xl font-bold text-[var(--color-brand-700)]">
           {view?.assignment.template_title}
         </h1>

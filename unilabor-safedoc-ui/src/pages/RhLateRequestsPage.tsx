@@ -38,7 +38,7 @@ export const RhLateRequestsPage = () => {
   const authorize = async (item: EvaluationAssignment, hours: number) => {
     const confirmed = await confirmAction(
       'Autorizar realización extemporánea',
-      `Se reabrirá la evaluación de ${item.employee_name} con una nueva ventana de ${hours} h para realizarla.`,
+      `Se reabrirá la evaluación de ${item.employee_name} con un nuevo plazo de ${hours} h para presentarla.`,
       `Autorizar (${hours}h)`,
       'primary',
     );
@@ -49,7 +49,7 @@ export const RhLateRequestsPage = () => {
     setAuthorizingId(item.id);
     try {
       await authorizeLateAttempt(item.id, hours);
-      notifySuccess(`Autorización extemporánea otorgada. Se reabrió la ventana de ${hours}h.`);
+      notifySuccess(`Autorización extemporánea otorgada. Se reabrió el plazo por ${hours}h.`);
       await load();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo autorizar la evaluacion.'));
@@ -68,7 +68,7 @@ export const RhLateRequestsPage = () => {
           <Clock size={24} /> Evaluaciones vencidas
         </h1>
         <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-          Evaluaciones que vencieron sin realizarse. Autoriza una realización extemporánea para reabrir la ventana.
+          Evaluaciones que vencieron sin realizarse. Autoriza una realización extemporánea para reabrir el plazo.
         </p>
       </div>
 

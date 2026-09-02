@@ -65,6 +65,12 @@ const templateCoreShape = {
     .int('La ventana debe ser un numero entero de horas')
     .positive('La ventana debe ser mayor a 0')
     .optional(),
+  attempt_time_limit_minutes: z.coerce
+    .number()
+    .int('El limite del intento debe ser un numero entero de minutos')
+    .positive('El limite del intento debe ser mayor a 0')
+    .optional()
+    .nullable(),
   selection_mode: z.enum(['all', 'random']).optional(),
   random_count: z.coerce
     .number()

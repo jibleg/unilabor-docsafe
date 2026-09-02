@@ -51,7 +51,8 @@ export const RhMyInductionPage = () => {
         <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Mi inducción</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--unilabor-neutral)]">
           Tu progreso en las fases de inducción institucional. Primero lees los documentos asignados
-          en Sala de Lectura; al firmarlos todos, se habilita la evaluación de la fase.
+          en Sala de Lectura; al firmarlos todos —o al vencer la fecha límite de lectura, si la fase
+          tiene una— se habilita la evaluación de la fase.
         </p>
       </div>
 
@@ -79,10 +80,24 @@ export const RhMyInductionPage = () => {
                         Fase {item.phase_number}: {item.phase_name}
                       </p>
                       <p className="text-xs text-[var(--unilabor-neutral)]">{step.label}</p>
+                      {item.reading_deadline_at && !item.reading_completed_at && !item.evaluation_assignment_id ? (
+                        <p className="text-xs font-semibold text-amber-600">
+                          Fecha límite de lectura:{' '}
+                          {new Date(item.reading_deadline_at).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' })}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
 
-                  {!item.reading_completed_at ? (
+                  {item.evaluation_assignment_id && item.evaluation_status !== 'passed' && item.evaluation_status !== 'failed' ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/rh/my-evaluations/${item.evaluation_assignment_id}`)}
+                      className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+                    >
+                      Realizar evaluación
+                    </button>
+                  ) : !item.reading_completed_at && !item.evaluation_assignment_id ? (
                     <button
                       type="button"
                       onClick={() => navigate('/quality/my-readings')}

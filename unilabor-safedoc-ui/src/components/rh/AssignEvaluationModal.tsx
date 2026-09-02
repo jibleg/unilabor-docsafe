@@ -144,7 +144,8 @@ export const AssignEvaluationModal = ({ template, onClose, onAssigned }: AssignE
             </p>
             <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{template.title}</h2>
             <p className="mt-0.5 text-xs text-[var(--unilabor-neutral)]">
-              Ventana de {template.window_hours}h | mínimo {template.passing_score}%
+              Plazo para presentar: {template.window_hours}h | mínimo {template.passing_score}%
+              {template.attempt_time_limit_minutes ? ` | intento: ${template.attempt_time_limit_minutes} min` : ''}
             </p>
           </div>
           <button

@@ -9,6 +9,7 @@ import {
 } from '../api/service';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { EmployeeDocumentUploadModal } from '../components/rh/EmployeeDocumentUploadModal';
+import { InductionHeroBanner } from '../components/rh/InductionHeroBanner';
 import { ExpedientSectionCard } from '../components/rh/ExpedientSectionCard';
 import type { EmployeeExpedient, EmployeeExpedientItem } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
@@ -157,6 +158,7 @@ export const MyExpedientPage = () => {
 
   return (
     <div className="space-y-6">
+      <InductionHeroBanner />
       <div className="overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.1)] bg-[linear-gradient(135deg,#ffffff_0%,#eef5fa_56%,#dbe8f2_100%)] shadow-xl shadow-[rgba(0,65,106,0.1)]">
         <div className="bg-[radial-gradient(circle_at_top_right,rgba(124,173,211,0.22),transparent_28%)] px-6 py-7">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">

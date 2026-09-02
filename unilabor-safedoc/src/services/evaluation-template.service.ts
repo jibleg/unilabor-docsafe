@@ -22,6 +22,7 @@ export interface EvaluationTemplatePayload {
   evaluation_type?: 'quiz' | 'practical';
   passing_score?: number;
   window_hours?: number;
+  attempt_time_limit_minutes?: number | null;
   selection_mode?: 'all' | 'random';
   random_count?: number | null;
   status?: 'draft' | 'published';
@@ -130,6 +131,10 @@ const mapTemplateRow = (row: any): EvaluationTemplateRecord => {
     instructions: row.instructions ? String(row.instructions) : null,
     passing_score: Number(row.passing_score),
     window_hours: Number(row.window_hours),
+    attempt_time_limit_minutes:
+      row.attempt_time_limit_minutes !== null && row.attempt_time_limit_minutes !== undefined
+        ? Number(row.attempt_time_limit_minutes)
+        : null,
     evaluation_type: String(row.evaluation_type ?? 'quiz') as EvaluationType,
     selection_mode: String(row.selection_mode) as 'all' | 'random',
     random_count: row.random_count !== null && row.random_count !== undefined ? Number(row.random_count) : null,
@@ -152,6 +157,7 @@ const mapTemplateRow = (row: any): EvaluationTemplateRecord => {
 const TEMPLATE_BASE_QUERY = `
   SELECT
     t.id, t.training_course_id, t.title, t.instructions, t.passing_score, t.window_hours,
+    t.attempt_time_limit_minutes,
     t.evaluation_type, t.selection_mode, t.random_count, t.status, t.is_active, t.created_at, t.updated_at,
     COUNT(q.id)::int AS question_count,
     COALESCE(BOOL_OR(q.type = 'open'), FALSE) AS requires_manual_grading
@@ -206,8 +212,8 @@ export const createEvaluationTemplate = async (
 
   const result = await pool.query(
     `INSERT INTO public.evaluation_templates
-       (training_course_id, title, instructions, evaluation_type, passing_score, window_hours, selection_mode, random_count, status, created_by_user_id)
-     VALUES ($1, $2, $3, $4, COALESCE($5, 80), COALESCE($6, 72), COALESCE($7, 'all'), $8, COALESCE($9, 'draft'), $10)
+       (training_course_id, title, instructions, evaluation_type, passing_score, window_hours, attempt_time_limit_minutes, selection_mode, random_count, status, created_by_user_id)
+     VALUES ($1, $2, $3, $4, COALESCE($5, 80), COALESCE($6, 72), $7, COALESCE($8, 'all'), $9, COALESCE($10, 'draft'), $11)
      RETURNING id;`,
     [
       courseId,
@@ -216,6 +222,7 @@ export const createEvaluationTemplate = async (
       evaluationType,
       payload.passing_score ?? null,
       payload.window_hours ?? null,
+      payload.attempt_time_limit_minutes ?? null,
       isPractical ? 'all' : payload.selection_mode ?? null,
       isPractical ? null : payload.selection_mode === 'random' ? payload.random_count ?? null : null,
       payload.status ?? null,
@@ -287,14 +294,20 @@ export const updateEvaluationTemplate = async (
     await client.query(
       `UPDATE public.evaluation_templates
         SET title = $1, instructions = $2, evaluation_type = $3, passing_score = $4, window_hours = $5,
-            selection_mode = $6, random_count = $7, status = $8, is_active = $9, updated_at = NOW()
-        WHERE id = $10;`,
+            attempt_time_limit_minutes = $6,
+            selection_mode = $7, random_count = $8, status = $9, is_active = $10, updated_at = NOW()
+        WHERE id = $11;`,
       [
         payload.title !== undefined ? payload.title.trim() : String(current.title),
         payload.instructions !== undefined ? normalizeOptionalText(payload.instructions) : current.instructions,
         evaluationType,
         payload.passing_score ?? Number(current.passing_score),
         payload.window_hours ?? Number(current.window_hours),
+        payload.attempt_time_limit_minutes !== undefined
+          ? payload.attempt_time_limit_minutes
+          : current.attempt_time_limit_minutes !== null && current.attempt_time_limit_minutes !== undefined
+            ? Number(current.attempt_time_limit_minutes)
+            : null,
         selectionMode,
         randomCount,
         payload.status ?? String(current.status),

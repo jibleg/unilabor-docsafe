@@ -85,6 +85,7 @@ export interface EvaluationTemplateRecord {
   instructions: string | null;
   passing_score: number;
   window_hours: number;
+  attempt_time_limit_minutes: number | null;
   evaluation_type: EvaluationType;
   selection_mode: EvaluationSelectionMode;
   random_count: number | null;
@@ -168,6 +169,9 @@ export interface EvaluationTakingView {
     instructions: string | null;
     passing_score: number;
     window_hours: number;
+    attempt_time_limit_minutes: number | null;
+    /** Momento limite real del intento: started_at + limite, acotado por deadline_at. */
+    attempt_deadline_at: string | null;
   };
   questions: EvaluationTakingQuestion[];
 }

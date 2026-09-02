@@ -1,24 +1,31 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckSquare, FileText, GraduationCap, ListChecks, Loader2, Phone, Square, Trash2, UserPlus } from 'lucide-react';
+import { CheckSquare, FileText, GraduationCap, ListChecks, Loader2, Phone, Square, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { listEmployees } from '../api/service';
 import {
   addPhaseChecklistItem,
   addPhaseDocument,
   enablePhaseForPosition,
+  enrollAllInPhase,
   enrollEmployeeInPhase,
+  getPhaseCertificateReadiness,
   listEnrollmentChecklistProgress,
   listInductionPhases,
   listPhaseChecklistItems,
   listPhaseEnrollments,
   listPhasePositions,
+  removeEnrollment,
   removePhaseChecklistItem,
   removePhaseDocument,
   setEnrollmentSupervisor,
   toggleChecklistItem,
   updatePhaseContact,
   updatePhaseDuration,
+  updatePhaseReadingLimit,
+  type RhInductionBulkEnrollmentResult,
+  type RhInductionCertificateReadiness,
 } from '../api/service.api-rh-induction';
+import { confirmAction } from '../utils/confirm';
 import { listPositions, lookupDocumentByCode, type DocumentLookupResult } from '../api/service.api-rh-position';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { SearchableSelect } from '../components/SearchableSelect';
@@ -62,6 +69,9 @@ export const RhInductionPage = () => {
 
   const [durationHours, setDurationHours] = useState('');
   const [savingDuration, setSavingDuration] = useState(false);
+  const [readingLimitHours, setReadingLimitHours] = useState('');
+  const [savingReadingLimit, setSavingReadingLimit] = useState(false);
+  const [certReadiness, setCertReadiness] = useState<RhInductionCertificateReadiness | null>(null);
 
   const [allPositions, setAllPositions] = useState<RhPosition[]>([]);
   const [phasePositions, setPhasePositions] = useState<RhInductionPhasePosition[]>([]);
@@ -71,6 +81,8 @@ export const RhInductionPage = () => {
   const [enrollEmployeeId, setEnrollEmployeeId] = useState('');
   const [enrollSupervisorId, setEnrollSupervisorId] = useState('');
   const [enrolling, setEnrolling] = useState(false);
+  const [enrollingAll, setEnrollingAll] = useState(false);
+  const [bulkResult, setBulkResult] = useState<RhInductionBulkEnrollmentResult | null>(null);
 
   const [checklistItems, setChecklistItems] = useState<RhInductionChecklistItem[]>([]);
   const [newChecklistText, setNewChecklistText] = useState('');
@@ -130,13 +142,21 @@ export const RhInductionPage = () => {
     setResponsibleName(phase.responsible_name ?? '');
     setResponsiblePhone(phase.responsible_phone ?? '');
     setDurationHours(phase.duration_hours !== null ? String(phase.duration_hours) : '');
+    setReadingLimitHours(phase.reading_time_limit_hours !== null ? String(phase.reading_time_limit_hours) : '');
     setDocumentCode('');
     setDocumentPreview(null);
     setExpandedEnrollmentId(null);
+    setBulkResult(null);
     setPhasePositions([]);
     setEnablePositionId('');
     void loadEnrollments(phase.id);
     void loadChecklistItems(phase.id);
+    setCertReadiness(null);
+    getPhaseCertificateReadiness(phase.id)
+      .then(setCertReadiness)
+      .catch(() => {
+        // Panel informativo: si falla la consulta simplemente no se muestra.
+      });
     if (phase.scope === 'POSITION' && phase.phase_number !== 7) {
       listPhasePositions(phase.id)
         .then(setPhasePositions)
@@ -236,6 +256,25 @@ export const RhInductionPage = () => {
     }
   };
 
+  const handleSaveReadingLimit = async () => {
+    if (!selectedPhase) return;
+    const trimmed = readingLimitHours.trim();
+    if (trimmed && (!Number.isFinite(Number(trimmed)) || Number(trimmed) <= 0)) {
+      toast.warning('El límite de lectura debe ser un número de horas mayor a 0.');
+      return;
+    }
+    setSavingReadingLimit(true);
+    try {
+      await updatePhaseReadingLimit(selectedPhase.id, trimmed ? Number(trimmed) : null);
+      toast.success('Límite de lectura actualizado correctamente (aplica a inscripciones nuevas).');
+      await load();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo actualizar el límite de lectura.'));
+    } finally {
+      setSavingReadingLimit(false);
+    }
+  };
+
   const handleEnroll = async () => {
     if (!selectedPhase || !enrollEmployeeId) {
       toast.warning('Selecciona un colaborador.');
@@ -256,6 +295,46 @@ export const RhInductionPage = () => {
       toast.error(getApiErrorMessage(error, 'No se pudo inscribir al colaborador.'));
     } finally {
       setEnrolling(false);
+    }
+  };
+
+  const handleEnrollAll = async () => {
+    if (!selectedPhase) return;
+    const confirmed = await confirmAction(
+      'Inscribir a todos',
+      `¿Inscribir a todos los colaboradores activos en la fase "${selectedPhase.name}"? Se omitirá automáticamente a quienes ya estén inscritos o aún no aprueben la fase anterior.`,
+      'Inscribir a todos',
+    );
+    if (!confirmed) return;
+    setEnrollingAll(true);
+    setBulkResult(null);
+    try {
+      const result = await enrollAllInPhase(selectedPhase.id);
+      setBulkResult(result);
+      toast.success(`Inscripción masiva: ${result.enrolled} inscrito(s), ${result.skipped.length} omitido(s).`);
+      await loadEnrollments(selectedPhase.id);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo completar la inscripción masiva.'));
+    } finally {
+      setEnrollingAll(false);
+    }
+  };
+
+  const handleRemoveEnrollment = async (item: RhInductionPhaseEnrollmentSummary) => {
+    if (!selectedPhase) return;
+    const confirmed = await confirmAction(
+      'Eliminar inscripción',
+      `¿Eliminar la inscripción de "${item.employee_name}" en esta fase? Se retirarán sus lecturas pendientes sin firmar; los acuses ya firmados se conservan como evidencia.`,
+      'Eliminar',
+      'danger',
+    );
+    if (!confirmed) return;
+    try {
+      await removeEnrollment(item.enrollment_id);
+      toast.success('Inscripción eliminada correctamente.');
+      await loadEnrollments(selectedPhase.id);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo eliminar la inscripción.'));
     }
   };
 
@@ -436,6 +515,83 @@ export const RhInductionPage = () => {
                 </div>
               </div>
 
+              {selectedPhase.phase_number !== 6 && selectedPhase.phase_number !== 7 ? (
+                <div>
+                  <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
+                    Límite de lectura (horas)
+                  </h3>
+                  <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
+                    Tiempo que tiene el colaborador para leer y firmar los documentos desde que se inscribe. Al
+                    vencer (o al terminar antes la lectura) se abre el cuestionario de la fase. Vacío = sin límite.
+                    Aplica a inscripciones nuevas.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <input
+                      type="number"
+                      min={1}
+                      value={readingLimitHours}
+                      onChange={(event) => setReadingLimitHours(event.target.value)}
+                      placeholder="Horas (ej. 24) — vacío: sin límite"
+                      className={inputClass}
+                    />
+                    <button type="button" onClick={() => void handleSaveReadingLimit()} disabled={savingReadingLimit} className={buttonClass}>
+                      {savingReadingLimit ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {certReadiness ? (
+                (() => {
+                  const missingSignatures = certReadiness.courses.filter((course) => course.signatures_count < 3);
+                  const issues: string[] = [];
+                  if (!certReadiness.duration_ok) {
+                    issues.push('Falta capturar la Duración de la fase: el campo DURACIÓN saldrá vacío ("—").');
+                  }
+                  missingSignatures.forEach((course) => {
+                    issues.push(
+                      `${course.label}: solo ${course.signatures_count} de 3 firmas configuradas en la plantilla de constancia (Capacitaciones).`,
+                    );
+                  });
+                  const nameList = (people: Array<{ full_name: string }>) => {
+                    const names = people.slice(0, 6).map((person) => person.full_name).join(', ');
+                    return people.length > 6 ? `${names} y ${people.length - 6} más` : names;
+                  };
+                  if (certReadiness.employees_missing_branch.length > 0) {
+                    issues.push(
+                      `${certReadiness.employees_missing_branch.length} inscrito(s) sin SUCURSAL capturada (RH → Empleados): ${nameList(certReadiness.employees_missing_branch)}.`,
+                    );
+                  }
+                  if (certReadiness.employees_missing_position.length > 0) {
+                    issues.push(
+                      `${certReadiness.employees_missing_position.length} inscrito(s) sin PUESTO activo asignado: ${nameList(certReadiness.employees_missing_position)}.`,
+                    );
+                  }
+                  return (
+                    <div>
+                      <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
+                        Preparación de la constancia
+                      </h3>
+                      {issues.length === 0 ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-700">
+                          ✓ Constancia completa: puesto, sucursal, duración y firmas están capturados para los{' '}
+                          {certReadiness.pending_enrollments} inscrito(s) pendientes de aprobar.
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                          <p className="font-bold">
+                            ⚠ Las constancias de esta fase saldrían incompletas — falta información:
+                          </p>
+                          {issues.map((issue) => (
+                            <p key={issue}>• {issue}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : null}
+
               {selectedPhase.scope === 'POSITION' && (
                 <div>
                   <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
@@ -577,10 +733,46 @@ export const RhInductionPage = () => {
               </div>
 
               <div>
-                <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
-                  <GraduationCap size={14} />
-                  Inscribir colaborador
-                </h3>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
+                    <GraduationCap size={14} />
+                    Inscribir colaborador
+                  </h3>
+                  {selectedPhase.scope === 'INSTITUTIONAL' ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleEnrollAll()}
+                      disabled={enrollingAll}
+                      className={buttonClass}
+                      title="Inscribe a todos los colaboradores activos; omite a los ya inscritos y a quienes no han aprobado la fase anterior"
+                    >
+                      {enrollingAll ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
+                      Inscribir a todos
+                    </button>
+                  ) : null}
+                </div>
+                {bulkResult ? (
+                  <div className="mb-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(248,251,253,0.96)] p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-[var(--color-brand-700)]">
+                        Inscripción masiva: {bulkResult.enrolled} de {bulkResult.total} inscritos
+                        {bulkResult.skipped.length > 0 ? ` · ${bulkResult.skipped.length} omitidos` : ''}
+                      </p>
+                      <button type="button" onClick={() => setBulkResult(null)} className="text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]">
+                        <X size={13} />
+                      </button>
+                    </div>
+                    {bulkResult.skipped.length > 0 ? (
+                      <div className="mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
+                        {bulkResult.skipped.map((item) => (
+                          <p key={item.employee_id} className="text-[var(--unilabor-neutral)]">
+                            <span className="font-semibold text-[var(--unilabor-ink)]">{item.full_name}</span> — {item.reason}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="space-y-2">
                   <SearchableSelect
                     value={enrollEmployeeId}
@@ -642,6 +834,12 @@ export const RhInductionPage = () => {
                             <p>
                               Lectura: {item.reading_signed}/{item.reading_total}
                             </p>
+                            {item.reading_deadline_at && !item.reading_completed_at ? (
+                              <p className={new Date(item.reading_deadline_at) < new Date() ? 'text-rose-500' : ''}>
+                                {new Date(item.reading_deadline_at) < new Date() ? 'Lectura vencida: ' : 'Lectura vence: '}
+                                {new Date(item.reading_deadline_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
+                              </p>
+                            ) : null}
                             <p>
                               Evaluación: {item.evaluation_status ?? 'Pendiente'} ({formatPercentage(item)})
                             </p>
@@ -685,14 +883,24 @@ export const RhInductionPage = () => {
                               Supervisor: <span className="font-semibold">{item.supervisor_name ?? 'No asignado'}</span>
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => void handleToggleExpandEnrollment(item.enrollment_id)}
-                            className="inline-flex items-center gap-1 text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]"
-                          >
-                            <ListChecks size={12} />
-                            Checklist: {item.checklist_completed}/{item.checklist_total}
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleExpandEnrollment(item.enrollment_id)}
+                              className="inline-flex items-center gap-1 text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]"
+                            >
+                              <ListChecks size={12} />
+                              Checklist: {item.checklist_completed}/{item.checklist_total}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRemoveEnrollment(item)}
+                              className="text-rose-500 transition hover:text-rose-700"
+                              title="Eliminar inscripción (solo si la fase no está aprobada)"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </div>
 
                         {expandedEnrollmentId === item.enrollment_id ? (

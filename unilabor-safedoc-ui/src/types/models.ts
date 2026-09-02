@@ -1018,6 +1018,7 @@ export interface EvaluationTemplate {
   evaluation_type: EvaluationType;
   passing_score: number;
   window_hours: number;
+  attempt_time_limit_minutes: number | null;
   selection_mode: EvaluationSelectionMode;
   random_count: number | null;
   status: EvaluationTemplateStatus;
@@ -1101,6 +1102,8 @@ export interface EvaluationTakingView {
     instructions: string | null;
     passing_score: number;
     window_hours: number;
+    attempt_time_limit_minutes: number | null;
+    attempt_deadline_at: string | null;
   };
   questions: EvaluationTakingQuestion[];
 }
@@ -1372,6 +1375,7 @@ export interface RhInductionPhase {
   training_course_id: number | null;
   training_course_title: string | null;
   duration_hours: number | null;
+  reading_time_limit_hours: number | null;
   documents: RhInductionPhaseDocument[];
 }
 
@@ -1394,6 +1398,7 @@ export interface RhInductionProgressItem {
   reading_total: number;
   reading_signed: number;
   reading_completed_at: string | null;
+  reading_deadline_at: string | null;
   evaluation_assignment_id: number | null;
   evaluation_status: string | null;
   evaluation_percentage: number | null;
@@ -1411,6 +1416,7 @@ export interface RhInductionPhaseEnrollmentSummary {
   reading_total: number;
   reading_signed: number;
   reading_completed_at: string | null;
+  reading_deadline_at: string | null;
   evaluation_status: string | null;
   evaluation_percentage: number | null;
   supervisor_employee_id: number | null;

@@ -6,7 +6,10 @@ import {
   addPhaseDocument,
   addPhaseChecklistItem,
   enablePhaseForPosition,
+  enrollAllEmployeesInPhase,
+  getPhaseCertificateReadiness,
   enrollEmployeeInPhase,
+  unenrollEmployeeFromPhase,
   getEmployeeInductionProgress,
   listEnrollmentChecklistProgress,
   listInductionPhases,
@@ -43,10 +46,13 @@ const ERROR_STATUS: Record<string, number> = {
   RH_INDUCTION_ALREADY_ENROLLED: 409,
   RH_INDUCTION_EMPLOYEE_WITHOUT_USER: 409,
   RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS: 409,
+  RH_INDUCTION_BULK_ONLY_INSTITUTIONAL: 409,
   RH_INDUCTION_PHASE_DOCUMENT_DUPLICATE: 409,
   RH_INDUCTION_PHASE_DOCUMENT_NOT_FOUND: 400,
   RH_INDUCTION_PREVIOUS_PHASE_NOT_APPROVED: 409,
   RH_INDUCTION_ENROLLMENT_NOT_FOUND: 404,
+  RH_INDUCTION_ENROLLMENT_ALREADY_PASSED: 409,
+  RH_INDUCTION_ENROLLMENT_EVALUATION_IN_REVIEW: 409,
   RH_INDUCTION_EMPLOYEE_NOT_FOUND: 404,
 };
 
@@ -85,6 +91,44 @@ export const enrollEmployeeInPhaseController = async (req: AuthRequest, res: Res
     if (mapped) return mapped;
     console.error('Error inscribiendo colaborador en fase de induccion:', error);
     return res.status(500).json({ message: 'No se pudo inscribir al colaborador.' });
+  }
+};
+
+export const enrollAllEmployeesInPhaseController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  if (!phaseId) {
+    return res.status(400).json({ message: 'ID de fase invalido.' });
+  }
+  if (!req.user?.id) {
+    return res.status(401).json({ message: 'Sesion invalida o expirada.' });
+  }
+  try {
+    const result = await enrollAllEmployeesInPhase(phaseId, req.user.id);
+    return res.status(201).json({
+      message: `Inscripcion masiva completada: ${result.enrolled} inscrito(s), ${result.skipped.length} omitido(s).`,
+      result,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error en inscripcion masiva de induccion:', error);
+    return res.status(500).json({ message: 'No se pudo completar la inscripcion masiva.' });
+  }
+};
+
+export const unenrollEmployeeFromPhaseController = async (req: AuthRequest, res: Response) => {
+  const enrollmentId = parsePositiveInt(req.params.enrollmentId);
+  if (!enrollmentId) {
+    return res.status(400).json({ message: 'ID de inscripcion invalido.' });
+  }
+  try {
+    await unenrollEmployeeFromPhase(enrollmentId);
+    return res.json({ message: 'Inscripcion eliminada correctamente.' });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error eliminando inscripcion de induccion:', error);
+    return res.status(500).json({ message: 'No se pudo eliminar la inscripcion.' });
   }
 };
 
@@ -250,6 +294,50 @@ export const updatePhaseDurationController = async (req: AuthRequest, res: Respo
   } catch (error: any) {
     console.error('Error actualizando duracion de fase:', error);
     return res.status(500).json({ message: 'No se pudo actualizar la duracion de la fase.' });
+  }
+};
+
+export const getPhaseCertificateReadinessController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  if (!phaseId) {
+    return res.status(400).json({ message: 'ID de fase invalido.' });
+  }
+  try {
+    const readiness = await getPhaseCertificateReadiness(phaseId);
+    return res.json({ readiness });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error consultando preparacion de constancia de la fase:', error);
+    return res.status(500).json({ message: 'No se pudo consultar la preparacion de la constancia.' });
+  }
+};
+
+export const updatePhaseReadingLimitController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  if (!phaseId) {
+    return res.status(400).json({ message: 'ID de fase invalido.' });
+  }
+  const raw = req.body?.reading_time_limit_hours;
+  const readingLimitHours = raw === null || raw === undefined || raw === '' ? null : Number(raw);
+  if (readingLimitHours !== null && (!Number.isFinite(readingLimitHours) || readingLimitHours <= 0)) {
+    return res.status(400).json({ message: 'El limite de lectura debe ser un numero de horas mayor a 0.' });
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE public.rh_induction_phases
+          SET reading_time_limit_hours = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING id;`,
+      [readingLimitHours, phaseId],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Fase no encontrada.' });
+    }
+    return res.json({ message: 'Limite de lectura de la fase actualizado correctamente.' });
+  } catch (error: any) {
+    console.error('Error actualizando limite de lectura de fase:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar el limite de lectura de la fase.' });
   }
 };
 

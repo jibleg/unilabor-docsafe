@@ -35,6 +35,7 @@ export interface RhInductionPhase {
   training_course_id: number | null;
   training_course_title: string | null;
   duration_hours: number | null;
+  reading_time_limit_hours: number | null;
   documents: RhInductionPhaseDocument[];
 }
 
@@ -42,7 +43,7 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
   const result = await pool.query(`
     SELECT
       p.id, p.phase_number, p.name, p.responsible_label, p.responsible_name, p.responsible_phone,
-      p.scope, p.training_course_id, p.duration_hours,
+      p.scope, p.training_course_id, p.duration_hours, p.reading_time_limit_hours,
       tc.title AS training_course_title
     FROM public.rh_induction_phases p
     LEFT JOIN public.training_courses tc ON tc.id = p.training_course_id
@@ -60,6 +61,10 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
       training_course_id: row.training_course_id ? Number(row.training_course_id) : null,
       training_course_title: row.training_course_title ? String(row.training_course_title) : null,
       duration_hours: row.duration_hours !== null && row.duration_hours !== undefined ? Number(row.duration_hours) : null,
+      reading_time_limit_hours:
+        row.reading_time_limit_hours !== null && row.reading_time_limit_hours !== undefined
+          ? Number(row.reading_time_limit_hours)
+          : null,
       documents: await listPhaseDocuments(Number(row.id)),
     })),
   );
@@ -345,7 +350,7 @@ export const enrollEmployeeInPhase = async (
   supervisorEmployeeId?: number | null,
 ): Promise<RhInductionEnrollment> => {
   const phaseResult = await pool.query(
-    `SELECT id, phase_number, scope FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
+    `SELECT id, phase_number, scope, reading_time_limit_hours FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
     [phaseId],
   );
   if (phaseResult.rows.length === 0) {
@@ -353,6 +358,9 @@ export const enrollEmployeeInPhase = async (
   }
   const phaseScope = String(phaseResult.rows[0].scope);
   const phaseNumber = Number(phaseResult.rows[0].phase_number);
+  const readingLimitHours = phaseResult.rows[0].reading_time_limit_hours
+    ? Number(phaseResult.rows[0].reading_time_limit_hours)
+    : null;
   if (phaseScope !== 'INSTITUTIONAL' && phaseNumber === 7) {
     throwCoded(
       'RH_INDUCTION_PHASE_NOT_INSTITUTIONAL',
@@ -467,11 +475,18 @@ export const enrollEmployeeInPhase = async (
     documents = positionDocuments;
   }
 
+  // Fecha limite de lectura: se congela al inscribir (cambios posteriores en la
+  // config de la fase no mueven inscripciones existentes). Solo aplica cuando
+  // la fase lleva lectura.
+  const readingDeadlineHours = documents.length > 0 && readingLimitHours ? readingLimitHours : null;
+
   const enrollmentId = await withTransaction(async (client) => {
     const inserted = await client.query(
-      `INSERT INTO public.rh_induction_enrollments (employee_id, phase_id, enrolled_by_user_id, supervisor_employee_id, training_course_id)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id;`,
-      [employeeId, phaseId, userId, supervisorEmployeeId ?? null, positionCourseId],
+      `INSERT INTO public.rh_induction_enrollments
+         (employee_id, phase_id, enrolled_by_user_id, supervisor_employee_id, training_course_id, reading_deadline_at)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE NOW() + make_interval(hours => $6::int) END)
+       RETURNING id;`,
+      [employeeId, phaseId, userId, supervisorEmployeeId ?? null, positionCourseId, readingDeadlineHours],
     );
     return Number(inserted.rows[0].id);
   });
@@ -533,6 +548,132 @@ export const enrollEmployeeInPhase = async (
     evaluation_assignment_id: row.evaluation_assignment_id ? Number(row.evaluation_assignment_id) : null,
     supervisor_employee_id: row.supervisor_employee_id ? Number(row.supervisor_employee_id) : null,
   };
+};
+
+/**
+ * Elimina una inscripcion que aun no genera evidencia aprobatoria: borra el
+ * enrollment (sus reading items y checklist caen en cascada), retira de la
+ * Sala de Lectura los acuses PENDIENTES sin firma que solo esta inscripcion
+ * habia asignado, y cancela la asignacion de evaluacion si nadie la ha
+ * contestado. Los acuses firmados y las evaluaciones presentadas NUNCA se
+ * tocan (evidencia ISO): con fase aprobada o evaluacion en revision, la baja
+ * se rechaza.
+ */
+export const unenrollEmployeeFromPhase = async (enrollmentId: number): Promise<void> => {
+  const enrollmentResult = await pool.query(
+    `SELECT e.id, e.evaluation_assignment_id, ea.status AS assignment_status
+       FROM public.rh_induction_enrollments e
+       LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
+      WHERE e.id = $1 LIMIT 1;`,
+    [enrollmentId],
+  );
+  if (enrollmentResult.rows.length === 0) {
+    throwCoded('RH_INDUCTION_ENROLLMENT_NOT_FOUND', 'La inscripcion no existe.');
+  }
+  const row = enrollmentResult.rows[0];
+  const assignmentStatus = row.assignment_status ? String(row.assignment_status) : null;
+  if (assignmentStatus === 'passed') {
+    throwCoded(
+      'RH_INDUCTION_ENROLLMENT_ALREADY_PASSED',
+      'La fase ya fue aprobada por el colaborador; la inscripcion es evidencia del programa y no puede eliminarse.',
+    );
+  }
+  if (assignmentStatus === 'submitted' || assignmentStatus === 'grading') {
+    throwCoded(
+      'RH_INDUCTION_ENROLLMENT_EVALUATION_IN_REVIEW',
+      'El colaborador ya presento la evaluacion y esta en revision; califica o descarta esa evaluacion antes de eliminar la inscripcion.',
+    );
+  }
+
+  const pendingAcks = await pool.query(
+    `SELECT ri.acknowledgement_id
+       FROM public.rh_induction_reading_items ri
+       INNER JOIN public.quality_reading_acknowledgements ack ON ack.id = ri.acknowledgement_id
+      WHERE ri.enrollment_id = $1 AND ack.signed_at IS NULL;`,
+    [enrollmentId],
+  );
+  const pendingAckIds = pendingAcks.rows.map((ackRow) => Number(ackRow.acknowledgement_id));
+
+  await withTransaction(async (client) => {
+    await client.query(`DELETE FROM public.rh_induction_enrollments WHERE id = $1;`, [enrollmentId]);
+    if (pendingAckIds.length > 0) {
+      // Solo los acuses que ninguna otra inscripcion sigue usando.
+      await client.query(
+        `DELETE FROM public.quality_reading_acknowledgements ack
+          WHERE ack.id = ANY($1::bigint[]) AND ack.signed_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.acknowledgement_id = ack.id
+            );`,
+        [pendingAckIds],
+      );
+    }
+    if (row.evaluation_assignment_id && assignmentStatus === 'pending') {
+      await client.query(`DELETE FROM public.evaluation_assignments WHERE id = $1 AND status = 'pending';`, [
+        Number(row.evaluation_assignment_id),
+      ]);
+    }
+  });
+};
+
+export interface RhInductionBulkEnrollmentResult {
+  total: number;
+  enrolled: number;
+  skipped: Array<{ employee_id: number; full_name: string; reason: string }>;
+}
+
+const BULK_SKIP_MESSAGES: Record<string, string> = {
+  RH_INDUCTION_ALREADY_ENROLLED: 'Ya estaba inscrito en la fase',
+  RH_INDUCTION_PREVIOUS_PHASE_NOT_APPROVED: 'No ha aprobado la fase anterior',
+  RH_INDUCTION_EMPLOYEE_WITHOUT_USER: 'Sin usuario de sistema vinculado',
+};
+
+/**
+ * Inscribe a todos los colaboradores activos en una fase INSTITUCIONAL (1-4)
+ * de una sola vez, reutilizando la inscripcion individual colaborador por
+ * colaborador para conservar todas sus reglas (gate secuencial, asignacion de
+ * lecturas, reuso de acuses previos). Los no elegibles quedan reportados como
+ * omitidos con su motivo, sin frenar al resto.
+ */
+export const enrollAllEmployeesInPhase = async (
+  phaseId: number,
+  userId: string,
+): Promise<RhInductionBulkEnrollmentResult> => {
+  const phaseResult = await pool.query(
+    `SELECT scope FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
+    [phaseId],
+  );
+  if (phaseResult.rows.length === 0) {
+    throwCoded('RH_INDUCTION_PHASE_NOT_FOUND', 'La fase no existe.');
+  }
+  if (String(phaseResult.rows[0].scope) !== 'INSTITUTIONAL') {
+    throwCoded(
+      'RH_INDUCTION_BULK_ONLY_INSTITUTIONAL',
+      'La inscripcion masiva solo aplica a las fases institucionales (1 a 4); las fases por puesto se inscriben individualmente.',
+    );
+  }
+  const documents = await getPhaseDocuments(phaseId);
+  if (documents.length === 0) {
+    throwCoded('RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS', 'Esta fase todavia no tiene documentos configurados.');
+  }
+
+  const employees = await pool.query(
+    `SELECT id, full_name FROM public.employees WHERE is_active = TRUE ORDER BY full_name ASC;`,
+  );
+  const result: RhInductionBulkEnrollmentResult = { total: employees.rows.length, enrolled: 0, skipped: [] };
+  for (const row of employees.rows) {
+    const employeeId = Number(row.id);
+    try {
+      await enrollEmployeeInPhase(employeeId, phaseId, userId);
+      result.enrolled += 1;
+    } catch (error: any) {
+      result.skipped.push({
+        employee_id: employeeId,
+        full_name: String(row.full_name),
+        reason: BULK_SKIP_MESSAGES[error?.code] ?? String(error?.publicMessage ?? 'No se pudo inscribir'),
+      });
+    }
+  }
+  return result;
 };
 
 /** Asigna o cambia el supervisor de una inscripcion ya creada. */
@@ -665,7 +806,7 @@ export const toggleChecklistItem = async (
 export const refreshEnrollmentReadingStatus = async (enrollmentId: number): Promise<void> => {
   const enrollmentResult = await pool.query(
     `SELECT e.id, e.employee_id, e.phase_id, e.reading_completed_at, e.evaluation_assignment_id,
-            e.enrolled_by_user_id,
+            e.enrolled_by_user_id, e.reading_deadline_at,
             COALESCE(e.training_course_id, p.training_course_id) AS training_course_id,
             p.name AS phase_name, p.responsible_label
        FROM public.rh_induction_enrollments e
@@ -689,13 +830,19 @@ export const refreshEnrollmentReadingStatus = async (enrollmentId: number): Prom
     itemsResult.rows.length > 0 &&
     itemsResult.rows.every((row) => row.acknowledgement_id && row.status === 'signed');
 
+  // Limite de lectura vencido: la evaluacion se abre aunque la lectura siga
+  // incompleta (reading_completed_at se conserva fiel: solo se marca al firmar
+  // todo).
+  const readingWindowExpired =
+    Boolean(enrollment.reading_deadline_at) && new Date(String(enrollment.reading_deadline_at)).getTime() <= Date.now();
+
   // Sin items solo procede si la lectura ya quedo marcada al inscribir
   // (Fase 6, practica supervisada: no lleva lectura).
-  if (!allSigned && !(itemsResult.rows.length === 0 && enrollment.reading_completed_at)) {
+  if (!allSigned && !readingWindowExpired && !(itemsResult.rows.length === 0 && enrollment.reading_completed_at)) {
     return;
   }
 
-  if (!enrollment.reading_completed_at) {
+  if (allSigned && !enrollment.reading_completed_at) {
     await pool.query(
       `UPDATE public.rh_induction_enrollments SET reading_completed_at = NOW(), updated_at = NOW() WHERE id = $1;`,
       [enrollmentId],
@@ -786,6 +933,7 @@ export interface RhInductionProgressItem {
   reading_total: number;
   reading_signed: number;
   reading_completed_at: string | null;
+  reading_deadline_at: string | null;
   evaluation_assignment_id: number | null;
   evaluation_status: string | null;
   evaluation_percentage: number | null;
@@ -801,7 +949,9 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
   // progreso (el responsable pudo publicar el cuestionario despues).
   const pendingResult = await pool.query(
     `SELECT id FROM public.rh_induction_enrollments
-      WHERE employee_id = $1 AND reading_completed_at IS NOT NULL AND evaluation_assignment_id IS NULL;`,
+      WHERE employee_id = $1 AND evaluation_assignment_id IS NULL
+        AND (reading_completed_at IS NOT NULL
+             OR (reading_deadline_at IS NOT NULL AND reading_deadline_at <= NOW()));`,
     [employeeId],
   );
   for (const row of pendingResult.rows) {
@@ -811,7 +961,7 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
   const result = await pool.query(
     `SELECT
         e.id AS enrollment_id, p.id AS phase_id, p.phase_number, p.name AS phase_name, p.responsible_label,
-        e.reading_completed_at, e.evaluation_assignment_id,
+        e.reading_completed_at, e.reading_deadline_at, e.evaluation_assignment_id,
         e.supervisor_employee_id, sup.full_name AS supervisor_name,
         ea.status AS evaluation_status, ea.percentage AS evaluation_percentage,
         (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id) AS reading_total,
@@ -837,6 +987,7 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
     reading_total: Number(row.reading_total ?? 0),
     reading_signed: Number(row.reading_signed ?? 0),
     reading_completed_at: row.reading_completed_at ? String(row.reading_completed_at) : null,
+    reading_deadline_at: row.reading_deadline_at ? String(row.reading_deadline_at) : null,
     evaluation_assignment_id: row.evaluation_assignment_id ? Number(row.evaluation_assignment_id) : null,
     evaluation_status: row.evaluation_status ? String(row.evaluation_status) : null,
     evaluation_percentage: row.evaluation_percentage !== null && row.evaluation_percentage !== undefined ? Number(row.evaluation_percentage) : null,
@@ -855,6 +1006,7 @@ export interface RhInductionPhaseEnrollmentSummary {
   reading_total: number;
   reading_signed: number;
   reading_completed_at: string | null;
+  reading_deadline_at: string | null;
   evaluation_status: string | null;
   evaluation_percentage: number | null;
   supervisor_employee_id: number | null;
@@ -869,7 +1021,9 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
   // cuestionario.
   const pendingResult = await pool.query(
     `SELECT id FROM public.rh_induction_enrollments
-      WHERE phase_id = $1 AND reading_completed_at IS NOT NULL AND evaluation_assignment_id IS NULL;`,
+      WHERE phase_id = $1 AND evaluation_assignment_id IS NULL
+        AND (reading_completed_at IS NOT NULL
+             OR (reading_deadline_at IS NOT NULL AND reading_deadline_at <= NOW()));`,
     [phaseId],
   );
   for (const row of pendingResult.rows) {
@@ -879,7 +1033,7 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
   const result = await pool.query(
     `SELECT
         e.id AS enrollment_id, emp.id AS employee_id, emp.full_name AS employee_name, emp.employee_code,
-        e.reading_completed_at,
+        e.reading_completed_at, e.reading_deadline_at,
         e.supervisor_employee_id, sup.full_name AS supervisor_name,
         ea.status AS evaluation_status, ea.percentage AS evaluation_percentage,
         (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id) AS reading_total,
@@ -904,6 +1058,7 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
     reading_total: Number(row.reading_total ?? 0),
     reading_signed: Number(row.reading_signed ?? 0),
     reading_completed_at: row.reading_completed_at ? String(row.reading_completed_at) : null,
+    reading_deadline_at: row.reading_deadline_at ? String(row.reading_deadline_at) : null,
     evaluation_status: row.evaluation_status ? String(row.evaluation_status) : null,
     evaluation_percentage: row.evaluation_percentage !== null && row.evaluation_percentage !== undefined ? Number(row.evaluation_percentage) : null,
     supervisor_employee_id: row.supervisor_employee_id ? Number(row.supervisor_employee_id) : null,
@@ -911,4 +1066,115 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
     checklist_total: Number(row.checklist_total ?? 0),
     checklist_completed: Number(row.checklist_completed ?? 0),
   }));
+};
+
+// --- Preparacion de la constancia (control preventivo) -----------------------
+
+export interface RhInductionCertificateReadiness {
+  duration_ok: boolean;
+  /** Cursos cuya plantilla de constancia emitiria para esta fase, con sus firmas configuradas. */
+  courses: Array<{ course_id: number; label: string; signatures_count: number }>;
+  employees_missing_branch: Array<{ employee_id: number; full_name: string }>;
+  employees_missing_position: Array<{ employee_id: number; full_name: string }>;
+  pending_enrollments: number;
+}
+
+/**
+ * Radiografia de los datos que alimentan la constancia oficial de la fase
+ * (PUESTO, SUCURSAL, DURACION y las 3 firmas de la plantilla): permite a RH
+ * detectar ANTES de que alguien apruebe que la constancia saldria incompleta.
+ * Solo revisa inscripciones cuya constancia aun no se emite (no aprobadas).
+ */
+export const getPhaseCertificateReadiness = async (
+  phaseId: number,
+): Promise<RhInductionCertificateReadiness> => {
+  const phaseResult = await pool.query(
+    `SELECT id, scope, duration_hours, training_course_id FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
+    [phaseId],
+  );
+  if (phaseResult.rows.length === 0) {
+    throwCoded('RH_INDUCTION_PHASE_NOT_FOUND', 'La fase no existe.');
+  }
+  const phase = phaseResult.rows[0];
+
+  // Cursos cuya constancia emite esta fase: el propio (institucional) o el de
+  // cada puesto habilitado (fases POSITION).
+  const coursesResult =
+    String(phase.scope) === 'INSTITUTIONAL'
+      ? await pool.query(
+          `SELECT tc.id AS course_id, 'Constancia de la fase' AS label
+             FROM public.training_courses tc WHERE tc.id = $1;`,
+          [phase.training_course_id],
+        )
+      : await pool.query(
+          `SELECT pp.training_course_id AS course_id, 'Puesto: ' || rp.name AS label
+             FROM public.rh_induction_phase_positions pp
+             INNER JOIN public.rh_positions rp ON rp.id = pp.position_id
+            WHERE pp.phase_id = $1
+            ORDER BY rp.name;`,
+          [phaseId],
+        );
+
+  const courses = await Promise.all(
+    coursesResult.rows.map(async (row) => {
+      const signatures = await pool.query(
+        `SELECT COUNT(s.id)::int AS total
+           FROM public.certificate_templates ct
+           LEFT JOIN public.certificate_template_signatures s ON s.certificate_template_id = ct.id
+          WHERE ct.training_course_id = $1
+          GROUP BY ct.id;`,
+        [Number(row.course_id)],
+      );
+      return {
+        course_id: Number(row.course_id),
+        label: String(row.label),
+        signatures_count: signatures.rows.length > 0 ? Number(signatures.rows[0].total) : 0,
+      };
+    }),
+  );
+
+  const employeesResult = await pool.query(
+    `SELECT emp.id, emp.full_name,
+            emp.branch_id IS NULL AS missing_branch,
+            NOT EXISTS (
+              SELECT 1 FROM public.rh_employee_positions ep
+               WHERE ep.employee_id = emp.id AND ep.is_active = TRUE
+            ) AS missing_position
+       FROM public.rh_induction_enrollments e
+       INNER JOIN public.employees emp ON emp.id = e.employee_id
+       LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
+      WHERE e.phase_id = $1 AND (ea.status IS DISTINCT FROM 'passed')
+      ORDER BY emp.full_name;`,
+    [phaseId],
+  );
+
+  return {
+    duration_ok: phase.duration_hours !== null && phase.duration_hours !== undefined,
+    courses,
+    employees_missing_branch: employeesResult.rows
+      .filter((row) => row.missing_branch)
+      .map((row) => ({ employee_id: Number(row.id), full_name: String(row.full_name) })),
+    employees_missing_position: employeesResult.rows
+      .filter((row) => row.missing_position)
+      .map((row) => ({ employee_id: Number(row.id), full_name: String(row.full_name) })),
+    pending_enrollments: employeesResult.rows.length,
+  };
+};
+
+/**
+ * Barrido periodico (cron): abre la evaluacion de las inscripciones cuyo
+ * limite de lectura ya vencio sin completarse (reutiliza el refresh, que ya
+ * contempla el vencimiento). Complementa los refrescos lazy al consultar el
+ * progreso, para que el examen se abra aunque nadie visite la pagina.
+ */
+export const sweepExpiredInductionReadings = async (): Promise<number> => {
+  const result = await pool.query(
+    `SELECT id FROM public.rh_induction_enrollments
+      WHERE reading_deadline_at IS NOT NULL AND reading_deadline_at <= NOW()
+        AND evaluation_assignment_id IS NULL AND reading_completed_at IS NULL;`,
+  );
+  for (const row of result.rows) {
+    await refreshEnrollmentReadingStatus(Number(row.id));
+  }
+  return result.rows.length;
 };

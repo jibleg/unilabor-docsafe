@@ -65,8 +65,18 @@ interface AssignmentContext {
   instructions: string | null;
   passing_score: number;
   window_hours: number;
+  attempt_time_limit_minutes: number | null;
   evaluation_type: string;
 }
+
+/** Momento limite real del intento: started_at + limite en minutos, acotado por deadline_at. */
+const attemptDeadline = (ctx: AssignmentContext): Date | null => {
+  if (!ctx.attempt_time_limit_minutes || !ctx.started_at) {
+    return null;
+  }
+  const byAttempt = new Date(ctx.started_at).getTime() + ctx.attempt_time_limit_minutes * 60_000;
+  return new Date(Math.min(byAttempt, new Date(ctx.deadline_at).getTime()));
+};
 
 const loadAssignmentContext = async (
   assignmentId: number,
@@ -75,7 +85,8 @@ const loadAssignmentContext = async (
 ): Promise<AssignmentContext> => {
   const result = await client.query(
     `SELECT a.id, a.employee_id, a.status, a.deadline_at, a.started_at, a.template_id,
-            t.title AS template_title, t.instructions, t.passing_score, t.window_hours, t.evaluation_type,
+            t.title AS template_title, t.instructions, t.passing_score, t.window_hours,
+            t.attempt_time_limit_minutes, t.evaluation_type,
             c.title AS course_title
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
@@ -102,6 +113,10 @@ const loadAssignmentContext = async (
     instructions: row.instructions ? String(row.instructions) : null,
     passing_score: Number(row.passing_score),
     window_hours: Number(row.window_hours),
+    attempt_time_limit_minutes:
+      row.attempt_time_limit_minutes !== null && row.attempt_time_limit_minutes !== undefined
+        ? Number(row.attempt_time_limit_minutes)
+        : null,
     evaluation_type: String(row.evaluation_type ?? 'quiz'),
   };
 };
@@ -158,6 +173,8 @@ const buildView = (ctx: AssignmentContext, questions: EvaluationTakingQuestion[]
     instructions: ctx.instructions,
     passing_score: ctx.passing_score,
     window_hours: ctx.window_hours,
+    attempt_time_limit_minutes: ctx.attempt_time_limit_minutes,
+    attempt_deadline_at: attemptDeadline(ctx)?.toISOString() ?? null,
   },
   questions,
 });
@@ -248,6 +265,11 @@ export const submitEvaluation = async (
     }
     if (isExpired(ctx.deadline_at)) {
       throwCoded('EVAL_WINDOW_EXPIRED');
+    }
+    // Limite de duracion del intento (con 30s de gracia por latencia de red).
+    const attemptLimit = attemptDeadline(ctx);
+    if (attemptLimit && Date.now() > attemptLimit.getTime() + 30_000) {
+      throwCoded('EVAL_ATTEMPT_TIME_EXCEEDED');
     }
 
     const questions = await loadGradableQuestions(client, assignmentId);

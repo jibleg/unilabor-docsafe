@@ -30,6 +30,25 @@ export const updatePhaseContact = async (
   });
 };
 
+export interface RhInductionCertificateReadiness {
+  duration_ok: boolean;
+  courses: Array<{ course_id: number; label: string; signatures_count: number }>;
+  employees_missing_branch: Array<{ employee_id: number; full_name: string }>;
+  employees_missing_position: Array<{ employee_id: number; full_name: string }>;
+  pending_enrollments: number;
+}
+
+/** Radiografia de los datos que alimentan la constancia de la fase (puesto/sucursal/duracion/firmas). */
+export const getPhaseCertificateReadiness = async (phaseId: number): Promise<RhInductionCertificateReadiness> => {
+  const response = await api.get(`/rh/induction/phases/${phaseId}/certificate-readiness`);
+  const data = asRecord(unwrapPayload(response.data));
+  return data?.readiness as RhInductionCertificateReadiness;
+};
+
+export const updatePhaseReadingLimit = async (phaseId: number, readingLimitHours: number | null): Promise<void> => {
+  await api.patch(`/rh/induction/phases/${phaseId}/reading-limit`, { reading_time_limit_hours: readingLimitHours });
+};
+
 export const updatePhaseDuration = async (phaseId: number, durationHours: number | null): Promise<void> => {
   await api.patch(`/rh/induction/phases/${phaseId}/duration`, { duration_hours: durationHours });
 };
@@ -75,6 +94,24 @@ export const enrollEmployeeInPhase = async (
     employee_id: employeeId,
     supervisor_employee_id: supervisorEmployeeId ?? null,
   });
+};
+
+export interface RhInductionBulkEnrollmentResult {
+  total: number;
+  enrolled: number;
+  skipped: Array<{ employee_id: number; full_name: string; reason: string }>;
+}
+
+/** Inscribe de una vez a todos los colaboradores activos en una fase institucional (1-4). */
+export const enrollAllInPhase = async (phaseId: number): Promise<RhInductionBulkEnrollmentResult> => {
+  const response = await api.post(`/rh/induction/phases/${phaseId}/enroll-all`);
+  const data = asRecord(unwrapPayload(response.data));
+  return data?.result as RhInductionBulkEnrollmentResult;
+};
+
+/** Elimina una inscripcion sin evidencia aprobatoria (el backend rechaza fases aprobadas o en revision). */
+export const removeEnrollment = async (enrollmentId: number): Promise<void> => {
+  await api.delete(`/rh/induction/enrollments/${enrollmentId}`);
 };
 
 export const setEnrollmentSupervisor = async (
