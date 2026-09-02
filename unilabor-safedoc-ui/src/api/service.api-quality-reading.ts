@@ -99,6 +99,12 @@ export const signMyReading = async (
   return response.data as MyReading;
 };
 
+/** Descarga la constancia (copia firmada) de una lectura propia como blob y devuelve un object URL. */
+export const getMySignedReadingUrl = async (readingId: number): Promise<string> => {
+  const response = await api.get(`/quality/me/readings/${readingId}/signed`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
+};
+
 // --- Re-lectura por version nueva (SL-06) -----------------------------------
 
 export const listRepublishCandidates = async (): Promise<RepublishCandidate[]> => {

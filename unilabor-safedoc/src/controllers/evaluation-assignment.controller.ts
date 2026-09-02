@@ -15,6 +15,8 @@ import {
   submitEvaluation,
   type SubmitAnswerInput,
 } from '../services/evaluation-attempt.service';
+import { getInductionPhaseByCourseId } from '../services/rh-induction.service';
+import pool from '../config/db';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -49,7 +51,11 @@ const mapAssignmentError = (res: Response, error: any): Response | null => {
       return res.status(403).json({ message: 'Esta evaluacion no esta asignada a tu cuenta.' });
     case 'EVAL_WINDOW_EXPIRED':
       return res.status(409).json({
-        message: 'La ventana de 72 horas vencio. Solicita a RH una autorizacion extemporanea.',
+        message: 'El plazo para presentar la evaluacion vencio. Solicita a RH una autorizacion extemporanea.',
+      });
+    case 'EVAL_ATTEMPT_TIME_EXCEEDED':
+      return res.status(409).json({
+        message: 'Se agoto el tiempo limite para completar el intento. Contacta a RH si necesitas una nueva oportunidad.',
       });
     case 'EVAL_NOT_ACTIONABLE':
       return res.status(409).json({ message: 'Esta evaluacion ya no se puede responder.' });
@@ -76,6 +82,21 @@ export const assignEvaluationController = async (req: AuthRequest, res: Response
     return res.status(400).json({ message: 'ID de evaluacion invalido.' });
   }
   try {
+    // Los cursos de Induccion NO se asignan a mano: la evaluacion la abre el
+    // propio programa al completarse (o vencerse) la lectura de la fase, y una
+    // asignacion manual brincaria ese candado (el colaborador podria contestar
+    // sin haber leido). Inscribir en /rh/induction es la via correcta.
+    const templateCourse = await pool.query(
+      `SELECT training_course_id FROM public.evaluation_templates WHERE id = $1 LIMIT 1;`,
+      [templateId],
+    );
+    const courseId = templateCourse.rows[0]?.training_course_id ? Number(templateCourse.rows[0].training_course_id) : null;
+    if (courseId && (await getInductionPhaseByCourseId(courseId))) {
+      return res.status(409).json({
+        message:
+          'Este curso pertenece al programa de Induccion: la evaluacion se abre sola cuando el colaborador completa (o vence) su lectura. Inscribelo a la fase en Induccion en lugar de asignarla manualmente.',
+      });
+    }
     const summary = await assignEvaluation(templateId, req.body.employee_ids as number[], req.user?.id ?? null);
     if (req.user?.id) {
       await registerAuditEvent({

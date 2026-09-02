@@ -6,6 +6,7 @@ import { SignaturePad } from '../components/helpdesk/SignaturePad';
 import { API_BASE_URL } from '../api/axios';
 import { getApiErrorMessage } from '../api/service.parsers';
 import {
+  getMySignedReadingUrl,
   listMyReadings,
   reportReadingProgress,
   signMyReading,
@@ -108,6 +109,15 @@ export const QualityMyReadingsPage = () => {
     }
   };
 
+  const openSignedCopy = async (readingId: number) => {
+    try {
+      const url = await getMySignedReadingUrl(readingId);
+      window.open(url, '_blank', 'noopener');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo abrir la constancia de lectura.'));
+    }
+  };
+
   const readComplete = active?.status === 'read' || active?.status === 'signed';
 
   const coveragePercent = useMemo(() => {
@@ -201,14 +211,13 @@ export const QualityMyReadingsPage = () => {
 
               <div className="flex items-center gap-2">
                 {item.status === 'signed' && item.has_signed_copy && (
-                  <a
-                    href={`${API_BASE_URL}/quality/me/readings/${item.id}/signed`}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => void openSignedCopy(item.id)}
                     className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(0,65,106,0.15)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-[rgba(0,65,106,0.05)]"
                   >
                     <Download size={14} /> Constancia
-                  </a>
+                  </button>
                 )}
                 {item.status !== 'signed' && item.status !== 'cancelled' && (
                   <button

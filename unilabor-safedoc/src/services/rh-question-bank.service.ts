@@ -18,7 +18,10 @@ import { resolveStoredDocumentPath } from './document.service';
  */
 
 const MAX_CHARS_PER_DOCUMENT = 12_000;
-const MAX_OUTPUT_TOKENS = 8_000;
+// Tope de salida holgado: con varios documentos y decenas de preguntas, 8k se
+// quedaba corto y el JSON llegaba truncado (parse error). claude-sonnet-5
+// soporta salidas mucho mayores; solo se paga lo realmente generado.
+const MAX_OUTPUT_TOKENS = 32_000;
 
 const throwCoded = (code: string, publicMessage?: string): never => {
   const error = new Error(code);
@@ -174,12 +177,20 @@ const isStructurallyValid = (question: z.infer<typeof aiQuestionSchema>): boolea
 };
 
 const parseAiResponse = (rawText: string, documents: PhaseDocumentSource[]): GeneratedQuestion[] => {
-  const cleaned = rawText.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  // El modelo a veces envuelve el JSON en fences o le antepone una frase:
+  // recorta al primer '{' y al ultimo '}' antes de parsear.
+  const stripped = rawText.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const firstBrace = stripped.indexOf('{');
+  const lastBrace = stripped.lastIndexOf('}');
+  const cleaned = firstBrace >= 0 && lastBrace > firstBrace ? stripped.slice(firstBrace, lastBrace + 1) : stripped;
 
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(cleaned);
   } catch {
+    console.error(
+      `Banco de preguntas: respuesta no parseable (${rawText.length} chars). Inicio: ${rawText.slice(0, 300)}`,
+    );
     throwCoded('QUESTION_BANK_INVALID_RESPONSE', 'El modelo no devolvio un JSON valido. Intenta de nuevo.');
   }
 
@@ -247,15 +258,25 @@ export const generateQuestions = async (input: GenerateQuestionBankInput): Promi
         ? { 'anthropic-workspace-id': anthropicConfig!.workspaceId }
         : undefined,
     });
-    const message = await client.messages.create({
-      model: anthropicConfig!.model,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      messages: [{ role: 'user', content: buildPrompt(documents, input.counts) }],
-    });
+    // Con topes de salida grandes el SDK exige streaming (la peticion podria
+    // exceder 10 min); el resultado final es el mismo Message.
+    const message = await client.messages
+      .stream({
+        model: anthropicConfig!.model,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        messages: [{ role: 'user', content: buildPrompt(documents, input.counts) }],
+      })
+      .finalMessage();
 
     const textBlock = message.content.find((block) => block.type === 'text');
     if (!textBlock || textBlock.type !== 'text') {
       return throwCoded('QUESTION_BANK_INVALID_RESPONSE', 'El modelo no devolvio texto en su respuesta.');
+    }
+    if (message.stop_reason === 'max_tokens') {
+      return throwCoded(
+        'QUESTION_BANK_RESPONSE_TRUNCATED',
+        'La respuesta del modelo se corto por longitud. Pide menos preguntas o selecciona menos documentos por lote.',
+      );
     }
 
     const questions = parseAiResponse(textBlock.text, documents);

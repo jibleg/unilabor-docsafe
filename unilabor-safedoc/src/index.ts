@@ -28,6 +28,7 @@ import { startEvaluationScheduler } from './services/evaluation-scheduler.servic
 import { startServiceReminderScheduler } from './services/helpdesk-service-scheduler.service';
 import { startAcknowledgementScheduler } from './services/rh-acknowledgement-scheduler.service';
 import { startQualityReadingScheduler } from './services/quality-reading-scheduler.service';
+import { startInductionScheduler } from './services/rh-induction-scheduler.service';
 import { startProviderDocumentReminderScheduler } from './services/provider-document-scheduler.service';
 import { startClientDocumentReminderScheduler } from './services/client-document-scheduler.service';
 
@@ -108,7 +109,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   return res.status(500).json({ message: 'Algo salio mal en el servidor' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Servidor SafeDoc corriendo en puerto ${PORT}`);
   // Scheduler de evaluaciones (recordatorios + vencimientos). Guardado por env.
   startEvaluationScheduler();
@@ -117,8 +118,21 @@ app.listen(PORT, () => {
   // Scheduler de acuses de lectura (recordatorios + vencimientos). Guardado por env.
   startAcknowledgementScheduler();
   startQualityReadingScheduler();
+  startInductionScheduler();
   // Scheduler de alertas de vencimiento de documentos de proveedor. Guardado por env.
   startProviderDocumentReminderScheduler();
   // Scheduler de alertas de vencimiento de documentos de cliente. Guardado por env.
   startClientDocumentReminderScheduler();
+});
+
+// Si no se pudo tomar el puerto (p. ej. otra instancia ya corre), el proceso
+// debe MORIR: un proceso huerfano sin puerto seguiria vivo por el pool de PG y
+// sus crons, duplicando recordatorios/notificaciones en cada tick.
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`El puerto ${PORT} ya esta en uso por otra instancia; este proceso termina.`);
+  } else {
+    console.error('Error del servidor HTTP; este proceso termina:', error);
+  }
+  process.exit(1);
 });

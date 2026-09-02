@@ -33,26 +33,34 @@ const tableExists = async (): Promise<boolean> => {
   return Boolean(result.rows[0]?.exists);
 };
 
-/** Envia recordatorios a las asignaciones por vencer (<= 24h) sin recordatorio previo. */
+/**
+ * Envia recordatorios a las asignaciones por vencer (<= 24h) sin recordatorio
+ * previo. El sello reminder_sent_at se RECLAMA de forma atomica ANTES de
+ * enviar: aunque corran varias instancias del scheduler a la vez (multi-
+ * instancia o procesos huerfanos), solo una gana cada fila y el colaborador
+ * recibe UN solo mensaje. Si el envio falla tras reclamar, no se reintenta
+ * (preferimos un aviso perdido a una rafaga duplicada).
+ */
 export const processReminders = async (now: Date = new Date()): Promise<number> => {
   const iso = now.toISOString();
-  const candidates = await pool.query(
-    `SELECT id FROM public.evaluation_assignments
+  const claimed = await pool.query(
+    `UPDATE public.evaluation_assignments
+        SET reminder_sent_at = $1, updated_at = NOW()
       WHERE status = ANY($2)
         AND reminder_sent_at IS NULL
         AND deadline_at > $1::timestamptz
-        AND deadline_at <= ($1::timestamptz + ($3 || ' hours')::interval);`,
+        AND deadline_at <= ($1::timestamptz + ($3 || ' hours')::interval)
+      RETURNING id;`,
     [iso, ACTIONABLE_STATUSES, REMINDER_WINDOW_HOURS],
   );
-  for (const row of candidates.rows) {
-    const assignmentId = Number(row.id);
-    await notifyEvaluationReminder(assignmentId);
-    await pool.query(
-      `UPDATE public.evaluation_assignments SET reminder_sent_at = $2, updated_at = NOW() WHERE id = $1;`,
-      [assignmentId, iso],
-    );
+  for (const row of claimed.rows) {
+    try {
+      await notifyEvaluationReminder(Number(row.id));
+    } catch (error) {
+      console.error(`No se pudo enviar el recordatorio de la asignacion ${row.id}:`, error);
+    }
   }
-  return candidates.rows.length;
+  return claimed.rows.length;
 };
 
 /** Marca como vencidas las asignaciones cuya ventana paso y avisa a RH. Idempotente. */
