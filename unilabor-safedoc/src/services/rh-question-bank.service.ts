@@ -1,6 +1,4 @@
 import fs from 'fs';
-import Anthropic from '@anthropic-ai/sdk';
-import { PDFParse } from 'pdf-parse';
 import { z } from 'zod';
 import pool from '../config/db';
 import { getAnthropicConfig } from '../config/env';
@@ -34,7 +32,31 @@ const throwCoded = (code: string, publicMessage?: string): never => {
 
 // --- Extraccion de texto -----------------------------------------------------
 
+/**
+ * pdf-parse y el SDK de Anthropic se cargan PEREZOSOS (import dinamico) a
+ * proposito: el pdfjs interno de pdf-parse truena al cargarse en Node < 18
+ * (visto en prod 2026-09-03: tumbaba TODO el backend al arrancar). Con la
+ * carga diferida la app arranca siempre; si el runtime no soporta la libreria,
+ * solo la generacion con IA falla, con mensaje claro, al invocarse.
+ */
+const loadAiDependencies = async () => {
+  try {
+    const [{ PDFParse }, { default: Anthropic }] = await Promise.all([
+      import('pdf-parse'),
+      import('@anthropic-ai/sdk'),
+    ]);
+    return { PDFParse, Anthropic };
+  } catch (error) {
+    console.error('Banco de preguntas: no se pudieron cargar las dependencias de IA:', error);
+    return throwCoded(
+      'QUESTION_BANK_RUNTIME_UNSUPPORTED',
+      'La generacion con IA no esta disponible en este servidor (version de Node.js incompatible con las librerias de IA). Contacta a Sistemas.',
+    );
+  }
+};
+
 const extractPdfText = async (filePath: string): Promise<string> => {
+  const { PDFParse } = await loadAiDependencies();
   const buffer = fs.readFileSync(filePath);
   const parser = new PDFParse({ data: buffer });
   try {
@@ -252,6 +274,7 @@ export const generateQuestions = async (input: GenerateQuestionBankInput): Promi
   const batchId = Number(batchResult.rows[0].id);
 
   try {
+    const { Anthropic } = await loadAiDependencies();
     const client = new Anthropic({
       apiKey: anthropicConfig!.apiKey,
       defaultHeaders: anthropicConfig!.workspaceId
