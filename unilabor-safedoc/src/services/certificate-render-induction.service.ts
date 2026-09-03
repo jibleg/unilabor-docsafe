@@ -209,21 +209,28 @@ export const renderInductionCertificatePdf = (input: InductionCertificateRenderI
       .moveTo(pt(column.x) - pt(0.04), pt(SIGNATURE_LINE_Y))
       .lineTo(pt(column.x) - pt(0.04) + pt(2.71), pt(SIGNATURE_LINE_Y))
       .stroke();
-    const cargoText = (signature.role || signature.name).toUpperCase();
-    const cargoFont = 'Helvetica-Bold';
-    const cargoSize = 10.88;
-    doc.font(cargoFont).fontSize(cargoSize);
-    // El cargo puede envolver a 2 lineas (ej. "COORDINACION DE RECURSOS HUMANOS"); se mide
-    // su alto real para no encimar la leyenda "Nombre y firma" de abajo con un offset fijo.
-    const cargoHeight = doc.heightOfString(cargoText, { width: pt(column.w), align: 'center' });
-    centered(doc, cargoText, column.x, SIGNATURE_LINE_Y + 0.04, column.w, {
-      font: cargoFont,
-      size: cargoSize,
-      color: COLOR.navy,
-    });
-    centered(doc, captions[index] ?? 'Nombre y firma', column.x, SIGNATURE_LINE_Y + 0.04 + cargoHeight / PT_PER_IN + 0.04, column.w, {
-      font: 'Helvetica',
-      size: 8.25,
+    // Debajo de la linea: NOMBRE del firmante (navy, bold) y su CARGO (gris, mayusculas),
+    // como en el motor generico. Antes solo se imprimia el cargo y el nombre capturado en la
+    // plantilla nunca aparecia. Cada bloque se mide (pueden envolver a 2 lineas) para que la
+    // leyenda "Nombre y firma" no se encime.
+    const nameText = signature.name.trim().toUpperCase();
+    const roleText = signature.role ? signature.role.trim().toUpperCase() : '';
+    const nameSize = 10.5;
+    const roleSize = 8.5;
+    let cursorY = SIGNATURE_LINE_Y + 0.04;
+    doc.font('Helvetica-Bold').fontSize(nameSize);
+    const nameHeight = doc.heightOfString(nameText, { width: pt(column.w), align: 'center' });
+    centered(doc, nameText, column.x, cursorY, column.w, { font: 'Helvetica-Bold', size: nameSize, color: COLOR.navy });
+    cursorY += nameHeight / PT_PER_IN + 0.02;
+    if (roleText) {
+      doc.font('Helvetica-Bold').fontSize(roleSize);
+      const roleHeight = doc.heightOfString(roleText, { width: pt(column.w), align: 'center' });
+      centered(doc, roleText, column.x, cursorY, column.w, { font: 'Helvetica-Bold', size: roleSize, color: COLOR.gray, spacing: 0.3 });
+      cursorY += roleHeight / PT_PER_IN + 0.02;
+    }
+    centered(doc, captions[index] ?? 'Nombre y firma', column.x, cursorY + 0.02, column.w, {
+      font: 'Helvetica-Oblique',
+      size: 7.5,
       color: COLOR.gray,
     });
   });

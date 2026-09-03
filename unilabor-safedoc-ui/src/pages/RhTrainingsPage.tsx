@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Award,
   BookOpen,
+  Briefcase,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
@@ -49,6 +50,11 @@ const EMPTY_COURSE_FORM: CourseFormState = {
 const inputClass =
   'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]';
 const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]';
+
+/** Cursos del Programa de Induccion (INDUCCION-FASE-N y INDUCCION-FASE-N-PUESTO): sus
+ *  evaluaciones NO se asignan a mano, las abre el programa al inscribir en /rh/induction
+ *  (el backend tambien lo rechaza con 409). */
+const isInductionCourse = (course: TrainingCourse): boolean => course.code.toUpperCase().startsWith('INDUCCION-FASE-');
 
 export const RhTrainingsPage = () => {
   const navigate = useNavigate();
@@ -260,7 +266,18 @@ export const RhTrainingsPage = () => {
                   >
                     {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                     <div>
-                      <p className="font-semibold text-[var(--color-brand-700)]">{course.title}</p>
+                      <p className="flex flex-wrap items-center gap-2 font-semibold text-[var(--color-brand-700)]">
+                        {course.title}
+                        {isInductionCourse(course) ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-[rgba(191,212,230,0.35)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]"
+                            title="Las inscripciones y la apertura de la evaluación se manejan desde Inducción."
+                          >
+                            <Briefcase size={10} />
+                            Programa de Inducción
+                          </span>
+                        ) : null}
+                      </p>
                       <p className="text-xs text-[var(--unilabor-neutral)]">
                         {course.code} | Vigencia constancia:{' '}
                         {course.certificate_validity_months === 0
@@ -393,6 +410,17 @@ export const RhTrainingsPage = () => {
                                   title="Capturar calificaciones"
                                 >
                                   <ClipboardCheck size={14} />
+                                </button>
+                              ) : isInductionCourse(course) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate('/rh/induction')}
+                                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.1)] px-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                                  aria-label="Inscribir en Inducción"
+                                  title="Los cursos de Inducción no se asignan a mano: la evaluación se abre sola al completar la lectura de la fase. Inscribe a los colaboradores en Inducción."
+                                >
+                                  <Briefcase size={14} />
+                                  Inscribir en Inducción
                                 </button>
                               ) : (
                                 <button
