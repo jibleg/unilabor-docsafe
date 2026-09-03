@@ -26,6 +26,8 @@ import {
   updatePhaseContactController,
   updatePhaseDurationController,
   updatePhaseReadingLimitController,
+  publishPhaseController,
+  unpublishPhaseController,
 } from '../controllers/rh-induction.controller';
 import {
   deleteQuestionBankItemController,
@@ -49,6 +51,8 @@ router.get('/induction/phases', requirePermission('RH.INDUCTION.MANAGE'), listIn
 router.patch('/induction/phases/:phaseId/contact', requirePermission('RH.INDUCTION.MANAGE'), updatePhaseContactController);
 router.patch('/induction/phases/:phaseId/duration', requirePermission('RH.INDUCTION.MANAGE'), updatePhaseDurationController);
 router.patch('/induction/phases/:phaseId/reading-limit', requirePermission('RH.INDUCTION.MANAGE'), updatePhaseReadingLimitController);
+router.post('/induction/phases/:phaseId/publish', requirePermission('RH.INDUCTION.MANAGE'), publishPhaseController);
+router.post('/induction/phases/:phaseId/unpublish', requirePermission('RH.INDUCTION.MANAGE'), unpublishPhaseController);
 router.get('/induction/phases/:phaseId/certificate-readiness', requirePermission('RH.INDUCTION.MANAGE'), getPhaseCertificateReadinessController);
 // Fases POSITION (5-6): habilitacion por puesto (crea la training_course propia).
 router.get('/induction/phases/:phaseId/positions', requirePermission('RH.INDUCTION.MANAGE'), listPhasePositionsController);

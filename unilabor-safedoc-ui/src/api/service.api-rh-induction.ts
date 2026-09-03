@@ -49,6 +49,21 @@ export const updatePhaseReadingLimit = async (phaseId: number, readingLimitHours
   await api.patch(`/rh/induction/phases/${phaseId}/reading-limit`, { reading_time_limit_hours: readingLimitHours });
 };
 
+export interface RhInductionPhasePublishResult {
+  message: string;
+  published_at: string;
+  readings_assigned: number;
+}
+
+export const publishInductionPhase = async (phaseId: number): Promise<RhInductionPhasePublishResult> => {
+  const response = await api.post(`/rh/induction/phases/${phaseId}/publish`);
+  return response.data as RhInductionPhasePublishResult;
+};
+
+export const unpublishInductionPhase = async (phaseId: number): Promise<void> => {
+  await api.post(`/rh/induction/phases/${phaseId}/unpublish`);
+};
+
 export const updatePhaseDuration = async (phaseId: number, durationHours: number | null): Promise<void> => {
   await api.patch(`/rh/induction/phases/${phaseId}/duration`, { duration_hours: durationHours });
 };

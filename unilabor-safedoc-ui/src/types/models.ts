@@ -1376,6 +1376,8 @@ export interface RhInductionPhase {
   training_course_title: string | null;
   duration_hours: number | null;
   reading_time_limit_hours: number | null;
+  /** null = borrador: los inscritos no ven documentos ni evaluación hasta "Publicar fase". */
+  published_at: string | null;
   documents: RhInductionPhaseDocument[];
 }
 
@@ -1406,6 +1408,8 @@ export interface RhInductionProgressItem {
   supervisor_name: string | null;
   checklist_total: number;
   checklist_completed: number;
+  /** false = la fase sigue en borrador (RH aún no la publica). */
+  phase_published?: boolean;
 }
 
 export interface RhInductionPhaseEnrollmentSummary {

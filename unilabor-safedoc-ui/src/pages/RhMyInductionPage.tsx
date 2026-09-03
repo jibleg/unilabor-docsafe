@@ -21,6 +21,9 @@ const stepStatus = (item: RhInductionProgressItem): { label: string; icon: typeo
   if (item.reading_completed_at) {
     return { label: 'Lectura completa, esperando evaluación', icon: ClipboardList, done: false };
   }
+  if (item.phase_published === false) {
+    return { label: 'Inscrito: la fase aún no se publica. RH te avisará cuando puedas empezar a leer.', icon: ClipboardList, done: false };
+  }
   return { label: `Leyendo documentos (${item.reading_signed}/${item.reading_total})`, icon: BookOpenCheck, done: false };
 };
 

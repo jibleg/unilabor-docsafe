@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckSquare, FileText, GraduationCap, ListChecks, Loader2, Phone, Square, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { CheckSquare, Eye, EyeOff, FileText, GraduationCap, ListChecks, Loader2, Phone, Square, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { listEmployees } from '../api/service';
 import {
   addPhaseChecklistItem,
   addPhaseDocument,
+  publishInductionPhase,
+  unpublishInductionPhase,
   enablePhaseForPosition,
   enrollAllInPhase,
   enrollEmployeeInPhase,
@@ -61,6 +63,7 @@ export const RhInductionPage = () => {
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
 
   const [savingDocument, setSavingDocument] = useState(false);
+  const [togglingPublish, setTogglingPublish] = useState(false);
 
   const [responsibleName, setResponsibleName] = useState('');
   const [responsiblePhone, setResponsiblePhone] = useState('');
@@ -224,6 +227,36 @@ export const RhInductionPage = () => {
       toast.error(getApiErrorMessage(error, 'No se pudo actualizar el contacto.'));
     } finally {
       setSavingContact(false);
+    }
+  };
+
+  const handleTogglePublish = async () => {
+    if (!selectedPhase) return;
+    const publishing = !selectedPhase.published_at;
+    const confirmed = await confirmAction(
+      publishing ? `Publicar la Fase ${selectedPhase.phase_number}` : `Regresar la Fase ${selectedPhase.phase_number} a borrador`,
+      publishing
+        ? 'Los inscritos verán los documentos en Sala de Lectura y, si la fase tiene límite de lectura, empezará a correr desde ahora. Requiere documentos y cuestionario publicado.'
+        : 'Los documentos dejarán de verse en Sala de Lectura y se retirarán las lecturas pendientes. Solo es posible si nadie ha empezado a leer ni tiene evaluación.',
+      publishing ? 'Publicar fase' : 'Regresar a borrador',
+      publishing ? 'primary' : 'danger',
+    );
+    if (!confirmed) return;
+    setTogglingPublish(true);
+    try {
+      if (publishing) {
+        const result = await publishInductionPhase(selectedPhase.id);
+        toast.success(result.message || 'Fase publicada.');
+      } else {
+        await unpublishInductionPhase(selectedPhase.id);
+        toast.success('La fase regresó a borrador.');
+      }
+      await load();
+      await loadEnrollments(selectedPhase.id);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, publishing ? 'No se pudo publicar la fase.' : 'No se pudo regresar la fase a borrador.'));
+    } finally {
+      setTogglingPublish(false);
     }
   };
 
@@ -430,8 +463,17 @@ export const RhInductionPage = () => {
                   <p className="text-sm font-bold text-[var(--color-brand-700)]">
                     Fase {phase.phase_number}: {phase.name}
                   </p>
-                  <p className="text-xs text-[var(--unilabor-neutral)]">
-                    {phase.scope === 'INSTITUTIONAL' ? `${phase.documents.length} documentos` : 'Por puesto (próximamente)'}
+                  <p className="flex items-center gap-2 text-xs text-[var(--unilabor-neutral)]">
+                    {phase.scope === 'INSTITUTIONAL' ? `${phase.documents.length} documentos` : 'Por puesto'}
+                    {phase.phase_number !== 7 ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                          phase.published_at ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                        }`}
+                      >
+                        {phase.published_at ? 'Publicada' : 'Borrador'}
+                      </span>
+                    ) : null}
                   </p>
                 </button>
               ))}
@@ -452,11 +494,33 @@ export const RhInductionPage = () => {
             </p>
           ) : (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-bold text-[var(--color-brand-700)]">
-                  Fase {selectedPhase.phase_number}: {selectedPhase.name}
-                </h2>
-                <p className="text-xs text-[var(--unilabor-neutral)]">{selectedPhase.responsible_label}</p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-brand-700)]">
+                    Fase {selectedPhase.phase_number}: {selectedPhase.name}
+                  </h2>
+                  <p className="text-xs text-[var(--unilabor-neutral)]">{selectedPhase.responsible_label}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => void handleTogglePublish()}
+                    disabled={togglingPublish}
+                    className={
+                      selectedPhase.published_at
+                        ? 'inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-60'
+                        : buttonClass
+                    }
+                  >
+                    {togglingPublish ? <Loader2 size={14} className="animate-spin" /> : selectedPhase.published_at ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {selectedPhase.published_at ? 'Regresar a borrador' : 'Publicar fase'}
+                  </button>
+                  <p className="text-[11px] text-[var(--unilabor-neutral)]">
+                    {selectedPhase.published_at
+                      ? `Publicada el ${new Date(selectedPhase.published_at).toLocaleDateString('es-MX', { dateStyle: 'medium' })}: los inscritos ya ven sus documentos.`
+                      : 'En borrador: puedes inscribir, pero nadie ve documentos hasta publicar.'}
+                  </p>
+                </div>
               </div>
 
               <div>

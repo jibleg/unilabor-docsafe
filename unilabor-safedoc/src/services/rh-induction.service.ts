@@ -36,6 +36,8 @@ export interface RhInductionPhase {
   training_course_title: string | null;
   duration_hours: number | null;
   reading_time_limit_hours: number | null;
+  /** NULL = borrador: las inscripciones no asignan lecturas y los documentos no se muestran al colaborador. */
+  published_at: string | null;
   documents: RhInductionPhaseDocument[];
 }
 
@@ -43,7 +45,7 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
   const result = await pool.query(`
     SELECT
       p.id, p.phase_number, p.name, p.responsible_label, p.responsible_name, p.responsible_phone,
-      p.scope, p.training_course_id, p.duration_hours, p.reading_time_limit_hours,
+      p.scope, p.training_course_id, p.duration_hours, p.reading_time_limit_hours, p.published_at,
       tc.title AS training_course_title
     FROM public.rh_induction_phases p
     LEFT JOIN public.training_courses tc ON tc.id = p.training_course_id
@@ -65,6 +67,7 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
         row.reading_time_limit_hours !== null && row.reading_time_limit_hours !== undefined
           ? Number(row.reading_time_limit_hours)
           : null,
+      published_at: row.published_at ? new Date(row.published_at).toISOString() : null,
       documents: await listPhaseDocuments(Number(row.id)),
     })),
   );
@@ -315,6 +318,255 @@ export const removePhaseDocument = async (phaseDocumentId: number): Promise<bool
   return (result.rowCount ?? 0) > 0;
 };
 
+/**
+ * Asigna en Sala de Lectura los documentos de una inscripcion y los liga como
+ * reading_items. Se usa al inscribir (fase publicada) y al publicar la fase
+ * (inscritos que quedaron en espera). Idempotente por acuse: si el colaborador
+ * ya tenia una lectura vigente/firmada del documento, se reusa.
+ */
+const assignEnrollmentReadings = async (
+  enrollmentId: number,
+  employeeUserId: string,
+  documents: PhaseDocumentRow[],
+  actorUserId: string,
+): Promise<void> => {
+  for (const document of documents) {
+    const publicationId = await getOrOpenPublication(document.document_id, actorUserId);
+    const { created, skipped_user_ids: skipped } = await assignReaders(
+      publicationId,
+      { mode: 'users', user_ids: [employeeUserId] },
+      actorUserId,
+    );
+    const acknowledgementId = created[0]?.id ?? null;
+    if (!acknowledgementId && skipped.length > 0) {
+      const publication = await getPublicationById(publicationId);
+      const reused = await pool.query(
+        `SELECT id FROM public.quality_reading_acknowledgements
+          WHERE publication_id = $1 AND user_id = $2
+          ORDER BY created_at DESC LIMIT 1;`,
+        [publication?.id ?? publicationId, employeeUserId],
+      );
+      await pool.query(
+        `INSERT INTO public.rh_induction_reading_items (enrollment_id, document_id, acknowledgement_id)
+         VALUES ($1, $2, $3);`,
+        [enrollmentId, document.document_id, reused.rows[0]?.id ?? null],
+      );
+      continue;
+    }
+    await pool.query(
+      `INSERT INTO public.rh_induction_reading_items (enrollment_id, document_id, acknowledgement_id)
+       VALUES ($1, $2, $3);`,
+      [enrollmentId, document.document_id, acknowledgementId],
+    );
+  }
+};
+
+/** Documentos obligatorios del puesto activo del colaborador (lectura de la Fase 5). */
+const getEmployeePositionDocuments = async (employeeId: number): Promise<PhaseDocumentRow[]> => {
+  const result = await pool.query(
+    `SELECT pd.document_id, d.title
+       FROM public.rh_employee_positions rep
+       INNER JOIN public.rh_position_documents pd ON pd.position_id = rep.position_id
+       INNER JOIN public.documents d ON d.id = pd.document_id
+      WHERE rep.employee_id = $1 AND rep.is_active = TRUE
+      ORDER BY rep.assigned_at DESC, pd.sort_order ASC, pd.id ASC;`,
+    [employeeId],
+  );
+  return result.rows.map((row) => ({ document_id: String(row.document_id), title: String(row.title) }));
+};
+
+// --- Publicar / despublicar la fase -----------------------------------------
+
+export interface RhInductionPhasePublishResult {
+  published_at: string;
+  /** Inscritos que estaban en espera y recibieron sus lecturas al publicar. */
+  readings_assigned: number;
+}
+
+/**
+ * "Publicar fase": a partir de aqui las inscripciones asignan lecturas y los
+ * documentos se muestran en Sala de Lectura. Requisitos: documentos (fases
+ * institucionales) o puestos habilitados (fases por puesto) y, cuando la fase
+ * se evalua con cuestionario, que este ya este publicado. Los inscritos que
+ * quedaron en espera reciben sus lecturas y su limite de lectura arranca ahora.
+ */
+export const publishInductionPhase = async (phaseId: number, userId: string): Promise<RhInductionPhasePublishResult> => {
+  const phaseResult = await pool.query(
+    `SELECT id, phase_number, scope, training_course_id, reading_time_limit_hours, published_at
+       FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
+    [phaseId],
+  );
+  if (phaseResult.rows.length === 0) {
+    throwCoded('RH_INDUCTION_PHASE_NOT_FOUND', 'La fase no existe.');
+  }
+  const phase = phaseResult.rows[0];
+  const phaseNumber = Number(phase.phase_number);
+  const phaseScope = String(phase.scope);
+  if (phase.published_at) {
+    throwCoded('RH_INDUCTION_PHASE_ALREADY_PUBLISHED', 'La fase ya esta publicada.');
+  }
+  if (phaseNumber === 7) {
+    throwCoded(
+      'RH_INDUCTION_PHASE_NOT_INSTITUTIONAL',
+      'La Fase 7 se resuelve con la Evaluacion de competencia (REH-REG-003); no se publica.',
+    );
+  }
+
+  if (phaseScope === 'INSTITUTIONAL') {
+    const documents = await getPhaseDocuments(phaseId);
+    if (documents.length === 0) {
+      throwCoded(
+        'RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS',
+        'Agrega los documentos obligatorios de la fase antes de publicarla.',
+      );
+    }
+    const quiz = await pool.query(
+      `SELECT id FROM public.evaluation_templates
+        WHERE training_course_id = $1 AND status = 'published' AND is_active = TRUE AND evaluation_type = 'quiz'
+        LIMIT 1;`,
+      [phase.training_course_id],
+    );
+    if (quiz.rows.length === 0) {
+      throwCoded(
+        'RH_INDUCTION_PHASE_WITHOUT_PUBLISHED_EVALUATION',
+        'Publica primero el cuestionario de la fase en Capacitaciones (hoy sigue en borrador).',
+      );
+    }
+  } else {
+    const positions = await pool.query(
+      `SELECT 1 FROM public.rh_induction_phase_positions WHERE phase_id = $1 LIMIT 1;`,
+      [phaseId],
+    );
+    if (positions.rows.length === 0) {
+      throwCoded(
+        'RH_INDUCTION_PHASE_WITHOUT_POSITIONS',
+        'Habilita al menos un puesto en la fase antes de publicarla.',
+      );
+    }
+  }
+
+  const updated = await pool.query(
+    `UPDATE public.rh_induction_phases
+        SET published_at = NOW(), published_by_user_id = $2, updated_at = NOW()
+      WHERE id = $1
+      RETURNING published_at;`,
+    [phaseId, userId],
+  );
+
+  // Inscritos en espera (sin lecturas asignadas). La Fase 6 no lleva lectura.
+  let readingsAssigned = 0;
+  if (phaseNumber !== 6) {
+    const readingLimitHours = phase.reading_time_limit_hours ? Number(phase.reading_time_limit_hours) : null;
+    const phaseDocuments = phaseScope === 'INSTITUTIONAL' ? await getPhaseDocuments(phaseId) : [];
+    const waiting = await pool.query(
+      `SELECT e.id, e.employee_id, emp.user_id
+         FROM public.rh_induction_enrollments e
+         INNER JOIN public.employees emp ON emp.id = e.employee_id
+        WHERE e.phase_id = $1
+          AND e.evaluation_assignment_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id)
+        ORDER BY e.id ASC;`,
+      [phaseId],
+    );
+    for (const row of waiting.rows) {
+      if (!row.user_id) {
+        continue;
+      }
+      const documents =
+        phaseScope === 'INSTITUTIONAL' ? phaseDocuments : await getEmployeePositionDocuments(Number(row.employee_id));
+      if (documents.length === 0) {
+        continue;
+      }
+      await assignEnrollmentReadings(Number(row.id), String(row.user_id), documents, userId);
+      if (readingLimitHours) {
+        await pool.query(
+          `UPDATE public.rh_induction_enrollments
+              SET reading_deadline_at = NOW() + make_interval(hours => $2::int), updated_at = NOW()
+            WHERE id = $1;`,
+          [Number(row.id), readingLimitHours],
+        );
+      }
+      await refreshEnrollmentReadingStatus(Number(row.id));
+      readingsAssigned += 1;
+    }
+  }
+
+  return {
+    published_at: new Date(updated.rows[0].published_at).toISOString(),
+    readings_assigned: readingsAssigned,
+  };
+};
+
+/**
+ * Regresa la fase a borrador. Solo si nadie ha empezado a leer ni tiene
+ * evaluacion: se retiran las lecturas pendientes (sin evidencia que perder) y
+ * el limite de lectura se reinicia; al volver a publicar se reasignan.
+ */
+export const unpublishInductionPhase = async (phaseId: number): Promise<void> => {
+  const phaseResult = await pool.query(
+    `SELECT id, published_at FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
+    [phaseId],
+  );
+  if (phaseResult.rows.length === 0) {
+    throwCoded('RH_INDUCTION_PHASE_NOT_FOUND', 'La fase no existe.');
+  }
+  if (!phaseResult.rows[0].published_at) {
+    throwCoded('RH_INDUCTION_PHASE_NOT_PUBLISHED', 'La fase ya esta en borrador.');
+  }
+
+  const started = await pool.query(
+    `SELECT COUNT(*)::int AS total
+       FROM public.rh_induction_enrollments e
+       LEFT JOIN public.rh_induction_reading_items ri ON ri.enrollment_id = e.id
+       LEFT JOIN public.quality_reading_acknowledgements a ON a.id = ri.acknowledgement_id
+      WHERE e.phase_id = $1
+        AND (e.evaluation_assignment_id IS NOT NULL OR (a.id IS NOT NULL AND a.status <> 'pending'));`,
+    [phaseId],
+  );
+  if (Number(started.rows[0].total) > 0) {
+    throwCoded(
+      'RH_INDUCTION_PHASE_READING_STARTED',
+      'No se puede regresar a borrador: hay colaboradores que ya empezaron a leer o ya tienen evaluacion.',
+    );
+  }
+
+  const pendingAcks = await pool.query(
+    `SELECT DISTINCT ri.acknowledgement_id
+       FROM public.rh_induction_reading_items ri
+       INNER JOIN public.rh_induction_enrollments e ON e.id = ri.enrollment_id
+      WHERE e.phase_id = $1 AND ri.acknowledgement_id IS NOT NULL;`,
+    [phaseId],
+  );
+  const pendingAckIds = pendingAcks.rows.map((row) => Number(row.acknowledgement_id));
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `DELETE FROM public.rh_induction_reading_items ri
+        USING public.rh_induction_enrollments e
+       WHERE e.id = ri.enrollment_id AND e.phase_id = $1;`,
+      [phaseId],
+    );
+    if (pendingAckIds.length > 0) {
+      await client.query(
+        `DELETE FROM public.quality_reading_acknowledgements ack
+          WHERE ack.id = ANY($1::bigint[]) AND ack.status = 'pending'
+            AND NOT EXISTS (SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.acknowledgement_id = ack.id);`,
+        [pendingAckIds],
+      );
+    }
+    await client.query(
+      `UPDATE public.rh_induction_enrollments SET reading_deadline_at = NULL, updated_at = NOW() WHERE phase_id = $1;`,
+      [phaseId],
+    );
+    await client.query(
+      `UPDATE public.rh_induction_phases
+          SET published_at = NULL, published_by_user_id = NULL, updated_at = NOW()
+        WHERE id = $1;`,
+      [phaseId],
+    );
+  });
+};
+
 const getOrOpenPublication = async (documentId: string, userId: string): Promise<number> => {
   const existing = await pool.query(
     `SELECT id FROM public.quality_reading_publications WHERE document_id = $1 AND status = 'open' LIMIT 1;`,
@@ -350,7 +602,8 @@ export const enrollEmployeeInPhase = async (
   supervisorEmployeeId?: number | null,
 ): Promise<RhInductionEnrollment> => {
   const phaseResult = await pool.query(
-    `SELECT id, phase_number, scope, reading_time_limit_hours FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
+    `SELECT id, phase_number, scope, reading_time_limit_hours, published_at
+       FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
     [phaseId],
   );
   if (phaseResult.rows.length === 0) {
@@ -358,6 +611,8 @@ export const enrollEmployeeInPhase = async (
   }
   const phaseScope = String(phaseResult.rows[0].scope);
   const phaseNumber = Number(phaseResult.rows[0].phase_number);
+  // Fase en borrador: se inscribe, pero las lecturas se asignan hasta "Publicar fase".
+  const phasePublished = Boolean(phaseResult.rows[0].published_at);
   const readingLimitHours = phaseResult.rows[0].reading_time_limit_hours
     ? Number(phaseResult.rows[0].reading_time_limit_hours)
     : null;
@@ -468,7 +723,7 @@ export const enrollEmployeeInPhase = async (
   let documents: PhaseDocumentRow[] = [];
   if (phaseScope === 'INSTITUTIONAL') {
     documents = await getPhaseDocuments(phaseId);
-    if (documents.length === 0) {
+    if (documents.length === 0 && phasePublished) {
       throwCoded('RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS', 'Esta fase todavia no tiene documentos configurados.');
     }
   } else if (phaseNumber === 5) {
@@ -477,8 +732,8 @@ export const enrollEmployeeInPhase = async (
 
   // Fecha limite de lectura: se congela al inscribir (cambios posteriores en la
   // config de la fase no mueven inscripciones existentes). Solo aplica cuando
-  // la fase lleva lectura.
-  const readingDeadlineHours = documents.length > 0 && readingLimitHours ? readingLimitHours : null;
+  // la fase lleva lectura y ya esta publicada (en borrador arranca al publicar).
+  const readingDeadlineHours = phasePublished && documents.length > 0 && readingLimitHours ? readingLimitHours : null;
 
   const enrollmentId = await withTransaction(async (client) => {
     const inserted = await client.query(
@@ -500,36 +755,8 @@ export const enrollEmployeeInPhase = async (
     );
   }
 
-  for (const document of documents) {
-    const publicationId = await getOrOpenPublication(document.document_id, userId);
-    const { created, skipped_user_ids: skipped } = await assignReaders(
-      publicationId,
-      { mode: 'users', user_ids: [employeeUserId] },
-      userId,
-    );
-    const acknowledgementId = created[0]?.id ?? null;
-    if (!acknowledgementId && skipped.length > 0) {
-      // El colaborador ya tenia una lectura vigente/firmada de este documento
-      // (de otra asignacion previa): la reusamos en vez de duplicarla.
-      const publication = await getPublicationById(publicationId);
-      const reused = await pool.query(
-        `SELECT id FROM public.quality_reading_acknowledgements
-          WHERE publication_id = $1 AND user_id = $2
-          ORDER BY created_at DESC LIMIT 1;`,
-        [publication?.id ?? publicationId, employeeUserId],
-      );
-      await pool.query(
-        `INSERT INTO public.rh_induction_reading_items (enrollment_id, document_id, acknowledgement_id)
-         VALUES ($1, $2, $3);`,
-        [enrollmentId, document.document_id, reused.rows[0]?.id ?? null],
-      );
-      continue;
-    }
-    await pool.query(
-      `INSERT INTO public.rh_induction_reading_items (enrollment_id, document_id, acknowledgement_id)
-       VALUES ($1, $2, $3);`,
-      [enrollmentId, document.document_id, acknowledgementId],
-    );
+  if (phasePublished) {
+    await assignEnrollmentReadings(enrollmentId, employeeUserId, documents, userId);
   }
 
   await refreshEnrollmentReadingStatus(enrollmentId);
@@ -941,6 +1168,8 @@ export interface RhInductionProgressItem {
   supervisor_name: string | null;
   checklist_total: number;
   checklist_completed: number;
+  /** false = la fase sigue en borrador: aun no hay lecturas ni evaluacion disponibles. */
+  phase_published: boolean;
 }
 
 export const getEmployeeInductionProgress = async (employeeId: number): Promise<RhInductionProgressItem[]> => {
@@ -961,6 +1190,7 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
   const result = await pool.query(
     `SELECT
         e.id AS enrollment_id, p.id AS phase_id, p.phase_number, p.name AS phase_name, p.responsible_label,
+        p.published_at,
         e.reading_completed_at, e.reading_deadline_at, e.evaluation_assignment_id,
         e.supervisor_employee_id, sup.full_name AS supervisor_name,
         ea.status AS evaluation_status, ea.percentage AS evaluation_percentage,
@@ -995,6 +1225,7 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
     supervisor_name: row.supervisor_name ? String(row.supervisor_name) : null,
     checklist_total: Number(row.checklist_total ?? 0),
     checklist_completed: Number(row.checklist_completed ?? 0),
+    phase_published: Boolean(row.published_at),
   }));
 };
 

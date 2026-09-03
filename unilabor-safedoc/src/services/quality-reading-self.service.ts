@@ -100,10 +100,28 @@ const mapRow = (row: any): MyReadingRecord => {
   };
 };
 
+/**
+ * Lecturas de Induccion que NO se muestran al colaborador: las de una fase que
+ * sigue en borrador (RH aun no la publica) y las de una fase que ya aprobo
+ * (la evidencia se conserva integra en Calidad/RH y en su expediente; solo
+ * deja de estorbar en "Mis lecturas").
+ */
+const HIDDEN_INDUCTION_READING = `
+  EXISTS (
+    SELECT 1
+      FROM public.rh_induction_reading_items ri
+      INNER JOIN public.rh_induction_enrollments e ON e.id = ri.enrollment_id
+      INNER JOIN public.rh_induction_phases ph ON ph.id = e.phase_id
+      LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
+     WHERE ri.acknowledgement_id = a.id
+       AND (ph.published_at IS NULL OR ea.status = 'passed')
+  )`;
+
 export const listMyReadings = async (userId: string): Promise<MyReadingRecord[]> => {
   const result = await pool.query(
     `${SELECT_MY_READING}
       WHERE a.user_id = $1 AND a.status <> 'cancelled'
+        AND NOT ${HIDDEN_INDUCTION_READING}
       ORDER BY a.deadline_at ASC, a.id DESC;`,
     [userId],
   );
@@ -120,6 +138,16 @@ export const getMyReading = async (
   }
   if (String(result.rows[0].user_id) !== userId) {
     return fail('QUALITY_READING_FORBIDDEN', 'No tienes acceso a esta lectura.');
+  }
+  const hidden = await pool.query(
+    `SELECT 1 FROM public.quality_reading_acknowledgements a WHERE a.id = $1 AND ${HIDDEN_INDUCTION_READING} LIMIT 1;`,
+    [readingId],
+  );
+  if (hidden.rows.length > 0) {
+    return fail(
+      'QUALITY_READING_FORBIDDEN',
+      'Esta lectura no esta disponible: la fase de induccion aun no se publica o ya fue aprobada.',
+    );
   }
   return mapRow(result.rows[0]);
 };

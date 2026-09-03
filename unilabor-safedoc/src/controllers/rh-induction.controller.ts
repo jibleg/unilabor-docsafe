@@ -20,6 +20,8 @@ import {
   removePhaseDocument,
   setEnrollmentSupervisor,
   toggleChecklistItem,
+  publishInductionPhase,
+  unpublishInductionPhase,
 } from '../services/rh-induction.service';
 import { createEffectivenessReview, listEffectivenessReviews } from '../services/rh-induction-effectiveness.service';
 import { getEmployeeInductionMasterRecord } from '../services/rh-induction-master-record.service';
@@ -54,6 +56,11 @@ const ERROR_STATUS: Record<string, number> = {
   RH_INDUCTION_ENROLLMENT_ALREADY_PASSED: 409,
   RH_INDUCTION_ENROLLMENT_EVALUATION_IN_REVIEW: 409,
   RH_INDUCTION_EMPLOYEE_NOT_FOUND: 404,
+  RH_INDUCTION_PHASE_ALREADY_PUBLISHED: 409,
+  RH_INDUCTION_PHASE_NOT_PUBLISHED: 409,
+  RH_INDUCTION_PHASE_WITHOUT_PUBLISHED_EVALUATION: 409,
+  RH_INDUCTION_PHASE_WITHOUT_POSITIONS: 409,
+  RH_INDUCTION_PHASE_READING_STARTED: 409,
 };
 
 const mapError = (res: Response, error: any): Response | null => {
@@ -263,6 +270,44 @@ export const enablePhaseForPositionController = async (req: AuthRequest, res: Re
     if (mapped) return mapped;
     console.error('Error habilitando fase para el puesto:', error);
     return res.status(500).json({ message: 'No se pudo habilitar la fase para el puesto.' });
+  }
+};
+
+export const publishPhaseController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  if (!phaseId) {
+    return res.status(400).json({ message: 'ID de fase invalido.' });
+  }
+  try {
+    const result = await publishInductionPhase(phaseId, req.user?.id ?? '');
+    return res.json({
+      message:
+        result.readings_assigned > 0
+          ? `Fase publicada. Se asignaron las lecturas a ${result.readings_assigned} inscrito(s) en espera.`
+          : 'Fase publicada.',
+      ...result,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error publicando fase de induccion:', error);
+    return res.status(500).json({ message: 'No se pudo publicar la fase.' });
+  }
+};
+
+export const unpublishPhaseController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  if (!phaseId) {
+    return res.status(400).json({ message: 'ID de fase invalido.' });
+  }
+  try {
+    await unpublishInductionPhase(phaseId);
+    return res.json({ message: 'La fase regreso a borrador.' });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error regresando a borrador la fase de induccion:', error);
+    return res.status(500).json({ message: 'No se pudo regresar la fase a borrador.' });
   }
 };
 
