@@ -129,11 +129,18 @@ export const PdfSafeViewer = ({
 
   // Reinicia el estado del visor cuando cambia el documento, durante el render
   // (patron recomendado por React en lugar de un efecto que llama setState).
+  // Paginas cuyo scroll llego hasta el final (criterio de lectura real): solo
+  // esas paginas laten. Una pagina que cabe completa se marca sola al render.
+  const [scrolledPages, setScrolledPages] = useState<Set<number>>(new Set());
+  const scrolledPagesRef = useRef(scrolledPages);
+  scrolledPagesRef.current = scrolledPages;
+
   if (fileUrl !== loadedFileUrl) {
     setLoadedFileUrl(fileUrl);
     setNumPages(0);
     setPageNumber(1);
     setLoadError(null);
+    setScrolledPages(new Set());
   }
 
   const watermarkName = useMemo(
@@ -232,6 +239,42 @@ export const PdfSafeViewer = ({
   const trackingEnabled = Boolean(tracking);
   const heartbeatMs = (tracking?.intervalSeconds ?? 4) * 1000;
 
+  // Criterio de scroll completo: la pagina actual queda "recorrida" cuando el
+  // area de lectura llego a su fondo (o cuando la pagina cabe entera sin
+  // scroll). Solo entonces el latido puede reportarla.
+  const evaluatePageScroll = useCallback(() => {
+    if (!trackingEnabled) {
+      return;
+    }
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= 24) {
+      const page = pageNumberRef.current;
+      setScrolledPages((prev) => (prev.has(page) ? prev : new Set(prev).add(page)));
+    }
+  }, [trackingEnabled]);
+
+  useEffect(() => {
+    if (!trackingEnabled) {
+      return;
+    }
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+    el.addEventListener('scroll', evaluatePageScroll, { passive: true });
+    return () => el.removeEventListener('scroll', evaluatePageScroll);
+  }, [trackingEnabled, evaluatePageScroll]);
+
+  // Al cambiar de pagina, la lectura arranca desde arriba.
+  useEffect(() => {
+    if (trackingEnabled) {
+      scrollRef.current?.scrollTo({ top: 0 });
+    }
+  }, [pageNumber, trackingEnabled]);
+
   useEffect(() => {
     if (!trackingEnabled || numPages === 0) {
       return;
@@ -240,6 +283,10 @@ export const PdfSafeViewer = ({
     let inFlight = false;
     const beat = async () => {
       if (inFlight || document.hidden || !document.hasFocus()) {
+        return;
+      }
+      // Sin scroll completo de la pagina actual no corre su tiempo de lectura.
+      if (!scrolledPagesRef.current.has(pageNumberRef.current)) {
         return;
       }
       inFlight = true;
@@ -386,6 +433,11 @@ export const PdfSafeViewer = ({
                     requestAnimationFrame(fitToWidth);
                   }
                 }}
+                onRenderSuccess={() => {
+                  // Con la pagina ya pintada (o re-pintada por zoom), si cabe
+                  // completa en el area visible cuenta como recorrida.
+                  requestAnimationFrame(evaluatePageScroll);
+                }}
               />
               {/* Marca de agua (nombre + fecha) SOBRE el documento, no imprimible. */}
               <div
@@ -401,6 +453,7 @@ export const PdfSafeViewer = ({
           </Document>
         </div>
       </div>
+
     </div>
   );
 };

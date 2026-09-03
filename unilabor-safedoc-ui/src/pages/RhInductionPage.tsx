@@ -26,6 +26,7 @@ import {
   type RhInductionCertificateReadiness,
 } from '../api/service.api-rh-induction';
 import { confirmAction } from '../utils/confirm';
+import { EnrollmentCertificateDataModal } from '../components/rh/EnrollmentCertificateDataModal';
 import { listPositions, lookupDocumentByCode, type DocumentLookupResult } from '../api/service.api-rh-position';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { SearchableSelect } from '../components/SearchableSelect';
@@ -72,6 +73,15 @@ export const RhInductionPage = () => {
   const [readingLimitHours, setReadingLimitHours] = useState('');
   const [savingReadingLimit, setSavingReadingLimit] = useState(false);
   const [certReadiness, setCertReadiness] = useState<RhInductionCertificateReadiness | null>(null);
+  const [certDataTarget, setCertDataTarget] = useState<RhInductionPhaseEnrollmentSummary | null>(null);
+
+  const refreshCertReadiness = useCallback((phaseId: number) => {
+    getPhaseCertificateReadiness(phaseId)
+      .then(setCertReadiness)
+      .catch(() => {
+        // Panel informativo: si falla la consulta simplemente no se muestra.
+      });
+  }, []);
 
   const [allPositions, setAllPositions] = useState<RhPosition[]>([]);
   const [phasePositions, setPhasePositions] = useState<RhInductionPhasePosition[]>([]);
@@ -152,11 +162,7 @@ export const RhInductionPage = () => {
     void loadEnrollments(phase.id);
     void loadChecklistItems(phase.id);
     setCertReadiness(null);
-    getPhaseCertificateReadiness(phase.id)
-      .then(setCertReadiness)
-      .catch(() => {
-        // Panel informativo: si falla la consulta simplemente no se muestra.
-      });
+    refreshCertReadiness(phase.id);
     if (phase.scope === 'POSITION' && phase.phase_number !== 7) {
       listPhasePositions(phase.id)
         .then(setPhasePositions)
@@ -829,6 +835,22 @@ export const RhInductionPage = () => {
                           <div>
                             <p className="font-bold text-[var(--color-brand-700)]">{item.employee_name}</p>
                             <p className="text-xs text-[var(--unilabor-neutral)]">{item.employee_code}</p>
+                            {item.missing_branch || item.missing_position ? (
+                              <button
+                                type="button"
+                                onClick={() => setCertDataTarget(item)}
+                                title="Capturar los datos faltantes de la constancia sin salir de esta pantalla"
+                                className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-amber-700"
+                              >
+                                <span className="rounded-full bg-amber-50 px-2 py-0.5 ring-1 ring-amber-200">
+                                  Constancia: falta{' '}
+                                  {[item.missing_branch ? 'sucursal' : null, item.missing_position ? 'puesto' : null]
+                                    .filter(Boolean)
+                                    .join(' y ')}
+                                </span>
+                                <span className="underline underline-offset-2">Completar datos</span>
+                              </button>
+                            ) : null}
                           </div>
                           <div className="text-right text-xs text-[var(--unilabor-neutral)]">
                             <p>
@@ -941,6 +963,20 @@ export const RhInductionPage = () => {
           )}
         </section>
       </div>
+
+      {certDataTarget && selectedPhase ? (
+        <EnrollmentCertificateDataModal
+          employeeId={certDataTarget.employee_id}
+          employeeName={certDataTarget.employee_name}
+          missingBranch={certDataTarget.missing_branch}
+          missingPosition={certDataTarget.missing_position}
+          onClose={() => setCertDataTarget(null)}
+          onSaved={() => {
+            void loadEnrollments(selectedPhase.id);
+            refreshCertReadiness(selectedPhase.id);
+          }}
+        />
+      ) : null}
     </div>
   );
 };

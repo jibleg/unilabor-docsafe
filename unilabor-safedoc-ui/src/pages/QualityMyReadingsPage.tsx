@@ -36,6 +36,10 @@ export const QualityMyReadingsPage = () => {
   const [active, setActive] = useState<MyReading | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
+  // Firma exprés desde la lista: documento ya leído por completo, solo falta la
+  // firma — modal directo sin reabrir el visor.
+  const [signTarget, setSignTarget] = useState<MyReading | null>(null);
+  const [modalSignature, setModalSignature] = useState<string | null>(null);
 
   // Evita repetir el aviso de "ya puedes firmar" en cada latido.
   const announcedReadRef = useRef(false);
@@ -103,6 +107,24 @@ export const QualityMyReadingsPage = () => {
       closeReader();
     } catch (error) {
       // El servidor decide si la lectura basta; su mensaje es el bueno.
+      toast.error(getApiErrorMessage(error, 'No se pudo firmar el documento.'));
+    } finally {
+      setSigning(false);
+    }
+  };
+
+  const handleSignFromModal = async () => {
+    if (!signTarget || !modalSignature) {
+      return;
+    }
+    setSigning(true);
+    try {
+      await signMyReading(signTarget.id, modalSignature);
+      toast.success('Documento firmado. La constancia queda en el expediente de Calidad.');
+      setSignTarget(null);
+      setModalSignature(null);
+      void load();
+    } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo firmar el documento.'));
     } finally {
       setSigning(false);
@@ -222,7 +244,14 @@ export const QualityMyReadingsPage = () => {
                 {item.status !== 'signed' && item.status !== 'cancelled' && (
                   <button
                     type="button"
-                    onClick={() => openReader(item)}
+                    onClick={() => {
+                      if (item.status === 'read') {
+                        setModalSignature(null);
+                        setSignTarget(item);
+                      } else {
+                        openReader(item);
+                      }
+                    }}
                     className="rounded-full bg-[var(--color-brand-700)] px-4 py-1.5 text-xs font-semibold text-white hover:opacity-90"
                   >
                     {item.status === 'read' ? 'Firmar' : 'Leer'}
@@ -321,6 +350,58 @@ export const QualityMyReadingsPage = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {signTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/96 shadow-2xl shadow-[rgba(0,65,106,0.18)]">
+            <div className="border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
+                Firma de conformidad
+              </p>
+              <h2 className="mt-1 text-base font-bold text-[var(--color-brand-700)]">
+                {signTarget.document_title}
+              </h2>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-4">
+              <p className="text-xs leading-relaxed text-[var(--unilabor-neutral)]">
+                Declaro que recibí, consulté en su totalidad y comprendí el documento que antecede,
+                y que manifiesto mi conformidad con su contenido. Firmo de manera autógrafa para
+                constancia.
+              </p>
+              <div className="mt-3">
+                <SignaturePad
+                  label="Firma autógrafa"
+                  hint="Firma con el dedo, el Apple Pencil o el mouse."
+                  onChange={setModalSignature}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-5 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSignTarget(null);
+                  setModalSignature(null);
+                }}
+                disabled={signing}
+                className="rounded-lg border border-[rgba(0,65,106,0.12)] px-4 py-2 text-sm text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSignFromModal()}
+                disabled={signing || !modalSignature}
+                className="rounded-lg bg-[var(--color-brand-700)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+              >
+                {signing ? 'Firmando…' : 'Firmar documento'}
+              </button>
+            </div>
           </div>
         </div>
       )}

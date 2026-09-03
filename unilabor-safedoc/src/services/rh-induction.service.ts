@@ -1013,6 +1013,9 @@ export interface RhInductionPhaseEnrollmentSummary {
   supervisor_name: string | null;
   checklist_total: number;
   checklist_completed: number;
+  /** Datos de la constancia pendientes de capturar para este colaborador. */
+  missing_branch: boolean;
+  missing_position: boolean;
 }
 
 export const listPhaseEnrollments = async (phaseId: number): Promise<RhInductionPhaseEnrollmentSummary[]> => {
@@ -1033,6 +1036,11 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
   const result = await pool.query(
     `SELECT
         e.id AS enrollment_id, emp.id AS employee_id, emp.full_name AS employee_name, emp.employee_code,
+        emp.branch_id IS NULL AS missing_branch,
+        NOT EXISTS (
+          SELECT 1 FROM public.rh_employee_positions ep
+           WHERE ep.employee_id = emp.id AND ep.is_active = TRUE
+        ) AS missing_position,
         e.reading_completed_at, e.reading_deadline_at,
         e.supervisor_employee_id, sup.full_name AS supervisor_name,
         ea.status AS evaluation_status, ea.percentage AS evaluation_percentage,
@@ -1047,7 +1055,7 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
       LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
       LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
      WHERE e.phase_id = $1
-     ORDER BY e.created_at DESC;`,
+     ORDER BY emp.full_name ASC;`,
     [phaseId],
   );
   return result.rows.map((row) => ({
@@ -1065,6 +1073,8 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
     supervisor_name: row.supervisor_name ? String(row.supervisor_name) : null,
     checklist_total: Number(row.checklist_total ?? 0),
     checklist_completed: Number(row.checklist_completed ?? 0),
+    missing_branch: Boolean(row.missing_branch),
+    missing_position: Boolean(row.missing_position),
   }));
 };
 

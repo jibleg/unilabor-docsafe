@@ -8,6 +8,7 @@ import {
   listPositions,
 } from '../../api/service.api-rh-position';
 import { getApiErrorMessage } from '../../api/service.parsers';
+import { SearchableSelect } from '../SearchableSelect';
 import type { RhEmployeePosition, RhPosition } from '../../types/models';
 
 interface EmployeePositionsPanelProps {
@@ -70,9 +71,9 @@ export const EmployeePositionsPanel = ({ employeeId }: EmployeePositionsPanelPro
     }
   };
 
-  const availablePositions = catalog.filter(
-    (position) => !assigned.some((item) => item.position_id === position.id),
-  );
+  const availablePositions = catalog
+    .filter((position) => !assigned.some((item) => item.position_id === position.id))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
 
   return (
     <div className="rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/92 shadow-xl shadow-[rgba(0,65,106,0.08)]">
@@ -116,18 +117,20 @@ export const EmployeePositionsPanel = ({ employeeId }: EmployeePositionsPanelPro
         )}
 
         <div className="flex gap-2">
-          <select
-            value={selectedPositionId}
-            onChange={(event) => setSelectedPositionId(event.target.value)}
-            className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none"
-          >
-            <option value="">Seleccionar puesto...</option>
-            {availablePositions.map((position) => (
-              <option key={position.id} value={position.id}>
-                {position.name}
-              </option>
-            ))}
-          </select>
+          <div className="w-full">
+            <SearchableSelect
+              value={selectedPositionId}
+              onChange={setSelectedPositionId}
+              options={availablePositions.map((position) => ({
+                value: String(position.id),
+                label: position.name,
+                hint: position.code,
+              }))}
+              placeholder="Seleccionar puesto..."
+              emptyLabel="Sin seleccionar"
+              searchPlaceholder="Buscar puesto por nombre o código..."
+            />
+          </div>
           <button
             type="button"
             onClick={() => void handleAssign()}

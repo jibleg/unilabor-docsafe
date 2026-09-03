@@ -406,7 +406,10 @@ export const TakeEvaluationPage = () => {
                   );
                 })}
                 {current.type === 'multiple' && (
-                  <p className="text-[11px] text-[var(--unilabor-neutral)]">Puedes seleccionar varias opciones.</p>
+                  <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-amber-300">
+                    <CheckCircle2 size={12} />
+                    Puedes seleccionar varias opciones
+                  </span>
                 )}
               </div>
             )}

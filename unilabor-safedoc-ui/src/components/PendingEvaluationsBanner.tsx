@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, GraduationCap, X } from 'lucide-react';
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations';
@@ -12,8 +12,12 @@ import { usePendingEvaluations } from '../hooks/usePendingEvaluations';
 export const PendingEvaluationsBanner = () => {
   const { count, loading } = usePendingEvaluations(true);
   const [dismissed, setDismissed] = useState(false);
+  // En las pantallas de "Mis evaluaciones" (lista o contestando) el banner
+  // sobra: el colaborador ya esta atendiendo la accion requerida.
+  const { pathname } = useLocation();
+  const onEvaluationScreens = pathname.startsWith('/rh/my-evaluations');
 
-  const visible = !loading && count > 0 && !dismissed;
+  const visible = !loading && count > 0 && !dismissed && !onEvaluationScreens;
   const plural = count === 1 ? '' : 'es';
 
   return (
@@ -56,8 +60,8 @@ export const PendingEvaluationsBanner = () => {
                   Tienes {count} evaluación{plural} de capacitación pendiente{plural}
                 </p>
                 <p className="text-xs text-[var(--unilabor-ink)]">
-                  Cuentas con <span className="font-semibold text-amber-700">72 horas</span> desde su disponibilidad
-                  para realizarla. Después deberás solicitar autorización a RH.
+                  Cuentas con un <span className="font-semibold text-amber-700">plazo limitado</span> desde su
+                  disponibilidad para presentarla. Si vence, deberás solicitar autorización a RH.
                 </p>
               </div>
             </div>

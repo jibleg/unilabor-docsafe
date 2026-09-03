@@ -1423,6 +1423,8 @@ export interface RhInductionPhaseEnrollmentSummary {
   supervisor_name: string | null;
   checklist_total: number;
   checklist_completed: number;
+  missing_branch: boolean;
+  missing_position: boolean;
 }
 
 export interface RhInductionChecklistItem {
