@@ -91,6 +91,16 @@ export const getAnthropicConfig = (): { apiKey: string; model: string; workspace
 };
 
 /**
+ * Apagador global de mensajeria saliente (correo, SMS y WhatsApp). Con
+ * NOTIFY_ENABLED=false el sistema calcula y BITACOREA cada aviso como
+ * 'skipped' pero no envia nada real — pensado para ambientes de prueba con
+ * credenciales reales en el .env. Ausente o con cualquier otro valor: se envia
+ * normal (prod no necesita declararla).
+ */
+export const isOutboundNotifyEnabled = (): boolean =>
+  process.env.NOTIFY_ENABLED?.trim().toLowerCase() !== 'false';
+
+/**
  * Valida la configuracion critica al arranque. Lanza si falta `JWT_SECRET` o si
  * conserva el valor por defecto inseguro. Llamar antes de `app.listen`.
  */

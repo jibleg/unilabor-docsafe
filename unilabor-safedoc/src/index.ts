@@ -23,7 +23,7 @@ import adminRoutes from './routes/admin.routes';
 import providerRoutes from './routes/provider.routes';
 import classificationRoutes from './routes/classification.routes';
 import clientRoutes from './routes/client.routes';
-import { assertRequiredEnv } from './config/env';
+import { assertRequiredEnv, isOutboundNotifyEnabled } from './config/env';
 import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
 import { startServiceReminderScheduler } from './services/helpdesk-service-scheduler.service';
 import { startAcknowledgementScheduler } from './services/rh-acknowledgement-scheduler.service';
@@ -111,6 +111,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 const server = app.listen(PORT, () => {
   console.log(`Servidor SafeDoc corriendo en puerto ${PORT}`);
+  if (!isOutboundNotifyEnabled()) {
+    console.log('⚠ NOTIFY_ENABLED=false: correos, SMS y WhatsApp NO se envian (solo se bitacorean como skipped).');
+  }
   // Scheduler de evaluaciones (recordatorios + vencimientos). Guardado por env.
   startEvaluationScheduler();
   // Scheduler de recordatorios de servicio (mantenimiento + calibracion). Guardado por env.

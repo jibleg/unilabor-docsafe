@@ -1,5 +1,5 @@
 import pool from '../config/db';
-import { getLabsMobileConfig, getWhapiConfig } from '../config/env';
+import { getLabsMobileConfig, getWhapiConfig, isOutboundNotifyEnabled } from '../config/env';
 import { sendGenericEmail } from './email.service';
 import { recordOutbound } from './outbox.service';
 
@@ -172,6 +172,19 @@ const dispatch = async (
   template: string,
   assignmentId: number | null,
 ): Promise<boolean> => {
+  if (!isOutboundNotifyEnabled()) {
+    await recordOutbound({
+      channel: channel.name,
+      recipient: recipient ?? '(sin destino)',
+      subject,
+      body: message,
+      template,
+      assignmentId,
+      status: 'skipped',
+      error: 'notify_disabled',
+    });
+    return false;
+  }
   if (!recipient || recipient.trim().length === 0) {
     await recordOutbound({
       channel: channel.name,

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import nodemailer from 'nodemailer';
-import { getEmailFrom, getSparkpostConfig } from '../config/env';
+import { getEmailFrom, getSparkpostConfig, isOutboundNotifyEnabled } from '../config/env';
 import { recordOutbound } from './outbox.service';
 
 const transporter = nodemailer.createTransport({
@@ -51,6 +51,19 @@ const deliverEmail = async (
   attachments: EmailAttachment[] = [],
   meta: EmailMeta = {},
 ): Promise<void> => {
+  if (!isOutboundNotifyEnabled()) {
+    await recordOutbound({
+      channel: 'email',
+      recipient: to,
+      subject,
+      body: meta.bodyText ?? stripHtml(html).slice(0, 2000),
+      template: meta.template ?? 'email',
+      assignmentId: meta.assignmentId ?? null,
+      status: 'skipped',
+      error: 'notify_disabled',
+    });
+    return;
+  }
   try {
     await sendEmailTransport(to, subject, html, attachments);
     await recordOutbound({
