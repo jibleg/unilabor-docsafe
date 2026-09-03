@@ -221,9 +221,16 @@ export const deletePositionCompetency = async (competencyId: number): Promise<bo
 export const findDocumentByCode = async (
   code: string,
 ): Promise<{ id: string; title: string; code: string } | null> => {
+  // Respaldo: si el documento aun no tiene `code` capturado, se reconoce por el
+  // prefijo literal del titulo ("REH-INS-001 Reglamento..."), que es la
+  // convencion real del SGC (ver migracion 20260903_01).
   const result = await pool.query(
-    `SELECT id, title, code FROM public.documents
-      WHERE UPPER(code) = UPPER($1) AND status = 'active' LIMIT 1;`,
+    `SELECT id, title, COALESCE(code, $1) AS code FROM public.documents
+      WHERE status = 'active'
+        AND (UPPER(code) = UPPER($1)
+             OR (code IS NULL AND UPPER(title) LIKE UPPER($1) || ' %'))
+      ORDER BY code NULLS LAST
+      LIMIT 1;`,
     [code.trim()],
   );
   if (result.rows.length === 0) {
@@ -247,7 +254,7 @@ export const searchDocuments = async (
     `SELECT id, title, code FROM public.documents
       WHERE status = 'active'
         AND ($1 = '' OR code ILIKE '%' || $1 || '%' OR title ILIKE '%' || $1 || '%')
-      ORDER BY code NULLS LAST, title
+      ORDER BY COALESCE(code, title), title
       LIMIT $2;`,
     [term, limit],
   );

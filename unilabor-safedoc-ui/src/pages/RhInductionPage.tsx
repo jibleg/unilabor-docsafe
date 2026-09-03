@@ -27,7 +27,8 @@ import {
 } from '../api/service.api-rh-induction';
 import { confirmAction } from '../utils/confirm';
 import { EnrollmentCertificateDataModal } from '../components/rh/EnrollmentCertificateDataModal';
-import { listPositions, lookupDocumentByCode, type DocumentLookupResult } from '../api/service.api-rh-position';
+import { listPositions, type DocumentSearchResult } from '../api/service.api-rh-position';
+import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { SearchableSelect } from '../components/SearchableSelect';
 import type {
@@ -59,9 +60,6 @@ export const RhInductionPage = () => {
   const [enrollments, setEnrollments] = useState<RhInductionPhaseEnrollmentSummary[]>([]);
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
 
-  const [documentCode, setDocumentCode] = useState('');
-  const [documentPreview, setDocumentPreview] = useState<DocumentLookupResult | null>(null);
-  const [lookingUp, setLookingUp] = useState(false);
   const [savingDocument, setSavingDocument] = useState(false);
 
   const [responsibleName, setResponsibleName] = useState('');
@@ -128,16 +126,21 @@ export const RhInductionPage = () => {
 
   const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? null;
 
-  const loadEnrollments = useCallback(async (phaseId: number) => {
-    setLoadingEnrollments(true);
-    try {
-      setEnrollments(await listPhaseEnrollments(phaseId));
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'No se pudieron cargar las inscripciones.'));
-    } finally {
-      setLoadingEnrollments(false);
-    }
-  }, []);
+  const loadEnrollments = useCallback(
+    async (phaseId: number) => {
+      setLoadingEnrollments(true);
+      try {
+        setEnrollments(await listPhaseEnrollments(phaseId));
+        // Inscribir, dar de baja o capturar sucursal/puesto cambia la radiografia de la constancia.
+        refreshCertReadiness(phaseId);
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, 'No se pudieron cargar las inscripciones.'));
+      } finally {
+        setLoadingEnrollments(false);
+      }
+    },
+    [refreshCertReadiness],
+  );
 
   const loadChecklistItems = useCallback(async (phaseId: number) => {
     try {
@@ -153,8 +156,6 @@ export const RhInductionPage = () => {
     setResponsiblePhone(phase.responsible_phone ?? '');
     setDurationHours(phase.duration_hours !== null ? String(phase.duration_hours) : '');
     setReadingLimitHours(phase.reading_time_limit_hours !== null ? String(phase.reading_time_limit_hours) : '');
-    setDocumentCode('');
-    setDocumentPreview(null);
     setExpandedEnrollmentId(null);
     setBulkResult(null);
     setPhasePositions([]);
@@ -188,28 +189,11 @@ export const RhInductionPage = () => {
     }
   };
 
-  const handleLookupDocument = async () => {
-    if (!documentCode.trim()) return;
-    setLookingUp(true);
-    setDocumentPreview(null);
-    try {
-      const found = await lookupDocumentByCode(documentCode.trim());
-      if (!found) {
-        toast.warning('No existe un documento vigente con ese código.');
-      }
-      setDocumentPreview(found);
-    } finally {
-      setLookingUp(false);
-    }
-  };
-
-  const handleAddDocument = async () => {
-    if (!selectedPhase || !documentPreview) return;
+  const handleAddDocument = async (document: DocumentSearchResult) => {
+    if (!selectedPhase) return;
     setSavingDocument(true);
     try {
-      await addPhaseDocument(selectedPhase.id, documentPreview.id);
-      setDocumentCode('');
-      setDocumentPreview(null);
+      await addPhaseDocument(selectedPhase.id, document.id);
       toast.success('Documento agregado a la fase correctamente.');
       await load();
     } catch (error) {
@@ -255,6 +239,7 @@ export const RhInductionPage = () => {
       await updatePhaseDuration(selectedPhase.id, trimmed ? Number(trimmed) : null);
       toast.success('Duración de la fase actualizada correctamente.');
       await load();
+      refreshCertReadiness(selectedPhase.id);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo actualizar la duración.'));
     } finally {
@@ -680,30 +665,16 @@ export const RhInductionPage = () => {
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={documentCode}
-                    onChange={(event) => {
-                      setDocumentCode(event.target.value);
-                      setDocumentPreview(null);
-                    }}
-                    placeholder="Código del documento (ej. REH-INS-001)"
-                    className={inputClass}
+                <div className="mt-2">
+                  <DocumentSearchPicker
+                    excludeIds={selectedPhase.documents.map((document) => document.document_id)}
+                    onPick={handleAddDocument}
+                    placeholder="Buscar documento vigente por código o título..."
                   />
-                  <button type="button" onClick={() => void handleLookupDocument()} disabled={lookingUp} className={buttonClass}>
-                    {lookingUp ? <Loader2 size={14} className="animate-spin" /> : 'Buscar'}
-                  </button>
+                  {savingDocument ? (
+                    <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">Agregando documento a la fase...</p>
+                  ) : null}
                 </div>
-                {documentPreview ? (
-                  <div className="mt-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    <span>
-                      Encontrado: <strong>{documentPreview.title}</strong>
-                    </span>
-                    <button type="button" onClick={() => void handleAddDocument()} disabled={savingDocument} className="font-semibold underline">
-                      {savingDocument ? 'Agregando...' : 'Agregar a la fase'}
-                    </button>
-                  </div>
-                ) : null}
               </div>
               )}
 

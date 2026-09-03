@@ -144,13 +144,14 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
 
   // Plantilla de constancia del curso (o defaults si no fue disenada).
   const template = await loadCertificateTemplate(context.assignmentId);
-  const referenceCode = template.show_folio
-    ? `CP-${issueDate.getFullYear()}-${String(context.assignmentId).padStart(4, '0')}`
-    : undefined;
-
   // Las fases de Induccion usan el diseno oficial fijo (plantilla PPTX de RH)
   // en vez del motor generico de 4 estilos rotativos.
   const inductionPhase = context.inductionPhase;
+  // Las constancias de Induccion NO llevan folio (decision de RH, 2026-09-03);
+  // el folio opcional de la plantilla aplica solo al motor generico.
+  const referenceCode = template.show_folio
+    ? `CP-${issueDate.getFullYear()}-${String(context.assignmentId).padStart(4, '0')}`
+    : undefined;
   const pdf = inductionPhase
     ? await renderInductionCertificatePdf({
         recipientName: context.employeeName,
@@ -164,7 +165,6 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
         issueDateLong: formatDate(issueDate),
         logoPath: template.logo_path,
         signatures: template.signatures,
-        referenceCode,
       })
     : await renderCertificatePdf({
         recipientName: context.employeeName,

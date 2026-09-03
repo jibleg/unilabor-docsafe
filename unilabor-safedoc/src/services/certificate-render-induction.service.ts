@@ -47,7 +47,6 @@ export interface InductionCertificateRenderInput {
   issueDateLong: string;
   logoPath?: string | null;
   signatures: InductionCertificateSignatureInput[];
-  referenceCode?: string | undefined;
 }
 
 const resolveImagePath = (relativeOrAbsolute: string | null | undefined): string | null => {
@@ -237,14 +236,6 @@ export const renderInductionCertificatePdf = (input: InductionCertificateRenderI
     6.73,
     { font: 'Helvetica-Oblique', size: 7.88, color: COLOR.gray },
   );
-
-  if (input.referenceCode) {
-    doc
-      .fillColor(COLOR.gray)
-      .font('Helvetica')
-      .fontSize(8.25)
-      .text(`Folio: ${input.referenceCode}`, pt(7.55), pt(7.29), { width: pt(2.6), align: 'right' });
-  }
 
   doc.end();
   return done;

@@ -185,6 +185,8 @@ export const buildCertificatePreviewPdf = async (courseId: number): Promise<Buff
   const template = await getCertificateTemplate(courseId);
   const now = new Date();
   const sampleDate = now.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+  const inductionPhase = await getInductionPhaseByCourseId(course.id);
+  // Solo el motor generico lleva folio; la constancia de Induccion no (RH, 2026-09-03).
   const referenceCode = template.show_folio ? `CP-${now.getFullYear()}-${String(course.id).padStart(4, '0')}` : undefined;
   const signatures = template.signatures.map((signature) => ({
     name: signature.signatory_name,
@@ -192,7 +194,6 @@ export const buildCertificatePreviewPdf = async (courseId: number): Promise<Buff
     imagePath: signature.signature_image_path,
   }));
 
-  const inductionPhase = await getInductionPhaseByCourseId(course.id);
   if (inductionPhase) {
     return renderInductionCertificatePdf({
       recipientName: 'Juan Perez Ramirez',
@@ -206,7 +207,6 @@ export const buildCertificatePreviewPdf = async (courseId: number): Promise<Buff
       issueDateLong: sampleDate,
       logoPath: template.logo_path,
       signatures,
-      referenceCode,
     });
   }
 
