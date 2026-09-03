@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Briefcase, FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Briefcase, FileText, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import {
   addPositionCompetency,
@@ -52,6 +52,34 @@ export const RhPositionsPage = () => {
   }, [load]);
 
   const selectedPosition = positions.find((position) => position.id === selectedId) ?? null;
+
+  const [positionQuery, setPositionQuery] = useState('');
+
+  const normalize = (value: string) =>
+    value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+  // Listado A-Z con filtro por nombre o código (insensible a acentos).
+  const visiblePositions = useMemo(() => {
+    const query = normalize(positionQuery.trim());
+    return positions
+      .filter(
+        (position) =>
+          !query || normalize(position.name).includes(query) || normalize(position.code).includes(query),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [positions, positionQuery]);
+
+  // Competencias del puesto seleccionado en orden A-Z (pedido del usuario;
+  // el orden del manual sigue guardado en sort_order por si se quiere volver).
+  const sortedCompetencies = useMemo(
+    () =>
+      selectedPosition
+        ? [...selectedPosition.competencies].sort((a, b) =>
+            a.competency_text.localeCompare(b.competency_text, 'es'),
+          )
+        : [],
+    [selectedPosition],
+  );
 
   const handleCreatePosition = async () => {
     if (!newCode.trim() || !newName.trim()) {
@@ -170,15 +198,25 @@ export const RhPositionsPage = () => {
             </button>
           </div>
 
+          <div className="relative mb-3">
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" />
+            <input
+              value={positionQuery}
+              onChange={(event) => setPositionQuery(event.target.value)}
+              placeholder="Buscar puesto por nombre o código..."
+              className={`${inputClass} pl-9`}
+            />
+          </div>
+
           {loading ? (
             <p className="text-sm text-[var(--unilabor-neutral)]">Cargando...</p>
-          ) : positions.length === 0 ? (
+          ) : visiblePositions.length === 0 ? (
             <p className="rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] p-4 text-sm text-[var(--unilabor-neutral)]">
-              Sin puestos registrados todavía.
+              {positions.length === 0 ? 'Sin puestos registrados todavía.' : 'Ningún puesto coincide con la búsqueda.'}
             </p>
           ) : (
             <div className="space-y-2">
-              {positions.map((position) => (
+              {visiblePositions.map((position) => (
                 <div
                   key={position.id}
                   className={`flex items-center justify-between rounded-xl border px-3 py-2 transition ${
@@ -221,7 +259,7 @@ export const RhPositionsPage = () => {
                   Competencias técnicas ({selectedPosition.competencies.length})
                 </h3>
                 <div className="space-y-1.5">
-                  {selectedPosition.competencies.map((competency) => (
+                  {sortedCompetencies.map((competency) => (
                     <div
                       key={competency.id}
                       className="flex items-center justify-between gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
