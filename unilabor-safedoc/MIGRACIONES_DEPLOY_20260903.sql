@@ -1,8 +1,568 @@
--- MIGRACIONES_DEPLOY_20260903.sql — aplicar por pgAdmin en prod (sgc.unilabor-app.com)
--- Consolida 20260831_01..07 + 20260902_01..03 en UNA transaccion y las registra en
--- schema_migrations con el checksum del runner (sha256 del contenido crudo).
--- Idempotencia: si una ya estuviera aplicada, abortara y hara ROLLBACK completo.
+-- MIGRACIONES_DEPLOY_20260903.sql (v2) — aplicar por pgAdmin en prod (sgc.unilabor-app.com)
+-- Consolida 20260828_01..07 + 20260831_01..07 + 20260902_01..03 en UNA transaccion y las
+-- registra en schema_migrations con el checksum del runner (sha256 del contenido crudo).
+-- PRE-CHEQUEO (ejecutar aparte ANTES): la ultima aplicada en prod debe ser 20260825_02:
+--   SELECT filename FROM public.schema_migrations ORDER BY filename DESC LIMIT 3;
+-- Si una ya estuviera aplicada, el INSERT o el DDL abortara y hara ROLLBACK completo.
 BEGIN;
+
+-- ============ 20260828_01_rh_induction_positions.sql ============
+-- =============================================================================
+-- RH - Induccion por puesto (ISO 15189:2022 6.2): Bloque 0, catalogo de puestos
+--
+-- Base para el modulo de induccion (7 fases, REH-MAN-002): catalogo minimo de
+-- puesto/categoria (nombre + documentos obligatorios + competencias tecnicas,
+-- SIN replicar la ficha completa de REH-MAN-001) y la relacion real
+-- colaborador<->puesto, que es M:N (un colaborador puede tener 2+ puestos
+-- activos a la vez). `employees.position` (texto libre) NO se toca: sigue
+-- mostrandose donde ya se muestra, solo deja de ser el insumo de induccion.
+--
+-- 100% ADITIVA: 4 tablas nuevas + 1 columna NULL-able en `documents` + 2
+-- permisos + otorgamiento a roles RH existentes. No modifica ninguna tabla
+-- existente salvo el ADD COLUMN aditivo.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1. Catalogo de puestos/categorias
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_positions (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_rh_positions_code
+  ON public.rh_positions (UPPER(code));
+
+CREATE INDEX IF NOT EXISTS idx_rh_positions_active
+  ON public.rh_positions (is_active);
+
+-- ---------------------------------------------------------------------------
+-- 2. Competencias tecnicas del puesto (alimenta la seleccion aleatoria de
+--    Fase 7 / REH-REG-003, columna COMPETENCIA)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_position_competencies (
+  id BIGSERIAL PRIMARY KEY,
+  position_id BIGINT NOT NULL REFERENCES public.rh_positions(id) ON DELETE CASCADE,
+  competency_text TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rh_position_competencies_position
+  ON public.rh_position_competencies (position_id);
+
+-- ---------------------------------------------------------------------------
+-- 3. Documentos obligatorios del puesto (Fase 5: "los documentos de la
+--    categoria son los documentos del puesto que debe si o si leer")
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_position_documents (
+  id BIGSERIAL PRIMARY KEY,
+  position_id BIGINT NOT NULL REFERENCES public.rh_positions(id) ON DELETE CASCADE,
+  document_id UUID NOT NULL REFERENCES public.documents(id) ON DELETE RESTRICT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_rh_position_documents
+  ON public.rh_position_documents (position_id, document_id);
+
+-- ---------------------------------------------------------------------------
+-- 4. Colaborador <-> puesto (M:N real, decision confirmada por el usuario)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_employee_positions (
+  id BIGSERIAL PRIMARY KEY,
+  employee_id BIGINT NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
+  position_id BIGINT NOT NULL REFERENCES public.rh_positions(id) ON DELETE RESTRICT,
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  ended_at TIMESTAMPTZ NULL,
+  assigned_by_user_id UUID NULL REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT chk_rh_employee_positions_ended
+    CHECK (is_active OR ended_at IS NOT NULL)
+);
+
+-- A lo sumo un puesto ACTIVO por (colaborador, puesto) — evita duplicar el
+-- mismo puesto dos veces vigente, sin impedir que se reasigne tras terminarlo.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_rh_employee_positions_active
+  ON public.rh_employee_positions (employee_id, position_id)
+  WHERE is_active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_rh_employee_positions_employee
+  ON public.rh_employee_positions (employee_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_employee_positions_position
+  ON public.rh_employee_positions (position_id);
+
+-- ---------------------------------------------------------------------------
+-- 5. Codigo de documento SGC (ej. "REH-INS-001"), columna NULL-able en
+--    `documents`. Sin unicidad forzada: versiones historicas superseded
+--    podrian compartir codigo con la vigente. Se etiqueta manualmente desde
+--    la UI de Calidad al implementar (sin importador automatico).
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.documents
+  ADD COLUMN IF NOT EXISTS code TEXT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_documents_code
+  ON public.documents (UPPER(code))
+  WHERE code IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- 6. RBAC
+-- ---------------------------------------------------------------------------
+INSERT INTO public.permissions (code, module_id, resource, action, description)
+SELECT
+  src.code,
+  m.id,
+  split_part(src.code, '.', 2),
+  split_part(src.code, '.', 3),
+  src.description
+FROM (
+  VALUES
+    ('RH.INDUCTION.MANAGE', 'RH',
+     'Administrar puestos, competencias, documentos por puesto e inducciones de colaboradores'),
+    ('RH.SELF.INDUCTION',   'RH',
+     'Ver mi propio progreso de induccion por puesto')
+) AS src(code, module_code, description)
+INNER JOIN public.modules m ON UPPER(m.code) = src.module_code
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.permissions p WHERE UPPER(p.code) = UPPER(src.code)
+);
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM (
+  VALUES
+    ('RH_VIEWER', 'RH.SELF.INDUCTION'),
+    ('RH_EDITOR', 'RH.INDUCTION.MANAGE'),
+    ('RH_EDITOR', 'RH.SELF.INDUCTION'),
+    ('RH_ADMIN',  'RH.INDUCTION.MANAGE'),
+    ('RH_ADMIN',  'RH.SELF.INDUCTION')
+) AS src(role_code, permission_code)
+INNER JOIN public.roles r ON UPPER(r.code) = src.role_code
+INNER JOIN public.permissions p ON UPPER(p.code) = src.permission_code
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+
+-- =============================================================================
+-- Verificacion (ejecutar aparte tras el COMMIT):
+--   SELECT to_regclass('public.rh_positions'), to_regclass('public.rh_position_competencies'),
+--          to_regclass('public.rh_position_documents'), to_regclass('public.rh_employee_positions');
+--   SELECT column_name FROM information_schema.columns WHERE table_name='documents' AND column_name='code';
+--   SELECT code FROM public.permissions WHERE code LIKE 'RH.INDUCTION%' OR code = 'RH.SELF.INDUCTION';
+-- =============================================================================
+INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20260828_01_rh_induction_positions.sql', '1def71318a46da206289d5f77a4e9db4a186da9c602f9b61d789a881b5d257d5');
+
+-- ============ 20260828_02_rh_induction_phases.sql ============
+-- =============================================================================
+-- RH - Induccion por puesto (ISO 15189:2022 6.2): Bloque 1, Fases 1-4
+-- (institucionales, iguales para todo colaborador)
+--
+-- Cada fase institucional se modela como una fila de `training_courses`: reusa
+-- integro el motor de Evaluaciones (plantilla con passing_score=80, asignacion,
+-- calificacion) y el de constancias (certificate_templates con N firmantes,
+-- archivo automatico en expediente) sin tocarles una linea. Lo unico nuevo es
+-- la capa de induccion: que fase le toca a cada colaborador, que documentos
+-- del SGC debe leer antes de poder presentar la evaluacion de esa fase, y el
+-- amarre a los acuses reales de Sala de Lectura (quality_reading_acknowledgements)
+-- que ya traen el gate anti-fraude de lectura resuelto.
+--
+-- 100% ADITIVA: 4 tablas nuevas + siembra de catalogo fijo (7 fases) + 4
+-- `training_courses` (Fases 1-4). No modifica ninguna tabla existente.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1. Catalogo fijo de las 7 fases (REH-MAN-002 §6.2.2.6 a 6.2.2.13)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_induction_phases (
+  id BIGSERIAL PRIMARY KEY,
+  phase_number INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  responsible_label TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  -- Solo se llena para fases INSTITUTIONAL (1-4): una unica training_course
+  -- para todos. Las fases POSITION (5-7) se resuelven por puesto en
+  -- `rh_induction_phase_positions` (bloque futuro), aqui queda NULL.
+  training_course_id BIGINT NULL REFERENCES public.training_courses(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT chk_rh_induction_phases_number CHECK (phase_number BETWEEN 1 AND 7),
+  CONSTRAINT chk_rh_induction_phases_scope CHECK (scope IN ('INSTITUTIONAL', 'POSITION'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_rh_induction_phases_number
+  ON public.rh_induction_phases (phase_number);
+
+-- ---------------------------------------------------------------------------
+-- 2. Documentos obligatorios por fase institucional (los 16 documentos que
+--    diste, mapeados tema por tema; se enlazan por codigo desde el backend
+--    una vez que `documents.code` este poblado — ver Bloque 0)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_induction_phase_documents (
+  id BIGSERIAL PRIMARY KEY,
+  phase_id BIGINT NOT NULL REFERENCES public.rh_induction_phases(id) ON DELETE CASCADE,
+  document_id UUID NOT NULL REFERENCES public.documents(id) ON DELETE RESTRICT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_rh_induction_phase_documents
+  ON public.rh_induction_phase_documents (phase_id, document_id);
+
+-- ---------------------------------------------------------------------------
+-- 3. Inscripcion de un colaborador en una fase
+--
+-- El estado real de la evaluacion vive en `evaluation_assignments` (no se
+-- duplica aqui): `evaluation_assignment_id` se llena solo cuando la lectura
+-- se completa. Antes de eso, "en que va" se deriva de
+-- `reading_completed_at IS NULL` (leyendo) vs no-NULL (ya puede evaluarse).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_induction_enrollments (
+  id BIGSERIAL PRIMARY KEY,
+  employee_id BIGINT NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
+  phase_id BIGINT NOT NULL REFERENCES public.rh_induction_phases(id) ON DELETE RESTRICT,
+  reading_completed_at TIMESTAMPTZ NULL,
+  evaluation_assignment_id BIGINT NULL REFERENCES public.evaluation_assignments(id) ON DELETE SET NULL,
+  enrolled_by_user_id UUID NULL REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Un colaborador solo se inscribe una vez por fase (reintentos de evaluacion
+-- vencida/reprobada se resuelven dentro del propio evaluation_assignments,
+-- que ya soporta reintento — no se crea otra inscripcion).
+CREATE UNIQUE INDEX IF NOT EXISTS ux_rh_induction_enrollments
+  ON public.rh_induction_enrollments (employee_id, phase_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_induction_enrollments_employee
+  ON public.rh_induction_enrollments (employee_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_induction_enrollments_phase
+  ON public.rh_induction_enrollments (phase_id);
+
+-- ---------------------------------------------------------------------------
+-- 4. Documento por documento, el acuse real de Sala de Lectura ligado a esta
+--    inscripcion. `acknowledgement_id` es la fuente de verdad de si ya se leyo
+--    y firmo (se consulta en vivo contra quality_reading_acknowledgements.status,
+--    nunca se duplica aqui).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_induction_reading_items (
+  id BIGSERIAL PRIMARY KEY,
+  enrollment_id BIGINT NOT NULL REFERENCES public.rh_induction_enrollments(id) ON DELETE CASCADE,
+  document_id UUID NOT NULL REFERENCES public.documents(id) ON DELETE RESTRICT,
+  acknowledgement_id BIGINT NULL REFERENCES public.quality_reading_acknowledgements(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_rh_induction_reading_items
+  ON public.rh_induction_reading_items (enrollment_id, document_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_induction_reading_items_enrollment
+  ON public.rh_induction_reading_items (enrollment_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_induction_reading_items_ack
+  ON public.rh_induction_reading_items (acknowledgement_id);
+
+-- ---------------------------------------------------------------------------
+-- 5. Siembra: 4 training_courses (Fases 1-4), certificado sin vencimiento (es
+--    autorizacion, no capacitacion recurrente) — RH autora el cuestionario y
+--    configura las 3 firmas (Director General/RH/Responsable de fase) desde
+--    la UI YA EXISTENTE de Evaluaciones, sin pantallas nuevas para esto.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.training_courses (code, title, description, certificate_validity_months)
+SELECT src.code, src.title, src.description, 0
+FROM (
+  VALUES
+    ('INDUCCION-FASE-1', 'Fase 1 - Bienvenida e induccion institucional',
+     'Reglamento interno, codigo de conducta, confidencialidad, principios eticos e imparcialidad.'),
+    ('INDUCCION-FASE-2', 'Fase 2 - Induccion al Sistema de Gestion de Calidad',
+     'Manual de Calidad, control de documentos/registros, gestion de riesgos, no conformidades y trabajo no conforme.'),
+    ('INDUCCION-FASE-3', 'Fase 3 - Salud y bioseguridad',
+     'Seguridad e higiene y manejo de Residuos Peligrosos Biologico-Infecciosos (RPBI).'),
+    ('INDUCCION-FASE-4', 'Fase 4 - Sistema informatico del laboratorio',
+     'Control de datos y gestion de la informacion del SIL.')
+) AS src(code, title, description)
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.training_courses existing WHERE existing.code = src.code
+);
+
+-- ---------------------------------------------------------------------------
+-- 6. Siembra: catalogo fijo de las 7 fases, ligando las institucionales (1-4)
+--    a la training_course recien sembrada.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.rh_induction_phases (phase_number, name, responsible_label, scope, training_course_id)
+SELECT src.phase_number, src.name, src.responsible_label, src.scope, tc.id
+FROM (
+  VALUES
+    (1, 'Bienvenida e induccion institucional', 'Coordinacion de RH',      'INSTITUTIONAL', 'INDUCCION-FASE-1'),
+    (2, 'Induccion al SGC',                     'Coordinacion de Calidad', 'INSTITUTIONAL', 'INDUCCION-FASE-2'),
+    (3, 'Salud y bioseguridad',                 'Supervision de Bioseguridad', 'INSTITUTIONAL', 'INDUCCION-FASE-3'),
+    (4, 'Sistema informatico del laboratorio',  'Coordinacion SIL',        'INSTITUTIONAL', 'INDUCCION-FASE-4'),
+    (5, 'Induccion tecnica por area/puesto',    'Coordinador de area',     'POSITION', NULL),
+    (6, 'Capacitacion practica supervisada',    'Coordinador de area',     'POSITION', NULL),
+    (7, 'Evaluacion de competencia inicial',    'Coordinador de area',     'POSITION', NULL)
+) AS src(phase_number, name, responsible_label, scope, training_course_code)
+LEFT JOIN public.training_courses tc ON tc.code = src.training_course_code
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.rh_induction_phases existing WHERE existing.phase_number = src.phase_number
+);
+
+
+-- =============================================================================
+-- Verificacion (ejecutar aparte tras el COMMIT):
+--   SELECT phase_number, name, scope, training_course_id FROM public.rh_induction_phases ORDER BY phase_number;
+--   SELECT code, title FROM public.training_courses WHERE code LIKE 'INDUCCION-FASE-%' ORDER BY code;
+--   SELECT to_regclass('public.rh_induction_phase_documents'), to_regclass('public.rh_induction_enrollments'),
+--          to_regclass('public.rh_induction_reading_items');
+-- =============================================================================
+INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20260828_02_rh_induction_phases.sql', '76a2ccdf681b61baf57b8a292196a1156a3d26dcdd67dc1d062722f756e70295');
+
+-- ============ 20260828_03_notification_log_whatsapp_channel.sql ============
+-- =============================================================================
+-- Agrega 'whatsapp' como canal valido de notification_log (integracion Whapi
+-- Cloud, usada primero por el modulo de induccion para avisar al responsable
+-- de fase). 100% ADITIVA: solo amplia el CHECK existente, no borra datos.
+-- =============================================================================
+
+ALTER TABLE public.notification_log
+  DROP CONSTRAINT IF EXISTS chk_notification_channel;
+
+ALTER TABLE public.notification_log
+  ADD CONSTRAINT chk_notification_channel CHECK (channel IN ('email', 'sms', 'whatsapp'));
+
+
+-- =============================================================================
+-- Verificacion (ejecutar aparte tras el COMMIT):
+--   SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint
+--     WHERE conname = 'chk_notification_channel';
+-- =============================================================================
+INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20260828_03_notification_log_whatsapp_channel.sql', 'd3cef1043fd61ac6cd0e63806210704bf2548175fde77007daac201101fee5a5');
+
+-- ============ 20260828_04_rh_induction_phase_contact.sql ============
+-- =============================================================================
+-- Contacto del responsable de fase (nombre + telefono), para poder avisarle
+-- por WhatsApp (Whapi Cloud) cuando un colaborador queda listo para su
+-- evaluacion. RH lo captura manualmente por fase (arranca vacio/NULL, no
+-- bloquea nada si no se configura: la notificacion simplemente se omite).
+-- 100% ADITIVA.
+-- =============================================================================
+
+ALTER TABLE public.rh_induction_phases
+  ADD COLUMN IF NOT EXISTS responsible_name TEXT NULL,
+  ADD COLUMN IF NOT EXISTS responsible_phone TEXT NULL;
+
+
+-- =============================================================================
+-- Verificacion (ejecutar aparte tras el COMMIT):
+--   SELECT column_name FROM information_schema.columns
+--     WHERE table_name = 'rh_induction_phases' AND column_name IN ('responsible_name', 'responsible_phone');
+-- =============================================================================
+INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20260828_04_rh_induction_phase_contact.sql', 'f759aee1b4430391b571740ed5605f5b3258f3d0361e77264d399e722d290259');
+
+-- ============ 20260828_05_certificate_templates_optional_folio.sql ============
+-- =============================================================================
+-- Constancias: el folio se vuelve opcional por plantilla (decision del usuario
+-- para el modulo de Induccion, donde la constancia se identifica solo por el
+-- nombre del colaborador, sin codigo). Default TRUE: ninguna capacitacion
+-- existente cambia de comportamiento salvo que alguien lo desactive a proposito.
+-- 100% ADITIVA.
+-- =============================================================================
+
+ALTER TABLE public.certificate_templates
+  ADD COLUMN IF NOT EXISTS show_folio BOOLEAN NOT NULL DEFAULT TRUE;
+
+
+-- =============================================================================
+-- Verificacion (ejecutar aparte tras el COMMIT):
+--   SELECT column_name, column_default FROM information_schema.columns
+--     WHERE table_name = 'certificate_templates' AND column_name = 'show_folio';
+-- =============================================================================
+INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20260828_05_certificate_templates_optional_folio.sql', '1fb0e9798bf46599a636b525cd08c745a5e839615b61be94c79bf3f8d358a4f3');
+
+-- ============ 20260828_06_quality_viewer_backfill.sql ============
+-- =============================================================================
+-- Otorga QUALITY_VIEWER a todo colaborador con usuario vinculado que hoy no
+-- tenga ningun rol del modulo QUALITY. Es el minimo necesario para poder leer
+-- y firmar en Sala de Lectura (permiso QUALITY.SELF.READING), requisito real
+-- para el modulo de Induccion (Bloque 1). NO toca a quien ya tiene
+-- QUALITY_ADMIN/EDITOR/VIEWER/READER/READING_MANAGER (no se degrada ni
+-- duplica acceso). 100% ADITIVA, idempotente (ON CONFLICT DO NOTHING).
+-- =============================================================================
+
+INSERT INTO public.user_roles (user_id, role_id, is_active)
+SELECT DISTINCT e.user_id, r.id, TRUE
+FROM public.employees e
+INNER JOIN public.roles r ON UPPER(r.code) = 'QUALITY_VIEWER'
+WHERE e.user_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.user_roles ur
+    INNER JOIN public.roles existing_role ON existing_role.id = ur.role_id
+    WHERE ur.user_id = e.user_id
+      AND ur.is_active = TRUE
+      AND existing_role.module_id = r.module_id
+  )
+ON CONFLICT (user_id, role_id) DO NOTHING;
+
+
+-- =============================================================================
+-- Verificacion (ejecutar aparte tras el COMMIT):
+--   SELECT COUNT(DISTINCT e.id) FROM employees e WHERE e.user_id IS NOT NULL; -- total vinculados
+--   SELECT COUNT(DISTINCT e.id) FROM employees e
+--     INNER JOIN user_roles ur ON ur.user_id = e.user_id AND ur.is_active = TRUE
+--     INNER JOIN roles r ON r.id = ur.role_id
+--     WHERE e.user_id IS NOT NULL AND r.module_id = (SELECT id FROM modules WHERE code = 'QUALITY');
+--     -- debe ser igual al total vinculados
+-- =============================================================================
+INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20260828_06_quality_viewer_backfill.sql', 'f9435aee02bccc28c2004c6f978f84d99e81b79a7e39c203b7c870376b3d9016');
+
+-- ============ 20260828_07_rh_induction_master_record.sql ============
+-- =============================================================================
+-- RH - Induccion por puesto: Formato de Induccion consolidado (REH-REG-005)
+--
+-- Agrega, sobre lo ya construido en Bloque 1 (Fases 1-4), las 3 piezas que la
+-- hoja INDUCCION de REH-REG-005 pide y que todavia no existian: checklist de
+-- contenidos por fase, columna SUPERVISOR por inscripcion, y el bloque de
+-- EFICACIA DEL PROGRAMA DE INDUCCION que la ema exige y el manual REH-MAN-002
+-- no contempla. El reporte consolidado en si (que agrega esto + lo que ya
+-- calculan getEmployeeInductionProgress/listPhaseEnrollments) vive en codigo,
+-- no en SQL.
+--
+-- 100% ADITIVA: 2 tablas nuevas + 1 columna nueva en rh_induction_enrollments.
+-- No modifica ninguna otra tabla existente.
+-- =============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1. Catalogo de contenidos por fase ("CONTENIDO DE CADA FASE, marque conforme
+--    se imparta" - hoja INDUCCION filas 35-78 de REH-REG-005). Se siembra
+--    exacto para las Fases 1-4 (las unicas construidas hoy); editable despues
+--    por RH, mismo patron que rh_induction_phase_documents.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_induction_phase_checklist_items (
+  id BIGSERIAL PRIMARY KEY,
+  phase_id BIGINT NOT NULL REFERENCES public.rh_induction_phases(id) ON DELETE CASCADE,
+  item_text TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rh_induction_checklist_items_phase
+  ON public.rh_induction_phase_checklist_items (phase_id);
+
+-- ---------------------------------------------------------------------------
+-- 2. Progreso del checklist por inscripcion (quien lo marco y cuando).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_induction_checklist_progress (
+  id BIGSERIAL PRIMARY KEY,
+  enrollment_id BIGINT NOT NULL REFERENCES public.rh_induction_enrollments(id) ON DELETE CASCADE,
+  checklist_item_id BIGINT NOT NULL REFERENCES public.rh_induction_phase_checklist_items(id) ON DELETE CASCADE,
+  completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_by_user_id UUID NULL REFERENCES public.users(id) ON DELETE SET NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_rh_induction_checklist_progress
+  ON public.rh_induction_checklist_progress (enrollment_id, checklist_item_id);
+
+-- ---------------------------------------------------------------------------
+-- 3. Columna SUPERVISOR de la tabla de 7 fases (la ema exige "personal en
+--    induccion supervisado en todo momento"; el manual solo lo preveia en
+--    Fases 5-6). Campo libre, no obligatorio.
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.rh_induction_enrollments
+  ADD COLUMN IF NOT EXISTS supervisor_employee_id BIGINT NULL REFERENCES public.employees(id) ON DELETE SET NULL;
+
+-- ---------------------------------------------------------------------------
+-- 4. EFICACIA DEL PROGRAMA DE INDUCCION (hoja INDUCCION filas 101-110). La ema
+--    la exige expresamente y el manual no la tiene; RH la captura cuando
+--    corresponde (no hay gate automatico todavia, Fase 7 no existe).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.rh_induction_effectiveness_reviews (
+  id BIGSERIAL PRIMARY KEY,
+  employee_id BIGINT NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
+  review_date DATE NOT NULL,
+  method TEXT NOT NULL,
+  result_percentage NUMERIC(5, 2) NULL,
+  performs_as_expected BOOLEAN NULL,
+  evidence_notes TEXT NULL,
+  reviewed_by_user_id UUID NULL REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_rh_induction_effectiveness_employee
+  ON public.rh_induction_effectiveness_reviews (employee_id);
+
+-- ---------------------------------------------------------------------------
+-- 5. Siembra del checklist de contenidos, exacto de la hoja INDUCCION.
+-- ---------------------------------------------------------------------------
+INSERT INTO public.rh_induction_phase_checklist_items (phase_id, item_text, sort_order)
+SELECT p.id, src.item_text, src.sort_order
+FROM public.rh_induction_phases p
+INNER JOIN (
+  VALUES
+    (1, 'Recepción del colaborador', 1),
+    (1, 'Alta en reloj biométrico', 2),
+    (1, 'Bienvenida formal', 3),
+    (1, 'Presentación del jefe inmediato', 4),
+    (1, 'Presentación del equipo de trabajo', 5),
+    (1, 'Entrega de documentos internos', 6),
+    (1, 'Recorrido por instalaciones', 7),
+    (1, 'Organigrama y líneas de autoridad', 8),
+    (1, 'Normas internas y disciplinarias', 9),
+    (1, 'Código de vestimenta', 10),
+    (1, 'Confidencialidad y aviso de privacidad', 11),
+    (2, 'Historia de UNILABOR®', 1),
+    (2, 'Misión, visión y valores', 2),
+    (2, 'Política de calidad', 3),
+    (2, 'Objetivos de calidad', 4),
+    (2, 'Introducción a la ISO 15189:2022', 5),
+    (2, 'Mapa de procesos', 6),
+    (2, 'Indicadores de calidad', 7),
+    (2, 'Control de documentos', 8),
+    (2, 'Control de registros', 9),
+    (2, 'Gestión de riesgos', 10),
+    (2, 'Trabajo no conforme', 11),
+    (3, 'Identificación de riesgos', 1),
+    (3, 'Uso de equipo de protección personal (EPP)', 2),
+    (3, 'Higiene y control de infecciones', 3),
+    (3, 'Manejo de residuos peligrosos biológico-infecciosos (RPBI)', 4),
+    (3, 'Servicios de salud laboral, manejo de accidentes y emergencias', 5),
+    (4, 'Acceso al sistema LIS', 1),
+    (4, 'Seguridad informática', 2),
+    (4, 'Registro de pacientes', 3),
+    (4, 'Gestión del proceso analítico', 4),
+    (4, 'Validación y liberación de resultados', 5),
+    (4, 'Control de calidad en el sistema', 6),
+    (4, 'Gestión documental y reportes', 7),
+    (4, 'Continuidad operativa', 8),
+    (4, 'Inducción básica al módulo de almacén (inventarios)', 9)
+) AS src(phase_number, item_text, sort_order) ON src.phase_number = p.phase_number
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.rh_induction_phase_checklist_items existing
+   WHERE existing.phase_id = p.id AND existing.item_text = src.item_text
+);
+
+
+-- =============================================================================
+-- Verificacion (ejecutar aparte tras el COMMIT):
+--   SELECT p.phase_number, COUNT(*) FROM public.rh_induction_phase_checklist_items c
+--     INNER JOIN public.rh_induction_phases p ON p.id = c.phase_id
+--    GROUP BY p.phase_number ORDER BY p.phase_number;
+--   -- Esperado: 1=11, 2=11, 3=5, 4=9
+--   SELECT to_regclass('public.rh_induction_checklist_progress'),
+--          to_regclass('public.rh_induction_effectiveness_reviews');
+--   SELECT column_name FROM information_schema.columns
+--    WHERE table_name = 'rh_induction_enrollments' AND column_name = 'supervisor_employee_id';
+-- =============================================================================
+INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20260828_07_rh_induction_master_record.sql', 'a57e6ea031cf0bf03e9d5aa3f2fadc0afafe2eca8a2892631de3bf48dda1a2e3');
 
 -- ============ 20260831_01_rh_question_bank.sql ============
 -- =============================================================================
