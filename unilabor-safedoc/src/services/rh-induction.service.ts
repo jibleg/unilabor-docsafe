@@ -2,7 +2,10 @@ import pool from '../config/db';
 import { withTransaction } from '../utils/transaction';
 import { assignEvaluation } from './evaluation-assignment.service';
 import { assignReaders, getPublicationById, publishReading } from './quality-reading.service';
-import { tryNotifyInductionPhaseReady } from './rh-induction-notification.service';
+import {
+  queueNotifyInductionReadingsAssigned,
+  tryNotifyInductionPhaseReady,
+} from './rh-induction-notification.service';
 
 /**
  * Orquestacion de las Fases 1-4 de induccion (institucionales, iguales para
@@ -381,6 +384,12 @@ export interface RhInductionPhasePublishResult {
   published_at: string;
   /** Inscritos que estaban en espera y recibieron sus lecturas al publicar. */
   readings_assigned: number;
+  /** Inscritos sin lectura terminada cuya fecha limite se fijo desde la publicacion. */
+  deadlines_updated: number;
+  /** Fecha limite resultante (ISO); null si la fase no tiene limite de lectura. */
+  reading_deadline_at: string | null;
+  /** Colaboradores a los que se encolo el aviso por correo + SMS. */
+  notified: number;
 }
 
 /**
@@ -453,47 +462,67 @@ export const publishInductionPhase = async (phaseId: number, userId: string): Pr
     [phaseId, userId],
   );
 
-  // Inscritos en espera (sin lecturas asignadas). La Fase 6 no lleva lectura.
+  // Inscritos sin examen abierto: a los que estaban en espera se les asignan
+  // sus lecturas; a TODOS los que aun no terminan de leer (incluidos los que ya
+  // traian lecturas de antes) se les fija la fecha limite desde este momento y
+  // se les avisa por correo + SMS. La Fase 6 no lleva lectura.
   let readingsAssigned = 0;
+  let deadlinesUpdated = 0;
+  let notified = 0;
+  let readingDeadlineAt: string | null = null;
   if (phaseNumber !== 6) {
     const readingLimitHours = phase.reading_time_limit_hours ? Number(phase.reading_time_limit_hours) : null;
     const phaseDocuments = phaseScope === 'INSTITUTIONAL' ? await getPhaseDocuments(phaseId) : [];
-    const waiting = await pool.query(
-      `SELECT e.id, e.employee_id, emp.user_id
+    const pending = await pool.query(
+      `SELECT e.id, e.employee_id, emp.user_id, e.reading_completed_at,
+              EXISTS (SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id) AS has_readings
          FROM public.rh_induction_enrollments e
          INNER JOIN public.employees emp ON emp.id = e.employee_id
-        WHERE e.phase_id = $1
-          AND e.evaluation_assignment_id IS NULL
-          AND NOT EXISTS (SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id)
+        WHERE e.phase_id = $1 AND e.evaluation_assignment_id IS NULL
         ORDER BY e.id ASC;`,
       [phaseId],
     );
-    for (const row of waiting.rows) {
-      if (!row.user_id) {
-        continue;
+    for (const row of pending.rows) {
+      const enrollmentId = Number(row.id);
+      if (!row.has_readings) {
+        if (!row.user_id) {
+          continue;
+        }
+        const documents =
+          phaseScope === 'INSTITUTIONAL' ? phaseDocuments : await getEmployeePositionDocuments(Number(row.employee_id));
+        if (documents.length === 0) {
+          continue;
+        }
+        await assignEnrollmentReadings(enrollmentId, String(row.user_id), documents, userId);
+        readingsAssigned += 1;
       }
-      const documents =
-        phaseScope === 'INSTITUTIONAL' ? phaseDocuments : await getEmployeePositionDocuments(Number(row.employee_id));
-      if (documents.length === 0) {
-        continue;
-      }
-      await assignEnrollmentReadings(Number(row.id), String(row.user_id), documents, userId);
-      if (readingLimitHours) {
-        await pool.query(
+      if (!row.reading_completed_at) {
+        const deadlineResult = await pool.query(
           `UPDATE public.rh_induction_enrollments
-              SET reading_deadline_at = NOW() + make_interval(hours => $2::int), updated_at = NOW()
-            WHERE id = $1;`,
-          [Number(row.id), readingLimitHours],
+              SET reading_deadline_at = CASE WHEN $2::int IS NULL THEN NULL ELSE NOW() + make_interval(hours => $2::int) END,
+                  updated_at = NOW()
+            WHERE id = $1
+            RETURNING reading_deadline_at;`,
+          [enrollmentId, readingLimitHours],
         );
+        deadlinesUpdated += 1;
+        const deadline = deadlineResult.rows[0]?.reading_deadline_at;
+        if (deadline && !readingDeadlineAt) {
+          readingDeadlineAt = new Date(deadline).toISOString();
+        }
+        queueNotifyInductionReadingsAssigned(enrollmentId);
+        notified += 1;
       }
-      await refreshEnrollmentReadingStatus(Number(row.id));
-      readingsAssigned += 1;
+      await refreshEnrollmentReadingStatus(enrollmentId);
     }
   }
 
   return {
     published_at: new Date(updated.rows[0].published_at).toISOString(),
     readings_assigned: readingsAssigned,
+    deadlines_updated: deadlinesUpdated,
+    reading_deadline_at: readingDeadlineAt,
+    notified,
   };
 };
 
@@ -757,6 +786,10 @@ export const enrollEmployeeInPhase = async (
 
   if (phasePublished) {
     await assignEnrollmentReadings(enrollmentId, employeeUserId, documents, userId);
+    if (documents.length > 0) {
+      // Aviso al colaborador (correo + SMS) con sus documentos y fecha limite.
+      queueNotifyInductionReadingsAssigned(enrollmentId);
+    }
   }
 
   await refreshEnrollmentReadingStatus(enrollmentId);

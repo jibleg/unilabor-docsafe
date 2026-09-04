@@ -45,14 +45,33 @@ export const getPhaseCertificateReadiness = async (phaseId: number): Promise<RhI
   return data?.readiness as RhInductionCertificateReadiness;
 };
 
-export const updatePhaseReadingLimit = async (phaseId: number, readingLimitHours: number | null): Promise<void> => {
-  await api.patch(`/rh/induction/phases/${phaseId}/reading-limit`, { reading_time_limit_hours: readingLimitHours });
+export interface RhInductionReadingLimitUpdateResult {
+  message: string;
+  reading_time_limit_hours: number | null;
+  phase_published: boolean;
+  /** Inscritos sin examen abierto cuya fecha límite se recalculó (0 si no se pidió o la fase está en borrador). */
+  enrollments_updated: number;
+}
+
+export const updatePhaseReadingLimit = async (
+  phaseId: number,
+  readingLimitHours: number | null,
+  applyToEnrolled: boolean,
+): Promise<RhInductionReadingLimitUpdateResult> => {
+  const response = await api.patch(`/rh/induction/phases/${phaseId}/reading-limit`, {
+    reading_time_limit_hours: readingLimitHours,
+    apply_to_enrolled: applyToEnrolled,
+  });
+  return response.data as RhInductionReadingLimitUpdateResult;
 };
 
 export interface RhInductionPhasePublishResult {
   message: string;
   published_at: string;
   readings_assigned: number;
+  deadlines_updated: number;
+  reading_deadline_at: string | null;
+  notified: number;
 }
 
 export const publishInductionPhase = async (phaseId: number): Promise<RhInductionPhasePublishResult> => {

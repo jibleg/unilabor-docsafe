@@ -72,6 +72,8 @@ export const RhInductionPage = () => {
   const [durationHours, setDurationHours] = useState('');
   const [savingDuration, setSavingDuration] = useState(false);
   const [readingLimitHours, setReadingLimitHours] = useState('');
+  // Fase publicada: al guardar el limite, ¿recalcular tambien a los inscritos que aun leen?
+  const [applyLimitToEnrolled, setApplyLimitToEnrolled] = useState(true);
   const [savingReadingLimit, setSavingReadingLimit] = useState(false);
   const [certReadiness, setCertReadiness] = useState<RhInductionCertificateReadiness | null>(null);
   const [certDataTarget, setCertDataTarget] = useState<RhInductionPhaseEnrollmentSummary | null>(null);
@@ -128,6 +130,11 @@ export const RhInductionPage = () => {
   }, [load]);
 
   const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? null;
+  // Inscritos que aun no terminan la lectura ni tienen examen abierto: son a
+  // quienes les afecta la fecha limite (al publicar o al cambiar las horas).
+  const pendingReaders = enrollments.filter((item) => !item.evaluation_status && !item.reading_completed_at);
+  const formatDeadline = (value: Date): string =>
+    value.toLocaleString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   const loadEnrollments = useCallback(
     async (phaseId: number) => {
@@ -233,10 +240,21 @@ export const RhInductionPage = () => {
   const handleTogglePublish = async () => {
     if (!selectedPhase) return;
     const publishing = !selectedPhase.published_at;
+    const limitHours = selectedPhase.reading_time_limit_hours;
+    const publishDescription = [
+      'Los inscritos verán los documentos en Sala de Lectura y recibirán un aviso por correo y SMS.',
+      limitHours
+        ? `Fecha límite de lectura resultante: ${formatDeadline(new Date(Date.now() + limitHours * 3_600_000))} (${limitHours} h corridas desde ahora, incluye fines de semana). Si quieres otra fecha, cancela y ajusta primero "Límite de lectura (horas)".`
+        : 'Sin límite de lectura: el cuestionario se abre solo cuando el colaborador termina de leer y firmar.',
+      pendingReaders.length > 0
+        ? `Aplica a ${pendingReaders.length} inscrito(s) pendiente(s) de lectura.`
+        : 'Todavía no hay inscritos pendientes de lectura.',
+      'Requiere documentos y cuestionario publicado.',
+    ].join(' ');
     const confirmed = await confirmAction(
       publishing ? `Publicar la Fase ${selectedPhase.phase_number}` : `Regresar la Fase ${selectedPhase.phase_number} a borrador`,
       publishing
-        ? 'Los inscritos verán los documentos en Sala de Lectura y, si la fase tiene límite de lectura, empezará a correr desde ahora. Requiere documentos y cuestionario publicado.'
+        ? publishDescription
         : 'Los documentos dejarán de verse en Sala de Lectura y se retirarán las lecturas pendientes. Solo es posible si nadie ha empezado a leer ni tiene evaluación.',
       publishing ? 'Publicar fase' : 'Regresar a borrador',
       publishing ? 'primary' : 'danger',
@@ -287,11 +305,27 @@ export const RhInductionPage = () => {
       toast.warning('El límite de lectura debe ser un número de horas mayor a 0.');
       return;
     }
+    const applyToEnrolled = Boolean(selectedPhase.published_at) && applyLimitToEnrolled && pendingReaders.length > 0;
+    if (applyToEnrolled) {
+      const hours = trimmed ? Number(trimmed) : null;
+      const confirmed = await confirmAction(
+        'Aplicar el límite a los inscritos',
+        hours
+          ? `Se recalculará la fecha límite de ${pendingReaders.length} inscrito(s) que aún no terminan la lectura: ${hours} h corridas desde que arrancó su lectura (la publicación de la fase o su inscripción, lo que haya sido después). Si el nuevo plazo ya venció, su cuestionario se abre de inmediato.`
+          : `Se quitará la fecha límite a ${pendingReaders.length} inscrito(s) que aún no terminan la lectura: su cuestionario se abrirá solo al terminar de leer.`,
+        'Guardar y aplicar',
+        'primary',
+      );
+      if (!confirmed) return;
+    }
     setSavingReadingLimit(true);
     try {
-      await updatePhaseReadingLimit(selectedPhase.id, trimmed ? Number(trimmed) : null);
-      toast.success('Límite de lectura actualizado correctamente (aplica a inscripciones nuevas).');
+      const result = await updatePhaseReadingLimit(selectedPhase.id, trimmed ? Number(trimmed) : null, applyToEnrolled);
+      toast.success(result.message || 'Límite de lectura actualizado correctamente.');
       await load();
+      if (applyToEnrolled) {
+        await loadEnrollments(selectedPhase.id);
+      }
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo actualizar el límite de lectura.'));
     } finally {
@@ -576,9 +610,11 @@ export const RhInductionPage = () => {
                     Límite de lectura (horas)
                   </h3>
                   <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
-                    Tiempo que tiene el colaborador para leer y firmar los documentos desde que se inscribe. Al
-                    vencer (o al terminar antes la lectura) se abre el cuestionario de la fase. Vacío = sin límite.
-                    Aplica a inscripciones nuevas.
+                    Horas corridas (incluyen fines de semana) que tiene el colaborador para leer y firmar los
+                    documentos desde que recibe sus lecturas: al publicar la fase o al inscribirlo si ya está
+                    publicada. Al vencer (o al terminar antes la lectura) se abre el cuestionario de la fase.
+                    Vacío = sin límite. La fecha de cada inscrito se fija en ese momento y no cambia sola al
+                    editar este campo.
                   </p>
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                     <input
@@ -593,6 +629,21 @@ export const RhInductionPage = () => {
                       {savingReadingLimit ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
                     </button>
                   </div>
+                  {selectedPhase.published_at && pendingReaders.length > 0 ? (
+                    <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-[var(--unilabor-neutral)]">
+                      <input
+                        type="checkbox"
+                        checked={applyLimitToEnrolled}
+                        onChange={(event) => setApplyLimitToEnrolled(event.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        Aplicar también a los {pendingReaders.length} inscrito(s) que aún no terminan la lectura
+                        (recalcula su fecha límite desde que recibieron sus lecturas). Sin marcar, solo aplica a
+                        inscripciones nuevas.
+                      </span>
+                    </label>
+                  ) : null}
                 </div>
               ) : null}
 

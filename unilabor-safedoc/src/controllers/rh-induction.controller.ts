@@ -32,6 +32,8 @@ import {
   getCurrentInductionClosureForPdf,
 } from '../services/rh-induction-closure.service';
 import { registerAuditEvent } from '../services/audit.service';
+import { updatePhaseReadingLimit } from '../services/rh-induction-reading-limit.service';
+import { formatInductionDeadline } from '../services/rh-induction-notification.service';
 
 const parsePositiveInt = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -280,13 +282,21 @@ export const publishPhaseController = async (req: AuthRequest, res: Response) =>
   }
   try {
     const result = await publishInductionPhase(phaseId, req.user?.id ?? '');
-    return res.json({
-      message:
-        result.readings_assigned > 0
-          ? `Fase publicada. Se asignaron las lecturas a ${result.readings_assigned} inscrito(s) en espera.`
-          : 'Fase publicada.',
-      ...result,
-    });
+    const parts = ['Fase publicada.'];
+    if (result.readings_assigned > 0) {
+      parts.push(`Se asignaron las lecturas a ${result.readings_assigned} inscrito(s) en espera.`);
+    }
+    if (result.deadlines_updated > 0) {
+      parts.push(
+        result.reading_deadline_at
+          ? `Fecha limite de lectura: ${formatInductionDeadline(result.reading_deadline_at)} para ${result.deadlines_updated} inscrito(s).`
+          : `${result.deadlines_updated} inscrito(s) sin limite de lectura.`,
+      );
+    }
+    if (result.notified > 0) {
+      parts.push(`Se esta avisando por correo y SMS a ${result.notified} colaborador(es).`);
+    }
+    return res.json({ message: parts.join(' '), ...result });
   } catch (error: any) {
     const mapped = mapError(res, error);
     if (mapped) return mapped;
@@ -365,22 +375,22 @@ export const updatePhaseReadingLimitController = async (req: AuthRequest, res: R
   }
   const raw = req.body?.reading_time_limit_hours;
   const readingLimitHours = raw === null || raw === undefined || raw === '' ? null : Number(raw);
-  if (readingLimitHours !== null && (!Number.isFinite(readingLimitHours) || readingLimitHours <= 0)) {
-    return res.status(400).json({ message: 'El limite de lectura debe ser un numero de horas mayor a 0.' });
+  if (readingLimitHours !== null && (!Number.isInteger(readingLimitHours) || readingLimitHours <= 0)) {
+    return res.status(400).json({ message: 'El limite de lectura debe ser un numero entero de horas mayor a 0.' });
   }
+  const applyToEnrolled = req.body?.apply_to_enrolled === true;
   try {
-    const result = await pool.query(
-      `UPDATE public.rh_induction_phases
-          SET reading_time_limit_hours = $1, updated_at = NOW()
-        WHERE id = $2
-        RETURNING id;`,
-      [readingLimitHours, phaseId],
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Fase no encontrada.' });
-    }
-    return res.json({ message: 'Limite de lectura de la fase actualizado correctamente.' });
+    const result = await updatePhaseReadingLimit(phaseId, readingLimitHours, applyToEnrolled);
+    const message =
+      result.enrollments_updated > 0
+        ? `Limite de lectura actualizado. Se recalculo la fecha limite de ${result.enrollments_updated} inscrito(s) sin examen abierto.`
+        : applyToEnrolled && result.phase_published
+          ? 'Limite de lectura actualizado. No habia inscritos pendientes de lectura a quienes aplicarlo.'
+          : 'Limite de lectura actualizado (aplica a inscripciones nuevas).';
+    return res.json({ message, ...result });
   } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
     console.error('Error actualizando limite de lectura de fase:', error);
     return res.status(500).json({ message: 'No se pudo actualizar el limite de lectura de la fase.' });
   }

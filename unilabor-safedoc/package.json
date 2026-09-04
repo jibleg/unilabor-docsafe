@@ -14,6 +14,7 @@
     "migrate:status:prod": "node dist/scripts/migrate.js status",
     "import:inventory": "ts-node src/scripts/import-inventory.ts",
     "export:assets-report": "ts-node src/scripts/export-assets-report.ts",
+    "notify:induction-readings": "ts-node src/scripts/notify-induction-readings.ts",
     "hash-password": "node scripts/hash-password.js"
   },
   "keywords": [],
