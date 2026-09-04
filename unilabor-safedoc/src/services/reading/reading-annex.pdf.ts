@@ -285,3 +285,26 @@ export const buildReadingAnnexPdf = async (input: ReadingAnnexInput): Promise<Bu
 
   return Buffer.from(await output.save());
 };
+
+/**
+ * Extrae SOLO la hoja de constancia (la ultima pagina) de una copia firmada
+ * generada por `buildReadingAnnexPdf`.
+ *
+ * La copia firmada completa (documento + hoja anexa) es evidencia del modulo
+ * que la custodia (Calidad/RH). Al lector solo se le entrega esta hoja: el
+ * documento es controlado y no debe salir del visor protegido en ningun formato
+ * descargable. La hoja ya identifica al documento por titulo, identificador y
+ * huella SHA-256, asi que conserva su valor probatorio sin exponer contenido.
+ */
+export const extractReadingAnnexPage = async (signedPdf: Buffer): Promise<Buffer> => {
+  const source = await PDFDocument.load(signedPdf, { ignoreEncryption: true });
+  const lastIndex = source.getPageCount() - 1;
+  if (lastIndex < 0) {
+    throw new Error('La copia firmada no tiene paginas.');
+  }
+
+  const output = await PDFDocument.create();
+  const [annex] = await output.copyPages(source, [lastIndex]);
+  output.addPage(annex);
+  return Buffer.from(await output.save());
+};

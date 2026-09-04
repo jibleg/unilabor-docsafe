@@ -5,6 +5,7 @@ import { registerAuditEvent } from '../services/audit.service';
 import {
   getMyReading,
   listMyReadings,
+  loadReaderConstancia,
   registerReadingProgress,
   resolveMyReadingSource,
   resolveSignedCopy,
@@ -176,7 +177,14 @@ export const signReadingController = async (req: AuthRequest, res: Response) => 
   }
 };
 
-/** Descarga de la copia firmada. `manage` la habilita para el gestor. */
+/**
+ * Descarga de la constancia de lectura.
+ *
+ * - Gestor (`manage`): recibe la copia firmada completa (documento + hoja
+ *   anexa), que es la evidencia del SGC.
+ * - Lector: recibe SOLO la hoja de constancia. El documento es controlado y no
+ *   debe poder descargarse; se consulta unicamente en el visor protegido.
+ */
 export const downloadSignedCopyController =
   (options: { manage?: boolean } = {}) =>
   async (req: AuthRequest, res: Response) => {
@@ -191,12 +199,19 @@ export const downloadSignedCopyController =
     }
 
     try {
-      const { absolutePath, fileName } = await resolveSignedCopy(readingId, user.id, {
-        ...(options.manage ? { allowAnyOwner: true } : {}),
-      });
       res.setHeader('Content-Type', 'application/pdf');
+
+      if (options.manage) {
+        const { absolutePath, fileName } = await resolveSignedCopy(readingId, user.id, {
+          allowAnyOwner: true,
+        });
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+        return fs.createReadStream(absolutePath).pipe(res);
+      }
+
+      const { content, fileName } = await loadReaderConstancia(readingId, user.id);
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
-      return fs.createReadStream(absolutePath).pipe(res);
+      return res.send(content);
     } catch (error: any) {
       const mapped = mapError(res, error);
       if (mapped) {

@@ -6,7 +6,7 @@ import { safeUnlink, sha256Buffer } from '../utils/file-storage';
 import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image';
 import { withTransaction } from '../utils/transaction';
 import { resolveStoredDocumentPath } from './document.service';
-import { buildReadingAnnexPdf } from './reading/reading-annex.pdf';
+import { buildReadingAnnexPdf, extractReadingAnnexPage } from './reading/reading-annex.pdf';
 import { refreshInductionForAcknowledgement } from './rh-induction.service';
 import {
   creditReadingHeartbeat,
@@ -455,5 +455,23 @@ export const resolveSignedCopy = async (
   return {
     absolutePath,
     fileName: `${String(row.title_snapshot)} (firmado).pdf`,
+  };
+};
+
+/**
+ * Constancia que se entrega al PROPIO lector: unicamente la hoja de acuse, sin
+ * las paginas del documento. El documento del SGC es controlado y solo se
+ * consulta dentro del visor protegido; la copia firmada completa queda como
+ * evidencia en Calidad y la ve el gestor de la sala.
+ */
+export const loadReaderConstancia = async (
+  readingId: number,
+  userId: string,
+): Promise<{ content: Buffer; fileName: string }> => {
+  const { absolutePath, fileName } = await resolveSignedCopy(readingId, userId);
+  const content = await extractReadingAnnexPage(fs.readFileSync(absolutePath));
+  return {
+    content,
+    fileName: fileName.replace(/ \(firmado\)\.pdf$/, ' - Constancia de lectura.pdf'),
   };
 };

@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { buildReadingAnnexPdf, winAnsiSafe } from './reading-annex.pdf';
+import { buildReadingAnnexPdf, extractReadingAnnexPage, winAnsiSafe } from './reading-annex.pdf';
 import { buildSignedAcknowledgementPdf } from '../rh-acknowledgement-pdf.service';
 
 // PNG 1x1 valido; alcanza para ejercitar el embebido de la firma.
@@ -106,5 +106,16 @@ describe('winAnsiSafe', () => {
   it('normaliza saltos de linea y descarta caracteres de control', () => {
     expect(winAnsiSafe('linea1\nlinea2')).toBe('linea1 linea2');
     expect(winAnsiSafe('concampana')).toBe('concampana');
+  });
+});
+
+describe('extractReadingAnnexPage', () => {
+  it('devuelve solo la hoja de constancia, sin las paginas del documento', async () => {
+    const sourcePdf = await buildSourcePdf(5);
+    const signed = await buildReadingAnnexPdf({ ...baseInput, sourcePdf });
+
+    const constancia = await PDFDocument.load(await extractReadingAnnexPage(signed));
+
+    expect(constancia.getPageCount()).toBe(1);
   });
 });
