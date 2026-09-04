@@ -1,5 +1,5 @@
 /**
- * Reenvia (o envia por primera vez) el aviso por correo + SMS "tienes N
+ * Reenvia (o envia por primera vez) el aviso por SMS "tienes N
  * documentos de Induccion por leer y firmar" a los inscritos de una fase que
  * aun no terminan la lectura ni tienen examen abierto. Util cuando la fase se
  * publico antes de que existiera el aviso automatico, o para un recordatorio
@@ -32,12 +32,10 @@ const parseArgs = (): { phaseNumber: number; dryRun: boolean } => {
 const main = async (): Promise<void> => {
   const { phaseNumber, dryRun } = parseArgs();
   const pending = await pool.query(
-    `SELECT e.id, emp.full_name, emp.phone, COALESCE(NULLIF(emp.email, ''), u.email) AS email,
-            e.reading_deadline_at, p.published_at
+    `SELECT e.id, emp.full_name, emp.phone, e.reading_deadline_at, p.published_at
        FROM public.rh_induction_enrollments e
        INNER JOIN public.rh_induction_phases p ON p.id = e.phase_id
        INNER JOIN public.employees emp ON emp.id = e.employee_id
-       LEFT JOIN public.users u ON u.id = emp.user_id
       WHERE p.phase_number = $1
         AND p.published_at IS NOT NULL
         AND e.evaluation_assignment_id IS NULL
@@ -48,11 +46,11 @@ const main = async (): Promise<void> => {
   );
   console.log(
     `Fase ${phaseNumber}: ${pending.rows.length} inscrito(s) pendiente(s) de lectura` +
-      ` (${pending.rows.filter((row) => row.phone).length} con telefono, ${pending.rows.filter((row) => row.email).length} con correo).`,
+      ` (${pending.rows.filter((row) => row.phone).length} con telefono).`,
   );
   for (const row of pending.rows) {
     console.log(
-      `  - ${row.full_name} | tel: ${row.phone ?? '-'} | correo: ${row.email ?? '-'} | limite: ${row.reading_deadline_at ?? 'sin limite'}`,
+      `  - ${row.full_name} | tel: ${row.phone ?? '-'} | limite: ${row.reading_deadline_at ?? 'sin limite'}`,
     );
   }
   if (dryRun) {

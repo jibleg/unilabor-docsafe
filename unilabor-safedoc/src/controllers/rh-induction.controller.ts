@@ -294,7 +294,7 @@ export const publishPhaseController = async (req: AuthRequest, res: Response) =>
       );
     }
     if (result.notified > 0) {
-      parts.push(`Se esta avisando por correo y SMS a ${result.notified} colaborador(es).`);
+      parts.push(`Se esta avisando por SMS a ${result.notified} colaborador(es).`);
     }
     return res.json({ message: parts.join(' '), ...result });
   } catch (error: any) {

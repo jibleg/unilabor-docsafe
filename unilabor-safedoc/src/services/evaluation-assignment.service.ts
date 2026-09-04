@@ -90,10 +90,16 @@ const ASSIGNMENT_BASE_QUERY = `
 `;
 
 /** Instancia una evaluacion para una lista de colaboradores. Idempotente. */
+export interface AssignEvaluationOptions {
+  /** false = no avisar al colaborador (correo + SMS); p. ej. Induccion, que solo avisa al inicio de la fase. */
+  notify?: boolean;
+}
+
 export const assignEvaluation = async (
   templateId: number,
   employeeIds: number[],
   createdByUserId: string | null,
+  options: AssignEvaluationOptions = {},
 ): Promise<AssignmentResultSummary> => {
   await assertTable();
 
@@ -177,8 +183,10 @@ export const assignEvaluation = async (
   }
 
   // Aviso de disponibilidad (correo + SMS) fuera de las transacciones, best-effort.
-  for (const assignmentId of createdAssignmentIds) {
-    await tryNotifyEvaluationAvailable(assignmentId);
+  if (options.notify !== false) {
+    for (const assignmentId of createdAssignmentIds) {
+      await tryNotifyEvaluationAvailable(assignmentId);
+    }
   }
 
   return summary;

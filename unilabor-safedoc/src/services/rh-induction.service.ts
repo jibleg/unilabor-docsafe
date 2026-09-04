@@ -1147,7 +1147,11 @@ export const refreshEnrollmentReadingStatus = async (enrollmentId: number): Prom
   const templateId = Number(templateResult.rows[0].id);
 
   try {
-    const summary = await assignEvaluation(templateId, [Number(enrollment.employee_id)], enrollment.enrolled_by_user_id);
+    // Induccion solo avisa al colaborador al inicio de la fase (SMS): el examen
+    // se abre sin correo/SMS para no saturarlo (decision RH 2026-09-04).
+    const summary = await assignEvaluation(templateId, [Number(enrollment.employee_id)], enrollment.enrolled_by_user_id, {
+      notify: false,
+    });
     if (summary.created > 0) {
       const assignmentResult = await pool.query(
         `SELECT id FROM public.evaluation_assignments

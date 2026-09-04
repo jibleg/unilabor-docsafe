@@ -242,7 +242,7 @@ export const RhInductionPage = () => {
     const publishing = !selectedPhase.published_at;
     const limitHours = selectedPhase.reading_time_limit_hours;
     const publishDescription = [
-      'Los inscritos verán los documentos en Sala de Lectura y recibirán un aviso por correo y SMS.',
+      'Los inscritos verán los documentos en Sala de Lectura y recibirán un único aviso por SMS (no hay recordatorios posteriores).',
       limitHours
         ? `Fecha límite de lectura resultante: ${formatDeadline(new Date(Date.now() + limitHours * 3_600_000))} (${limitHours} h corridas desde ahora, incluye fines de semana). Si quieres otra fecha, cancela y ajusta primero "Límite de lectura (horas)".`
         : 'Sin límite de lectura: el cuestionario se abre solo cuando el colaborador termina de leer y firmar.',

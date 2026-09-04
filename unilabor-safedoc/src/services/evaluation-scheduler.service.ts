@@ -50,6 +50,11 @@ export const processReminders = async (now: Date = new Date()): Promise<number> 
         AND reminder_sent_at IS NULL
         AND deadline_at > $1::timestamptz
         AND deadline_at <= ($1::timestamptz + ($3 || ' hours')::interval)
+        -- Induccion: el colaborador solo recibe el aviso de inicio de fase.
+        AND NOT EXISTS (
+          SELECT 1 FROM public.rh_induction_enrollments ie
+           WHERE ie.evaluation_assignment_id = evaluation_assignments.id
+        )
       RETURNING id;`,
     [iso, ACTIONABLE_STATUSES, REMINDER_WINDOW_HOURS],
   );

@@ -223,6 +223,14 @@ export const sendGenericNotification = async (
   return { emailSent, smsSent };
 };
 
+/** Envio suelto solo por SMS (LabsMobile), sin correo. */
+export const sendSmsNotification = async (
+  phone: string | null,
+  subject: string,
+  message: string,
+  template: string,
+): Promise<boolean> => dispatch(smsChannel, phone, subject, message, template, null);
+
 /** Envio suelto por WhatsApp (Whapi Cloud), fuera del flujo de evaluaciones. */
 export const sendWhatsAppNotification = async (
   phone: string | null,

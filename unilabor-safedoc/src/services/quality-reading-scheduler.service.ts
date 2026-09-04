@@ -49,7 +49,11 @@ export const findReadingsDueForReminder = async (
       WHERE a.status IN ('pending', 'in_progress', 'read')
         AND a.reminder_sent_at IS NULL
         AND a.deadline_at > $1::timestamptz
-        AND a.deadline_at <= ($1::timestamptz + make_interval(hours => $2));`,
+        AND a.deadline_at <= ($1::timestamptz + make_interval(hours => $2))
+        -- Lecturas de Induccion: el colaborador solo recibe el aviso de inicio de fase.
+        AND NOT EXISTS (
+          SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.acknowledgement_id = a.id
+        );`,
     [now.toISOString(), REMINDER_WINDOW_HOURS],
   );
 
