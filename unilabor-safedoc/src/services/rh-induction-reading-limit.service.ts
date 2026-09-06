@@ -1,5 +1,6 @@
 import pool from '../config/db';
 import { refreshEnrollmentReadingStatus } from './rh-induction.service';
+import { syncInductionReadingDeadlines } from './rh-induction-reading-deadline.service';
 
 const throwCoded = (code: string, message: string): never => {
   const error = new Error(message) as Error & { code: string; publicMessage: string };
@@ -23,7 +24,9 @@ export interface RhInductionReadingLimitUpdateResult {
  * que aun no terminan la lectura ni tienen examen abierto, contando desde que
  * arranco su lectura (la publicacion de la fase o su inscripcion, lo que haya
  * sido despues). Si el nuevo plazo ya vencio, la evaluacion se abre de
- * inmediato (mismo criterio que el barrido periodico).
+ * inmediato (mismo criterio que el barrido periodico). Los acuses de Sala de
+ * Lectura ligados se alinean al mismo limite (ver
+ * rh-induction-reading-deadline.service).
  */
 export const updatePhaseReadingLimit = async (
   phaseId: number,
@@ -60,6 +63,9 @@ export const updatePhaseReadingLimit = async (
       RETURNING e.id, e.reading_deadline_at;`,
     [phaseId, readingLimitHours],
   );
+  // Los acuses de Sala de Lectura ligados a estas inscripciones vencen con el
+  // nuevo limite (y se reactivan si estaban vencidos y el limite es futuro).
+  await syncInductionReadingDeadlines({ phaseId });
   for (const row of recalculated.rows) {
     if (row.reading_deadline_at && new Date(row.reading_deadline_at).getTime() <= Date.now()) {
       await refreshEnrollmentReadingStatus(Number(row.id));

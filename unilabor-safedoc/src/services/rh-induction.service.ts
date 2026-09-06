@@ -6,6 +6,7 @@ import {
   queueNotifyInductionReadingsAssigned,
   tryNotifyInductionPhaseReady,
 } from './rh-induction-notification.service';
+import { syncInductionReadingDeadlines } from './rh-induction-reading-deadline.service';
 
 /**
  * Orquestacion de las Fases 1-4 de induccion (institucionales, iguales para
@@ -513,6 +514,9 @@ export const publishInductionPhase = async (phaseId: number, userId: string): Pr
         queueNotifyInductionReadingsAssigned(enrollmentId);
         notified += 1;
       }
+      // Los acuses de Sala de Lectura deben vencer junto con la inscripcion,
+      // no con el plazo por defecto de su publicacion.
+      await syncInductionReadingDeadlines({ enrollmentId });
       await refreshEnrollmentReadingStatus(enrollmentId);
     }
   }
@@ -786,6 +790,7 @@ export const enrollEmployeeInPhase = async (
 
   if (phasePublished) {
     await assignEnrollmentReadings(enrollmentId, employeeUserId, documents, userId);
+    await syncInductionReadingDeadlines({ enrollmentId });
     if (documents.length > 0) {
       // Aviso al colaborador (correo + SMS) con sus documentos y fecha limite.
       queueNotifyInductionReadingsAssigned(enrollmentId);
