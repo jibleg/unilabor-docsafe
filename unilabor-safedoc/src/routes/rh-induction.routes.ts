@@ -9,6 +9,7 @@ import {
   getPhaseCertificateReadinessController,
   enrollEmployeeInPhaseController,
   unenrollEmployeeFromPhaseController,
+  authorizeInductionRetryController,
   getEmployeeInductionMasterRecordController,
   getEmployeeInductionMasterRecordPdfController,
   getEmployeeInductionProgressController,
@@ -38,6 +39,7 @@ import {
 } from '../controllers/rh-question-bank.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
+import { authorizeInductionRetrySchema } from '../schemas/rh-induction-retry.schema';
 import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
 import { closeInductionRecordSchema } from '../schemas/rh-induction-closure.schema';
 
@@ -71,6 +73,12 @@ router.get('/induction/enrollments/:enrollmentId/checklist-progress', requirePer
 router.put('/induction/enrollments/:enrollmentId/checklist-items/:checklistItemId', requirePermission('RH.INDUCTION.MANAGE'), toggleChecklistItemController);
 router.patch('/induction/enrollments/:enrollmentId/supervisor', requirePermission('RH.INDUCTION.MANAGE'), setEnrollmentSupervisorController);
 router.delete('/induction/enrollments/:enrollmentId', requirePermission('RH.INDUCTION.MANAGE'), unenrollEmployeeFromPhaseController);
+router.post(
+  '/induction/enrollments/:enrollmentId/authorize-retry',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(authorizeInductionRetrySchema),
+  authorizeInductionRetryController,
+);
 
 router.get('/employees/:employeeId/induction/effectiveness', requirePermission('RH.INDUCTION.MANAGE'), listEffectivenessReviewsController);
 router.post('/employees/:employeeId/induction/effectiveness', requirePermission('RH.INDUCTION.MANAGE'), createEffectivenessReviewController);

@@ -1,6 +1,8 @@
 import api from './axios';
 import { getArrayFromPayload, unwrapPayload } from './service.shared';
 import type {
+  AcknowledgementBoardItem,
+  AcknowledgementSource,
   AcknowledgementStatus,
   DocumentAcknowledgement,
   InstitutionalDocument,
@@ -62,6 +64,8 @@ export interface AssignAcknowledgementResult {
 
 export interface AcknowledgementFilters {
   status?: AcknowledgementStatus | null;
+  /** Sin origen = ambas fuentes (institucionales + Sala de Lectura/Induccion). */
+  source?: AcknowledgementSource | null;
   employeeId?: number | null;
   institutionalDocumentId?: number | null;
 }
@@ -81,12 +85,16 @@ export const assignAcknowledgements = async (
   };
 };
 
+/** Tablero de seguimiento de RH: une acuses institucionales y lecturas de la Sala. */
 export const listAcknowledgements = async (
   filters: AcknowledgementFilters = {},
-): Promise<DocumentAcknowledgement[]> => {
+): Promise<AcknowledgementBoardItem[]> => {
   const params: Record<string, string | number> = {};
   if (filters.status) {
     params.status = filters.status;
+  }
+  if (filters.source) {
+    params.source = filters.source;
   }
   if (filters.employeeId) {
     params.employee_id = filters.employeeId;
@@ -99,7 +107,7 @@ export const listAcknowledgements = async (
     'acknowledgements',
     'items',
     'results',
-  ]) as DocumentAcknowledgement[];
+  ]) as AcknowledgementBoardItem[];
 };
 
 export const cancelAcknowledgement = async (acknowledgementId: number): Promise<void> => {

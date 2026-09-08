@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckSquare, Eye, EyeOff, FileText, GraduationCap, ListChecks, Loader2, Phone, Square, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { CheckSquare, Eye, EyeOff, FileText, GraduationCap, ListChecks, Loader2, Phone, RotateCcw, Square, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { listEmployees } from '../api/service';
 import {
@@ -29,6 +29,7 @@ import {
 } from '../api/service.api-rh-induction';
 import { confirmAction } from '../utils/confirm';
 import { EnrollmentCertificateDataModal } from '../components/rh/EnrollmentCertificateDataModal';
+import { InductionRetryModal } from '../components/rh/InductionRetryModal';
 import { listPositions, type DocumentSearchResult } from '../api/service.api-rh-position';
 import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
 import { getApiErrorMessage } from '../api/service.parsers';
@@ -54,6 +55,13 @@ const formatPercentage = (item: RhInductionPhaseEnrollmentSummary): string => {
   return `${item.evaluation_percentage}%`;
 };
 
+// Solo estos estados admiten "Autorizar nuevo intento" (politica: intento unico,
+// RH reabre tras retroalimentacion). El backend valida lo mismo.
+const RETRYABLE_EVALUATION_STATUSES = ['failed', 'expired'];
+
+const canAuthorizeRetry = (item: RhInductionPhaseEnrollmentSummary): boolean =>
+  item.evaluation_status !== null && RETRYABLE_EVALUATION_STATUSES.includes(item.evaluation_status);
+
 export const RhInductionPage = () => {
   const [phases, setPhases] = useState<RhInductionPhase[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -77,6 +85,7 @@ export const RhInductionPage = () => {
   const [savingReadingLimit, setSavingReadingLimit] = useState(false);
   const [certReadiness, setCertReadiness] = useState<RhInductionCertificateReadiness | null>(null);
   const [certDataTarget, setCertDataTarget] = useState<RhInductionPhaseEnrollmentSummary | null>(null);
+  const [retryEnrollment, setRetryEnrollment] = useState<RhInductionPhaseEnrollmentSummary | null>(null);
 
   const refreshCertReadiness = useCallback((phaseId: number) => {
     getPhaseCertificateReadiness(phaseId)
@@ -950,6 +959,9 @@ export const RhInductionPage = () => {
                             ) : null}
                             <p>
                               Evaluación: {item.evaluation_status ?? 'Pendiente'} ({formatPercentage(item)})
+                              {item.evaluation_attempt_no && item.evaluation_attempt_no > 1
+                                ? ` · intento #${item.evaluation_attempt_no}`
+                                : ''}
                             </p>
                           </div>
                         </div>
@@ -1000,6 +1012,17 @@ export const RhInductionPage = () => {
                               <ListChecks size={12} />
                               Checklist: {item.checklist_completed}/{item.checklist_total}
                             </button>
+                            {canAuthorizeRetry(item) ? (
+                              <button
+                                type="button"
+                                onClick={() => setRetryEnrollment(item)}
+                                className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-100"
+                                title="Abrir un nuevo intento del cuestionario tras la retroalimentación"
+                              >
+                                <RotateCcw size={12} />
+                                Autorizar nuevo intento
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => void handleRemoveEnrollment(item)}
@@ -1061,6 +1084,13 @@ export const RhInductionPage = () => {
             void loadEnrollments(selectedPhase.id);
             refreshCertReadiness(selectedPhase.id);
           }}
+        />
+      ) : null}
+      {retryEnrollment && selectedPhase ? (
+        <InductionRetryModal
+          enrollment={retryEnrollment}
+          onClose={() => setRetryEnrollment(null)}
+          onAuthorized={() => void loadEnrollments(selectedPhase.id)}
         />
       ) : null}
     </div>

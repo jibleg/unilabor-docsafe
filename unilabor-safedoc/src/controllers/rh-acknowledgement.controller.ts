@@ -2,16 +2,15 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import { getEmployeeForAuthenticatedUser } from '../services/employee-document.service';
+import { listAcknowledgementBoard } from '../services/rh-acknowledgement-board.service';
+import { listAcknowledgementsQuerySchema } from '../schemas/rh-acknowledgement.schema';
 import {
   assignAcknowledgements,
   cancelAcknowledgement,
   getAcknowledgementById,
-  listAcknowledgements,
   listAcknowledgementsForEmployee,
   registerReadingProgress,
   signAcknowledgement,
-  type AcknowledgementFilters,
-  type AcknowledgementStatus,
 } from '../services/rh-document-acknowledgement.service';
 
 const parsePositiveInt = (value: unknown): number | null => {
@@ -21,15 +20,6 @@ const parsePositiveInt = (value: unknown): number | null => {
   }
   return parsed;
 };
-
-const ACKNOWLEDGEMENT_STATUSES: AcknowledgementStatus[] = [
-  'pending',
-  'in_progress',
-  'read',
-  'signed',
-  'expired',
-  'cancelled',
-];
 
 // Errores de dominio -> HTTP. Los codigos los emite el servicio via `fail`.
 const ERROR_STATUS: Record<string, number> = {
@@ -114,26 +104,19 @@ export const assignAcknowledgementsController = async (req: AuthRequest, res: Re
 };
 
 export const listAcknowledgementsController = async (req: AuthRequest, res: Response) => {
-  const rawStatus = String(req.query.status ?? '').trim();
-  if (rawStatus && !ACKNOWLEDGEMENT_STATUSES.includes(rawStatus as AcknowledgementStatus)) {
-    return res.status(400).json({ message: 'Estado de acuse invalido.' });
-  }
-
-  const filters: AcknowledgementFilters = {};
-  if (rawStatus) {
-    filters.status = rawStatus as AcknowledgementStatus;
-  }
-  const employeeId = parsePositiveInt(req.query.employee_id);
-  if (employeeId) {
-    filters.employee_id = employeeId;
-  }
-  const documentId = parsePositiveInt(req.query.institutional_document_id);
-  if (documentId) {
-    filters.institutional_document_id = documentId;
+  const parsed = listAcknowledgementsQuerySchema.safeParse(req.query ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: 'Filtros de busqueda invalidos.',
+      errors: parsed.error.issues.map((issue) => ({
+        field: issue.path.join('.') || '(query)',
+        message: issue.message,
+      })),
+    });
   }
 
   try {
-    return res.json(await listAcknowledgements(filters));
+    return res.json(await listAcknowledgementBoard(parsed.data));
   } catch (error: any) {
     const mapped = mapError(res, error);
     if (mapped) {

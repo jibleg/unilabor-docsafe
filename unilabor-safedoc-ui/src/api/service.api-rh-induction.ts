@@ -148,6 +148,32 @@ export const removeEnrollment = async (enrollmentId: number): Promise<void> => {
   await api.delete(`/rh/induction/enrollments/${enrollmentId}`);
 };
 
+export interface InductionRetryResult {
+  enrollment_id: number;
+  employee_id: number;
+  previous_assignment_id: number;
+  previous_status: string;
+  new_assignment_id: number;
+  attempt_no: number;
+  deadline_at: string;
+}
+
+/**
+ * Autoriza un nuevo intento del cuestionario de la fase (evaluacion no
+ * acreditada o vencida). Crea una asignacion nueva y la liga a la inscripcion;
+ * el intento anterior se conserva. Sin correo ni SMS.
+ */
+export const authorizeInductionRetry = async (
+  enrollmentId: number,
+  note?: string,
+): Promise<InductionRetryResult> => {
+  const response = await api.post(`/rh/induction/enrollments/${enrollmentId}/authorize-retry`, {
+    note: note ?? '',
+  });
+  const payload = unwrapPayload(response.data) as { retry?: InductionRetryResult } | InductionRetryResult;
+  return ((payload as { retry?: InductionRetryResult }).retry ?? payload) as InductionRetryResult;
+};
+
 export const setEnrollmentSupervisor = async (
   enrollmentId: number,
   supervisorEmployeeId: number | null,

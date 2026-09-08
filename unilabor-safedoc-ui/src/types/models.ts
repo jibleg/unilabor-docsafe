@@ -1423,6 +1423,8 @@ export interface RhInductionPhaseEnrollmentSummary {
   reading_deadline_at: string | null;
   evaluation_status: string | null;
   evaluation_percentage: number | null;
+  /** Numero de intento del cuestionario vigente (>1 cuando RH autorizo reintentos). */
+  evaluation_attempt_no: number | null;
   supervisor_employee_id: number | null;
   supervisor_name: string | null;
   checklist_total: number;
@@ -1611,6 +1613,41 @@ export interface DocumentAcknowledgement {
   document_title?: string;
   employee_name?: string;
   employee_code?: string | null;
+}
+
+/**
+ * Fila del tablero "Seguimiento de acuses" de RH. Une dos fuentes: los acuses
+ * de documentos institucionales (RH-ACK, cancelables por RH) y las lecturas de
+ * la Sala de Lectura de Calidad, incluidas las del Programa de Induccion
+ * (solo lectura para RH: su ciclo de vida lo gobierna Calidad/Induccion).
+ */
+export type AcknowledgementSource = 'institutional' | 'reading_room';
+
+export interface AcknowledgementBoardItem {
+  id: number;
+  source: AcknowledgementSource;
+  /** Texto corto listo para mostrar: "Documento institucional", "Sala de Lectura" o "Inducción · Fase N". */
+  source_label: string;
+  /** Solo para lecturas de Induccion: numero y nombre de la fase que origino la lectura. */
+  induction_phase_number: number | null;
+  induction_phase: string | null;
+  institutional_document_id: number | null;
+  publication_id: number | null;
+  employee_id: number | null;
+  status: AcknowledgementStatus;
+  available_at: string | null;
+  deadline_at: string | null;
+  started_at: string | null;
+  read_completed_at: string | null;
+  signed_at: string | null;
+  pages_total: number;
+  pages_seen_count: number;
+  active_seconds: number;
+  min_seconds_per_page: number;
+  current_page: number | null;
+  document_title: string;
+  employee_name: string;
+  employee_code: string | null;
 }
 
 // --- Sala de Lectura (Calidad) ----------------------------------------------

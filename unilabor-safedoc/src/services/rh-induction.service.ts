@@ -1282,6 +1282,8 @@ export interface RhInductionPhaseEnrollmentSummary {
   reading_deadline_at: string | null;
   evaluation_status: string | null;
   evaluation_percentage: number | null;
+  /** Numero de intento del cuestionario vigente (>1 cuando RH autorizo reintentos). */
+  evaluation_attempt_no: number | null;
   supervisor_employee_id: number | null;
   supervisor_name: string | null;
   checklist_total: number;
@@ -1316,7 +1318,7 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
         ) AS missing_position,
         e.reading_completed_at, e.reading_deadline_at,
         e.supervisor_employee_id, sup.full_name AS supervisor_name,
-        ea.status AS evaluation_status, ea.percentage AS evaluation_percentage,
+        ea.status AS evaluation_status, ea.percentage AS evaluation_percentage, ea.attempt_no AS evaluation_attempt_no,
         (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id) AS reading_total,
         (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri
            INNER JOIN public.quality_reading_acknowledgements a ON a.id = ri.acknowledgement_id
@@ -1342,6 +1344,7 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
     reading_deadline_at: row.reading_deadline_at ? String(row.reading_deadline_at) : null,
     evaluation_status: row.evaluation_status ? String(row.evaluation_status) : null,
     evaluation_percentage: row.evaluation_percentage !== null && row.evaluation_percentage !== undefined ? Number(row.evaluation_percentage) : null,
+    evaluation_attempt_no: row.evaluation_attempt_no ? Number(row.evaluation_attempt_no) : null,
     supervisor_employee_id: row.supervisor_employee_id ? Number(row.supervisor_employee_id) : null,
     supervisor_name: row.supervisor_name ? String(row.supervisor_name) : null,
     checklist_total: Number(row.checklist_total ?? 0),

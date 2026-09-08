@@ -32,6 +32,8 @@ import {
   getCurrentInductionClosureForPdf,
 } from '../services/rh-induction-closure.service';
 import { registerAuditEvent } from '../services/audit.service';
+import { authorizeInductionRetry } from '../services/rh-induction-retry.service';
+import type { AuthorizeInductionRetryInput } from '../schemas/rh-induction-retry.schema';
 import { updatePhaseReadingLimit } from '../services/rh-induction-reading-limit.service';
 import { formatInductionDeadline } from '../services/rh-induction-notification.service';
 
@@ -63,6 +65,9 @@ const ERROR_STATUS: Record<string, number> = {
   RH_INDUCTION_PHASE_WITHOUT_PUBLISHED_EVALUATION: 409,
   RH_INDUCTION_PHASE_WITHOUT_POSITIONS: 409,
   RH_INDUCTION_PHASE_READING_STARTED: 409,
+  RH_INDUCTION_RETRY_NO_EVALUATION: 409,
+  RH_INDUCTION_RETRY_NOT_ALLOWED: 409,
+  RH_INDUCTION_RETRY_ASSIGNMENT_FAILED: 500,
 };
 
 const mapError = (res: Response, error: any): Response | null => {
@@ -138,6 +143,52 @@ export const unenrollEmployeeFromPhaseController = async (req: AuthRequest, res:
     if (mapped) return mapped;
     console.error('Error eliminando inscripcion de induccion:', error);
     return res.status(500).json({ message: 'No se pudo eliminar la inscripcion.' });
+  }
+};
+
+/**
+ * RH autoriza un nuevo intento del cuestionario de la fase tras la
+ * retroalimentacion/recapacitacion. Sin correo ni SMS. La nota queda en la
+ * auditoria junto con el intento anterior y el nuevo.
+ */
+export const authorizeInductionRetryController = async (req: AuthRequest, res: Response) => {
+  const enrollmentId = parsePositiveInt(req.params.enrollmentId);
+  if (!enrollmentId) {
+    return res.status(400).json({ message: 'ID de inscripcion invalido.' });
+  }
+  const { note } = (req.body ?? {}) as AuthorizeInductionRetryInput;
+  try {
+    const result = await authorizeInductionRetry({
+      enrollmentId,
+      actorUserId: req.user?.id ?? null,
+      note,
+    });
+    await registerAuditEvent({
+      user_id: req.user?.id ?? null,
+      action: `RH_INDUCTION_RETRY_AUTHORIZED:${enrollmentId}:${result.previous_assignment_id}->${result.new_assignment_id}`,
+      ip_address: req.ip ?? null,
+      module_code: 'RH',
+      entity_type: 'induction_enrollment',
+      entity_id: enrollmentId,
+      employee_id: result.employee_id,
+      metadata: {
+        previous_assignment_id: result.previous_assignment_id,
+        previous_status: result.previous_status,
+        new_assignment_id: result.new_assignment_id,
+        attempt_no: result.attempt_no,
+        deadline_at: result.deadline_at,
+        note: note ?? null,
+      },
+    });
+    return res.status(201).json({
+      message: `Nuevo intento autorizado (intento #${result.attempt_no}).`,
+      retry: result,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error autorizando nuevo intento de induccion:', error);
+    return res.status(500).json({ message: 'No se pudo autorizar el nuevo intento.' });
   }
 };
 

@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, RefreshCw, Signature, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookOpenCheck,
+  CheckCircle2,
+  Clock,
+  FileText,
+  GraduationCap,
+  RefreshCw,
+  Signature,
+  X,
+} from 'lucide-react';
 import { toast } from 'react-toastify';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { confirmAction } from '../utils/confirm';
@@ -7,7 +17,11 @@ import {
   cancelAcknowledgement,
   listAcknowledgements,
 } from '../api/service.api-rh-acknowledgement';
-import type { AcknowledgementStatus, DocumentAcknowledgement } from '../types/models';
+import type {
+  AcknowledgementBoardItem,
+  AcknowledgementSource,
+  AcknowledgementStatus,
+} from '../types/models';
 
 const STATUS_LABEL: Record<AcknowledgementStatus, string> = {
   pending: 'Pendiente',
@@ -27,7 +41,7 @@ const STATUS_STYLE: Record<AcknowledgementStatus, string> = {
   cancelled: 'bg-slate-100 text-slate-500',
 };
 
-const FILTERS: Array<{ value: AcknowledgementStatus | 'all'; label: string }> = [
+const STATUS_FILTERS: Array<{ value: AcknowledgementStatus | 'all'; label: string }> = [
   { value: 'all', label: 'Todos' },
   { value: 'pending', label: 'Pendientes' },
   { value: 'in_progress', label: 'En lectura' },
@@ -35,6 +49,37 @@ const FILTERS: Array<{ value: AcknowledgementStatus | 'all'; label: string }> = 
   { value: 'signed', label: 'Firmados' },
   { value: 'expired', label: 'Vencidos' },
 ];
+
+// El tablero une dos fuentes: los acuses de documentos institucionales que RH
+// carga y asigna, y las lecturas de la Sala de Lectura de Calidad (donde caen
+// las del Programa de Induccion). Solo las primeras se cancelan desde aqui.
+const SOURCE_FILTERS: Array<{ value: AcknowledgementSource | 'all'; label: string }> = [
+  { value: 'all', label: 'Todas las fuentes' },
+  { value: 'institutional', label: 'Documentos institucionales' },
+  { value: 'reading_room', label: 'Sala de Lectura e Inducción' },
+];
+
+const SourceBadge = ({ item }: { item: AcknowledgementBoardItem }) => {
+  const Icon = item.induction_phase
+    ? GraduationCap
+    : item.source === 'reading_room'
+      ? BookOpenCheck
+      : FileText;
+  const tone = item.induction_phase
+    ? 'bg-violet-50 text-violet-700'
+    : item.source === 'reading_room'
+      ? 'bg-indigo-50 text-indigo-700'
+      : 'bg-slate-100 text-slate-700';
+  return (
+    <span
+      className={`inline-flex max-w-[200px] items-center gap-1 truncate rounded-full px-2 py-0.5 text-xs font-medium ${tone}`}
+      title={item.induction_phase ? `${item.source_label} · ${item.induction_phase}` : item.source_label}
+    >
+      <Icon size={12} className="shrink-0" />
+      <span className="truncate">{item.source_label}</span>
+    </span>
+  );
+};
 
 const formatStamp = (value: string | null): string =>
   value
@@ -49,30 +94,36 @@ const formatStamp = (value: string | null): string =>
     : '—';
 
 export const RhAcknowledgementsPage = () => {
-  const [items, setItems] = useState<DocumentAcknowledgement[]>([]);
+  const [items, setItems] = useState<AcknowledgementBoardItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<AcknowledgementStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<AcknowledgementStatus | 'all'>('all');
+  const [sourceFilter, setSourceFilter] = useState<AcknowledgementSource | 'all'>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setItems(await listAcknowledgements(filter === 'all' ? {} : { status: filter }));
+      setItems(
+        await listAcknowledgements({
+          status: statusFilter === 'all' ? null : statusFilter,
+          source: sourceFilter === 'all' ? null : sourceFilter,
+        }),
+      );
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudieron cargar los acuses.'));
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [statusFilter, sourceFilter]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const handleCancel = async (item: DocumentAcknowledgement) => {
+  const handleCancel = async (item: AcknowledgementBoardItem) => {
     const confirmed = await confirmAction(
       'Cancelar acuse',
-      `¿Cancelar el acuse de "${item.document_title ?? 'este documento'}" para ${
-        item.employee_name ?? 'el colaborador'
+      `¿Cancelar el acuse de "${item.document_title || 'este documento'}" para ${
+        item.employee_name || 'el colaborador'
       }? Dejará de verlo entre sus pendientes.`,
       'Cancelar acuse',
     );
@@ -107,7 +158,8 @@ export const RhAcknowledgementsPage = () => {
             Acuses de lectura
           </h1>
           <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-            Seguimiento de los documentos enviados a leer y firmar.
+            Seguimiento de los documentos enviados a leer y firmar: documentos institucionales de
+            RH y lecturas de la Sala de Lectura, incluidas las del Programa de Inducción.
           </p>
         </div>
         <button
@@ -139,21 +191,39 @@ export const RhAcknowledgementsPage = () => {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setFilter(option.value)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-              filter === option.value
-                ? 'bg-[var(--color-brand-700)] text-white'
-                : 'border border-[rgba(0,65,106,0.12)] bg-white/92 text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.28)]'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setStatusFilter(option.value)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                statusFilter === option.value
+                  ? 'bg-[var(--color-brand-700)] text-white'
+                  : 'border border-[rgba(0,65,106,0.12)] bg-white/92 text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.28)]'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {SOURCE_FILTERS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setSourceFilter(option.value)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                sourceFilter === option.value
+                  ? 'bg-[var(--color-brand-500)] text-white'
+                  : 'border border-dashed border-[rgba(0,65,106,0.18)] bg-white/92 text-[var(--unilabor-neutral)] hover:bg-[rgba(191,212,230,0.28)]'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading && <p className="text-sm text-[var(--unilabor-neutral)]">Cargando…</p>}
@@ -169,11 +239,12 @@ export const RhAcknowledgementsPage = () => {
 
       {!loading && items.length > 0 && (
         <div className="overflow-x-auto rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/92 shadow-sm">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[1040px] text-sm">
             <thead>
               <tr className="border-b border-[rgba(0,65,106,0.08)] text-left text-xs uppercase tracking-wide text-[var(--unilabor-neutral)]">
                 <th className="px-4 py-3 font-semibold">Colaborador</th>
                 <th className="px-4 py-3 font-semibold">Documento</th>
+                <th className="px-4 py-3 font-semibold">Origen</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
                 <th className="px-4 py-3 font-semibold">Avance</th>
                 <th className="px-4 py-3 font-semibold">Plazo</th>
@@ -189,12 +260,12 @@ export const RhAcknowledgementsPage = () => {
                     : 0;
                 return (
                   <tr
-                    key={item.id}
+                    key={`${item.source}-${item.id}`}
                     className="border-b border-[rgba(0,65,106,0.05)] last:border-0"
                   >
                     <td className="px-4 py-3">
                       <p className="font-semibold text-[var(--color-brand-700)]">
-                        {item.employee_name ?? `#${item.employee_id}`}
+                        {item.employee_name || `#${item.employee_id ?? '—'}`}
                       </p>
                       {item.employee_code && (
                         <p className="text-xs text-[var(--unilabor-neutral)]">
@@ -202,8 +273,14 @@ export const RhAcknowledgementsPage = () => {
                         </p>
                       )}
                     </td>
-                    <td className="max-w-[240px] truncate px-4 py-3 text-[var(--unilabor-neutral)]">
-                      {item.document_title ?? `#${item.institutional_document_id}`}
+                    <td
+                      className="max-w-[240px] truncate px-4 py-3 text-[var(--unilabor-neutral)]"
+                      title={item.document_title}
+                    >
+                      {item.document_title || '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <SourceBadge item={item} />
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -241,8 +318,10 @@ export const RhAcknowledgementsPage = () => {
                       {formatStamp(item.signed_at)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {item.status !== 'signed' && item.status !== 'cancelled' && (
-                        <button
+                      {item.source === 'institutional' &&
+                        item.status !== 'signed' &&
+                        item.status !== 'cancelled' && (
+                          <button
                           type="button"
                           onClick={() => void handleCancel(item)}
                           title="Cancelar acuse"

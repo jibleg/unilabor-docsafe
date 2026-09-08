@@ -59,3 +59,34 @@ export const createInstitutionalDocumentSchema = z.object({
 });
 
 export type CreateInstitutionalDocumentInput = z.infer<typeof createInstitutionalDocumentSchema>;
+
+// Filtros del tablero de seguimiento (query string). Llegan como texto y se
+// coercionan; vacio o ausente significa "sin filtro".
+export const ACKNOWLEDGEMENT_STATUSES = [
+  'pending',
+  'in_progress',
+  'read',
+  'signed',
+  'expired',
+  'cancelled',
+] as const;
+
+export const ACKNOWLEDGEMENT_SOURCES = ['institutional', 'reading_room'] as const;
+
+const optionalPositiveInt = z.preprocess(
+  (value) => (value === '' || value === undefined || value === null ? undefined : value),
+  z.coerce
+    .number({ error: 'El identificador es invalido.' })
+    .int('El identificador es invalido.')
+    .positive('El identificador es invalido.')
+    .optional(),
+);
+
+export const listAcknowledgementsQuerySchema = z.object({
+  status: z.enum(ACKNOWLEDGEMENT_STATUSES, { message: 'Estado de acuse invalido.' }).optional(),
+  source: z.enum(ACKNOWLEDGEMENT_SOURCES, { message: 'Origen de acuse invalido.' }).optional(),
+  employee_id: optionalPositiveInt,
+  institutional_document_id: optionalPositiveInt,
+});
+
+export type ListAcknowledgementsQuery = z.infer<typeof listAcknowledgementsQuerySchema>;
