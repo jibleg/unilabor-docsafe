@@ -105,7 +105,7 @@ export const assignEvaluation = async (
 
   const templateResult = await pool.query(
     `SELECT t.id, t.is_active, t.status, t.evaluation_type, t.window_hours, t.selection_mode, t.random_count,
-            (SELECT COUNT(*)::int FROM public.evaluation_questions q WHERE q.template_id = t.id) AS question_count
+            (SELECT COUNT(*)::int FROM public.evaluation_questions q WHERE q.template_id = t.id AND q.is_active = TRUE) AS question_count
        FROM public.evaluation_templates t WHERE t.id = $1 LIMIT 1;`,
     [templateId],
   );
@@ -205,7 +205,7 @@ const snapshotQuestions = async (
        SELECT $1, sub.id, ROW_NUMBER() OVER () - 1
          FROM (
            SELECT id FROM public.evaluation_questions
-            WHERE template_id = $2
+            WHERE template_id = $2 AND is_active = TRUE
             ORDER BY RANDOM()
             LIMIT $3
          ) sub;`,
@@ -217,7 +217,7 @@ const snapshotQuestions = async (
   await client.query(
     `INSERT INTO public.evaluation_assignment_questions (assignment_id, question_id, sort_order)
      SELECT $1, id, sort_order FROM public.evaluation_questions
-      WHERE template_id = $2 ORDER BY sort_order ASC, id ASC;`,
+      WHERE template_id = $2 AND is_active = TRUE ORDER BY sort_order ASC, id ASC;`,
     [assignmentId, templateId],
   );
 };

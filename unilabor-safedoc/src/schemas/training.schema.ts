@@ -109,6 +109,7 @@ export const updateEvaluationTemplateSchema = z
 // --- Banco de preguntas (reemplazo total del banco de una plantilla) ---
 
 const questionOptionSchema = z.object({
+  id: z.coerce.number().int().positive().optional(),
   text: requiredText('El texto de la opcion es obligatorio'),
   is_correct: z.coerce.boolean().optional().default(false),
   sort_order: z.coerce.number().int().optional(),
@@ -116,6 +117,7 @@ const questionOptionSchema = z.object({
 
 const questionSchema = z
   .object({
+    id: z.coerce.number().int().positive().optional(),
     type: z.enum(['single', 'multiple', 'boolean', 'open'], {
       message: 'Tipo de pregunta invalido',
     }),

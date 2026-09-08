@@ -30,12 +30,15 @@ export interface EvaluationTemplatePayload {
 }
 
 export interface QuestionOptionInput {
+  id?: number;
   text: string;
   is_correct?: boolean;
   sort_order?: number;
 }
 
 export interface QuestionInput {
+  /** id de una pregunta ya guardada (para conservarla / versionarla). */
+  id?: number;
   type: EvaluationQuestionType;
   text: string;
   points?: number;
@@ -90,7 +93,7 @@ const loadQuestions = async (templateId: number): Promise<EvaluationQuestionReco
   const questionsResult = await pool.query(
     `SELECT id, template_id, type, text, points, sort_order
        FROM public.evaluation_questions
-      WHERE template_id = $1
+      WHERE template_id = $1 AND is_active = TRUE
       ORDER BY sort_order ASC, id ASC;`,
     [templateId],
   );
@@ -103,7 +106,7 @@ const loadQuestions = async (templateId: number): Promise<EvaluationQuestionReco
     `SELECT o.id, o.question_id, o.text, o.is_correct, o.sort_order
        FROM public.evaluation_question_options o
        JOIN public.evaluation_questions q ON q.id = o.question_id
-      WHERE q.template_id = $1
+      WHERE q.template_id = $1 AND q.is_active = TRUE AND o.is_active = TRUE
       ORDER BY o.sort_order ASC, o.id ASC;`,
     [templateId],
   );
@@ -162,7 +165,7 @@ const TEMPLATE_BASE_QUERY = `
     COUNT(q.id)::int AS question_count,
     COALESCE(BOOL_OR(q.type = 'open'), FALSE) AS requires_manual_grading
   FROM public.evaluation_templates t
-  LEFT JOIN public.evaluation_questions q ON q.template_id = t.id
+  LEFT JOIN public.evaluation_questions q ON q.template_id = t.id AND q.is_active = TRUE
 `;
 
 export const listTemplatesByCourse = async (courseId: number): Promise<EvaluationTemplateRecord[]> => {
@@ -239,7 +242,7 @@ export const createEvaluationTemplate = async (
 
 const countQuestions = async (client: PoolClient, templateId: number): Promise<number> => {
   const result = await client.query(
-    `SELECT COUNT(*)::int AS total FROM public.evaluation_questions WHERE template_id = $1;`,
+    `SELECT COUNT(*)::int AS total FROM public.evaluation_questions WHERE template_id = $1 AND is_active = TRUE;`,
     [templateId],
   );
   return Number(result.rows[0]?.total ?? 0);
@@ -336,6 +339,51 @@ export const deactivateEvaluationTemplate = async (templateId: number): Promise<
 };
 
 /** Reemplaza por completo el banco de preguntas de una plantilla (transaccional). */
+/** Huella de contenido de una pregunta: si no cambia, se conserva la fila (y su id). */
+const questionFingerprint = (question: {
+  type: string;
+  text: string;
+  points?: number | null;
+  options?: Array<{ text: string; is_correct?: boolean | null }> | null;
+}): string =>
+  JSON.stringify([
+    question.type,
+    question.text.trim(),
+    question.points ?? 1,
+    question.type === 'open' ? [] : (question.options ?? []).map((option) => [option.text.trim(), Boolean(option.is_correct)]),
+  ]);
+
+const insertQuestionWithOptions = async (
+  client: PoolClient,
+  templateId: number,
+  question: QuestionInput,
+  sortOrder: number,
+): Promise<number> => {
+  const inserted = await client.query(
+    `INSERT INTO public.evaluation_questions (template_id, type, text, points, sort_order)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id;`,
+    [templateId, question.type, question.text.trim(), question.points ?? 1, sortOrder],
+  );
+  const questionId = Number(inserted.rows[0]?.id);
+  const options = question.type === 'open' ? [] : question.options ?? [];
+  for (const [optionIndex, option] of options.entries()) {
+    await client.query(
+      `INSERT INTO public.evaluation_question_options (question_id, text, is_correct, sort_order)
+       VALUES ($1, $2, $3, $4);`,
+      [questionId, option.text.trim(), option.is_correct ?? false, option.sort_order ?? optionIndex],
+    );
+  }
+  return questionId;
+};
+
+/**
+ * Guarda el banco de preguntas SIN destruir evidencia. Las preguntas ya usadas
+ * por algun intento (snapshot o respuestas) nunca se borran: si no cambiaron
+ * se conservan con su id; si cambiaron o se quitaron, se desactivan y (en el
+ * primer caso) se inserta una version nueva. Las preguntas nunca usadas se
+ * editan o eliminan fisicamente. Asi, un guardado del cuestionario ya no deja
+ * sin preguntas los examenes abiertos ni sin respuestas los ya calificados.
+ */
 export const replaceTemplateQuestions = async (
   templateId: number,
   questions: QuestionInput[],
@@ -346,7 +394,7 @@ export const replaceTemplateQuestions = async (
     await client.query('BEGIN');
 
     const templateResult = await client.query(
-      `SELECT id, selection_mode, random_count FROM public.evaluation_templates WHERE id = $1 LIMIT 1;`,
+      `SELECT id, selection_mode, random_count FROM public.evaluation_templates WHERE id = $1 LIMIT 1 FOR UPDATE;`,
       [templateId],
     );
     if (templateResult.rows.length === 0) {
@@ -364,17 +412,74 @@ export const replaceTemplateQuestions = async (
       throwCoded('RANDOM_COUNT_EXCEEDS_BANK');
     }
 
-    // ON DELETE CASCADE elimina opciones al borrar las preguntas previas.
-    await client.query(`DELETE FROM public.evaluation_questions WHERE template_id = $1;`, [templateId]);
+    const existingResult = await client.query(
+      `SELECT q.id, q.type, q.text, q.points,
+              COALESCE(
+                (SELECT json_agg(json_build_object('text', o.text, 'is_correct', o.is_correct) ORDER BY o.sort_order, o.id)
+                   FROM public.evaluation_question_options o WHERE o.question_id = q.id AND o.is_active = TRUE),
+                '[]'::json
+              ) AS options,
+              EXISTS (SELECT 1 FROM public.evaluation_assignment_questions aq WHERE aq.question_id = q.id)
+                OR EXISTS (SELECT 1 FROM public.evaluation_responses r WHERE r.question_id = q.id) AS referenced
+         FROM public.evaluation_questions q
+        WHERE q.template_id = $1 AND q.is_active = TRUE
+        FOR UPDATE OF q;`,
+      [templateId],
+    );
+    const existing = new Map<number, { fingerprint: string; referenced: boolean }>();
+    for (const row of existingResult.rows) {
+      existing.set(Number(row.id), {
+        fingerprint: questionFingerprint({
+          type: String(row.type),
+          text: String(row.text),
+          points: Number(row.points),
+          options: Array.isArray(row.options) ? row.options : [],
+        }),
+        referenced: Boolean(row.referenced),
+      });
+    }
 
+    const handled = new Set<number>();
     for (const [index, question] of questions.entries()) {
-      const insertedQuestion = await client.query(
-        `INSERT INTO public.evaluation_questions (template_id, type, text, points, sort_order)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id;`,
-        [templateId, question.type, question.text.trim(), question.points ?? 1, question.sort_order ?? index],
-      );
-      const questionId = Number(insertedQuestion.rows[0]?.id);
+      const sortOrder = question.sort_order ?? index;
+      const current = question.id !== undefined ? existing.get(Number(question.id)) : undefined;
+      if (!current || handled.has(Number(question.id))) {
+        await insertQuestionWithOptions(client, templateId, question, sortOrder);
+        continue;
+      }
+      const questionId = Number(question.id);
+      handled.add(questionId);
 
+      if (current.fingerprint === questionFingerprint(question)) {
+        await client.query(
+          `UPDATE public.evaluation_questions SET sort_order = $2, updated_at = NOW() WHERE id = $1;`,
+          [questionId, sortOrder],
+        );
+        continue;
+      }
+
+      if (current.referenced) {
+        // Ya la contesto alguien: se conserva como version historica y se crea la nueva.
+        await client.query(
+          `UPDATE public.evaluation_questions SET is_active = FALSE, updated_at = NOW() WHERE id = $1;`,
+          [questionId],
+        );
+        await client.query(
+          `UPDATE public.evaluation_question_options SET is_active = FALSE, updated_at = NOW() WHERE question_id = $1;`,
+          [questionId],
+        );
+        await insertQuestionWithOptions(client, templateId, question, sortOrder);
+        continue;
+      }
+
+      // Nunca usada: se edita en sitio.
+      await client.query(
+        `UPDATE public.evaluation_questions
+            SET type = $2, text = $3, points = $4, sort_order = $5, updated_at = NOW()
+          WHERE id = $1;`,
+        [questionId, question.type, question.text.trim(), question.points ?? 1, sortOrder],
+      );
+      await client.query(`DELETE FROM public.evaluation_question_options WHERE question_id = $1;`, [questionId]);
       const options = question.type === 'open' ? [] : question.options ?? [];
       for (const [optionIndex, option] of options.entries()) {
         await client.query(
@@ -382,6 +487,25 @@ export const replaceTemplateQuestions = async (
            VALUES ($1, $2, $3, $4);`,
           [questionId, option.text.trim(), option.is_correct ?? false, option.sort_order ?? optionIndex],
         );
+      }
+    }
+
+    // Preguntas que RH quito del banco.
+    for (const [questionId, current] of existing.entries()) {
+      if (handled.has(questionId)) {
+        continue;
+      }
+      if (current.referenced) {
+        await client.query(
+          `UPDATE public.evaluation_questions SET is_active = FALSE, updated_at = NOW() WHERE id = $1;`,
+          [questionId],
+        );
+        await client.query(
+          `UPDATE public.evaluation_question_options SET is_active = FALSE, updated_at = NOW() WHERE question_id = $1;`,
+          [questionId],
+        );
+      } else {
+        await client.query(`DELETE FROM public.evaluation_questions WHERE id = $1;`, [questionId]);
       }
     }
 
