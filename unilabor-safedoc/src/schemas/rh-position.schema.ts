@@ -18,6 +18,18 @@ export const positionCompetencySchema = z.object({
 
 export type PositionCompetencyInput = z.infer<typeof positionCompetencySchema>;
 
+/** Edicion parcial de una competencia ya registrada (texto y/o criticidad). */
+export const positionCompetencyUpdateSchema = z
+  .object({
+    competency_text: z.string().trim().min(1, 'La competencia no puede estar vacia').optional(),
+    criticality: z.enum(['A', 'M', 'B']).optional(),
+  })
+  .refine((value) => value.competency_text !== undefined || value.criticality !== undefined, {
+    message: 'Indica el texto o la criticidad a actualizar',
+  });
+
+export type PositionCompetencyUpdateInput = z.infer<typeof positionCompetencyUpdateSchema>;
+
 export const positionDocumentSchema = z.object({
   document_id: z.string().uuid('El documento es invalido'),
   sort_order: z.number().int().optional(),

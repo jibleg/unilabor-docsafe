@@ -12,6 +12,7 @@ import {
   removePositionDocument,
   searchDocuments,
   updatePosition,
+  updatePositionCompetency,
 } from '../services/rh-position.service';
 import {
   assignPositionToEmployee,
@@ -143,6 +144,28 @@ export const addPositionCompetencyController = async (req: AuthRequest, res: Res
     if (mapped) return mapped;
     console.error('Error agregando competencia:', error);
     return res.status(500).json({ message: 'No se pudo agregar la competencia.' });
+  }
+};
+
+export const updatePositionCompetencyController = async (req: AuthRequest, res: Response) => {
+  const competencyId = parsePositiveInt(req.params.competencyId);
+  if (!competencyId) {
+    return res.status(400).json({ message: 'ID de competencia invalido.' });
+  }
+  try {
+    const competency = await updatePositionCompetency(competencyId, {
+      competency_text: req.body?.competency_text,
+      criticality: req.body?.criticality,
+    });
+    if (!competency) {
+      return res.status(404).json({ message: 'Competencia no encontrada.' });
+    }
+    return res.json({ message: 'Competencia actualizada correctamente.', competency });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error actualizando competencia:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar la competencia.' });
   }
 };
 

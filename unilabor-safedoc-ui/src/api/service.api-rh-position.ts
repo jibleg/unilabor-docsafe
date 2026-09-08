@@ -56,6 +56,15 @@ export const addPositionCompetency = async (
   return data?.competency as RhPositionCompetency;
 };
 
+export const updatePositionCompetency = async (
+  competencyId: number,
+  changes: { competency_text?: string; criticality?: 'A' | 'M' | 'B' },
+): Promise<RhPositionCompetency> => {
+  const response = await api.patch(`/rh/positions/competencies/${competencyId}`, changes);
+  const data = asRecord(unwrapPayload(response.data));
+  return data?.competency as RhPositionCompetency;
+};
+
 export const deletePositionCompetency = async (competencyId: number): Promise<void> => {
   await api.delete(`/rh/positions/competencies/${competencyId}`);
 };

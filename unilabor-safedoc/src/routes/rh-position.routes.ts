@@ -14,12 +14,14 @@ import {
   removePositionDocumentController,
   searchDocumentsController,
   updatePositionController,
+  updatePositionCompetencyController,
 } from '../controllers/rh-position.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   assignEmployeePositionSchema,
   positionCompetencySchema,
+  positionCompetencyUpdateSchema,
   positionDocumentSchema,
   positionSchema,
 } from '../schemas/rh-position.schema';
@@ -47,6 +49,12 @@ router.post(
   requirePermission('RH.INDUCTION.MANAGE'),
   validate(positionCompetencySchema),
   addPositionCompetencyController,
+);
+router.patch(
+  '/positions/competencies/:competencyId',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(positionCompetencyUpdateSchema),
+  updatePositionCompetencyController,
 );
 router.delete(
   '/positions/competencies/:competencyId',

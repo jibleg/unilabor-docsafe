@@ -9,6 +9,7 @@ import {
   deletePositionCompetency,
   listPositions,
   removePositionDocument,
+  updatePositionCompetency,
   type DocumentSearchResult,
 } from '../api/service.api-rh-position';
 import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
@@ -33,6 +34,7 @@ export const RhPositionsPage = () => {
 
   const [competencyText, setCompetencyText] = useState('');
   const [competencyCriticality, setCompetencyCriticality] = useState<'A' | 'M' | 'B'>('M');
+  const [updatingCompetencyId, setUpdatingCompetencyId] = useState<number | null>(null);
   const [savingCompetency, setSavingCompetency] = useState(false);
 
 
@@ -135,6 +137,19 @@ export const RhPositionsPage = () => {
       toast.error(getApiErrorMessage(error, 'No se pudo agregar la competencia.'));
     } finally {
       setSavingCompetency(false);
+    }
+  };
+
+  const handleChangeCriticality = async (competencyId: number, criticality: 'A' | 'M' | 'B') => {
+    setUpdatingCompetencyId(competencyId);
+    try {
+      await updatePositionCompetency(competencyId, { criticality });
+      toast.success('Criticidad actualizada correctamente.');
+      await load();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo actualizar la criticidad.'));
+    } finally {
+      setUpdatingCompetencyId(null);
     }
   };
 
@@ -266,18 +281,24 @@ export const RhPositionsPage = () => {
                     >
                       <span className="text-[var(--unilabor-ink)]">{competency.competency_text}</span>
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        <select
+                          value={competency.criticality}
+                          onChange={(event) => void handleChangeCriticality(competency.id, event.target.value as 'A' | 'M' | 'B')}
+                          disabled={updatingCompetencyId === competency.id}
+                          className={`cursor-pointer rounded-full border-0 px-2 py-0.5 text-[10px] font-bold outline-none disabled:opacity-60 ${
                             competency.criticality === 'A'
                               ? 'bg-rose-50 text-rose-700'
                               : competency.criticality === 'B'
                                 ? 'bg-[rgba(151,163,172,0.14)] text-[var(--unilabor-neutral)]'
                                 : 'bg-amber-50 text-amber-700'
                           }`}
-                          title="Criticidad (pondera la Evaluación de competencia REH-REG-003)"
+                          title="Cambiar criticidad (pondera la Evaluación de competencia REH-REG-003)"
+                          aria-label="Criticidad de la competencia"
                         >
-                          {competency.criticality === 'A' ? 'Alta' : competency.criticality === 'B' ? 'Baja' : 'Media'}
-                        </span>
+                          <option value="A">Alta (5)</option>
+                          <option value="M">Media (3)</option>
+                          <option value="B">Baja (1)</option>
+                        </select>
                         <button type="button" onClick={() => void handleDeleteCompetency(competency.id)} className="text-rose-500 hover:text-rose-700">
                           <Trash2 size={13} />
                         </button>

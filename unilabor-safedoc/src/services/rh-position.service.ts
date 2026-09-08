@@ -212,6 +212,35 @@ export const addPositionCompetency = async (
   };
 };
 
+/** Actualiza texto y/o criticidad de una competencia; null si no existe. */
+export const updatePositionCompetency = async (
+  competencyId: number,
+  changes: { competency_text?: string; criticality?: 'A' | 'M' | 'B' },
+): Promise<RhPositionCompetency | null> => {
+  const text = changes.competency_text?.trim();
+  if (changes.competency_text !== undefined && !text) {
+    throwCoded('RH_POSITION_COMPETENCY_INVALID', 'La competencia no puede estar vacia.');
+  }
+  const result = await pool.query(
+    `UPDATE public.rh_position_competencies
+        SET competency_text = COALESCE($2, competency_text),
+            criticality = COALESCE($3, criticality)
+      WHERE id = $1
+      RETURNING id, competency_text, criticality, sort_order;`,
+    [competencyId, text ?? null, changes.criticality ?? null],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+  return {
+    id: Number(row.id),
+    competency_text: String(row.competency_text),
+    criticality: String(row.criticality) as 'A' | 'M' | 'B',
+    sort_order: Number(row.sort_order ?? 0),
+  };
+};
+
 export const deletePositionCompetency = async (competencyId: number): Promise<boolean> => {
   const result = await pool.query(`DELETE FROM public.rh_position_competencies WHERE id = $1;`, [competencyId]);
   return (result.rowCount ?? 0) > 0;
