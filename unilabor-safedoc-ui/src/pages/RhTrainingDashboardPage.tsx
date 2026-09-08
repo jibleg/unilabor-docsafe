@@ -15,6 +15,18 @@ const TRACEABILITY_PAGE_SIZE = 10;
 const formatDate = (iso: string | null): string =>
   iso ? new Date(iso).toLocaleDateString('es-MX', { dateStyle: 'short' }) : '-';
 
+const formatDateTime = (iso: string | null): string =>
+  iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+
+// Estados en los que la fecha limite sigue corriendo: si ya paso, se resalta
+// para que RH detecte asignaciones que el cron aun no marca como vencidas.
+const OPEN_STATUSES = new Set(['pending', 'in_progress', 'authorized_late']);
+
+const deadlineClassName = (row: TraceabilityRow): string => {
+  if (!row.deadline_at || !OPEN_STATUSES.has(row.status)) return 'text-[var(--unilabor-neutral)]';
+  return new Date(row.deadline_at) < new Date() ? 'font-semibold text-rose-600' : 'text-[var(--unilabor-ink)]';
+};
+
 const StatCard = ({ label, value, accent }: { label: string; value: string | number; accent?: string }) => (
   <div className="rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/90 px-4 py-3">
     <p className={`text-2xl font-black ${accent ?? 'text-[var(--color-brand-700)]'}`}>{value}</p>
@@ -221,6 +233,7 @@ export const RhTrainingDashboardPage = () => {
                       <th className="px-4 py-2.5">Colaborador</th>
                       <th className="px-4 py-2.5">Capacitación</th>
                       <th className="px-4 py-2.5">Estado</th>
+                      <th className="px-4 py-2.5">Vence</th>
                       <th className="px-4 py-2.5">Calif.</th>
                       <th className="px-4 py-2.5">Constancia</th>
                       <th className="px-4 py-2.5">Vigencia</th>
@@ -239,6 +252,9 @@ export const RhTrainingDashboardPage = () => {
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${EVALUATION_STATUS_META[row.status].className}`}>
                             {EVALUATION_STATUS_META[row.status].label}
                           </span>
+                        </td>
+                        <td className={`whitespace-nowrap px-4 py-2.5 text-xs ${deadlineClassName(row)}`} title="Fecha y hora limite para contestar la evaluacion">
+                          {formatDateTime(row.deadline_at)}
                         </td>
                         <td className="px-4 py-2.5 text-xs">{row.percentage !== null ? `${row.percentage}%` : '-'}</td>
                         <td className="px-4 py-2.5 text-xs">{formatDate(row.certificate_issue_date)}</td>

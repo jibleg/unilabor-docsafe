@@ -554,6 +554,7 @@ export const getTraceabilityReport = async (
         status: (getString(r, ['status']) as TraceabilityRow['status']) || 'pending',
         percentage: getNumber(r, ['percentage']) ?? null,
         passing_score: getNumber(r, ['passing_score']) ?? 0,
+        deadline_at: getString(r, ['deadline_at']) || null,
         submitted_at: getString(r, ['submitted_at']) || null,
         graded_at: getString(r, ['graded_at']) || null,
         certificate_issue_date: getString(r, ['certificate_issue_date']) || null,

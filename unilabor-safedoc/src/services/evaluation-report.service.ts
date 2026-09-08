@@ -118,6 +118,7 @@ export interface TraceabilityRow {
   status: string;
   percentage: number | null;
   passing_score: number;
+  deadline_at: string | null;
   submitted_at: string | null;
   graded_at: string | null;
   certificate_issue_date: string | null;
@@ -158,7 +159,7 @@ export const getTraceabilityReport = async (
   const dataResult = await pool.query(
     `SELECT a.id AS assignment_id, e.full_name AS employee_name, e.employee_code,
             c.title AS course_title, t.title AS template_title,
-            a.status, a.percentage, t.passing_score, a.submitted_at, a.graded_at,
+            a.status, a.percentage, t.passing_score, a.deadline_at, a.submitted_at, a.graded_at,
             ed.issue_date AS certificate_issue_date, ed.expiry_date AS certificate_expiry_date
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
@@ -180,6 +181,7 @@ export const getTraceabilityReport = async (
     status: String(row.status),
     percentage: row.percentage !== null ? Number(row.percentage) : null,
     passing_score: Number(row.passing_score),
+    deadline_at: row.deadline_at ? new Date(row.deadline_at).toISOString() : null,
     submitted_at: row.submitted_at ? String(row.submitted_at) : null,
     graded_at: row.graded_at ? String(row.graded_at) : null,
     certificate_issue_date: row.certificate_issue_date ? String(row.certificate_issue_date) : null,

@@ -1157,6 +1157,7 @@ export interface TraceabilityRow {
   status: EvaluationAssignmentStatus;
   percentage: number | null;
   passing_score: number;
+  deadline_at: string | null;
   submitted_at: string | null;
   graded_at: string | null;
   certificate_issue_date: string | null;
