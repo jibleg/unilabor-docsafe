@@ -1,9 +1,16 @@
+import fs from 'fs';
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import { getEmployeeForAuthenticatedUser } from '../services/employee-document.service';
-import { listAcknowledgementBoard } from '../services/rh-acknowledgement-board.service';
-import { listAcknowledgementsQuerySchema } from '../schemas/rh-acknowledgement.schema';
+import {
+  listAcknowledgementBoard,
+  resolveBoardSignedCopy,
+} from '../services/rh-acknowledgement-board.service';
+import {
+  listAcknowledgementsQuerySchema,
+  signedCopyParamsSchema,
+} from '../schemas/rh-acknowledgement.schema';
 import {
   assignAcknowledgements,
   cancelAcknowledgement,
@@ -32,7 +39,11 @@ const ERROR_STATUS: Record<string, number> = {
   RH_ACK_SOURCE_FILE_MISSING: 409,
   RH_ACK_ALREADY_SIGNED: 409,
   RH_ACK_NOT_FOUND: 404,
+  RH_ACK_NOT_SIGNED: 409,
   RH_ACK_FORBIDDEN: 403,
+  QUALITY_READING_NOT_FOUND: 404,
+  QUALITY_READING_NOT_SIGNED: 409,
+  QUALITY_READING_FILE_MISSING: 409,
   RH_ACK_NOT_TRACKABLE: 409,
   RH_ACK_EXPIRED: 409,
   RH_ACK_INVALID_PAGE: 400,
@@ -124,6 +135,48 @@ export const listAcknowledgementsController = async (req: AuthRequest, res: Resp
     }
     console.error('Error listando acuses de lectura:', error);
     return res.status(500).json({ message: 'No se pudieron consultar los acuses.' });
+  }
+};
+
+/**
+ * Evidencia firmada (PDF) de cualquier fila del tablero, para presentarla en
+ * auditoria. Se registra en auditoria porque expone el documento completo.
+ */
+export const downloadSignedCopyController = async (req: AuthRequest, res: Response) => {
+  const parsed = signedCopyParamsSchema.safeParse(req.params ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({ message: parsed.error.issues[0]?.message ?? 'Parametros invalidos.' });
+  }
+
+  const user = req.user;
+  if (!user?.id) {
+    return res.status(401).json({ message: 'Sesion invalida o expirada.' });
+  }
+
+  const { source, id } = parsed.data;
+  try {
+    const { absolutePath, fileName } = await resolveBoardSignedCopy(source, id);
+
+    await registerAuditEvent({
+      user_id: user.id,
+      action: `RH_ACK_SIGNED_COPY_VIEW:${source}:${id}`,
+      ip_address: req.ip ?? null,
+      module_code: 'RH',
+      entity_type:
+        source === 'institutional' ? 'rh_document_acknowledgement' : 'quality_reading_acknowledgement',
+      entity_id: id,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+    return fs.createReadStream(absolutePath).pipe(res);
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) {
+      return mapped;
+    }
+    console.error('Error descargando el acuse firmado:', error);
+    return res.status(500).json({ message: 'No se pudo abrir el acuse firmado.' });
   }
 };
 

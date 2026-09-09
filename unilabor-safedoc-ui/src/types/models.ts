@@ -1649,6 +1649,8 @@ export interface AcknowledgementBoardItem {
   document_title: string;
   employee_name: string;
   employee_code: string | null;
+  /** TRUE cuando ya existe el PDF firmado (evidencia presentable en auditoria). */
+  signed_copy_available: boolean;
 }
 
 // --- Sala de Lectura (Calidad) ----------------------------------------------

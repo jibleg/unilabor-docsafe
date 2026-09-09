@@ -90,3 +90,14 @@ export const listAcknowledgementsQuerySchema = z.object({
 });
 
 export type ListAcknowledgementsQuery = z.infer<typeof listAcknowledgementsQuerySchema>;
+
+// Descarga de la evidencia firmada desde el tablero: la fuente viaja en la URL.
+export const signedCopyParamsSchema = z.object({
+  source: z.enum(ACKNOWLEDGEMENT_SOURCES, { message: 'Origen de acuse invalido.' }),
+  id: z.coerce
+    .number({ error: 'El identificador del acuse es invalido.' })
+    .int('El identificador del acuse es invalido.')
+    .positive('El identificador del acuse es invalido.'),
+});
+
+export type SignedCopyParams = z.infer<typeof signedCopyParamsSchema>;

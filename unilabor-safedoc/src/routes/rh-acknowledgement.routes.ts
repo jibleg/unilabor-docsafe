@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   assignAcknowledgementsController,
   cancelAcknowledgementController,
+  downloadSignedCopyController,
   getAcknowledgementController,
   listAcknowledgementsController,
   listMyAcknowledgementsController,
@@ -76,6 +77,13 @@ router.delete(
   '/acknowledgements/:id',
   requirePermission('RH.ACKNOWLEDGEMENTS.MANAGE'),
   cancelAcknowledgementController,
+);
+
+// Evidencia firmada de cualquier fila del tablero (institucional o Sala/Induccion).
+router.get(
+  '/acknowledgements/:source/:id/signed',
+  requirePermission('RH.ACKNOWLEDGEMENTS.MANAGE'),
+  downloadSignedCopyController,
 );
 
 // --- Autoservicio del colaborador ------------------------------------------

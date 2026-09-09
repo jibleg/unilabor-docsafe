@@ -1,5 +1,7 @@
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
+import { resolveEmployeeDocumentPath } from './employee-document.service';
+import { resolveSignedCopy } from './quality-reading-self.service';
 import type { AcknowledgementStatus } from './rh-document-acknowledgement.service';
 
 // -----------------------------------------------------------------------------
@@ -46,6 +48,8 @@ export interface AcknowledgementBoardItem {
   document_title: string;
   employee_name: string;
   employee_code: string | null;
+  /** TRUE cuando ya existe el PDF firmado (evidencia presentable en auditoria). */
+  signed_copy_available: boolean;
 }
 
 export interface AcknowledgementBoardFilters {
@@ -83,7 +87,8 @@ const INSTITUTIONAL_SELECT = `
          e.full_name AS employee_name,
          e.employee_code,
          NULL::integer AS induction_phase_number,
-         NULL::text AS induction_phase
+         NULL::text AS induction_phase,
+         (a.signed_document_id IS NOT NULL) AS signed_copy_available
     FROM public.rh_document_acknowledgements a
     INNER JOIN public.rh_institutional_documents d ON d.id = a.institutional_document_id
     INNER JOIN public.employees e ON e.id = a.employee_id
@@ -114,7 +119,8 @@ const READING_ROOM_SELECT = `
          COALESCE(e.full_name, u.full_name) AS employee_name,
          e.employee_code,
          ind.phase_number AS induction_phase_number,
-         ind.phase_name AS induction_phase
+         ind.phase_name AS induction_phase,
+         (a.signed_file_path IS NOT NULL) AS signed_copy_available
     FROM public.quality_reading_acknowledgements a
     INNER JOIN public.quality_reading_publications p ON p.id = a.publication_id
     INNER JOIN public.users u ON u.id = a.user_id
@@ -165,6 +171,7 @@ const mapRow = (row: any): AcknowledgementBoardItem => {
     document_title: String(row.document_title ?? ''),
     employee_name: String(row.employee_name ?? ''),
     employee_code: row.employee_code ?? null,
+    signed_copy_available: Boolean(row.signed_copy_available),
   };
 };
 
@@ -220,4 +227,49 @@ export const listAcknowledgementBoard = async (
     params,
   );
   return result.rows.map(mapRow);
+};
+
+const failBoard = (code: string, message: string): never => {
+  const error = new Error(code);
+  (error as any).code = code;
+  (error as any).publicMessage = message;
+  throw error;
+};
+
+/**
+ * Evidencia firmada de una fila del tablero, para que RH la presente en
+ * auditoria. Cada fuente guarda su PDF en un lugar distinto:
+ *   * institutional -> copia firmada archivada en el expediente del firmante.
+ *   * reading_room  -> archivo firmado que custodia Calidad (documento + hoja
+ *     anexa con firma). El permiso de RH sobre el tablero ya autoriza verlo,
+ *     por eso no se exige ser el dueño de la lectura.
+ */
+export const resolveBoardSignedCopy = async (
+  source: AcknowledgementSource,
+  acknowledgementId: number,
+): Promise<{ absolutePath: string; fileName: string }> => {
+  if (source === 'reading_room') {
+    return resolveSignedCopy(acknowledgementId, '', { allowAnyOwner: true });
+  }
+
+  const result = await pool.query(
+    `SELECT a.signed_document_id, d.title
+       FROM public.rh_document_acknowledgements a
+       INNER JOIN public.rh_institutional_documents d ON d.id = a.institutional_document_id
+      WHERE a.id = $1 LIMIT 1;`,
+    [acknowledgementId],
+  );
+  if (result.rows.length === 0) {
+    return failBoard('RH_ACK_NOT_FOUND', 'El acuse no existe.');
+  }
+  const signedDocumentId = toNullableNumber(result.rows[0].signed_document_id);
+  if (!signedDocumentId) {
+    return failBoard('RH_ACK_NOT_SIGNED', 'Este acuse todavia no tiene copia firmada.');
+  }
+
+  const { absolutePath } = await resolveEmployeeDocumentPath(signedDocumentId);
+  return {
+    absolutePath,
+    fileName: `${String(result.rows[0].title)} (firmado).pdf`,
+  };
 };

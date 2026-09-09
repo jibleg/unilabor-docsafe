@@ -114,6 +114,20 @@ export const cancelAcknowledgement = async (acknowledgementId: number): Promise<
   await api.delete(`/rh/acknowledgements/${acknowledgementId}`);
 };
 
+/**
+ * Evidencia firmada (PDF completo con hoja anexa) de una fila del tablero, de
+ * cualquier fuente. Devuelve un object URL listo para abrir en otra pestaña.
+ */
+export const getAcknowledgementSignedCopyUrl = async (
+  source: AcknowledgementSource,
+  acknowledgementId: number,
+): Promise<string> => {
+  const response = await api.get(`/rh/acknowledgements/${source}/${acknowledgementId}/signed`, {
+    responseType: 'blob',
+  });
+  return URL.createObjectURL(response.data as Blob);
+};
+
 // --- Autoservicio del colaborador -------------------------------------------
 
 export const listMyAcknowledgements = async (): Promise<DocumentAcknowledgement[]> => {

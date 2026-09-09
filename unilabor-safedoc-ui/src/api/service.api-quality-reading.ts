@@ -99,6 +99,18 @@ export const signMyReading = async (
   return response.data as MyReading;
 };
 
+/** Evidencia firmada completa de un lector, para el gestor de la Sala. Devuelve un object URL. */
+export const getReaderSignedCopyUrl = async (
+  publicationId: number,
+  readingId: number,
+): Promise<string> => {
+  const response = await api.get(
+    `/quality/readings/${publicationId}/readers/${readingId}/signed`,
+    { responseType: 'blob' },
+  );
+  return URL.createObjectURL(response.data as Blob);
+};
+
 /** Descarga la constancia (copia firmada) de una lectura propia como blob y devuelve un object URL. */
 export const getMySignedReadingUrl = async (readingId: number): Promise<string> => {
   const response = await api.get(`/quality/me/readings/${readingId}/signed`, { responseType: 'blob' });

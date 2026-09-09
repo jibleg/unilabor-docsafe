@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
   BookOpen,
-  CheckCircle2,
+  FileCheck2,
   Lock,
   RefreshCw,
   UserPlus,
@@ -16,6 +16,7 @@ import {
   assignReaders,
   cancelReadingAssignment,
   closeReadingPublication,
+  getReaderSignedCopyUrl,
   getReadingPublication,
   listAssignableAreas,
   listReadingPublications,
@@ -178,6 +179,17 @@ export const QualityReadingRoomPage = () => {
       toast.error(getApiErrorMessage(error, 'No se pudieron asignar los lectores.'));
     } finally {
       setAssigning(false);
+    }
+  };
+
+  // La evidencia firmada completa (documento + hoja anexa) la custodia Calidad;
+  // el gestor la abre desde aqui para auditoria.
+  const handleOpenSignedCopy = async (reader: ReadingAssignment) => {
+    try {
+      const url = await getReaderSignedCopyUrl(reader.publication_id, reader.id);
+      window.open(url, '_blank', 'noopener');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo abrir el acuse firmado.'));
     }
   };
 
@@ -600,7 +612,15 @@ export const QualityReadingRoomPage = () => {
                       </button>
                     )}
                     {reader.status === 'signed' && (
-                      <CheckCircle2 size={16} className="text-emerald-500" />
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenSignedCopy(reader)}
+                        title="Abrir el acuse firmado (documento + hoja de firma)"
+                        className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                      >
+                        <FileCheck2 size={13} />
+                        Ver acuse firmado
+                      </button>
                     )}
                   </li>
                 ))}
