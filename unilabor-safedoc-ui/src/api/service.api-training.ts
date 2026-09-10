@@ -33,6 +33,7 @@ import type {
   EvaluationQuestionResponse,
   NotificationLogEntry,
   OpenAnswerToGrade,
+  TraceabilityEmployee,
   TraceabilityRow,
   TrainingCourse,
 } from '../types/models';
@@ -530,12 +531,32 @@ export const getEvaluationDashboard = async (): Promise<EvaluationDashboard> => 
   };
 };
 
+export const listTraceabilityEmployees = async (): Promise<TraceabilityEmployee[]> => {
+  const response = await api.get('/rh/evaluations/report/employees');
+  return getArrayFromPayload(response.data, ['employees', 'data', 'items'])
+    .map((raw): TraceabilityEmployee | null => {
+      const r = asRecord(raw);
+      const id = r ? getNumber(r, ['id']) : null;
+      if (!r || !id) return null;
+      return {
+        id,
+        full_name: getString(r, ['full_name']),
+        employee_code: getString(r, ['employee_code']),
+        is_active: getBoolean(r, ['is_active'], true),
+      };
+    })
+    .filter((row): row is TraceabilityEmployee => row !== null);
+};
+
 export const getTraceabilityReport = async (
-  query: PageQuery & { course_id?: number; status?: string } = {},
+  query: PageQuery & { course_id?: number; employee_id?: number; status?: string } = {},
 ): Promise<PageResult<TraceabilityRow>> => {
   const params: Record<string, string | number> = { ...buildPageParams(query) };
   if (query.course_id) {
     params.course_id = query.course_id;
+  }
+  if (query.employee_id) {
+    params.employee_id = query.employee_id;
   }
   if (query.status) {
     params.status = query.status;

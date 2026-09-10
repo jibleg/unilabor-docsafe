@@ -125,6 +125,33 @@ export interface TraceabilityRow {
   certificate_expiry_date: string | null;
 }
 
+export interface TraceabilityEmployee {
+  id: number;
+  full_name: string;
+  employee_code: string;
+  is_active: boolean;
+}
+
+/**
+ * Colaboradores que tienen al menos una evaluacion asignada, para el filtro
+ * del reporte de trazabilidad. Incluye inactivos: sus evaluaciones siguen
+ * siendo evidencia ISO y deben poder consultarse.
+ */
+export const listTraceabilityEmployees = async (): Promise<TraceabilityEmployee[]> => {
+  const result = await pool.query(
+    `SELECT DISTINCT e.id, e.full_name, e.employee_code, e.is_active
+       FROM public.evaluation_assignments a
+       JOIN public.employees e ON e.id = a.employee_id
+      ORDER BY e.full_name ASC, e.id ASC;`,
+  );
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    full_name: String(row.full_name),
+    employee_code: String(row.employee_code ?? ''),
+    is_active: Boolean(row.is_active),
+  }));
+};
+
 export interface TraceabilityFilters extends PaginationInput {
   course_id?: number;
   employee_id?: number;

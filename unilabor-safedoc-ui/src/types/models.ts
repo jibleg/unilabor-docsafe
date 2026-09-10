@@ -1164,6 +1164,14 @@ export interface TraceabilityRow {
   certificate_expiry_date: string | null;
 }
 
+/** Colaborador con al menos una evaluacion, para el filtro de trazabilidad. */
+export interface TraceabilityEmployee {
+  id: number;
+  full_name: string;
+  employee_code: string;
+  is_active: boolean;
+}
+
 export interface NotificationLogEntry {
   id: number;
   channel: 'email' | 'sms';

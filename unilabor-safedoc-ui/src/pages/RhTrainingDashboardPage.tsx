@@ -1,16 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, Eye, Loader2 } from 'lucide-react';
-import { getApiErrorMessage, getEvaluationDashboard, getTraceabilityReport } from '../api/service';
-import type { EvaluationDashboard, TraceabilityRow } from '../types/models';
+import {
+  getApiErrorMessage,
+  getEvaluationDashboard,
+  getTraceabilityReport,
+  listTraceabilityEmployees,
+} from '../api/service';
+import type { EvaluationDashboard, TraceabilityEmployee, TraceabilityRow } from '../types/models';
 import { notifyError } from '../utils/notify';
 import { EVALUATION_STATUS_META } from '../utils/evaluations';
 import { EvaluationResponsesModal } from '../components/rh/EvaluationResponsesModal';
 import { Pagination } from '../components/Pagination';
+import { SearchableSelect, type SearchableOption } from '../components/SearchableSelect';
 
 /** Estados cuyas evaluaciones ya tienen respuestas registradas para consultar. */
 const ANSWERED_STATUSES = new Set(['submitted', 'grading', 'passed', 'failed']);
 
 const TRACEABILITY_PAGE_SIZE = 10;
+
+/** Opciones del filtro de colaborador: '' = todos (convencion de SearchableSelect). */
+const buildEmployeeOptions = (employees: TraceabilityEmployee[]): SearchableOption[] =>
+  employees.map((employee) => ({
+    value: String(employee.id),
+    label: employee.full_name,
+    hint: [employee.employee_code, employee.is_active ? null : 'Inactivo'].filter(Boolean).join(' · '),
+  }));
 
 const formatDate = (iso: string | null): string =>
   iso ? new Date(iso).toLocaleDateString('es-MX', { dateStyle: 'short' }) : '-';
@@ -39,6 +53,8 @@ export const RhTrainingDashboardPage = () => {
   const [rows, setRows] = useState<TraceabilityRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [courseFilter, setCourseFilter] = useState<number | ''>('');
+  const [employeeFilter, setEmployeeFilter] = useState<string>('');
+  const [employees, setEmployees] = useState<TraceabilityEmployee[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -46,32 +62,41 @@ export const RhTrainingDashboardPage = () => {
   const [loadingReport, setLoadingReport] = useState(false);
   const [responsesAssignmentId, setResponsesAssignmentId] = useState<number | null>(null);
 
-  const loadReport = useCallback(async (courseId: number | '', status: string, targetPage: number) => {
-    setLoadingReport(true);
-    try {
-      const result = await getTraceabilityReport({
-        page: targetPage,
-        limit: TRACEABILITY_PAGE_SIZE,
-        ...(courseId ? { course_id: courseId } : {}),
-        ...(status ? { status } : {}),
-      });
-      setRows(result.data);
-      setPage(result.pagination.page);
-      setTotal(result.pagination.total);
-      setTotalPages(result.pagination.totalPages);
-    } finally {
-      setLoadingReport(false);
-    }
-  }, []);
+  const loadReport = useCallback(
+    async (courseId: number | '', employeeId: string, status: string, targetPage: number) => {
+      setLoadingReport(true);
+      try {
+        const result = await getTraceabilityReport({
+          page: targetPage,
+          limit: TRACEABILITY_PAGE_SIZE,
+          ...(courseId ? { course_id: courseId } : {}),
+          ...(employeeId ? { employee_id: Number(employeeId) } : {}),
+          ...(status ? { status } : {}),
+        });
+        setRows(result.data);
+        setPage(result.pagination.page);
+        setTotal(result.pagination.total);
+        setTotalPages(result.pagination.totalPages);
+      } finally {
+        setLoadingReport(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       setLoading(true);
       try {
-        const [dash] = await Promise.all([getEvaluationDashboard(), loadReport('', '', 1)]);
+        const [dash, employeeList] = await Promise.all([
+          getEvaluationDashboard(),
+          listTraceabilityEmployees(),
+          loadReport('', '', '', 1),
+        ]);
         if (active) {
           setDashboard(dash);
+          setEmployees(employeeList);
         }
       } catch (error) {
         if (active) {
@@ -92,7 +117,16 @@ export const RhTrainingDashboardPage = () => {
   const onCourseChange = async (value: number | '') => {
     setCourseFilter(value);
     try {
-      await loadReport(value, statusFilter, 1);
+      await loadReport(value, employeeFilter, statusFilter, 1);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo filtrar el reporte.'));
+    }
+  };
+
+  const onEmployeeChange = async (value: string) => {
+    setEmployeeFilter(value);
+    try {
+      await loadReport(courseFilter, value, statusFilter, 1);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo filtrar el reporte.'));
     }
@@ -101,7 +135,7 @@ export const RhTrainingDashboardPage = () => {
   const onStatusChange = async (value: string) => {
     setStatusFilter(value);
     try {
-      await loadReport(courseFilter, value, 1);
+      await loadReport(courseFilter, employeeFilter, value, 1);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo filtrar el reporte.'));
     }
@@ -109,7 +143,7 @@ export const RhTrainingDashboardPage = () => {
 
   const onPageChange = async (targetPage: number) => {
     try {
-      await loadReport(courseFilter, statusFilter, targetPage);
+      await loadReport(courseFilter, employeeFilter, statusFilter, targetPage);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cambiar de página.'));
     }
@@ -117,6 +151,7 @@ export const RhTrainingDashboardPage = () => {
 
   const totals = dashboard?.totals;
   const courses = useMemo(() => dashboard?.courses ?? [], [dashboard]);
+  const employeeOptions = useMemo(() => buildEmployeeOptions(employees), [employees]);
 
   return (
     <div className="space-y-6">
@@ -197,6 +232,17 @@ export const RhTrainingDashboardPage = () => {
                 Trazabilidad (evidencia ISO)
               </h2>
               <div className="flex flex-wrap gap-2">
+                <div className="w-full sm:w-72">
+                  <SearchableSelect
+                    value={employeeFilter}
+                    onChange={(value) => void onEmployeeChange(value)}
+                    options={employeeOptions}
+                    placeholder="Todos los colaboradores"
+                    emptyLabel="Todos los colaboradores"
+                    searchPlaceholder="Buscar por nombre o clave..."
+                    disabled={loadingReport}
+                  />
+                </div>
                 <select
                   value={courseFilter}
                   onChange={(event) => void onCourseChange(event.target.value ? Number(event.target.value) : '')}

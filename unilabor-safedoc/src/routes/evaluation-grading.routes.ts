@@ -8,6 +8,7 @@ import {
   listExpiredAssignmentsController,
   listGradingQueueController,
   listNotificationLogController,
+  traceabilityEmployeesController,
   traceabilityReportController,
 } from '../controllers/evaluation-grading.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
@@ -27,6 +28,7 @@ router.get('/notifications', requirePermission('RH.EVAL_GRADING.READ'), listNoti
 router.get('/expired', requirePermission('RH.EVAL_GRADING.READ'), listExpiredAssignmentsController);
 router.get('/dashboard', requirePermission('RH.EVAL_GRADING.READ'), evaluationDashboardController);
 router.get('/report', requirePermission('RH.EVAL_GRADING.READ'), traceabilityReportController);
+router.get('/report/employees', requirePermission('RH.EVAL_GRADING.READ'), traceabilityEmployeesController);
 router.get('/:id/grading', requirePermission('RH.EVAL_GRADING.READ'), getGradingDetailController);
 router.get('/:id/responses', requirePermission('RH.EVAL_GRADING.READ'), evaluationResponsesController);
 router.post('/:id/grade', requirePermission('RH.EVAL_GRADING.WRITE'), validate(gradeEvaluationSchema), gradeEvaluationController);

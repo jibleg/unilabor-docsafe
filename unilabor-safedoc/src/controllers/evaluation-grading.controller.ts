@@ -12,6 +12,7 @@ import {
   getEvaluationDashboard,
   getEvaluationResponsesDetail,
   getTraceabilityReport,
+  listTraceabilityEmployees,
 } from '../services/evaluation-report.service';
 
 const parseId = (value: unknown): number | null => {
@@ -89,6 +90,17 @@ export const evaluationDashboardController = async (_req: AuthRequest, res: Resp
   } catch (error) {
     console.error('Error obteniendo dashboard de evaluaciones:', error);
     return res.status(500).json({ message: 'No se pudo cargar el dashboard de capacitacion.' });
+  }
+};
+
+/** Colaboradores con evaluaciones, para el filtro del reporte de trazabilidad. */
+export const traceabilityEmployeesController = async (_req: AuthRequest, res: Response) => {
+  try {
+    const employees = await listTraceabilityEmployees();
+    return res.json({ employees });
+  } catch (error) {
+    console.error('Error listando colaboradores del reporte de trazabilidad:', error);
+    return res.status(500).json({ message: 'No se pudieron cargar los colaboradores.' });
   }
 };
 
