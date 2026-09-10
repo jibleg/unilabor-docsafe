@@ -1,6 +1,8 @@
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
 import { resolveEmployeeDocumentPath } from './employee-document.service';
+import fs from 'fs';
+import { extractReadingAnnexPage } from './reading/reading-annex.pdf';
 import { resolveSignedCopy } from './quality-reading-self.service';
 import type { AcknowledgementStatus } from './rh-document-acknowledgement.service';
 
@@ -237,14 +239,35 @@ const failBoard = (code: string, message: string): never => {
 };
 
 /**
- * Evidencia firmada de una fila del tablero, para que RH la presente en
- * auditoria. Cada fuente guarda su PDF en un lugar distinto:
+ * Hoja de acuse firmada de una fila del tablero, para que RH la presente en
+ * auditoria. Cada fuente guarda su PDF firmado (documento + hoja anexa al
+ * final) en un lugar distinto:
  *   * institutional -> copia firmada archivada en el expediente del firmante.
- *   * reading_room  -> archivo firmado que custodia Calidad (documento + hoja
- *     anexa con firma). El permiso de RH sobre el tablero ya autoriza verlo,
- *     por eso no se exige ser el dueño de la lectura.
+ *   * reading_room  -> archivo firmado que custodia Calidad. El permiso de RH
+ *     sobre el tablero ya autoriza verlo, por eso no se exige ser el dueno.
+ *
+ * REGLA: los documentos controlados nunca se exponen fuera del visor protegido.
+ * Por eso aqui se entrega UNICAMENTE la hoja de acuse (ultima pagina), que ya
+ * identifica el documento por titulo, identificador y SHA-256; nunca el PDF
+ * completo, que permitiria descargarlo o imprimirlo.
  */
-export const resolveBoardSignedCopy = async (
+export const loadBoardAcknowledgementSheet = async (
+  source: AcknowledgementSource,
+  acknowledgementId: number,
+): Promise<{ content: Buffer; fileName: string }> => {
+  const { absolutePath, fileName } = await resolveBoardSignedCopyPath(source, acknowledgementId);
+  const content = await extractReadingAnnexPage(fs.readFileSync(absolutePath));
+  return {
+    content,
+    fileName: fileName.replace(/ \(firmado\)\.pdf$/, ' - Hoja de acuse.pdf'),
+  };
+};
+
+/**
+ * Ruta del PDF firmado completo. Uso interno: NO servirlo por HTTP, la hoja
+ * de acuse se obtiene con `loadBoardAcknowledgementSheet`.
+ */
+const resolveBoardSignedCopyPath = async (
   source: AcknowledgementSource,
   acknowledgementId: number,
 ): Promise<{ absolutePath: string; fileName: string }> => {

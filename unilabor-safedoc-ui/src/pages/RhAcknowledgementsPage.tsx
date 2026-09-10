@@ -526,11 +526,11 @@ export const RhAcknowledgementsPage = () => {
                             type="button"
                             disabled={openingId === rowKey}
                             onClick={() => void handleOpenSignedCopy(item)}
-                            title="Abrir el acuse firmado (documento + hoja de firma)"
+                            title="Abrir la hoja de acuse firmada (no incluye el documento)"
                             className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-60"
                           >
                             <FileCheck2 size={13} />
-                            {openingId === rowKey ? 'Abriendo…' : 'Ver acuse firmado'}
+                            {openingId === rowKey ? 'Abriendo…' : 'Ver hoja de acuse'}
                           </button>
                         )}
                         {item.source === 'institutional' &&

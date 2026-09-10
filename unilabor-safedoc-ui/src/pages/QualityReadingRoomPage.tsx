@@ -182,8 +182,8 @@ export const QualityReadingRoomPage = () => {
     }
   };
 
-  // La evidencia firmada completa (documento + hoja anexa) la custodia Calidad;
-  // el gestor la abre desde aqui para auditoria.
+  // La evidencia firmada completa la custodia Calidad en disco; por HTTP solo
+  // se sirve la hoja de acuse (el documento controlado nunca sale del visor).
   const handleOpenSignedCopy = async (reader: ReadingAssignment) => {
     try {
       const url = await getReaderSignedCopyUrl(reader.publication_id, reader.id);
@@ -615,11 +615,11 @@ export const QualityReadingRoomPage = () => {
                       <button
                         type="button"
                         onClick={() => void handleOpenSignedCopy(reader)}
-                        title="Abrir el acuse firmado (documento + hoja de firma)"
+                        title="Abrir la hoja de acuse firmada (no incluye el documento)"
                         className="inline-flex items-center gap-1 rounded-full border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
                       >
                         <FileCheck2 size={13} />
-                        Ver acuse firmado
+                        Ver hoja de acuse
                       </button>
                     )}
                   </li>

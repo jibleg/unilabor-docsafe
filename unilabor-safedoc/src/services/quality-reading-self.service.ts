@@ -459,16 +459,17 @@ export const resolveSignedCopy = async (
 };
 
 /**
- * Constancia que se entrega al PROPIO lector: unicamente la hoja de acuse, sin
- * las paginas del documento. El documento del SGC es controlado y solo se
- * consulta dentro del visor protegido; la copia firmada completa queda como
- * evidencia en Calidad y la ve el gestor de la sala.
+ * Constancia de lectura: unicamente la hoja de acuse, sin las paginas del
+ * documento. El documento del SGC es controlado y solo se consulta dentro del
+ * visor protegido; la copia firmada completa queda como evidencia en disco y
+ * NUNCA se sirve por HTTP, ni al lector ni al gestor (`allowAnyOwner`).
  */
 export const loadReaderConstancia = async (
   readingId: number,
   userId: string,
+  options: { allowAnyOwner?: boolean } = {},
 ): Promise<{ content: Buffer; fileName: string }> => {
-  const { absolutePath, fileName } = await resolveSignedCopy(readingId, userId);
+  const { absolutePath, fileName } = await resolveSignedCopy(readingId, userId, options);
   const content = await extractReadingAnnexPage(fs.readFileSync(absolutePath));
   return {
     content,

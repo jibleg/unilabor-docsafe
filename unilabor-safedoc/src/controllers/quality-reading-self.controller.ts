@@ -8,7 +8,6 @@ import {
   loadReaderConstancia,
   registerReadingProgress,
   resolveMyReadingSource,
-  resolveSignedCopy,
   signReading,
 } from '../services/quality-reading-self.service';
 
@@ -178,12 +177,13 @@ export const signReadingController = async (req: AuthRequest, res: Response) => 
 };
 
 /**
- * Descarga de la constancia de lectura.
+ * Descarga de la constancia de lectura (solo la hoja de acuse).
  *
- * - Gestor (`manage`): recibe la copia firmada completa (documento + hoja
- *   anexa), que es la evidencia del SGC.
- * - Lector: recibe SOLO la hoja de constancia. El documento es controlado y no
- *   debe poder descargarse; se consulta unicamente en el visor protegido.
+ * Ni el lector ni el gestor (`manage`) reciben el documento completo: los
+ * documentos controlados solo se consultan en el visor protegido. La copia
+ * firmada completa queda en disco como evidencia; la hoja de acuse identifica
+ * al documento por titulo, identificador y SHA-256 y conserva valor probatorio.
+ * `manage` solo relaja el chequeo de dueno de la lectura.
  */
 export const downloadSignedCopyController =
   (options: { manage?: boolean } = {}) =>
@@ -199,17 +199,10 @@ export const downloadSignedCopyController =
     }
 
     try {
+      const { content, fileName } = await loadReaderConstancia(readingId, user.id, {
+        allowAnyOwner: options.manage === true,
+      });
       res.setHeader('Content-Type', 'application/pdf');
-
-      if (options.manage) {
-        const { absolutePath, fileName } = await resolveSignedCopy(readingId, user.id, {
-          allowAnyOwner: true,
-        });
-        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
-        return fs.createReadStream(absolutePath).pipe(res);
-      }
-
-      const { content, fileName } = await loadReaderConstancia(readingId, user.id);
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
       return res.send(content);
     } catch (error: any) {

@@ -1,11 +1,10 @@
-import fs from 'fs';
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import { getEmployeeForAuthenticatedUser } from '../services/employee-document.service';
 import {
   listAcknowledgementBoard,
-  resolveBoardSignedCopy,
+  loadBoardAcknowledgementSheet,
 } from '../services/rh-acknowledgement-board.service';
 import {
   listAcknowledgementsQuerySchema,
@@ -139,8 +138,9 @@ export const listAcknowledgementsController = async (req: AuthRequest, res: Resp
 };
 
 /**
- * Evidencia firmada (PDF) de cualquier fila del tablero, para presentarla en
- * auditoria. Se registra en auditoria porque expone el documento completo.
+ * Hoja de acuse firmada (PDF de una pagina) de cualquier fila del tablero, para
+ * presentarla en auditoria. Nunca se sirve el documento completo: los
+ * documentos controlados solo se consultan en el visor protegido.
  */
 export const downloadSignedCopyController = async (req: AuthRequest, res: Response) => {
   const parsed = signedCopyParamsSchema.safeParse(req.params ?? {});
@@ -155,7 +155,7 @@ export const downloadSignedCopyController = async (req: AuthRequest, res: Respon
 
   const { source, id } = parsed.data;
   try {
-    const { absolutePath, fileName } = await resolveBoardSignedCopy(source, id);
+    const { content, fileName } = await loadBoardAcknowledgementSheet(source, id);
 
     await registerAuditEvent({
       user_id: user.id,
@@ -169,7 +169,7 @@ export const downloadSignedCopyController = async (req: AuthRequest, res: Respon
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
-    return fs.createReadStream(absolutePath).pipe(res);
+    return res.send(content);
   } catch (error: any) {
     const mapped = mapError(res, error);
     if (mapped) {
