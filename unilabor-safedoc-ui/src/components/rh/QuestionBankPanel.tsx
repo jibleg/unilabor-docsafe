@@ -110,10 +110,18 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
   };
 
   const handleUse = async (item: QuestionBankItem) => {
+    // Evaluacion guiada: la pregunta conserva el documento del que la IA la
+    // derivo, para mostrarlo como pista al colaborador durante el examen.
+    const sourceDocument = item.document_id
+      ? phaseDocuments.find((doc) => doc.document_id === item.document_id) ?? null
+      : null;
     onUseQuestion({
       type: item.type,
       text: item.text,
       points: item.points,
+      source_document_id: item.document_id,
+      source_document_code: sourceDocument?.code ?? null,
+      source_document_title: sourceDocument?.title ?? null,
       options: item.options.map((option) => ({ text: option.text, is_correct: option.is_correct })),
     });
     setUsedIds((current) => new Set(current).add(item.id));

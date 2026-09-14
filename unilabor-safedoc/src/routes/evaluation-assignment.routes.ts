@@ -6,6 +6,7 @@ import {
   requestLateAuthorizationController,
   startMyEvaluationController,
   submitMyEvaluationController,
+  viewMyEvaluationSourceDocumentController,
 } from '../controllers/evaluation-assignment.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
@@ -30,6 +31,12 @@ router.get('/me/evaluations/pending-count', selfEvaluations, myPendingEvaluation
 router.get('/me/evaluations', selfEvaluations, listMyEvaluationsController);
 router.get('/me/evaluations/:id', selfEvaluations, getMyEvaluationDetailController);
 router.post('/me/evaluations/:id/start', selfEvaluations, startMyEvaluationController);
+// Evaluacion guiada: documento de apoyo de una pregunta, solo en visor protegido.
+router.get(
+  '/me/evaluations/:id/source-documents/:documentId/view',
+  selfEvaluations,
+  viewMyEvaluationSourceDocumentController,
+);
 router.post(
   '/me/evaluations/:id/submit',
   selfEvaluations,

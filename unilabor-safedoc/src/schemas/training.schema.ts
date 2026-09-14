@@ -124,6 +124,8 @@ const questionSchema = z
     text: requiredText('El texto de la pregunta es obligatorio'),
     points: z.coerce.number().int().positive('Los puntos deben ser mayores a 0').optional(),
     sort_order: z.coerce.number().int().optional(),
+    // Documento del SGC del que se tomo la pregunta (evaluacion guiada). Opcional.
+    source_document_id: z.string().uuid('Documento de origen invalido').nullable().optional(),
     options: z.array(questionOptionSchema).optional().default([]),
   })
   .superRefine((data, ctx) => {

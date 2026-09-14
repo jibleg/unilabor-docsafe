@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, Save, Trash2, X } from 'lucide-react';
+import { BookOpen, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
 import {
   getApiErrorMessage,
   getEvaluationTemplate,
@@ -145,9 +145,49 @@ export const EvaluationTemplateEditorModal = ({
   const changeQuestionType = (index: number, type: EvaluationQuestionType) =>
     setQuestions((current) =>
       current.map((question, i) =>
-        i === index ? { ...emptyQuestion(type), text: question.text, points: question.points } : question,
+        i === index
+          ? {
+              ...emptyQuestion(type),
+              text: question.text,
+              points: question.points,
+              source_document_id: question.source_document_id ?? null,
+              source_document_code: question.source_document_code ?? null,
+              source_document_title: question.source_document_title ?? null,
+            }
+          : question,
       ),
     );
+
+  // Evaluacion guiada: documento del SGC del que se tomo la pregunta. Se
+  // ofrecen los documentos obligatorios de la fase; si la pregunta ya trae uno
+  // que no esta en esa lista (p. ej. se quito de la fase) se conserva visible.
+  const sourceDocumentChoices = useMemo(() => {
+    const byId = new Map<string, { id: string; label: string }>();
+    for (const doc of inductionPhase?.documents ?? []) {
+      byId.set(doc.document_id, { id: doc.document_id, label: doc.code ? `${doc.code} · ${doc.title}` : doc.title });
+    }
+    for (const question of questions) {
+      if (question.source_document_id && !byId.has(question.source_document_id)) {
+        byId.set(question.source_document_id, {
+          id: question.source_document_id,
+          label: question.source_document_code
+            ? `${question.source_document_code} · ${question.source_document_title ?? ''}`
+            : (question.source_document_title ?? 'Documento no disponible'),
+        });
+      }
+    }
+    return [...byId.values()];
+  }, [inductionPhase, questions]);
+
+  const setSourceDocument = (index: number, documentId: string) => {
+    const choice = sourceDocumentChoices.find((entry) => entry.id === documentId) ?? null;
+    const phaseDoc = inductionPhase?.documents.find((doc) => doc.document_id === documentId) ?? null;
+    updateQuestion(index, {
+      source_document_id: choice ? choice.id : null,
+      source_document_code: phaseDoc?.code ?? null,
+      source_document_title: phaseDoc?.title ?? (choice ? choice.label : null),
+    });
+  };
 
   const updateOption = (qIndex: number, oIndex: number, patch: Partial<EvaluationQuestion['options'][number]>) =>
     setQuestions((current) =>
@@ -499,6 +539,28 @@ export const EvaluationTemplateEditorModal = ({
                       <Trash2 size={15} />
                     </button>
                   </div>
+
+                  {sourceDocumentChoices.length > 0 && (
+                    <div>
+                      <label className={labelClass}>
+                        <span className="inline-flex items-center gap-1">
+                          <BookOpen size={12} /> Documento de origen (pista para el colaborador)
+                        </span>
+                      </label>
+                      <select
+                        value={question.source_document_id ?? ''}
+                        onChange={(event) => setSourceDocument(qIndex, event.target.value)}
+                        className={inputClass}
+                      >
+                        <option value="">Sin pista (evaluación sin apoyo)</option>
+                        {sourceDocumentChoices.map((choice) => (
+                          <option key={choice.id} value={choice.id}>
+                            {choice.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="sm:col-span-2">

@@ -344,6 +344,9 @@ export const requestLateAuthorization = async (assignmentId: number, employeeId:
  * RH autoriza la realizacion extemporanea: reabre la ventana (mismo intento).
  * `reopenHours` permite fijar un plazo distinto (p. ej. 12 o 24h); si se omite,
  * se usa el window_hours del template (72h por defecto).
+ * Se limpia `started_at`: si el colaborador habia iniciado el intento antes de
+ * vencer, el cronometro (started_at + attempt_time_limit_minutes) ya estaria
+ * agotado y no podria presentar (la UI enviaria sola y el envio seria rechazado).
  */
 export const authorizeLateAttempt = async (
   assignmentId: number,
@@ -370,6 +373,7 @@ export const authorizeLateAttempt = async (
     `UPDATE public.evaluation_assignments
         SET status = 'authorized_late', available_at = NOW(),
             deadline_at = NOW() + ($2 || ' hours')::interval,
+            started_at = NULL,
             reminder_sent_at = NULL, late_requested_at = NULL, updated_at = NOW()
       WHERE id = $1;`,
     [assignmentId, windowHours],

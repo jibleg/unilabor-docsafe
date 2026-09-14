@@ -131,6 +131,9 @@ const normalizeQuestion = (input: unknown): EvaluationQuestion | null => {
     text,
     points: getNumber(source, ['points']) ?? 1,
     sort_order: getNumber(source, ['sort_order']) ?? undefined,
+    source_document_id: getString(source, ['source_document_id']) || null,
+    source_document_code: getString(source, ['source_document_code']) || null,
+    source_document_title: getString(source, ['source_document_title']) || null,
     options,
   };
 };
@@ -415,12 +418,21 @@ const normalizeTakingView = (input: unknown): EvaluationTakingView | null => {
                 })
                 .filter((o): o is { id: number; text: string; sort_order: number } => o !== null)
             : [];
+          const sourceDocument = asRecord(q.source_document);
+          const sourceDocumentId = sourceDocument ? getString(sourceDocument, ['id']) : '';
           return {
             id,
             type,
             text: getString(q, ['text']),
             points: getNumber(q, ['points']) ?? 1,
             sort_order: getNumber(q, ['sort_order']) ?? 0,
+            source_document: sourceDocumentId
+              ? {
+                  id: sourceDocumentId,
+                  code: getString(sourceDocument!, ['code']) || null,
+                  title: getString(sourceDocument!, ['title']),
+                }
+              : null,
             options,
           };
         })

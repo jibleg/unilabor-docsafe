@@ -7,6 +7,7 @@ import type {
   EvaluationTakingView,
 } from '../types';
 import { issueCertificateForAssignment } from './certificate-issuance.service';
+import { resolveStoredDocumentPath } from './document.service';
 import { tryNotifyNotAccredited } from './notification.service';
 
 /**
@@ -124,9 +125,11 @@ const loadAssignmentContext = async (
 /** Carga las preguntas del snapshot SIN exponer cual opcion es la correcta. */
 const loadTakingQuestions = async (assignmentId: number): Promise<EvaluationTakingQuestion[]> => {
   const questionsResult = await pool.query(
-    `SELECT q.id, q.type, q.text, q.points, aq.sort_order
+    `SELECT q.id, q.type, q.text, q.points, aq.sort_order,
+            q.source_document_id, d.code AS source_document_code, d.title AS source_document_title
        FROM public.evaluation_assignment_questions aq
        JOIN public.evaluation_questions q ON q.id = aq.question_id
+       LEFT JOIN public.documents d ON d.id = q.source_document_id
       WHERE aq.assignment_id = $1
       ORDER BY aq.sort_order ASC, q.id ASC;`,
     [assignmentId],
@@ -137,6 +140,16 @@ const loadTakingQuestions = async (assignmentId: number): Promise<EvaluationTaki
     text: String(row.text),
     points: Number(row.points),
     sort_order: Number(row.sort_order),
+    // Evaluacion guiada: si el documento fuente ya no existe (LEFT JOIN sin
+    // titulo) no se ofrece la pista, para no mostrar un enlace roto.
+    source_document:
+      row.source_document_id && row.source_document_title
+        ? {
+            id: String(row.source_document_id),
+            code: row.source_document_code ? String(row.source_document_code) : null,
+            title: String(row.source_document_title),
+          }
+        : null,
     options: [],
   }));
   if (questions.length === 0) {
@@ -181,6 +194,42 @@ const buildView = (ctx: AssignmentContext, questions: EvaluationTakingQuestion[]
 
 const isExpired = (deadlineIso: string): boolean => new Date(deadlineIso).getTime() <= Date.now();
 
+/**
+ * Evaluacion guiada: resuelve el PDF de un documento de apoyo para mostrarlo
+ * en el visor protegido mientras el colaborador responde. Lo autoriza el
+ * intento mismo (no el repositorio documental): la asignacion debe ser suya,
+ * seguir abierta y el documento debe ser el origen de alguna pregunta de SU
+ * snapshot. Asi nunca se expone un documento ajeno a la evaluacion en curso.
+ */
+export const resolveTakingSourceDocument = async (
+  assignmentId: number,
+  employeeId: number,
+  documentId: string,
+): Promise<{ absolutePath: string; title: string }> => {
+  const ctx = await loadAssignmentContext(assignmentId, employeeId);
+  if (!['pending', 'in_progress', 'authorized_late'].includes(ctx.status)) {
+    throwCoded('EVAL_NOT_ACTIONABLE');
+  }
+  const result = await pool.query(
+    `SELECT d.title, d.file_path
+       FROM public.evaluation_assignment_questions aq
+       JOIN public.evaluation_questions q ON q.id = aq.question_id
+       JOIN public.documents d ON d.id = q.source_document_id
+      WHERE aq.assignment_id = $1 AND q.source_document_id = $2::uuid
+      LIMIT 1;`,
+    [assignmentId, documentId],
+  );
+  if (result.rows.length === 0) {
+    throwCoded('EVAL_SOURCE_DOCUMENT_NOT_FOUND');
+  }
+  const row = result.rows[0];
+  try {
+    return { absolutePath: resolveStoredDocumentPath(String(row.file_path)), title: String(row.title) };
+  } catch {
+    return throwCoded('EVAL_SOURCE_DOCUMENT_FILE_MISSING');
+  }
+};
+
 export const getTakingView = async (
   assignmentId: number,
   employeeId: number,
@@ -203,6 +252,14 @@ export const startEvaluation = async (
   }
   if (isExpired(ctx.deadline_at)) {
     throwCoded('EVAL_WINDOW_EXPIRED');
+  }
+  // Intento ya iniciado cuyo cronometro se agoto sin que llegara el envio
+  // (cerro el navegador / perdio internet): no se reabre con el reloj vencido,
+  // porque la UI enviaria sola respuestas vacias y el envio seria rechazado.
+  // Se reporta el codigo claro para que RH autorice un nuevo intento.
+  const staleAttemptLimit = attemptDeadline(ctx);
+  if (staleAttemptLimit && Date.now() > staleAttemptLimit.getTime() + 30_000) {
+    throwCoded('EVAL_ATTEMPT_TIME_EXCEEDED');
   }
   await pool.query(
     `UPDATE public.evaluation_assignments

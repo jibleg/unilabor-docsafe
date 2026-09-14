@@ -43,6 +43,8 @@ export interface QuestionInput {
   text: string;
   points?: number;
   sort_order?: number;
+  /** Documento del SGC del que se tomo la pregunta (evaluacion guiada); null/undefined = sin pista. */
+  source_document_id?: string | null;
   options?: QuestionOptionInput[];
 }
 
@@ -86,15 +88,20 @@ const mapQuestionRow = (row: any): EvaluationQuestionRecord => ({
   text: String(row.text),
   points: Number(row.points),
   sort_order: Number(row.sort_order),
+  source_document_id: row.source_document_id ? String(row.source_document_id) : null,
+  source_document_code: row.source_document_code ? String(row.source_document_code) : null,
+  source_document_title: row.source_document_title ? String(row.source_document_title) : null,
   options: [],
 });
 
 const loadQuestions = async (templateId: number): Promise<EvaluationQuestionRecord[]> => {
   const questionsResult = await pool.query(
-    `SELECT id, template_id, type, text, points, sort_order
-       FROM public.evaluation_questions
-      WHERE template_id = $1 AND is_active = TRUE
-      ORDER BY sort_order ASC, id ASC;`,
+    `SELECT q.id, q.template_id, q.type, q.text, q.points, q.sort_order,
+            q.source_document_id, d.code AS source_document_code, d.title AS source_document_title
+       FROM public.evaluation_questions q
+       LEFT JOIN public.documents d ON d.id = q.source_document_id
+      WHERE q.template_id = $1 AND q.is_active = TRUE
+      ORDER BY q.sort_order ASC, q.id ASC;`,
     [templateId],
   );
   const questions = questionsResult.rows.map(mapQuestionRow);
@@ -360,9 +367,9 @@ const insertQuestionWithOptions = async (
   sortOrder: number,
 ): Promise<number> => {
   const inserted = await client.query(
-    `INSERT INTO public.evaluation_questions (template_id, type, text, points, sort_order)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id;`,
-    [templateId, question.type, question.text.trim(), question.points ?? 1, sortOrder],
+    `INSERT INTO public.evaluation_questions (template_id, type, text, points, sort_order, source_document_id)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id;`,
+    [templateId, question.type, question.text.trim(), question.points ?? 1, sortOrder, question.source_document_id ?? null],
   );
   const questionId = Number(inserted.rows[0]?.id);
   const options = question.type === 'open' ? [] : question.options ?? [];
@@ -451,9 +458,14 @@ export const replaceTemplateQuestions = async (
       handled.add(questionId);
 
       if (current.fingerprint === questionFingerprint(question)) {
+        // El documento de origen es metadato de apoyo (no cambia lo que se
+        // evaluo), asi que se actualiza en sitio aunque la pregunta ya este
+        // referenciada por intentos: no amerita una version nueva.
         await client.query(
-          `UPDATE public.evaluation_questions SET sort_order = $2, updated_at = NOW() WHERE id = $1;`,
-          [questionId, sortOrder],
+          `UPDATE public.evaluation_questions
+              SET sort_order = $2, source_document_id = $3, updated_at = NOW()
+            WHERE id = $1;`,
+          [questionId, sortOrder, question.source_document_id ?? null],
         );
         continue;
       }
@@ -475,9 +487,9 @@ export const replaceTemplateQuestions = async (
       // Nunca usada: se edita en sitio.
       await client.query(
         `UPDATE public.evaluation_questions
-            SET type = $2, text = $3, points = $4, sort_order = $5, updated_at = NOW()
+            SET type = $2, text = $3, points = $4, sort_order = $5, source_document_id = $6, updated_at = NOW()
           WHERE id = $1;`,
-        [questionId, question.type, question.text.trim(), question.points ?? 1, sortOrder],
+        [questionId, question.type, question.text.trim(), question.points ?? 1, sortOrder, question.source_document_id ?? null],
       );
       await client.query(`DELETE FROM public.evaluation_question_options WHERE question_id = $1;`, [questionId]);
       const options = question.type === 'open' ? [] : question.options ?? [];

@@ -1007,6 +1007,10 @@ export interface EvaluationQuestion {
   text: string;
   points: number;
   sort_order?: number;
+  /** Documento del SGC del que se tomó la pregunta (evaluación guiada); null = sin pista. */
+  source_document_id?: string | null;
+  source_document_code?: string | null;
+  source_document_title?: string | null;
   options: EvaluationQuestionOption[];
 }
 
@@ -1082,12 +1086,20 @@ export interface EvaluationTakingOption {
   sort_order: number;
 }
 
+export interface EvaluationSourceDocument {
+  id: string;
+  code: string | null;
+  title: string;
+}
+
 export interface EvaluationTakingQuestion {
   id: number;
   type: EvaluationQuestionType;
   text: string;
   points: number;
   sort_order: number;
+  /** Pista de apoyo (evaluación guiada): documento del que se tomó la pregunta. */
+  source_document: EvaluationSourceDocument | null;
   options: EvaluationTakingOption[];
 }
 

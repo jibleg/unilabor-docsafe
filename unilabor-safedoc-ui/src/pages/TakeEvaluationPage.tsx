@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertTriangle, ArrowLeft, ArrowRight, Award, CheckCircle2, Loader2, Send, Timer } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Award,
+  BookOpen,
+  CheckCircle2,
+  Loader2,
+  Send,
+  Timer,
+} from 'lucide-react';
 import {
   getApiErrorMessage,
   getEmployeeDocumentUrl,
@@ -9,7 +19,10 @@ import {
   submitMyEvaluation,
   type SubmitAnswerPayload,
 } from '../api/service';
+import { API_BASE_URL } from '../api/axios';
+import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import type {
+  EvaluationSourceDocument,
   EvaluationSubmitResult,
   EvaluationTakingQuestion,
   EvaluationTakingView,
@@ -53,6 +66,22 @@ const buildResultMessage = (result: EvaluationSubmitResult): CongratsMessage => 
 const cardClass =
   'rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/92 p-5 shadow-[0_10px_28px_rgba(0,65,106,0.06)] md:p-7';
 
+/**
+ * Muchos títulos del SGC ya empiezan con el código ("SGC-PRC-001 Procedimiento…");
+ * como el badge muestra el código aparte, se evita repetirlo en el nombre.
+ */
+const sourceDocumentName = (doc: EvaluationSourceDocument): string => {
+  if (!doc.code) {
+    return doc.title;
+  }
+  const trimmed = doc.title.trim();
+  if (trimmed.toUpperCase().startsWith(doc.code.toUpperCase())) {
+    const rest = trimmed.slice(doc.code.length).replace(/^[\s\-–·:]+/, '');
+    return rest || trimmed;
+  }
+  return trimmed;
+};
+
 const formatRemaining = (ms: number): string => {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -76,6 +105,9 @@ export const TakeEvaluationPage = () => {
   const [direction, setDirection] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<EvaluationSubmitResult | null>(null);
+  // Evaluación guiada: documento de apoyo abierto en el visor protegido
+  // (solo lectura en línea; el cronómetro sigue corriendo mientras se consulta).
+  const [openSourceDocument, setOpenSourceDocument] = useState<EvaluationSourceDocument | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -187,12 +219,21 @@ export const TakeEvaluationPage = () => {
     : null;
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const autoSubmittedRef = useRef(false);
+  // Solo se auto-envía si el cronómetro corrió en esta sesión: si la evaluación
+  // se abre con el tiempo ya agotado no hay nada capturado que enviar.
+  const hadTimeRef = useRef(false);
 
   useEffect(() => {
     if (!attemptDeadlineMs || result) {
       return;
     }
-    const tick = () => setRemainingMs(Math.max(0, attemptDeadlineMs - Date.now()));
+    const tick = () => {
+      const remaining = Math.max(0, attemptDeadlineMs - Date.now());
+      if (remaining > 0) {
+        hadTimeRef.current = true;
+      }
+      setRemainingMs(remaining);
+    };
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
@@ -203,6 +244,12 @@ export const TakeEvaluationPage = () => {
     // momento (el backend concede 30s de gracia por latencia).
     if (remainingMs === 0 && !result && !autoSubmittedRef.current) {
       autoSubmittedRef.current = true;
+      if (!hadTimeRef.current) {
+        setLoadError(
+          'El tiempo límite de este intento ya se había agotado. Contacta a RH si necesitas una nueva oportunidad.',
+        );
+        return;
+      }
       notifyError('Se agotó el tiempo del intento: se enviaron tus respuestas capturadas.');
       void handleSubmit();
     }
@@ -368,6 +415,29 @@ export const TakeEvaluationPage = () => {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className={cardClass}
           >
+            {current.source_document && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                  Documento de apoyo
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOpenSourceDocument(current.source_document)}
+                  title="Abrir el documento en el visor seguro"
+                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--color-brand-300)] bg-[var(--color-brand-500)] py-1 pl-1.5 pr-3 text-left text-xs font-semibold text-white shadow-[0_4px_12px_rgba(0,65,106,0.18)] transition hover:bg-[var(--color-brand-700)] focus:outline-none focus:ring-2 focus:ring-[rgba(124,173,211,0.5)]"
+                >
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20">
+                    <BookOpen size={13} />
+                  </span>
+                  {current.source_document.code && (
+                    <span className="shrink-0 rounded-md bg-white/22 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-wide">
+                      {current.source_document.code}
+                    </span>
+                  )}
+                  <span className="truncate">{sourceDocumentName(current.source_document)}</span>
+                </button>
+              </div>
+            )}
             <p className="mb-4 text-base font-semibold text-[var(--unilabor-ink)]">{current.text}</p>
 
             {current.type === 'open' ? (
@@ -448,6 +518,52 @@ export const TakeEvaluationPage = () => {
           </button>
         )}
       </div>
+
+      {/* Evaluación guiada: visor protegido del documento de apoyo */}
+      {openSourceDocument && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="my-auto w-full max-w-5xl overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/95 shadow-2xl shadow-[rgba(0,65,106,0.16)]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(0,65,106,0.08)] bg-white/96 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-500)]">
+                  Documento de apoyo
+                </p>
+                <div className="truncate text-sm font-bold text-[var(--color-brand-700)]">
+                  {openSourceDocument.code ? `${openSourceDocument.code} · ` : ''}
+                  {sourceDocumentName(openSourceDocument)}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {remainingMs !== null ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold tabular-nums ${
+                      remainingMs <= 60_000
+                        ? 'bg-rose-50 text-rose-600'
+                        : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)]'
+                    }`}
+                    title="Tiempo restante del intento"
+                  >
+                    <Timer size={13} />
+                    {formatRemaining(remainingMs)}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setOpenSourceDocument(null)}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)] hover:text-[var(--color-brand-700)]"
+                >
+                  <ArrowLeft size={15} />
+                  Volver a la pregunta
+                </button>
+              </div>
+            </div>
+            <PdfSafeViewer
+              key={openSourceDocument.id}
+              fileUrl={`${API_BASE_URL}/rh/me/evaluations/${assignmentId}/source-documents/${openSourceDocument.id}/view`}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,3 +1,4 @@
+import fs from 'fs';
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
@@ -11,6 +12,7 @@ import {
 } from '../services/evaluation-assignment.service';
 import {
   getTakingView,
+  resolveTakingSourceDocument,
   startEvaluation,
   submitEvaluation,
   type SubmitAnswerInput,
@@ -59,6 +61,10 @@ const mapAssignmentError = (res: Response, error: any): Response | null => {
       });
     case 'EVAL_NOT_ACTIONABLE':
       return res.status(409).json({ message: 'Esta evaluacion ya no se puede responder.' });
+    case 'EVAL_SOURCE_DOCUMENT_NOT_FOUND':
+      return res.status(404).json({ message: 'El documento de apoyo no pertenece a esta evaluacion.' });
+    case 'EVAL_SOURCE_DOCUMENT_FILE_MISSING':
+      return res.status(404).json({ message: 'No se encontro el archivo del documento de apoyo en el servidor.' });
     case 'EVAL_NOT_EXPIRED':
       return res.status(409).json({ message: 'Esta evaluacion no esta vencida.' });
     default:
@@ -217,6 +223,33 @@ export const startMyEvaluationController = async (req: AuthRequest, res: Respons
     if (mapped) return mapped;
     console.error('Error iniciando evaluacion:', error);
     return res.status(500).json({ message: 'No se pudo iniciar la evaluacion.' });
+  }
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Evaluacion guiada: sirve en linea (visor protegido, nunca descarga) el
+ * documento del SGC del que se tomo una pregunta del intento en curso.
+ */
+export const viewMyEvaluationSourceDocumentController = async (req: AuthRequest, res: Response) => {
+  const assignmentId = parseId(req.params.id);
+  const documentId = String(req.params.documentId ?? '');
+  if (!assignmentId || !UUID_PATTERN.test(documentId)) {
+    return res.status(400).json({ message: 'Documento de apoyo invalido.' });
+  }
+  try {
+    const employeeId = await requireOwnEmployee(req, res);
+    if (employeeId === null) return res;
+    const { absolutePath, title } = await resolveTakingSourceDocument(assignmentId, employeeId, documentId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(title)}.pdf"`);
+    return fs.createReadStream(absolutePath).pipe(res);
+  } catch (error: any) {
+    const mapped = mapAssignmentError(res, error);
+    if (mapped) return mapped;
+    console.error('Error sirviendo el documento de apoyo de la evaluacion:', error);
+    return res.status(500).json({ message: 'No se pudo abrir el documento de apoyo.' });
   }
 };
 
