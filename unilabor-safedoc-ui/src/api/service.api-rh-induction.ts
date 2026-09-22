@@ -83,6 +83,11 @@ export const unpublishInductionPhase = async (phaseId: number): Promise<void> =>
   await api.post(`/rh/induction/phases/${phaseId}/unpublish`);
 };
 
+export const updatePhaseAutoChecklist = async (phaseId: number, enabled: boolean): Promise<{ message: string; enabled: boolean }> => {
+  const response = await api.patch(`/rh/induction/phases/${phaseId}/auto-checklist`, { enabled });
+  return response.data as { message: string; enabled: boolean };
+};
+
 export const updatePhaseDuration = async (phaseId: number, durationHours: number | null): Promise<void> => {
   await api.patch(`/rh/induction/phases/${phaseId}/duration`, { duration_hours: durationHours });
 };

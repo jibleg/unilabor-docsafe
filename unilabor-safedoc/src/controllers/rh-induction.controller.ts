@@ -4,25 +4,29 @@ import pool from '../config/db';
 import { getEmployeeByUserId } from '../services/employee.service';
 import {
   addPhaseDocument,
-  addPhaseChecklistItem,
   enablePhaseForPosition,
   enrollAllEmployeesInPhase,
   getPhaseCertificateReadiness,
   enrollEmployeeInPhase,
   unenrollEmployeeFromPhase,
   getEmployeeInductionProgress,
-  listEnrollmentChecklistProgress,
   listInductionPhases,
-  listPhaseChecklistItems,
   listPhaseEnrollments,
   listPhasePositions,
-  removePhaseChecklistItem,
   removePhaseDocument,
   setEnrollmentSupervisor,
-  toggleChecklistItem,
   publishInductionPhase,
   unpublishInductionPhase,
 } from '../services/rh-induction.service';
+import {
+  addPhaseChecklistItem,
+  listEnrollmentChecklistProgress,
+  listPhaseChecklistItems,
+  removePhaseChecklistItem,
+  setPhaseAutoCompleteChecklist,
+  toggleChecklistItem,
+} from '../services/rh-induction-checklist.service';
+import type { UpdatePhaseAutoChecklistInput } from '../schemas/rh-induction-phase.schema';
 import { createEffectivenessReview, listEffectivenessReviews } from '../services/rh-induction-effectiveness.service';
 import { getEmployeeInductionMasterRecord } from '../services/rh-induction-master-record.service';
 import { buildInductionMasterRecordPdf } from '../services/rh-induction-master-record.pdf';
@@ -462,6 +466,29 @@ export const setEnrollmentSupervisorController = async (req: AuthRequest, res: R
   } catch (error: any) {
     console.error('Error actualizando supervisor de la inscripcion:', error);
     return res.status(500).json({ message: 'No se pudo actualizar el supervisor.' });
+  }
+};
+
+export const updatePhaseAutoChecklistController = async (req: AuthRequest, res: Response) => {
+  const phaseId = parsePositiveInt(req.params.phaseId);
+  if (!phaseId) {
+    return res.status(400).json({ message: 'ID de fase invalido.' });
+  }
+  const { enabled } = req.body as UpdatePhaseAutoChecklistInput;
+  try {
+    const updated = await setPhaseAutoCompleteChecklist(phaseId, enabled);
+    if (!updated) {
+      return res.status(404).json({ message: 'Fase no encontrada.' });
+    }
+    return res.json({
+      message: enabled
+        ? 'Al aprobar la fase, el checklist de contenidos se completara automaticamente.'
+        : 'El checklist de contenidos volvera a marcarse a mano.',
+      enabled,
+    });
+  } catch (error: any) {
+    console.error('Error actualizando el interruptor de checklist automatico:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar el interruptor del checklist.' });
   }
 };
 

@@ -1399,6 +1399,8 @@ export interface RhInductionPhase {
   reading_time_limit_hours: number | null;
   /** null = borrador: los inscritos no ven documentos ni evaluación hasta "Publicar fase". */
   published_at: string | null;
+  /** Interruptor "Completar checklist al aprobar": al acreditar la evaluación se marcan todos los contenidos. */
+  auto_complete_checklist_on_pass: boolean;
   documents: RhInductionPhaseDocument[];
 }
 

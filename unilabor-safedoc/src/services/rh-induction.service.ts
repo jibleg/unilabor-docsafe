@@ -42,6 +42,8 @@ export interface RhInductionPhase {
   reading_time_limit_hours: number | null;
   /** NULL = borrador: las inscripciones no asignan lecturas y los documentos no se muestran al colaborador. */
   published_at: string | null;
+  /** Interruptor "Completar checklist al aprobar": al acreditar la evaluacion se marcan todos los contenidos. */
+  auto_complete_checklist_on_pass: boolean;
   documents: RhInductionPhaseDocument[];
 }
 
@@ -50,6 +52,7 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
     SELECT
       p.id, p.phase_number, p.name, p.responsible_label, p.responsible_name, p.responsible_phone,
       p.scope, p.training_course_id, p.duration_hours, p.reading_time_limit_hours, p.published_at,
+      p.auto_complete_checklist_on_pass,
       tc.title AS training_course_title
     FROM public.rh_induction_phases p
     LEFT JOIN public.training_courses tc ON tc.id = p.training_course_id
@@ -72,6 +75,7 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
           ? Number(row.reading_time_limit_hours)
           : null,
       published_at: row.published_at ? new Date(row.published_at).toISOString() : null,
+      auto_complete_checklist_on_pass: Boolean(row.auto_complete_checklist_on_pass),
       documents: await listPhaseDocuments(Number(row.id)),
     })),
   );
@@ -954,111 +958,6 @@ export const setEnrollmentSupervisor = async (
     [supervisorEmployeeId, enrollmentId],
   );
   return result.rows.length > 0;
-};
-
-export interface RhInductionChecklistItem {
-  id: number;
-  phase_id: number;
-  item_text: string;
-  sort_order: number;
-}
-
-export const listPhaseChecklistItems = async (phaseId: number): Promise<RhInductionChecklistItem[]> => {
-  const result = await pool.query(
-    `SELECT id, phase_id, item_text, sort_order
-       FROM public.rh_induction_phase_checklist_items
-      WHERE phase_id = $1
-      ORDER BY sort_order ASC, id ASC;`,
-    [phaseId],
-  );
-  return result.rows.map((row) => ({
-    id: Number(row.id),
-    phase_id: Number(row.phase_id),
-    item_text: String(row.item_text),
-    sort_order: Number(row.sort_order ?? 0),
-  }));
-};
-
-export const addPhaseChecklistItem = async (
-  phaseId: number,
-  itemText: string,
-  sortOrder = 0,
-): Promise<RhInductionChecklistItem> => {
-  const result = await pool.query(
-    `INSERT INTO public.rh_induction_phase_checklist_items (phase_id, item_text, sort_order)
-     VALUES ($1, $2, $3) RETURNING id, phase_id, item_text, sort_order;`,
-    [phaseId, itemText, sortOrder],
-  );
-  const row = result.rows[0];
-  return {
-    id: Number(row.id),
-    phase_id: Number(row.phase_id),
-    item_text: String(row.item_text),
-    sort_order: Number(row.sort_order ?? 0),
-  };
-};
-
-export const removePhaseChecklistItem = async (checklistItemId: number): Promise<boolean> => {
-  const result = await pool.query(
-    `DELETE FROM public.rh_induction_phase_checklist_items WHERE id = $1;`,
-    [checklistItemId],
-  );
-  return (result.rowCount ?? 0) > 0;
-};
-
-export interface RhInductionChecklistProgressItem {
-  checklist_item_id: number;
-  item_text: string;
-  sort_order: number;
-  completed_at: string | null;
-}
-
-export const listEnrollmentChecklistProgress = async (
-  enrollmentId: number,
-): Promise<RhInductionChecklistProgressItem[]> => {
-  const phaseResult = await pool.query(
-    `SELECT phase_id FROM public.rh_induction_enrollments WHERE id = $1 LIMIT 1;`,
-    [enrollmentId],
-  );
-  if (phaseResult.rows.length === 0) {
-    return throwCoded('RH_INDUCTION_ENROLLMENT_NOT_FOUND', 'La inscripcion no existe.');
-  }
-  const result = await pool.query(
-    `SELECT ci.id AS checklist_item_id, ci.item_text, ci.sort_order, cp.completed_at
-       FROM public.rh_induction_phase_checklist_items ci
-       LEFT JOIN public.rh_induction_checklist_progress cp
-         ON cp.checklist_item_id = ci.id AND cp.enrollment_id = $2
-      WHERE ci.phase_id = $1
-      ORDER BY ci.sort_order ASC, ci.id ASC;`,
-    [phaseResult.rows[0].phase_id, enrollmentId],
-  );
-  return result.rows.map((row) => ({
-    checklist_item_id: Number(row.checklist_item_id),
-    item_text: String(row.item_text),
-    sort_order: Number(row.sort_order ?? 0),
-    completed_at: row.completed_at ? String(row.completed_at) : null,
-  }));
-};
-
-export const toggleChecklistItem = async (
-  enrollmentId: number,
-  checklistItemId: number,
-  userId: string,
-  completed: boolean,
-): Promise<void> => {
-  if (completed) {
-    await pool.query(
-      `INSERT INTO public.rh_induction_checklist_progress (enrollment_id, checklist_item_id, completed_by_user_id)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (enrollment_id, checklist_item_id) DO NOTHING;`,
-      [enrollmentId, checklistItemId, userId],
-    );
-    return;
-  }
-  await pool.query(
-    `DELETE FROM public.rh_induction_checklist_progress WHERE enrollment_id = $1 AND checklist_item_id = $2;`,
-    [enrollmentId, checklistItemId],
-  );
 };
 
 /**

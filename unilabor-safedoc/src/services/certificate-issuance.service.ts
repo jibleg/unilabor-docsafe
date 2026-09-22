@@ -8,6 +8,7 @@ import {
   getInductionPhaseByCourseId,
   type InductionCertificatePhaseContext,
 } from './rh-induction.service';
+import { autoCompleteChecklistForPassedAssignment } from './rh-induction-checklist.service';
 
 /**
  * Generacion REAL de la constancia al acreditar una evaluacion (>= passing_score)
@@ -76,6 +77,12 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
     return Number(row.certificate_document_id);
   }
 
+  // Gancho de Induccion: con el interruptor "Completar checklist al aprobar"
+  // encendido en la fase, se marcan los contenidos de la inscripcion. Corre
+  // solo mientras la constancia no exista (asi RH conserva sus desmarcados
+  // posteriores) y nunca bloquea la emision.
+  await tryAutoCompleteInductionChecklist(assignmentId);
+
   // Fase de Induccion (o null si es una capacitacion normal): decide el motor de
   // render Y la seccion del expediente donde se archiva la constancia.
   const inductionPhase = await getInductionPhaseByCourseId(Number(row.course_id));
@@ -125,6 +132,19 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
   };
 
   return persistCertificate(context, documentTypeId);
+};
+
+const tryAutoCompleteInductionChecklist = async (assignmentId: number): Promise<void> => {
+  try {
+    const result = await autoCompleteChecklistForPassedAssignment(assignmentId);
+    if (result && result.items_marked > 0) {
+      console.info(
+        `Induccion Fase ${result.phase_number}: checklist completado automaticamente (${result.items_marked} contenidos) para la inscripcion ${result.enrollment_id}.`,
+      );
+    }
+  } catch (error) {
+    console.error('No se pudo completar el checklist de Induccion al aprobar:', error);
+  }
 };
 
 const resolveIssuerUserId = async (preferredUserId: string | null): Promise<string | null> => {

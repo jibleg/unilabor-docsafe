@@ -24,6 +24,7 @@ import {
   removePhaseDocumentController,
   setEnrollmentSupervisorController,
   toggleChecklistItemController,
+  updatePhaseAutoChecklistController,
   updatePhaseContactController,
   updatePhaseDurationController,
   updatePhaseReadingLimitController,
@@ -40,6 +41,7 @@ import {
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { authorizeInductionRetrySchema } from '../schemas/rh-induction-retry.schema';
+import { updatePhaseAutoChecklistSchema } from '../schemas/rh-induction-phase.schema';
 import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
 import { closeInductionRecordSchema } from '../schemas/rh-induction-closure.schema';
 
@@ -66,6 +68,12 @@ router.post('/induction/phases/:phaseId/enroll-all', requirePermission('RH.INDUC
 router.get('/induction/phases/:phaseId/enrollments', requirePermission('RH.INDUCTION.MANAGE'), listPhaseEnrollmentsController);
 router.get('/employees/:employeeId/induction', requirePermission('RH.INDUCTION.MANAGE'), getEmployeeInductionProgressController);
 
+router.patch(
+  '/induction/phases/:phaseId/auto-checklist',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(updatePhaseAutoChecklistSchema),
+  updatePhaseAutoChecklistController,
+);
 router.get('/induction/phases/:phaseId/checklist-items', requirePermission('RH.INDUCTION.MANAGE'), listPhaseChecklistItemsController);
 router.post('/induction/phases/:phaseId/checklist-items', requirePermission('RH.INDUCTION.MANAGE'), addPhaseChecklistItemController);
 router.delete('/induction/checklist-items/:checklistItemId', requirePermission('RH.INDUCTION.MANAGE'), removePhaseChecklistItemController);

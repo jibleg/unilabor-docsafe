@@ -7,6 +7,7 @@ import {
   addPhaseDocument,
   publishInductionPhase,
   unpublishInductionPhase,
+  updatePhaseAutoChecklist,
   enablePhaseForPosition,
   enrollAllInPhase,
   enrollEmployeeInPhase,
@@ -72,6 +73,7 @@ export const RhInductionPage = () => {
 
   const [savingDocument, setSavingDocument] = useState(false);
   const [togglingPublish, setTogglingPublish] = useState(false);
+  const [togglingAutoChecklist, setTogglingAutoChecklist] = useState(false);
 
   const [responsibleName, setResponsibleName] = useState('');
   const [responsiblePhone, setResponsiblePhone] = useState('');
@@ -243,6 +245,30 @@ export const RhInductionPage = () => {
       toast.error(getApiErrorMessage(error, 'No se pudo actualizar el contacto.'));
     } finally {
       setSavingContact(false);
+    }
+  };
+
+  const handleToggleAutoChecklist = async () => {
+    if (!selectedPhase) return;
+    const enabling = !selectedPhase.auto_complete_checklist_on_pass;
+    const confirmed = await confirmAction(
+      enabling ? 'Completar checklist al aprobar' : 'Volver al marcado manual del checklist',
+      enabling
+        ? `Cuando un colaborador apruebe la evaluación de la Fase ${selectedPhase.phase_number}, el sistema marcará todos los contenidos del checklist de su inscripción con la cuenta de Recursos Humanos como autora. Podrás desmarcar contenidos a mano después.`
+        : `El checklist de contenidos de la Fase ${selectedPhase.phase_number} volverá a marcarse a mano inscrito por inscrito. Las marcas ya hechas se conservan.`,
+      enabling ? 'Activar' : 'Desactivar',
+      'primary',
+    );
+    if (!confirmed) return;
+    setTogglingAutoChecklist(true);
+    try {
+      const result = await updatePhaseAutoChecklist(selectedPhase.id, enabling);
+      toast.success(result.message);
+      await load();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo actualizar el interruptor del checklist.'));
+    } finally {
+      setTogglingAutoChecklist(false);
     }
   };
 
@@ -562,6 +588,31 @@ export const RhInductionPage = () => {
                     {selectedPhase.published_at
                       ? `Publicada el ${new Date(selectedPhase.published_at).toLocaleDateString('es-MX', { dateStyle: 'medium' })}: los inscritos ya ven sus documentos.`
                       : 'En borrador: puedes inscribir, pero nadie ve documentos hasta publicar.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleAutoChecklist()}
+                    disabled={togglingAutoChecklist}
+                    className={
+                      selectedPhase.auto_complete_checklist_on_pass
+                        ? 'inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60'
+                        : 'inline-flex items-center gap-2 rounded-xl border border-[rgba(191,212,230,0.8)] bg-white px-3 py-2 text-xs font-semibold text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.2)] disabled:opacity-60'
+                    }
+                    title="Al aprobar la evaluación de la fase, el sistema marca todos los contenidos del checklist"
+                  >
+                    {togglingAutoChecklist ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : selectedPhase.auto_complete_checklist_on_pass ? (
+                      <CheckSquare size={14} />
+                    ) : (
+                      <Square size={14} />
+                    )}
+                    Completar checklist al aprobar
+                  </button>
+                  <p className="text-[11px] text-[var(--unilabor-neutral)]">
+                    {selectedPhase.auto_complete_checklist_on_pass
+                      ? 'Activo: al aprobar la evaluación se marcan todos los contenidos (autor: Recursos Humanos).'
+                      : 'Inactivo: el checklist de contenidos se marca a mano por inscrito.'}
                   </p>
                 </div>
               </div>
