@@ -10,6 +10,7 @@ import type {
   MaintenanceTemplate,
   MaintenanceTemplatePayload,
   OrderExecutionPayload,
+  ProgramKpis,
   ProgramPayload,
   ProgramRoutine,
   RoutineInput,
@@ -36,6 +37,16 @@ const filtersToParams = (filters: CalendarFilters): Record<string, string> => {
 export const fetchProgramCalendar = async (from: string, to: string, filters: CalendarFilters): Promise<CalendarResponse> => {
   const response = await api.get('/helpdesk/maintenance-program/calendar', { params: { from, to, ...filtersToParams(filters) } });
   return unwrapPayload(response.data) as CalendarResponse;
+};
+
+export const fetchProgramKpis = async (from: string, to: string, filters: CalendarFilters): Promise<ProgramKpis> => {
+  const response = await api.get('/helpdesk/maintenance-program/kpis', { params: { from, to, ...filtersToParams(filters) } });
+  return asRecord(unwrapPayload(response.data))?.kpis as ProgramKpis;
+};
+
+export const downloadProgramReportPdf = async (from: string, to: string, filters: CalendarFilters): Promise<Blob> => {
+  const response = await api.get('/helpdesk/maintenance-program/report.pdf', { params: { from, to, ...filtersToParams(filters) }, responseType: 'blob' });
+  return response.data as Blob;
 };
 
 export const fetchProgramCoverage = async (filters: CalendarFilters): Promise<CoverageSummary> => {

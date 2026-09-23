@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Download, List, Loader2, Printer, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
+import { BarChart3, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Download, FileDown, List, Loader2, Printer, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
 import type { CalendarViewMode } from '../../../types/helpdesk-program';
 
 interface ProgramToolbarProps {
@@ -14,6 +14,9 @@ interface ProgramToolbarProps {
   onExportIcs: () => void;
   onPrint: () => void;
   onOpenCoverage: () => void;
+  onOpenKpis: () => void;
+  onDownloadPdf: () => void;
+  downloadingPdf: boolean;
   loading: boolean;
 }
 
@@ -40,6 +43,9 @@ export const ProgramToolbar = ({
   onExportIcs,
   onPrint,
   onOpenCoverage,
+  onOpenKpis,
+  onDownloadPdf,
+  downloadingPdf,
   loading,
 }: ProgramToolbarProps) => (
   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -89,6 +95,14 @@ export const ProgramToolbar = ({
       <button type="button" onClick={onOpenCoverage} className={iconButton} title="Activos que deberían tener programa y no lo tienen">
         <ShieldCheck size={14} />
         Cobertura
+      </button>
+      <button type="button" onClick={onOpenKpis} className={iconButton} title="Indicadores del periodo (cumplimiento, vencidas, downtime, correctivos repetidos)">
+        <BarChart3 size={14} />
+        Indicadores
+      </button>
+      <button type="button" onClick={onDownloadPdf} className={iconButton} disabled={downloadingPdf} title="Programa del periodo en PDF (evidencia firmable)">
+        {downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+        PDF
       </button>
       <button type="button" onClick={onExportIcs} className={iconButton} title="Exportar a Outlook / Google Calendar (.ics)">
         <Download size={14} />

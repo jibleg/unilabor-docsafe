@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDays } from 'lucide-react';
-import { fetchProgramCalendar, getApiErrorMessage, getHelpdeskOrgStructure, listEmployees, listHelpdeskCatalogs } from '../api/service';
+import { downloadProgramReportPdf, fetchProgramCalendar, getApiErrorMessage, getHelpdeskOrgStructure, listEmployees, listHelpdeskCatalogs } from '../api/service';
 import { CoveragePanel } from '../components/helpdesk/program/CoveragePanel';
+import { KpiPanel } from '../components/helpdesk/program/KpiPanel';
 import { ProgramAgendaView } from '../components/helpdesk/program/ProgramAgendaView';
 import { ProgramEventDrawer } from '../components/helpdesk/program/ProgramEventDrawer';
 import { ProgramFilterBar } from '../components/helpdesk/program/ProgramFilterBar';
@@ -61,6 +62,8 @@ export const HelpdeskProgramCalendarPage = () => {
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
   const [pendingDropDate, setPendingDropDate] = useState<string | null>(null);
   const [showCoverage, setShowCoverage] = useState(false);
+  const [showKpis, setShowKpis] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const range = useMemo(() => rangeFor(viewMode, anchor), [viewMode, anchor]);
 
@@ -150,6 +153,25 @@ export const HelpdeskProgramCalendarPage = () => {
     downloadTextFile(buildIcs(events), `programa-mantenimiento-${range.from}-${range.to}.ics`);
   };
 
+  const downloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const blob = await downloadProgramReportPdf(range.from, range.to, filters);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `programa-mantenimiento-${range.from}-${range.to}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo generar el PDF del programa.'));
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const title = titleFor(viewMode, anchor, range);
   const year = parseIsoDate(anchor).getFullYear();
 
@@ -179,6 +201,9 @@ export const HelpdeskProgramCalendarPage = () => {
           onExportIcs={exportIcs}
           onPrint={() => window.print()}
           onOpenCoverage={() => setShowCoverage(true)}
+          onOpenKpis={() => setShowKpis(true)}
+          onDownloadPdf={() => void downloadPdf()}
+          downloadingPdf={downloadingPdf}
           loading={loading}
         />
       </div>
@@ -235,6 +260,7 @@ export const HelpdeskProgramCalendarPage = () => {
       </div>
 
       <CoveragePanel open={showCoverage} filters={filters} onClose={() => setShowCoverage(false)} />
+      <KpiPanel open={showKpis} from={range.from} to={range.to} filters={filters} onClose={() => setShowKpis(false)} />
     </div>
   );
 };

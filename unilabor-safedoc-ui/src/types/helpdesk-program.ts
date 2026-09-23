@@ -82,6 +82,18 @@ export interface CalendarFilters {
   mine?: boolean;
 }
 
+export interface ProgramKpis {
+  from: string;
+  to: string;
+  compliance: { due: number; on_time: number; late: number; open_overdue: number; pct: number | null };
+  overdue_by_criticality: Array<{ criticality: string; count: number }>;
+  by_kind: Array<{ kind: string; scheduled: number; closed: number; overdue: number }>;
+  downtime: { orders_avg_minutes: number | null; tickets_avg_minutes: number | null; tickets_total_minutes: number };
+  pending_validation: number;
+  external_services: { scheduled: number; closed: number; without_evidence: number };
+  repeated_correctives: Array<{ asset_id: number; asset_code: string; name: string; tickets_6m: number; last_reported_at: string | null }>;
+}
+
 export interface CoverageGapAsset {
   id: number;
   asset_code: string;

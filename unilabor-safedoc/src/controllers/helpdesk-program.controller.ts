@@ -22,6 +22,9 @@ import {
 import { getCoverage, listCalendarEvents, type CalendarEventKind } from '../services/helpdesk-service-calendar.service';
 import { getMaintenanceOrderById } from '../services/helpdesk-maintenance.service';
 import { getPendingPostRepairVerification } from '../services/helpdesk-maintenance-verification.service';
+import { getProgramKpis } from '../services/helpdesk-program-kpi.service';
+import { renderProgramReportPdf } from '../services/helpdesk-program-report.pdf';
+import pool from '../config/db';
 import {
   attachOrderEvidence,
   closeMaintenanceOrder,
@@ -391,5 +394,74 @@ export const getTicketVerificationController = async (req: AuthRequest, res: Res
     return res.json({ verification: pending });
   } catch (error: any) {
     return fail(res, error, 'Error consultando verificacion post-reparacion del ticket:', 'No se pudo consultar la verificacion.');
+  }
+};
+
+const validRange = (req: AuthRequest): { from: string; to: string } | null => {
+  const from = queryText(req.query.from);
+  const to = queryText(req.query.to);
+  if (!from || !to || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) {
+    return null;
+  }
+  return { from, to };
+};
+
+export const getKpisController = async (req: AuthRequest, res: Response) => {
+  const range = validRange(req);
+  if (!range) {
+    return res.status(400).json({ message: 'Indica un rango de fechas valido (from/to en formato AAAA-MM-DD).' });
+  }
+  try {
+    const kpis = await getProgramKpis({ ...range, ...readCalendarFilters(req) });
+    return res.json({ kpis });
+  } catch (error: any) {
+    return fail(res, error, 'Error calculando indicadores del programa:', 'No se pudieron calcular los indicadores.');
+  }
+};
+
+const describeFilters = async (req: AuthRequest): Promise<string> => {
+  const parts: string[] = [];
+  const unitId = getNumberId(req.query.unit_id);
+  const areaId = getNumberId(req.query.area_id);
+  if (unitId) {
+    const r = await pool.query(`SELECT name FROM public.helpdesk_asset_units WHERE id = $1;`, [unitId]);
+    if (r.rows[0]) parts.push(`Unidad: ${r.rows[0].name}`);
+  }
+  if (areaId) {
+    const r = await pool.query(`SELECT name FROM public.helpdesk_asset_areas WHERE id = $1;`, [areaId]);
+    if (r.rows[0]) parts.push(`Area: ${r.rows[0].name}`);
+  }
+  const employeeId = getNumberId(req.query.responsible_employee_id);
+  if (employeeId) {
+    const r = await pool.query(`SELECT full_name FROM public.employees WHERE id = $1;`, [employeeId]);
+    if (r.rows[0]) parts.push(`Responsable: ${r.rows[0].full_name}`);
+  }
+  const search = queryText(req.query.search);
+  if (search) parts.push(`Busqueda: ${search}`);
+  return parts.length > 0 ? parts.join(' · ') : 'Todos los activos';
+};
+
+export const downloadProgramReportController = async (req: AuthRequest, res: Response) => {
+  const range = validRange(req);
+  if (!range) {
+    return res.status(400).json({ message: 'Indica un rango de fechas valido (from/to en formato AAAA-MM-DD).' });
+  }
+  try {
+    const data = await listCalendarEvents({ ...range, ...readCalendarFilters(req) });
+    const user = req.user?.id ? await pool.query(`SELECT full_name FROM public.users WHERE id = $1;`, [req.user.id]) : null;
+    const pdf = await renderProgramReportPdf({
+      from: range.from,
+      to: range.to,
+      filtersLabel: await describeFilters(req),
+      events: data.events,
+      summary: data.summary,
+      generatedBy: user?.rows[0]?.full_name ? String(user.rows[0].full_name) : null,
+    });
+    await logHelpdeskAudit(req.user?.id, `HELPDESK_MAINTENANCE_PROGRAM_REPORT:${range.from}:${range.to}`, req.ip, 0, 'helpdesk_maintenance_program');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="programa-mantenimiento-${range.from}-${range.to}.pdf"`);
+    return res.send(pdf);
+  } catch (error: any) {
+    return fail(res, error, 'Error generando el programa en PDF:', 'No se pudo generar el PDF del programa.');
   }
 };
