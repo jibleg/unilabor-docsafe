@@ -10,6 +10,8 @@ export interface HelpdeskAssetDocumentPayload {
   reference_key?: string | null;
   issued_on?: string | null;
   expires_on?: string | null;
+  /** Evidencia ligada a una orden de mantenimiento (Programa de Mantenimiento). */
+  maintenance_order_id?: number | null;
 }
 
 export interface HelpdeskAssetDocumentRecord {
@@ -20,6 +22,7 @@ export interface HelpdeskAssetDocumentRecord {
   document_kind_code: string | null;
   document_kind_name: string | null;
   lifecycle_event_id: number | null;
+  maintenance_order_id: number | null;
   file_path: string;
   file_size: number;
   mime_type: string;
@@ -69,6 +72,7 @@ const mapDocumentRow = (row: any): HelpdeskAssetDocumentRecord => ({
   document_kind_code: row.document_kind_code ? String(row.document_kind_code) : null,
   document_kind_name: row.document_kind_name ? String(row.document_kind_name) : null,
   lifecycle_event_id: row.lifecycle_event_id ? Number(row.lifecycle_event_id) : null,
+  maintenance_order_id: row.maintenance_order_id ? Number(row.maintenance_order_id) : null,
   file_path: String(row.file_path),
   file_size: Number(row.file_size ?? 0),
   mime_type: String(row.mime_type ?? 'application/pdf'),
@@ -97,6 +101,7 @@ export const getAssetDocumentById = async (
 
 export interface ListAssetDocumentsOptions {
   lifecycleEventId?: number | null;
+  maintenanceOrderId?: number | null;
   documentKindId?: number | null;
   currentOnly?: boolean;
 }
@@ -113,6 +118,10 @@ export const listAssetDocuments = async (
   if (options.lifecycleEventId) {
     params.push(options.lifecycleEventId);
     filters.push(`d.lifecycle_event_id = $${params.length}`);
+  }
+  if (options.maintenanceOrderId) {
+    params.push(options.maintenanceOrderId);
+    filters.push(`d.maintenance_order_id = $${params.length}`);
   }
   if (options.documentKindId) {
     params.push(options.documentKindId);
@@ -180,9 +189,9 @@ export const uploadAssetDocument = async (
         INSERT INTO public.helpdesk_asset_documents (
           asset_id, title, document_kind, document_kind_id, lifecycle_event_id,
           file_path, file_size, mime_type, reference_key, version, is_current,
-          replaces_document_id, issued_on, expires_on, uploaded_by_user_id
+          replaces_document_id, issued_on, expires_on, uploaded_by_user_id, maintenance_order_id
         )
-        VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, TRUE, $10, $11, $12, $13)
+        VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, TRUE, $10, $11, $12, $13, $14)
         RETURNING id;
       `,
       [
@@ -199,6 +208,7 @@ export const uploadAssetDocument = async (
         normalizeOptionalText(payload.issued_on),
         normalizeOptionalText(payload.expires_on),
         userId ?? null,
+        payload.maintenance_order_id ?? null,
       ],
     );
 

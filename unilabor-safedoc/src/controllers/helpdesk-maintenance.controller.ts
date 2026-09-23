@@ -2,7 +2,6 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import {
   addMaintenanceScheduleDates,
-  closeMaintenanceOrder,
   createMaintenancePlan,
   listMaintenanceCatalogs,
   listMaintenanceOrders,
@@ -11,6 +10,7 @@ import {
   startMaintenanceOrder,
   updateMaintenancePlan,
 } from '../services/helpdesk-maintenance.service';
+import { closeMaintenanceOrder } from '../services/helpdesk-maintenance-execution.service';
 import {
   getNumberId,
   mapHelpdeskError,

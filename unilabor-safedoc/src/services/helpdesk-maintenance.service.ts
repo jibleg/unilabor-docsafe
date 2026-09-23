@@ -2,6 +2,8 @@ import pool from '../config/db';
 import { toIsoDate, toIsoDateTime } from '../utils/date-serialization';
 import { withTransaction, type Queryable } from '../utils/transaction';
 import type { HelpdeskCatalogItem } from './helpdesk-asset.service';
+import { computeWindow, requiresResponsibleSignature, todayIso, windowState, type MaintenanceExecutorKind, type MaintenanceServiceKind, type WindowState } from './helpdesk-maintenance-recurrence';
+import { ensurePlanProjection, insertScheduledOrder, resyncPlanNextDue } from './helpdesk-maintenance-projection.service';
 import {
   PaginatedResult,
   PaginationInput,
@@ -104,7 +106,7 @@ export interface HelpdeskMaintenanceOrderReschedulePayload {
 export interface HelpdeskMaintenanceOrderRecord {
   id: number;
   order_code: string;
-  plan_id: number;
+  plan_id: number | null;
   asset_id: number;
   scheduled_for: string;
   window_starts_on: string | null;
@@ -121,6 +123,30 @@ export interface HelpdeskMaintenanceOrderRecord {
   rescheduled_from: string | null;
   rescheduled_at: string | null;
   reschedule_reason: string | null;
+  // Programa de mantenimiento (20260922_02)
+  is_projected: boolean;
+  program_version: number | null;
+  service_kind: MaintenanceServiceKind;
+  executor_kind: MaintenanceExecutorKind;
+  checklist_required: boolean;
+  evidence_required: boolean;
+  requires_responsible_signature: boolean;
+  window_state: WindowState | null;
+  ticket_id: number | null;
+  ticket_code: string | null;
+  derived_ticket_id: number | null;
+  derived_ticket_code: string | null;
+  executed_by_employee_id: number | null;
+  executed_by_employee_name: string | null;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  downtime_minutes: number | null;
+  has_technician_signature: boolean;
+  has_responsible_signature: boolean;
+  validated_at: string | null;
+  validated_by_user_id: string | null;
+  lifecycle_event_id: number | null;
+  constancia_document_id: number | null;
   created_at?: string;
   updated_at?: string;
   plan?: {
@@ -132,11 +158,21 @@ export interface HelpdeskMaintenanceOrderRecord {
     interval_months: number | null;
     tolerance_before_days: number;
     tolerance_after_days: number;
+    anchor_mode: 'FIXED' | 'FLOATING';
   } | null;
   asset?: {
     id: number;
     asset_code: string;
     name: string;
+    criticality_code: string | null;
+    criticality_name: string | null;
+    unit_name: string | null;
+    area_name: string | null;
+    category_name: string | null;
+    responsible_employee_id: number | null;
+    responsible_employee_name: string | null;
+    assigned_employee_id: number | null;
+    assigned_employee_name: string | null;
   } | null;
   checklist: Array<{
     id: number;
@@ -274,13 +310,40 @@ const buildOrderQuery = () => `
     p.frequency_id,
     p.tolerance_before_days,
     p.tolerance_after_days,
+    p.anchor_mode,
+    p.executor_kind,
+    p.checklist_required,
+    p.evidence_required,
     f.interval_months,
     a.asset_code,
-    a.name AS asset_name
+    a.name AS asset_name,
+    a.responsible_employee_id AS asset_responsible_employee_id,
+    a.assigned_employee_id AS asset_assigned_employee_id,
+    cr.code AS criticality_code,
+    cr.name AS criticality_name,
+    un.name AS unit_name,
+    ar.name AS area_name,
+    ca.name AS category_name,
+    re.full_name AS responsible_employee_name,
+    ae.full_name AS assigned_employee_name,
+    ex.full_name AS executed_by_employee_name,
+    su.name AS supplier_name,
+    t.ticket_code,
+    dt.ticket_code AS derived_ticket_code
   FROM public.helpdesk_maintenance_orders o
-  INNER JOIN public.helpdesk_maintenance_plans p ON p.id = o.plan_id
+  LEFT JOIN public.helpdesk_maintenance_plans p ON p.id = o.plan_id
   INNER JOIN public.helpdesk_assets a ON a.id = o.asset_id
   LEFT JOIN public.helpdesk_maintenance_frequencies f ON f.id = p.frequency_id
+  LEFT JOIN public.helpdesk_criticalities cr ON cr.id = a.criticality_id
+  LEFT JOIN public.helpdesk_asset_units un ON un.id = a.unit_id
+  LEFT JOIN public.helpdesk_asset_areas ar ON ar.id = a.area_id
+  LEFT JOIN public.helpdesk_asset_categories ca ON ca.id = a.category_id
+  LEFT JOIN public.employees re ON re.id = a.responsible_employee_id
+  LEFT JOIN public.employees ae ON ae.id = a.assigned_employee_id
+  LEFT JOIN public.employees ex ON ex.id = o.executed_by_employee_id
+  LEFT JOIN public.helpdesk_suppliers su ON su.id = o.supplier_id
+  LEFT JOIN public.helpdesk_tickets t ON t.id = o.ticket_id
+  LEFT JOIN public.helpdesk_tickets dt ON dt.id = o.derived_ticket_id
 `;
 
 const listOrderChecklist = async (orderId: number): Promise<HelpdeskMaintenanceOrderRecord['checklist']> => {
@@ -332,7 +395,7 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
   const order: HelpdeskMaintenanceOrderRecord = {
     id: orderId,
     order_code: String(row.order_code),
-    plan_id: Number(row.plan_id),
+    plan_id: row.plan_id ? Number(row.plan_id) : null,
     asset_id: Number(row.asset_id),
     scheduled_for: row.scheduled_for ? toIsoDate(row.scheduled_for) : '',
     window_starts_on: row.window_starts_on ? toIsoDate(row.window_starts_on) : null,
@@ -346,9 +409,42 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
     provider_name: row.provider_name ? String(row.provider_name) : null,
     result: row.result ? String(row.result) : null,
     evidence_notes: row.evidence_notes ? String(row.evidence_notes) : null,
-    rescheduled_from: row.rescheduled_from ? String(row.rescheduled_from) : null,
+    rescheduled_from: row.rescheduled_from ? toIsoDate(row.rescheduled_from) : null,
     rescheduled_at: row.rescheduled_at ? toIsoDateTime(row.rescheduled_at) : null,
     reschedule_reason: row.reschedule_reason ? String(row.reschedule_reason) : null,
+    is_projected: Boolean(row.is_projected),
+    program_version: row.program_version !== null && row.program_version !== undefined ? Number(row.program_version) : null,
+    service_kind: (row.service_kind ?? 'PREVENTIVE') as MaintenanceServiceKind,
+    executor_kind: (row.executor_kind ?? 'INTERNAL_TECH') as MaintenanceExecutorKind,
+    checklist_required: row.checklist_required === undefined || row.checklist_required === null ? true : Boolean(row.checklist_required),
+    evidence_required: row.evidence_required === undefined || row.evidence_required === null ? true : Boolean(row.evidence_required),
+    requires_responsible_signature: requiresResponsibleSignature(
+      (row.executor_kind ?? 'INTERNAL_TECH') as MaintenanceExecutorKind,
+      row.criticality_code ? String(row.criticality_code) : null,
+    ),
+    window_state:
+      String(row.status) === 'CLOSED'
+        ? null
+        : windowState(
+            row.window_starts_on ? toIsoDate(row.window_starts_on) : null,
+            row.window_ends_on ? toIsoDate(row.window_ends_on) : null,
+            todayIso(),
+          ),
+    ticket_id: row.ticket_id ? Number(row.ticket_id) : null,
+    ticket_code: row.ticket_code ? String(row.ticket_code) : null,
+    derived_ticket_id: row.derived_ticket_id ? Number(row.derived_ticket_id) : null,
+    derived_ticket_code: row.derived_ticket_code ? String(row.derived_ticket_code) : null,
+    executed_by_employee_id: row.executed_by_employee_id ? Number(row.executed_by_employee_id) : null,
+    executed_by_employee_name: row.executed_by_employee_name ? String(row.executed_by_employee_name) : null,
+    supplier_id: row.supplier_id ? Number(row.supplier_id) : null,
+    supplier_name: row.supplier_name ? String(row.supplier_name) : null,
+    downtime_minutes: row.downtime_minutes !== null && row.downtime_minutes !== undefined ? Number(row.downtime_minutes) : null,
+    has_technician_signature: Boolean(row.technician_signature_path),
+    has_responsible_signature: Boolean(row.responsible_signature_path),
+    validated_at: row.validated_at ? toIsoDateTime(row.validated_at) : null,
+    validated_by_user_id: row.validated_by_user_id ? String(row.validated_by_user_id) : null,
+    lifecycle_event_id: row.lifecycle_event_id ? Number(row.lifecycle_event_id) : null,
+    constancia_document_id: row.constancia_document_id ? Number(row.constancia_document_id) : null,
     plan: row.plan_id
       ? {
           id: Number(row.plan_id),
@@ -359,6 +455,7 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
           interval_months: row.interval_months ? Number(row.interval_months) : null,
           tolerance_before_days: Number(row.tolerance_before_days ?? 0),
           tolerance_after_days: Number(row.tolerance_after_days ?? 0),
+          anchor_mode: row.anchor_mode === 'FLOATING' ? 'FLOATING' : 'FIXED',
         }
       : null,
     asset: row.asset_id
@@ -366,6 +463,15 @@ const mapOrderRow = async (row: any): Promise<HelpdeskMaintenanceOrderRecord> =>
           id: Number(row.asset_id),
           asset_code: String(row.asset_code ?? ''),
           name: String(row.asset_name ?? ''),
+          criticality_code: row.criticality_code ? String(row.criticality_code) : null,
+          criticality_name: row.criticality_name ? String(row.criticality_name) : null,
+          unit_name: row.unit_name ? String(row.unit_name) : null,
+          area_name: row.area_name ? String(row.area_name) : null,
+          category_name: row.category_name ? String(row.category_name) : null,
+          responsible_employee_id: row.asset_responsible_employee_id ? Number(row.asset_responsible_employee_id) : null,
+          responsible_employee_name: row.responsible_employee_name ? String(row.responsible_employee_name) : null,
+          assigned_employee_id: row.asset_assigned_employee_id ? Number(row.asset_assigned_employee_id) : null,
+          assigned_employee_name: row.assigned_employee_name ? String(row.assigned_employee_name) : null,
         }
       : null,
     checklist: await listOrderChecklist(orderId),
@@ -581,32 +687,28 @@ const createScheduledOrder = async (
   userId?: string | null,
   executor: Queryable = pool,
 ) => {
-  const orderCode = await generateOrderCode();
-
-  await executor.query(
-    `
-      INSERT INTO public.helpdesk_maintenance_orders (
-        order_code,
-        plan_id,
-        asset_id,
-        scheduled_for,
-        window_starts_on,
-        window_ends_on,
-        created_by_user_id
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      ON CONFLICT (plan_id, scheduled_for) DO NOTHING;
-    `,
-    [
-      orderCode,
-      planId,
-      assetId,
-      nextDueOn,
-      addDays(nextDueOn, -Math.max(toleranceBeforeDays, 0)),
-      addDays(nextDueOn, Math.max(toleranceAfterDays, 0)),
-      userId ?? null,
-    ],
+  const ctx = await executor.query(
+    `SELECT p.service_kind, g.version, cr.code AS criticality_code
+       FROM public.helpdesk_maintenance_plans p
+       LEFT JOIN public.helpdesk_asset_maintenance_programs g ON g.id = p.program_id
+       LEFT JOIN public.helpdesk_assets a ON a.id = p.asset_id
+       LEFT JOIN public.helpdesk_criticalities cr ON cr.id = a.criticality_id
+      WHERE p.id = $1 LIMIT 1;`,
+    [planId],
   );
+  const row = ctx.rows[0] ?? {};
+  await insertScheduledOrder(executor, {
+    planId,
+    assetId,
+    scheduledFor: nextDueOn,
+    beforeDays: toleranceBeforeDays,
+    afterDays: toleranceAfterDays,
+    criticalityCode: row.criticality_code ? String(row.criticality_code) : null,
+    serviceKind: (row.service_kind ?? 'PREVENTIVE') as MaintenanceServiceKind,
+    programVersion: row.version ? Number(row.version) : null,
+    isProjected: false,
+    userId: userId ?? null,
+  });
 };
 
 export const createMaintenancePlan = async (
@@ -686,6 +788,7 @@ export const createMaintenancePlan = async (
       userId,
       client,
     );
+    await ensurePlanProjection(id, { userId }, client);
 
     return id;
   });
@@ -776,6 +879,7 @@ export const updateMaintenancePlan = async (
       userId,
       client,
     );
+    await ensurePlanProjection(planId, { userId }, client);
   });
 
   return getMaintenancePlanById(planId);
@@ -866,6 +970,7 @@ export const startMaintenanceOrder = async (
       SET
         status = 'IN_PROGRESS',
         started_at = COALESCE(started_at, NOW()),
+        is_projected = FALSE,
         updated_by_user_id = $2,
         updated_at = NOW()
       WHERE id = $1
@@ -895,6 +1000,12 @@ export const rescheduleMaintenanceOrder = async (
 
   const beforeDays = current.plan?.tolerance_before_days ?? 0;
   const afterDays = current.plan?.tolerance_after_days ?? 0;
+  const window = computeWindow({
+    scheduledFor: payload.scheduled_for,
+    beforeDays,
+    afterDays,
+    criticalityCode: current.asset?.criticality_code ?? null,
+  });
 
   await withTransaction(async (client) => {
     await client.query(
@@ -909,141 +1020,17 @@ export const rescheduleMaintenanceOrder = async (
           rescheduled_at = NOW(),
           reschedule_reason = $5,
           reminder_sent_at = NULL,
+          is_projected = FALSE,
           updated_by_user_id = $6,
           updated_at = NOW()
         WHERE id = $1
           AND status IN ('SCHEDULED', 'RESCHEDULED');
       `,
-      [
-        orderId,
-        payload.scheduled_for,
-        addDays(payload.scheduled_for, -Math.max(beforeDays, 0)),
-        addDays(payload.scheduled_for, Math.max(afterDays, 0)),
-        payload.reschedule_reason.trim(),
-        userId ?? null,
-      ],
+      [orderId, payload.scheduled_for, window.starts_on, window.ends_on, payload.reschedule_reason.trim(), userId ?? null],
     );
 
-    await client.query(
-      `
-        UPDATE public.helpdesk_maintenance_plans
-        SET next_due_on = $2, updated_by_user_id = $3, updated_at = NOW()
-        WHERE id = $1;
-      `,
-      [current.plan_id, payload.scheduled_for, userId ?? null],
-    );
-  });
-
-  return getMaintenanceOrderById(orderId);
-};
-
-export const closeMaintenanceOrder = async (
-  orderId: number,
-  payload: HelpdeskMaintenanceOrderClosePayload,
-  userId?: string | null,
-): Promise<HelpdeskMaintenanceOrderRecord | null> => {
-  await assertMaintenanceTables();
-
-  const current = await getMaintenanceOrderById(orderId);
-  if (!current) {
-    return null;
-  }
-
-  if (current.status === 'CLOSED') {
-    throw invalidOrderState('Esta orden de mantenimiento ya esta cerrada.');
-  }
-
-  await withTransaction(async (client) => {
-    await client.query(
-      `
-        UPDATE public.helpdesk_maintenance_orders
-        SET
-          status = 'CLOSED',
-          started_at = COALESCE(started_at, NOW()),
-          completed_at = $2,
-          completed_by_user_id = $3,
-          performed_activities = $4,
-          findings = $5,
-          provider_name = $6,
-          result = $7,
-          evidence_notes = $8,
-          updated_by_user_id = $3,
-          updated_at = NOW()
-        WHERE id = $1;
-      `,
-      [
-        orderId,
-        payload.completed_at,
-        userId ?? null,
-        payload.performed_activities.trim(),
-        normalizeOptionalText(payload.findings),
-        normalizeOptionalText(payload.provider_name),
-        payload.result.trim(),
-        normalizeOptionalText(payload.evidence_notes),
-      ],
-    );
-
-    await client.query('DELETE FROM public.helpdesk_maintenance_order_checklist WHERE order_id = $1;', [orderId]);
-
-    const checklist = payload.checklist ?? [];
-    for (const [index, item] of checklist.entries()) {
-      const taskText = normalizeOptionalText(item.task_text);
-      if (!taskText) {
-        continue;
-      }
-
-      await client.query(
-        `
-          INSERT INTO public.helpdesk_maintenance_order_checklist (
-            order_id,
-            plan_task_id,
-            task_text,
-            result,
-            notes,
-            sort_order
-          )
-          VALUES ($1, $2, $3, $4, $5, $6);
-        `,
-        [
-          orderId,
-          item.plan_task_id ?? null,
-          taskText,
-          normalizeOptionalText(item.result) ?? 'PENDING',
-          normalizeOptionalText(item.notes),
-          (index + 1) * 10,
-        ],
-      );
-    }
-
-    // En modo CALENDAR las fechas las provee el proveedor (ya cargadas); no se
-    // autogenera la siguiente al cerrar. Solo FREQUENCY deriva del intervalo.
-    if (
-      current.plan?.schedule_mode === 'FREQUENCY' &&
-      current.plan?.interval_months &&
-      current.plan.interval_months > 0
-    ) {
-      const nextDueOn = addMonths(current.scheduled_for, current.plan.interval_months);
-      await client.query(
-        `
-          UPDATE public.helpdesk_maintenance_plans
-          SET next_due_on = $2, updated_by_user_id = $3, updated_at = NOW()
-          WHERE id = $1;
-        `,
-        [current.plan_id, nextDueOn, userId ?? null],
-      );
-
-      await createScheduledOrder(
-        current.plan_id,
-        current.asset_id,
-        nextDueOn,
-        current.plan.tolerance_before_days,
-        current.plan.tolerance_after_days,
-        userId,
-        client,
-      );
-    } else if (current.plan?.schedule_mode === 'CALENDAR') {
-      // Fechas provistas: apuntar next_due_on a la orden pendiente mas proxima.
-      await resyncNextDueOn(current.plan_id, userId, client);
+    if (current.plan_id) {
+      await resyncPlanNextDue(current.plan_id, userId, client);
     }
   });
 

@@ -95,18 +95,19 @@ export const processServiceReminders = async (kind: ServiceKind): Promise<number
   const windowDays = getReminderWindowDays();
   const candidates = await pool.query(
     `
-      SELECT o.id, o.scheduled_for, p.plan_code, p.title AS plan_title,
+      SELECT o.id, o.scheduled_for, COALESCE(p.plan_code, 'VERIFICACION') AS plan_code,
+             COALESCE(p.title, 'Verificacion post-reparacion') AS plan_title,
              a.asset_code, a.name AS asset_name,
              op.full_name AS op_name, op.email AS op_email, op.phone AS op_phone,
              rs.full_name AS rs_name, rs.email AS rs_email, rs.phone AS rs_phone
         FROM public.${cfg.ordersTable} o
-        JOIN public.${cfg.plansTable} p ON p.id = o.plan_id
+        LEFT JOIN public.${cfg.plansTable} p ON p.id = o.plan_id
         JOIN public.helpdesk_assets a ON a.id = o.asset_id
         LEFT JOIN public.employees op ON op.id = a.assigned_employee_id
         LEFT JOIN public.employees rs ON rs.id = a.responsible_employee_id
        WHERE o.status IN ('SCHEDULED', 'RESCHEDULED')
          AND o.reminder_sent_at IS NULL
-         AND o.scheduled_for <= (CURRENT_DATE + ($1 || ' days')::interval)
+         AND COALESCE(o.window_starts_on, o.scheduled_for) <= (CURRENT_DATE + ($1 || ' days')::interval)
        ORDER BY o.scheduled_for ASC;
     `,
     [windowDays],
@@ -142,11 +143,136 @@ export const processServiceReminders = async (kind: ServiceKind): Promise<number
   return notified;
 };
 
-/** Un ciclo del scheduler: recordatorios de mantenimiento y calibracion. */
-export const runServiceReminderTick = async (): Promise<{ maintenance: number; calibration: number }> => {
+const ESCALATION_AFTER_DAYS_DEFAULT = 3;
+
+export const getEscalationAfterDays = (): number => {
+  const raw = Number(process.env.SERVICE_ESCALATION_DAYS);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : ESCALATION_AFTER_DAYS_DEFAULT;
+};
+
+/**
+ * Programa de Mantenimiento, nivel 2: aviso de VENCIDA al operador y responsable
+ * el dia siguiente al "hasta" de la ventana (una sola vez por orden).
+ */
+export const processMaintenanceOverdue = async (): Promise<number> => {
+  if (!(await tableExists('helpdesk_maintenance_orders'))) {
+    return 0;
+  }
+  const candidates = await pool.query(
+    `
+      SELECT o.id, o.order_code, o.scheduled_for, o.window_ends_on, COALESCE(p.title, 'Verificacion post-reparacion') AS plan_title,
+             a.asset_code, a.name AS asset_name,
+             op.full_name AS op_name, op.email AS op_email, op.phone AS op_phone,
+             rs.full_name AS rs_name, rs.email AS rs_email, rs.phone AS rs_phone
+        FROM public.helpdesk_maintenance_orders o
+        LEFT JOIN public.helpdesk_maintenance_plans p ON p.id = o.plan_id
+        JOIN public.helpdesk_assets a ON a.id = o.asset_id
+        LEFT JOIN public.employees op ON op.id = a.assigned_employee_id
+        LEFT JOIN public.employees rs ON rs.id = a.responsible_employee_id
+       WHERE o.status IN ('SCHEDULED', 'RESCHEDULED', 'IN_PROGRESS')
+         AND o.overdue_notified_at IS NULL
+         AND o.window_ends_on IS NOT NULL
+         AND o.window_ends_on < CURRENT_DATE
+       ORDER BY o.window_ends_on ASC;
+    `,
+  );
+  let notified = 0;
+  for (const row of candidates.rows) {
+    const recipients = collectRecipients(row);
+    if (recipients.length === 0) {
+      continue;
+    }
+    const limit = formatDate(String(row.window_ends_on));
+    const assetLabel = `${row.asset_code} — ${row.asset_name}`;
+    const subject = `Mantenimiento VENCIDO: ${row.asset_code} (${row.order_code})`;
+    for (const r of recipients) {
+      await sendGenericNotification(
+        r,
+        subject,
+        `Hola ${r.name},\nLa orden ${row.order_code} (${row.plan_title}) del equipo ${assetLabel} vencio el ${limit} sin registrar su ejecucion.\nRegistra el servicio o reprograma con justificacion en SafeDoc > Programa de Mantenimiento.`,
+        `SafeDoc: mantenimiento VENCIDO ${row.asset_code} (${row.order_code}), limite ${limit}.`,
+        'maintenance_overdue',
+      );
+    }
+    await pool.query(`UPDATE public.helpdesk_maintenance_orders SET overdue_notified_at = NOW() WHERE id = $1;`, [row.id]);
+    notified += 1;
+  }
+  return notified;
+};
+
+/**
+ * Nivel 3: escalamiento de ordenes de activos CRITICOS vencidas mas de N dias,
+ * a los responsables del area (estructura organizacional) y al correo de
+ * coordinacion de Help Desk (HELPDESK_ESCALATION_EMAIL). Una sola vez por orden.
+ */
+export const processMaintenanceEscalation = async (): Promise<number> => {
+  if (!(await tableExists('helpdesk_maintenance_orders'))) {
+    return 0;
+  }
+  const afterDays = getEscalationAfterDays();
+  const candidates = await pool.query(
+    `
+      SELECT o.id, o.order_code, o.window_ends_on, COALESCE(p.title, 'Verificacion post-reparacion') AS plan_title,
+             a.id AS asset_id, a.asset_code, a.name AS asset_name, a.area_id, ar.name AS area_name,
+             (SELECT COALESCE(json_agg(json_build_object('name', u.full_name, 'email', u.email)), '[]'::json)
+                FROM public.helpdesk_area_responsibles rp JOIN public.users u ON u.id = rp.user_id AND u.is_active = TRUE
+               WHERE rp.area_id = a.area_id) AS area_responsibles
+        FROM public.helpdesk_maintenance_orders o
+        LEFT JOIN public.helpdesk_maintenance_plans p ON p.id = o.plan_id
+        JOIN public.helpdesk_assets a ON a.id = o.asset_id
+        LEFT JOIN public.helpdesk_asset_areas ar ON ar.id = a.area_id
+        LEFT JOIN public.helpdesk_criticalities cr ON cr.id = a.criticality_id
+       WHERE o.status IN ('SCHEDULED', 'RESCHEDULED', 'IN_PROGRESS')
+         AND o.escalation_notified_at IS NULL
+         AND UPPER(COALESCE(cr.code, '')) = 'CRITICAL'
+         AND o.window_ends_on IS NOT NULL
+         AND o.window_ends_on < CURRENT_DATE - ($1 || ' days')::interval
+       ORDER BY o.window_ends_on ASC;
+    `,
+    [afterDays],
+  );
+  const coordinatorEmail = (process.env.HELPDESK_ESCALATION_EMAIL || '').trim() || null;
+  let notified = 0;
+  for (const row of candidates.rows) {
+    const recipients: Recipient[] = [];
+    const seen = new Set<string>();
+    const responsibles: Array<{ name: string; email: string | null }> = Array.isArray(row.area_responsibles) ? row.area_responsibles : [];
+    for (const r of responsibles) {
+      if (r.email && !seen.has(r.email.toLowerCase())) {
+        seen.add(r.email.toLowerCase());
+        recipients.push({ name: r.name ?? '', email: r.email, phone: null });
+      }
+    }
+    if (coordinatorEmail && !seen.has(coordinatorEmail.toLowerCase())) {
+      recipients.push({ name: 'Coordinacion Help Desk', email: coordinatorEmail, phone: null });
+    }
+    if (recipients.length === 0) {
+      continue;
+    }
+    const limit = formatDate(String(row.window_ends_on));
+    const subject = `ESCALAMIENTO: activo critico ${row.asset_code} con mantenimiento vencido (${row.order_code})`;
+    for (const r of recipients) {
+      await sendGenericNotification(
+        r,
+        subject,
+        `Hola ${r.name},\nEl activo CRITICO ${row.asset_code} — ${row.asset_name} (area ${row.area_name ?? 'N/E'}) tiene la orden ${row.order_code} (${row.plan_title}) vencida desde el ${limit}, mas de ${afterDays} dia(s).\nSe requiere intervencion: registrar el servicio, reprogramar con justificacion o poner el equipo fuera de servicio.`,
+        `SafeDoc ESCALAMIENTO: ${row.asset_code} critico, orden ${row.order_code} vencida desde ${limit}.`,
+        'maintenance_escalation',
+      );
+    }
+    await pool.query(`UPDATE public.helpdesk_maintenance_orders SET escalation_notified_at = NOW() WHERE id = $1;`, [row.id]);
+    notified += 1;
+  }
+  return notified;
+};
+
+/** Un ciclo del scheduler: recordatorios, vencidas y escalamiento. */
+export const runServiceReminderTick = async (): Promise<{ maintenance: number; calibration: number; overdue: number; escalated: number }> => {
   const maintenance = await processServiceReminders('maintenance');
   const calibration = await processServiceReminders('calibration');
-  return { maintenance, calibration };
+  const overdue = await processMaintenanceOverdue();
+  const escalated = await processMaintenanceEscalation();
+  return { maintenance, calibration, overdue, escalated };
 };
 
 let scheduledTask: ReturnType<typeof cron.schedule> | null = null;

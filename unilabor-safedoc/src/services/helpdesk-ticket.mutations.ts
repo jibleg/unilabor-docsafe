@@ -4,6 +4,7 @@ import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image'
 import { employeeCanAccessHelpdeskAsset } from './helpdesk-asset.service';
 import { archiveTicketConstancia } from './helpdesk-ticket-document.service';
 import { notifyTicketAssigned, notifyTicketSolved } from './helpdesk-ticket-notification.service';
+import { createPostRepairVerificationOrder, getPendingPostRepairVerification } from './helpdesk-maintenance-verification.service';
 import { getHelpdeskTicketById, getMyHelpdeskTicketById } from './helpdesk-ticket.read';
 import {
   HelpdeskTicketPayload,
@@ -764,6 +765,21 @@ export const solveHelpdeskTicket = async (
     );
 
     await recordTicketHistory(ticketId, 'SOLVE', 'Solucion tecnica registrada.', userId, current, payload, client);
+
+    // Programa de Mantenimiento: activos criticos/altos requieren verificacion
+    // post-reparacion en el calendario antes de validar el retorno a operacion.
+    const verification = await createPostRepairVerificationOrder(ticketId, userId, client);
+    if (verification.created) {
+      await recordTicketHistory(
+        ticketId,
+        'POST_REPAIR_VERIFICATION',
+        `Verificacion post-reparacion programada (orden ${verification.order_id}).`,
+        userId,
+        current,
+        { maintenance_order_id: verification.order_id },
+        client,
+      );
+    }
   });
 
   void notifyTicketSolved(ticketId);
@@ -801,6 +817,14 @@ export const validateHelpdeskTicketReturn = async (
     const error = new Error('HELPDESK_TECHNICAL_RELEASE_REQUIRED');
     (error as any).code = 'HELPDESK_TECHNICAL_RELEASE_REQUIRED';
     throw error;
+  }
+
+  const pendingVerification = await getPendingPostRepairVerification(ticketId);
+  if (pendingVerification) {
+    throw createTicketError(
+      'HELPDESK_POST_REPAIR_VERIFICATION_PENDING',
+      `El activo es critico o alto: cierra primero la verificacion post-reparacion ${pendingVerification.order_code} en el Programa de Mantenimiento.`,
+    );
   }
 
   const downtimeMinutes = calculateDowntimeMinutes(current.reported_at, payload.return_to_operation_at);

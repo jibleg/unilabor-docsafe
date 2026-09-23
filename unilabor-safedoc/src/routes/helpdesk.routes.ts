@@ -106,6 +106,38 @@ import {
   updateCalibrationPlanController,
 } from '../controllers/helpdesk-calibration.controller';
 import {
+  createAssetProgramController,
+  createTemplateController,
+  deactivateRoutineController,
+  executeOrderController,
+  getAssetProgramController,
+  getCoverageController,
+  getOrderController,
+  getRoutineController,
+  getTemplateController,
+  listCalendarController,
+  listTemplatesController,
+  pauseRoutineController,
+  proposeFromTemplateController,
+  resumeRoutineController,
+  setProjectionMonthsController,
+  setTemplateActiveController,
+  updateRoutineController,
+  updateTemplateController,
+  uploadOrderEvidenceController,
+  validateOrderController,
+} from '../controllers/helpdesk-program.controller';
+import {
+  assetProgramSchema,
+  maintenanceTemplateSchema,
+  orderExecutionSchema,
+  orderValidationSchema,
+  programRoutineSchema,
+  projectionMonthsSchema,
+  routinePauseSchema,
+  routineResumeSchema,
+} from '../schemas/helpdesk-program.schema';
+import {
   listAssetDocumentsController,
   uploadAssetDocumentController,
   viewAssetDocumentController,
@@ -377,6 +409,30 @@ router.post(
 );
 
 // --- Calibracion (ISO 15189:2022, control metrologico 6.5) ---
+// --- Programa de Mantenimiento (ISO 15189:2022 6.4.5 / 6.4.7) -----------------
+router.get('/maintenance-templates', requirePermission('HELPDESK.MAINTENANCE.READ'), listTemplatesController);
+router.get('/maintenance-templates/:id', requirePermission('HELPDESK.MAINTENANCE.READ'), getTemplateController);
+router.get('/maintenance-templates/:id/propose', requirePermission('HELPDESK.MAINTENANCE.WRITE'), proposeFromTemplateController);
+router.post('/maintenance-templates', requirePermission('HELPDESK.CATALOGS.MANAGE'), validate(maintenanceTemplateSchema), createTemplateController);
+router.put('/maintenance-templates/:id', requirePermission('HELPDESK.CATALOGS.MANAGE'), validate(maintenanceTemplateSchema), updateTemplateController);
+router.patch('/maintenance-templates/:id/active', requirePermission('HELPDESK.CATALOGS.MANAGE'), setTemplateActiveController);
+
+router.get('/maintenance-program/calendar', requirePermission('HELPDESK.MAINTENANCE.READ'), listCalendarController);
+router.get('/maintenance-program/coverage', requirePermission('HELPDESK.MAINTENANCE.READ'), getCoverageController);
+router.get('/maintenance-program/assets/:assetId', requirePermission('HELPDESK.MAINTENANCE.READ'), getAssetProgramController);
+router.post('/maintenance-program/assets/:assetId', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(assetProgramSchema), createAssetProgramController);
+router.patch('/maintenance-program/programs/:programId/projection', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(projectionMonthsSchema), setProjectionMonthsController);
+router.get('/maintenance-program/routines/:planId', requirePermission('HELPDESK.MAINTENANCE.READ'), getRoutineController);
+router.put('/maintenance-program/routines/:planId', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(programRoutineSchema), updateRoutineController);
+router.post('/maintenance-program/routines/:planId/pause', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(routinePauseSchema), pauseRoutineController);
+router.post('/maintenance-program/routines/:planId/resume', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(routineResumeSchema), resumeRoutineController);
+router.delete('/maintenance-program/routines/:planId', requirePermission('HELPDESK.MAINTENANCE.WRITE'), deactivateRoutineController);
+
+router.get('/maintenance/orders/:id', requirePermission('HELPDESK.MAINTENANCE.READ'), getOrderController);
+router.post('/maintenance/orders/:id/execute', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(orderExecutionSchema), executeOrderController);
+router.post('/maintenance/orders/:id/validate', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(orderValidationSchema), validateOrderController);
+router.post('/maintenance/orders/:id/evidence', requirePermission('HELPDESK.MAINTENANCE.WRITE'), upload.single('file'), uploadOrderEvidenceController);
+
 router.get(
   '/calibration-catalogs',
   requirePermission('HELPDESK.CATALOGS.READ'),

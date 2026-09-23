@@ -117,6 +117,21 @@ export const mapHelpdeskError = (res: Response, error: any) => {
   if (
     error?.code === 'HELPDESK_TICKET_INVALID_STATE' ||
     error?.code === 'HELPDESK_MAINTENANCE_ORDER_INVALID_STATE' ||
+    error?.code === 'HELPDESK_POST_REPAIR_VERIFICATION_PENDING' ||
+    error?.code === 'HELPDESK_MAINTENANCE_CHECKLIST_INCOMPLETE' ||
+    error?.code === 'HELPDESK_MAINTENANCE_EVIDENCE_REQUIRED' ||
+    error?.code === 'HELPDESK_MAINTENANCE_CORRECTIVE_REQUIRED' ||
+    error?.code === 'HELPDESK_MAINTENANCE_SUPPLIER_REQUIRED' ||
+    error?.code === 'HELPDESK_MAINTENANCE_INVALID_SIGNATURE' ||
+    error?.code === 'HELPDESK_PROGRAM_WITHOUT_ROUTINES' ||
+    error?.code === 'HELPDESK_PROGRAM_ROUTINE_WITHOUT_INTERVAL' ||
+    error?.code === 'HELPDESK_PROGRAM_ROUTINE_WITHOUT_SUPPLIER' ||
+    error?.code === 'HELPDESK_PROGRAM_CHANGE_REASON_REQUIRED' ||
+    error?.code === 'HELPDESK_PROGRAM_ROUTINE_NOT_FOUND' ||
+    error?.code === 'HELPDESK_PROGRAM_ROUTINE_ALREADY_PAUSED' ||
+    error?.code === 'HELPDESK_PROGRAM_ROUTINE_NOT_PAUSED' ||
+    error?.code === 'HELPDESK_PROGRAM_NOT_FOUND' ||
+    error?.code === 'HELPDESK_MAINTENANCE_ORDER_NOT_FOUND' ||
     error?.code === 'HELPDESK_ASSET_COMPONENT_NESTED' ||
     error?.code === 'HELPDESK_ASSET_COMPONENT_SELF' ||
     error?.code === 'HELPDESK_ASSET_COMPONENT_HAS_CHILDREN'
