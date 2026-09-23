@@ -15,8 +15,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
-  Unlink,
-} from 'lucide-react';
+  Unlink, CalendarDays } from 'lucide-react';
 import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
 import { AssetLabelsPrintModal } from '../components/helpdesk/AssetLabelsPrintModal';
 import { AddComponentModal, AttachComponentModal } from '../components/helpdesk/AssetComponentModals';
@@ -937,6 +936,12 @@ export const HelpdeskAssetsPage = () => {
                                 label: 'Ver expediente',
                                 icon: <FolderOpen size={14} />,
                                 onClick: () => navigate(`/helpdesk/assets/${asset.id}/expedient`),
+                              },
+                              {
+                                key: 'programa',
+                                label: 'Programa de mantenimiento',
+                                icon: <CalendarDays size={14} />,
+                                onClick: () => navigate(`/helpdesk/assets/${asset.id}/program`),
                               },
                               {
                                 key: 'etiqueta',

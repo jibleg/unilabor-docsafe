@@ -123,6 +123,7 @@ export const orderStatusLabel = (status: string): string => {
     SCHEDULED: 'Programada',
     RESCHEDULED: 'Reprogramada',
     IN_PROGRESS: 'En proceso',
+    PENDING_VALIDATION: 'En validación (firma del responsable)',
     CLOSED: 'Cerrada',
   };
 

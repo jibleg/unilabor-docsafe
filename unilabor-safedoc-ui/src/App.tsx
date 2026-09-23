@@ -64,6 +64,15 @@ const HelpdeskCalibrationPage = lazy(() =>
 const HelpdeskServiceCalendarPage = lazy(() =>
   import('./pages/HelpdeskServiceCalendarPage').then((module) => ({ default: module.HelpdeskServiceCalendarPage })),
 );
+const HelpdeskProgramCalendarPage = lazy(() =>
+  import('./pages/HelpdeskProgramCalendarPage').then((module) => ({ default: module.HelpdeskProgramCalendarPage })),
+);
+const HelpdeskAssetProgramPage = lazy(() =>
+  import('./pages/HelpdeskAssetProgramPage').then((module) => ({ default: module.HelpdeskAssetProgramPage })),
+);
+const HelpdeskMaintenanceTemplatesPage = lazy(() =>
+  import('./pages/HelpdeskMaintenanceTemplatesPage').then((module) => ({ default: module.HelpdeskMaintenanceTemplatesPage })),
+);
 const HelpdeskOrgStructurePage = lazy(() =>
   import('./pages/HelpdeskOrgStructurePage').then((module) => ({ default: module.HelpdeskOrgStructurePage })),
 );
@@ -591,6 +600,30 @@ function App() {
           element={
             <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
               <HelpdeskServiceCalendarPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="maintenance-program"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskProgramCalendarPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="assets/:id/program"
+          element={
+            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
+              <HelpdeskAssetProgramPage />
+            </RoleGate>
+          }
+        />
+        <Route
+          path="maintenance-templates"
+          element={
+            <RoleGate allowedRoles={['ADMIN']} redirectTo="/helpdesk/dashboard">
+              <HelpdeskMaintenanceTemplatesPage />
             </RoleGate>
           }
         />

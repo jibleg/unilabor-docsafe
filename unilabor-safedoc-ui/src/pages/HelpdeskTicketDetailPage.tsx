@@ -38,6 +38,7 @@ import {
   type HelpdeskTicketIsoRiskPayload,
   type HelpdeskTicketTechnicalReleasePayload,
 } from '../api/service';
+import { fetchTicketPostRepairVerification, type TicketPostRepairVerification } from '../api/service.api-helpdesk-program';
 import { useAuthStore } from '../store/useAuthStore';
 import type {
   Employee,
@@ -133,6 +134,23 @@ export const HelpdeskTicketDetailPage = () => {
   const [assignForm, setAssignForm] = useState<AssignFormState>(EMPTY_ASSIGN_FORM);
   const [solutionForm, setSolutionForm] = useState<SolutionFormState>(EMPTY_SOLUTION_FORM);
   const [returnForm, setReturnForm] = useState<ReturnFormState>(EMPTY_RETURN_FORM);
+  // Programa de Mantenimiento: verificacion post-reparacion pendiente (activos criticos/altos).
+  const [verification, setVerification] = useState<TicketPostRepairVerification | null>(null);
+  useEffect(() => {
+    const ticketId = ticket?.id;
+    if (!ticketId || !ticket?.solved_at || ticket?.validated_at) {
+      return;
+    }
+    let cancelled = false;
+    fetchTicketPostRepairVerification(ticketId)
+      .then((pending) => {
+        if (!cancelled) setVerification(pending);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [ticket?.id, ticket?.solved_at, ticket?.validated_at]);
   const [isoRiskForm, setIsoRiskForm] = useState<IsoRiskFormState>(EMPTY_ISO_RISK_FORM);
   const [technicalReleaseForm, setTechnicalReleaseForm] = useState<TechnicalReleaseFormState>(EMPTY_TECHNICAL_RELEASE_FORM);
   const [closeForm, setCloseForm] = useState<CloseFormState>(EMPTY_CLOSE_FORM);
@@ -1000,6 +1018,20 @@ export const HelpdeskTicketDetailPage = () => {
                 Tiempo fuera de servicio: {formatDowntime(ticket.downtime_minutes)} · Estado posterior:{' '}
                 {catalogName(ticket.equipment_status_after_solution)}
               </p>
+            ) : null}
+            {ticket.solved_at && !ticket.validated_at && verification ? (
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(234,88,12,0.35)] bg-[rgba(254,215,170,0.35)] p-3 text-xs text-[#9a3412]">
+                <span className="inline-flex items-center gap-2 font-semibold">
+                  <ShieldCheck size={14} /> Activo crítico/alto: falta cerrar la verificación post-reparación {verification.order_code} (programada {verification.scheduled_for}) antes de validar el retorno.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/helpdesk/maintenance-program?asset_id=${ticket.asset_id ?? ''}&view=agenda&date=${verification.scheduled_for}`)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[rgba(234,88,12,0.4)] bg-white px-2.5 py-1.5 font-semibold text-[#9a3412] hover:bg-[rgba(254,215,170,0.5)]"
+                >
+                  Abrir en el programa
+                </button>
+              </div>
             ) : null}
             {canManage && ticket.solved_at && !ticket.validated_at ? (
               <div className="grid gap-2 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.72)] p-3">

@@ -149,6 +149,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: Move, label: 'Movimientos', path: '/helpdesk/movements', permission: 'HELPDESK.MOVEMENTS.WRITE' },
         { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', permission: 'HELPDESK.MAINTENANCE.WRITE' },
         { icon: ShieldCheck, label: 'Calibración', path: '/helpdesk/calibration', permission: 'HELPDESK.CALIBRATION.WRITE' },
+        { icon: CalendarDays, label: 'Programa de mantenimiento', path: '/helpdesk/maintenance-program', permission: 'HELPDESK.MAINTENANCE.READ' },
         { icon: CalendarDays, label: 'Calendario de servicios', path: '/helpdesk/service-calendar', permission: ['HELPDESK.MAINTENANCE.WRITE', 'HELPDESK.CALIBRATION.WRITE'] },
       ],
     },
@@ -162,6 +163,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       title: 'Configuración',
       items: [
         { icon: Wrench, label: 'Catálogos', path: '/helpdesk/catalogs', permission: 'HELPDESK.CATALOGS.MANAGE' },
+        { icon: BookOpen, label: 'Plantillas de mantenimiento', path: '/helpdesk/maintenance-templates', permission: 'HELPDESK.CATALOGS.MANAGE' },
         { icon: Building2, label: 'Estructura', path: '/helpdesk/org-structure', permission: 'HELPDESK.ORG.MANAGE' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
       ],

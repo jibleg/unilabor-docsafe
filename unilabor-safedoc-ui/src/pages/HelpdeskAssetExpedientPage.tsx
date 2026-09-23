@@ -17,8 +17,7 @@ import {
   Move,
   Printer,
   Plus,
-  X,
-} from 'lucide-react';
+  X, CalendarDays } from 'lucide-react';
 import {
   fetchAssetExpedient,
   createLifecycleEvent,
@@ -170,6 +169,13 @@ export const HelpdeskAssetExpedientPage = () => {
             <p className="text-sm text-[var(--unilabor-ink)]">{asset.name}</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(`/helpdesk/assets/${assetId}/program`)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.3)]"
+            >
+              <CalendarDays size={16} /> Programa de mantenimiento
+            </button>
             <button
               type="button"
               onClick={() => setShowLabel(true)}

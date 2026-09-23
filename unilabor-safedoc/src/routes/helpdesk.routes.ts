@@ -115,6 +115,7 @@ import {
   getOrderController,
   getRoutineController,
   getTemplateController,
+  getTicketVerificationController,
   listCalendarController,
   listTemplatesController,
   pauseRoutineController,
@@ -419,6 +420,7 @@ router.patch('/maintenance-templates/:id/active', requirePermission('HELPDESK.CA
 
 router.get('/maintenance-program/calendar', requirePermission('HELPDESK.MAINTENANCE.READ'), listCalendarController);
 router.get('/maintenance-program/coverage', requirePermission('HELPDESK.MAINTENANCE.READ'), getCoverageController);
+router.get('/maintenance-program/tickets/:ticketId/verification', requirePermission('HELPDESK.TICKETS.READ'), getTicketVerificationController);
 router.get('/maintenance-program/assets/:assetId', requirePermission('HELPDESK.MAINTENANCE.READ'), getAssetProgramController);
 router.post('/maintenance-program/assets/:assetId', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(assetProgramSchema), createAssetProgramController);
 router.patch('/maintenance-program/programs/:programId/projection', requirePermission('HELPDESK.MAINTENANCE.WRITE'), validate(projectionMonthsSchema), setProjectionMonthsController);

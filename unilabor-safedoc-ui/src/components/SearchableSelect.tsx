@@ -130,7 +130,7 @@ export const SearchableSelect = ({
             <div
               ref={menuRef}
               style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
-              className="z-[60] overflow-hidden rounded-xl border border-[rgba(0,65,106,0.12)] bg-white shadow-2xl shadow-[rgba(0,65,106,0.18)]"
+              className="z-[90] overflow-hidden rounded-xl border border-[rgba(0,65,106,0.12)] bg-white shadow-2xl shadow-[rgba(0,65,106,0.18)]"
             >
               <div className="flex items-center gap-2 border-b border-[rgba(0,65,106,0.08)] px-3 py-2">
                 <Search size={15} className="text-[var(--unilabor-neutral)]" />

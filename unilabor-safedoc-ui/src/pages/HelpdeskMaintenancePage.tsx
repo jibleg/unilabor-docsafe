@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarClock,
@@ -9,8 +10,7 @@ import {
   PlayCircle,
   RefreshCw,
   Search,
-  Send,
-} from 'lucide-react';
+  Send, CalendarDays } from 'lucide-react';
 import {
   closeMaintenanceOrderById,
   createMaintenancePlan,
@@ -64,6 +64,7 @@ import {
 const EMPTY_ORG_STRUCTURE: HelpdeskOrgStructure = { units: [], areas: [], users: [] };
 
 export const HelpdeskMaintenancePage = () => {
+  const navigate = useNavigate();
   const availableModules = useAuthStore((state) => state.availableModules);
   const moduleRole = getModuleRole(availableModules, 'HELPDESK') ?? 'VIEWER';
   const canWrite = hasAnyRole(moduleRole, ['ADMIN', 'EDITOR']);
@@ -456,6 +457,15 @@ export const HelpdeskMaintenancePage = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/helpdesk/maintenance-program')}
+            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-white/90 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+            title="Programa de mantenimiento: calendario por unidad, área y responsable"
+          >
+            <CalendarDays size={16} />
+            Ver en calendario
+          </button>
           <button
             type="button"
             onClick={() => void loadData()}

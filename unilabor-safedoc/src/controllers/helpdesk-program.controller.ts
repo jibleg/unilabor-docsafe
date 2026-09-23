@@ -21,6 +21,7 @@ import {
 } from '../services/helpdesk-asset-program.service';
 import { getCoverage, listCalendarEvents, type CalendarEventKind } from '../services/helpdesk-service-calendar.service';
 import { getMaintenanceOrderById } from '../services/helpdesk-maintenance.service';
+import { getPendingPostRepairVerification } from '../services/helpdesk-maintenance-verification.service';
 import {
   attachOrderEvidence,
   closeMaintenanceOrder,
@@ -376,5 +377,19 @@ export const uploadOrderEvidenceController = async (req: AuthRequest, res: Respo
     return res.status(201).json({ message: 'Evidencia adjuntada a la orden y al expediente del activo.', document });
   } catch (error: any) {
     return fail(res, error, 'Error adjuntando evidencia de orden:', 'No se pudo adjuntar la evidencia.');
+  }
+};
+
+/** Verificacion post-reparacion pendiente de un ticket (para la ficha del ticket). */
+export const getTicketVerificationController = async (req: AuthRequest, res: Response) => {
+  const ticketId = getNumberId(req.params.ticketId);
+  if (!ticketId) {
+    return res.status(400).json({ message: 'ID de ticket invalido.' });
+  }
+  try {
+    const pending = await getPendingPostRepairVerification(ticketId);
+    return res.json({ verification: pending });
+  } catch (error: any) {
+    return fail(res, error, 'Error consultando verificacion post-reparacion del ticket:', 'No se pudo consultar la verificacion.');
   }
 };
