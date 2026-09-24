@@ -7,6 +7,7 @@ import { ModuleGuard } from './components/ModuleGuard';
 import { RoleGate } from './components/RoleGate';
 import { PermissionGate } from './components/PermissionGate';
 import { ConfirmHost } from './components/ConfirmHost';
+import { RouteErrorBoundary } from './components/RouteErrorBoundary';
 import { QualityLayout } from './layouts/QualityLayout';
 import { RhLayout } from './layouts/RhLayout';
 import { HelpdeskLayout } from './layouts/HelpdeskLayout';
@@ -226,6 +227,7 @@ const RouteFallback = () => (
 function App() {
   return (
   <BrowserRouter>
+    <RouteErrorBoundary>
     <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
@@ -754,9 +756,10 @@ function App() {
       <Route path="/users" element={<Navigate to="/admin/users" replace />} />
       <Route path="/audit" element={<Navigate to="/admin/audit" replace />} />
 
-      <Route path="*" element={<Navigate to="/login" />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
     </Suspense>
+    </RouteErrorBoundary>
     <ToastContainer
       position="bottom-right"
       autoClose={4000}

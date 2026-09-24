@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AppNavbar } from '../components/AppNavbar';
 import { AppSidebar } from '../components/AppSidebar';
@@ -8,7 +8,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { usePendingEvaluationsStore } from '../store/usePendingEvaluationsStore';
 import { getCurrentUserProfile, getMyAccess } from '../api/service';
 import { tokenRequiresPasswordChange } from '../utils/auth';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Loader2 } from 'lucide-react';
 import type { ModuleCode } from '../types/models';
 
 export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
@@ -119,7 +119,18 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
         <div className="px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-8">
           <div className="mx-auto max-w-7xl">
             {moduleCode === 'RH' && <PendingEvaluationsBanner />}
-            <Outlet />
+            {/* Suspense propio del layout: mientras se descarga el chunk de una
+                pagina lazy, el sidebar y la barra superior siguen visibles en
+                lugar de que el Suspense raiz reemplace toda la pantalla. */}
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center py-16 text-sm text-[var(--unilabor-neutral)]">
+                  <Loader2 className="mr-2 animate-spin" size={18} /> Cargando pantalla...
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </div>
         </div>
       </main>

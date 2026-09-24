@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getApiErrorMessage, login } from '../api/service';
 import { FormFieldError } from '../components/FormFieldError';
 import { useNativeFormValidation } from '../hooks/useNativeFormValidation';
 import { useAuthStore } from '../store/useAuthStore';
+import { tokenRequiresPasswordChange } from '../utils/auth';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import loginPageBackground from '../assets/login-page-v1-optimized.jpg';
 import { getModuleHomePath } from '../utils/modules';
@@ -19,6 +20,10 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuth = useAuthStore((state) => state.setAuth);
+  const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+  const availableModules = useAuthStore((state) => state.availableModules);
+  const activeModule = useAuthStore((state) => state.activeModule);
   const infoMessage =
     location.state && typeof location.state === 'object' && 'message' in location.state
       ? String((location.state as { message?: string }).message ?? '')
@@ -57,24 +62,42 @@ export const LoginPage = () => {
       const { token, user, availableModules, permissions } = await login({ email, password });
       setAuth(token, user, availableModules, permissions);
 
+      // replace: /login no debe quedar en el historial; el boton "atras" del
+      // navegador no tiene que regresar a la pantalla de acceso con sesion viva.
       if (user.mustChangePassword) {
-        navigate('/change-password');
+        navigate('/change-password', { replace: true });
         return;
       }
 
       if (availableModules.length <= 1) {
         const targetModule = availableModules[0]?.code ?? 'QUALITY';
-        navigate(getModuleHomePath(targetModule));
+        navigate(getModuleHomePath(targetModule), { replace: true });
         return;
       }
 
-      navigate('/select-module');
+      navigate('/select-module', { replace: true });
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error al conectar con el servidor'));
     } finally {
       setLoading(false);
     }
   };
+
+  // Sesion viva: no mostrar el login (p. ej. al volver con "atras" desde
+  // /select-module o al escribir /login a mano). Si la cuenta no tiene modulos
+  // se queda aqui para mostrar el aviso que envia ModuleSelectorPage.
+  if (token && user && availableModules.length > 0) {
+    if (user.mustChangePassword || tokenRequiresPasswordChange(token)) {
+      return <Navigate to="/change-password" replace />;
+    }
+    if (availableModules.length === 1) {
+      return <Navigate to={getModuleHomePath(availableModules[0].code)} replace />;
+    }
+    if (activeModule && availableModules.some((moduleAccess) => moduleAccess.code === activeModule)) {
+      return <Navigate to={getModuleHomePath(activeModule)} replace />;
+    }
+    return <Navigate to="/select-module" replace />;
+  }
 
   return (
     <div className="relative isolate flex h-dvh overflow-hidden bg-[linear-gradient(180deg,#f8fbfd_0%,#eef5fa_52%,#dbe8f2_100%)] text-[var(--unilabor-ink)]">
