@@ -39,7 +39,7 @@ export const InductionReopenReadingModal = ({
   const hoursValid = Number.isInteger(parsedHours) && parsedHours >= 1 && parsedHours <= HOURS_MAX;
   const resultingDeadline = hoursValid ? new Date(Date.now() + parsedHours * 3_600_000) : null;
   const readingExpired = Boolean(enrollment.reading_deadline_at) && new Date(enrollment.reading_deadline_at as string) < new Date();
-  const hasUnstartedExam = enrollment.evaluation_status === 'pending';
+  const hasUnstartedExam = enrollment.evaluation_status === 'pending' || enrollment.evaluation_status === 'expired';
 
   const handleConfirm = async () => {
     if (!hoursValid) {
@@ -95,8 +95,9 @@ export const InductionReopenReadingModal = ({
             </p>
             {hasUnstartedExam ? (
               <p className="mt-2">
-                El cuestionario que se abrió al vencer <span className="font-semibold">se retira</span> (nadie lo
-                inició) y volverá a abrirse cuando termine de leer o al vencer el nuevo plazo.
+                El cuestionario que se abrió al vencer{enrollment.evaluation_status === 'expired' ? ' (y que también venció)' : ''}{' '}
+                <span className="font-semibold">se retira</span> porque nadie lo inició, y volverá a abrirse cuando
+                termine de leer o al vencer el nuevo plazo.
               </p>
             ) : null}
             <p className="mt-2 text-xs text-[var(--unilabor-neutral)]">

@@ -15,18 +15,20 @@ import { withTransaction } from '../utils/transaction';
 // por inscrito y con el mismo criterio endurecido contra carreras.
 //
 // Que hace, en una transaccion:
-//   1. Si hay un cuestionario abierto que NUNCA se inicio (pending, sin
-//      started_at ni respuestas), lo desliga y lo elimina con su snapshot de
-//      preguntas (no es evidencia: nadie lo contesto). Los avisos enviados se
-//      conservan (solo se desligan).
+//   1. Si hay un cuestionario que NUNCA se inicio (pending, o expired porque
+//      tambien se agoto su ventana, sin started_at ni respuestas), lo desliga
+//      y lo elimina con su snapshot de preguntas (no es evidencia: nadie lo
+//      contesto; el estado que tenia queda en la auditoria). Los avisos
+//      enviados se conservan (solo se desligan).
 //   2. Fija reading_deadline_at = NOW() + N horas en la inscripcion.
 //   3. Reactiva los acuses de Sala de Lectura con ese limite: expired ->
 //      read / in_progress / pending segun el avance guardado (paginas leidas
 //      y tiempo acumulado no se pierden).
 //
 // NO toca: lectura ya completa, ni cuestionarios iniciados, enviados,
-// calificados, reprobados o vencidos (para esos existe "Autorizar nuevo
-// intento"). Sin correo ni SMS (politica: 1 SMS por fase; RH avisa en persona).
+// calificados o reprobados (para reprobados/vencidos con intento real existe
+// "Autorizar nuevo intento"). Sin correo ni SMS (politica: 1 SMS por fase; RH
+// avisa en persona).
 // -----------------------------------------------------------------------------
 
 export interface ReopenInductionReadingInput {
@@ -43,6 +45,8 @@ export interface ReopenInductionReadingResult {
   previous_deadline_at: string | null;
   new_deadline_at: string;
   removed_assignment_id: number | null;
+  /** Estado que tenia el cuestionario retirado (pending | expired). */
+  removed_assignment_status: string | null;
   acknowledgements_reactivated: number;
   reading_signed: number;
   reading_total: number;
@@ -56,6 +60,9 @@ const throwCoded = (code: string, publicMessage?: string): never => {
   }
   throw error;
 };
+
+/** Cuestionarios que se pueden retirar si nunca se iniciaron ni contestaron. */
+const REMOVABLE_UNSTARTED_STATUSES = ['pending', 'expired'];
 
 const EVALUATION_STATUS_LABEL: Record<string, string> = {
   in_progress: 'ya esta en curso',
@@ -108,6 +115,7 @@ export const reopenInductionReading = async (
     }
 
     let removedAssignmentId: number | null = null;
+    let removedAssignmentStatus: string | null = null;
     const assignmentId = ctx.evaluation_assignment_id ? Number(ctx.evaluation_assignment_id) : null;
     if (assignmentId) {
       const assignmentResult = await client.query(
@@ -121,7 +129,8 @@ export const reopenInductionReading = async (
       const assignment = assignmentResult.rows[0];
       if (assignment) {
         const status = String(assignment.status);
-        const untouched = status === 'pending' && !assignment.started_at && !assignment.has_responses;
+        const untouched =
+          REMOVABLE_UNSTARTED_STATUSES.includes(status) && !assignment.started_at && !assignment.has_responses;
         if (!untouched) {
           const label = EVALUATION_STATUS_LABEL[status] ?? `esta en estado ${status}`;
           return throwCoded(
@@ -141,6 +150,7 @@ export const reopenInductionReading = async (
         await client.query(`DELETE FROM public.evaluation_assignment_questions WHERE assignment_id = $1;`, [assignmentId]);
         await client.query(`DELETE FROM public.evaluation_assignments WHERE id = $1;`, [assignmentId]);
         removedAssignmentId = assignmentId;
+        removedAssignmentStatus = status;
       }
     }
 
@@ -179,6 +189,7 @@ export const reopenInductionReading = async (
       previous_deadline_at: ctx.reading_deadline_at ? toIsoDateTime(ctx.reading_deadline_at) : null,
       new_deadline_at: newDeadline ? toIsoDateTime(newDeadline) : '',
       removed_assignment_id: removedAssignmentId,
+      removed_assignment_status: removedAssignmentStatus,
       acknowledgements_reactivated: ackResult.rowCount ?? 0,
       reading_signed: readingSigned,
       reading_total: readingTotal,

@@ -65,12 +65,15 @@ const canAuthorizeRetry = (item: RhInductionPhaseEnrollmentSummary): boolean =>
   item.evaluation_status !== null && RETRYABLE_EVALUATION_STATUSES.includes(item.evaluation_status);
 
 // "Reabrir lectura": lectura incompleta con documentos asignados y sin un
-// cuestionario en curso (sin examen, o examen abierto por vencimiento que nadie
-// inicio: el backend verifica que siga sin iniciar).
+// cuestionario en curso: sin examen, o examen abierto por vencimiento que nadie
+// inicio (pending, o expired si ademas se agoto su ventana). El backend
+// verifica que siga sin iniciar ni contestar.
+const REOPENABLE_EVALUATION_STATUSES: Array<string | null> = [null, 'pending', 'expired'];
+
 const canReopenReading = (item: RhInductionPhaseEnrollmentSummary): boolean =>
   item.reading_total > 0 &&
   !item.reading_completed_at &&
-  (item.evaluation_status === null || item.evaluation_status === 'pending');
+  REOPENABLE_EVALUATION_STATUSES.includes(item.evaluation_status);
 
 const isReadingExpired = (item: RhInductionPhaseEnrollmentSummary): boolean =>
   Boolean(item.reading_deadline_at) && new Date(item.reading_deadline_at as string) < new Date();

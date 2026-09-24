@@ -229,6 +229,7 @@ export const reopenInductionReadingController = async (req: AuthRequest, res: Re
         previous_deadline_at: result.previous_deadline_at,
         new_deadline_at: result.new_deadline_at,
         removed_assignment_id: result.removed_assignment_id,
+        removed_assignment_status: result.removed_assignment_status,
         acknowledgements_reactivated: result.acknowledgements_reactivated,
         reading_signed: result.reading_signed,
         reading_total: result.reading_total,

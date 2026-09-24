@@ -186,6 +186,7 @@ export interface InductionReopenReadingResult {
   previous_deadline_at: string | null;
   new_deadline_at: string;
   removed_assignment_id: number | null;
+  removed_assignment_status: string | null;
   acknowledgements_reactivated: number;
   reading_signed: number;
   reading_total: number;
