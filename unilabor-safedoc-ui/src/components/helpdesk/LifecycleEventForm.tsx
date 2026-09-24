@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Loader2, Plus } from 'lucide-react';
-import type { HelpdeskCatalogs, HelpdeskLifecycleEventPayload } from '../../types/models';
+import { Loader2, PencilLine, Plus } from 'lucide-react';
+import type { HelpdeskCatalogs, HelpdeskLifecycleEvent, HelpdeskLifecycleEventPayload } from '../../types/models';
 
 interface LifecycleEventFormProps {
   catalogs: HelpdeskCatalogs;
   saving: boolean;
   onSubmit: (payload: HelpdeskLifecycleEventPayload) => void;
+  /** Evento a corregir: precarga los campos y bloquea el tipo (define efectos sobre el activo). */
+  initialEvent?: HelpdeskLifecycleEvent | null;
 }
 
 const inputClass =
@@ -14,19 +16,22 @@ const labelClass = 'mb-1 block text-xs font-semibold text-[var(--unilabor-neutra
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-export const LifecycleEventForm = ({ catalogs, saving, onSubmit }: LifecycleEventFormProps) => {
-  const [eventTypeId, setEventTypeId] = useState<number | ''>('');
-  const [eventDate, setEventDate] = useState(todayIso());
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [supplierId, setSupplierId] = useState<number | ''>('');
-  const [provider, setProvider] = useState('');
-  const [cost, setCost] = useState('');
-  const [disposalReasonId, setDisposalReasonId] = useState<number | ''>('');
-  const [toLocationId, setToLocationId] = useState<number | ''>('');
-  const [calibrationCert, setCalibrationCert] = useState('');
-  const [calibrationDue, setCalibrationDue] = useState('');
-  const [notes, setNotes] = useState('');
+export const LifecycleEventForm = ({ catalogs, saving, onSubmit, initialEvent = null }: LifecycleEventFormProps) => {
+  const isEdit = initialEvent !== null;
+  const [eventTypeId, setEventTypeId] = useState<number | ''>(initialEvent?.event_type_id ?? '');
+  const [eventDate, setEventDate] = useState(initialEvent?.event_date ?? todayIso());
+  const [title, setTitle] = useState(initialEvent?.title ?? '');
+  const [description, setDescription] = useState(initialEvent?.description ?? '');
+  const [supplierId, setSupplierId] = useState<number | ''>(initialEvent?.supplier_id ?? '');
+  const [provider, setProvider] = useState(initialEvent?.performed_by_provider ?? '');
+  const [cost, setCost] = useState(
+    initialEvent?.cost !== null && initialEvent?.cost !== undefined ? String(initialEvent.cost) : '',
+  );
+  const [disposalReasonId, setDisposalReasonId] = useState<number | ''>(initialEvent?.disposal_reason_id ?? '');
+  const [toLocationId, setToLocationId] = useState<number | ''>(initialEvent?.to_location_id ?? '');
+  const [calibrationCert, setCalibrationCert] = useState(initialEvent?.calibration_certificate_no ?? '');
+  const [calibrationDue, setCalibrationDue] = useState(initialEvent?.calibration_due_on ?? '');
+  const [notes, setNotes] = useState(initialEvent?.notes ?? '');
 
   const selectedCode = useMemo(
     () => catalogs.lifecycle_event_types.find((t) => t.id === eventTypeId)?.code ?? '',
@@ -51,6 +56,11 @@ export const LifecycleEventForm = ({ catalogs, saving, onSubmit }: LifecycleEven
       performed_by_provider: provider.trim() || null,
       cost: cost ? Number(cost) : null,
       disposal_reason_id: isDecommission && disposalReasonId ? Number(disposalReasonId) : null,
+      from_location_id: initialEvent?.from_location_id ?? null,
+      performed_by_employee_id: initialEvent?.performed_by_employee_id ?? null,
+      maintenance_order_id: initialEvent?.maintenance_order_id ?? null,
+      ticket_id: initialEvent?.ticket_id ?? null,
+      currency: initialEvent?.currency ?? null,
       to_location_id: isRelocation && toLocationId ? Number(toLocationId) : null,
       calibration_certificate_no: isCalibration ? calibrationCert.trim() || null : null,
       calibration_due_on: isCalibration ? calibrationDue || null : null,
@@ -63,7 +73,13 @@ export const LifecycleEventForm = ({ catalogs, saving, onSubmit }: LifecycleEven
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <div>
           <label className={labelClass}>Tipo de evento *</label>
-          <select className={inputClass} value={eventTypeId} onChange={(e) => setEventTypeId(e.target.value ? Number(e.target.value) : '')}>
+          <select
+            className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`}
+            value={eventTypeId}
+            disabled={isEdit}
+            title={isEdit ? 'El tipo de un evento registrado no puede cambiarse' : undefined}
+            onChange={(e) => setEventTypeId(e.target.value ? Number(e.target.value) : '')}
+          >
             <option value="">Selecciona...</option>
             {catalogs.lifecycle_event_types.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
@@ -133,7 +149,7 @@ export const LifecycleEventForm = ({ catalogs, saving, onSubmit }: LifecycleEven
         </div>
       ) : null}
 
-      {isDecommission ? (
+      {isDecommission && !isEdit ? (
         <div>
           <label className={labelClass}>Motivo de baja</label>
           <select className={inputClass} value={disposalReasonId} onChange={(e) => setDisposalReasonId(e.target.value ? Number(e.target.value) : '')}>
@@ -157,8 +173,8 @@ export const LifecycleEventForm = ({ catalogs, saving, onSubmit }: LifecycleEven
         disabled={saving || !eventTypeId || !title.trim()}
         className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-3 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
       >
-        {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-        Registrar evento
+        {saving ? <Loader2 size={16} className="animate-spin" /> : isEdit ? <PencilLine size={16} /> : <Plus size={16} />}
+        {isEdit ? 'Guardar cambios' : 'Registrar evento'}
       </button>
     </div>
   );

@@ -32,7 +32,23 @@ export interface HelpdeskAssetDocumentRecord {
   issued_on: string | null;
   expires_on: string | null;
   uploaded_by_user_id: string | null;
+  is_active: boolean;
+  /**
+   * Evidencia generada por el sistema (acta de un evento, constancia de una
+   * orden de mantenimiento, documento fuente de un programa): no se edita ni
+   * se da de baja desde el expediente.
+   */
+  is_protected: boolean;
   created_at?: string | undefined;
+  updated_at?: string | undefined;
+}
+
+export interface HelpdeskAssetDocumentMetadataPayload {
+  title: string;
+  document_kind_id?: number | null;
+  lifecycle_event_id?: number | null;
+  issued_on?: string | null;
+  expires_on?: string | null;
 }
 
 export interface UploadedAssetFile {
@@ -82,11 +98,19 @@ const mapDocumentRow = (row: any): HelpdeskAssetDocumentRecord => ({
   issued_on: row.issued_on ? toIsoDate(row.issued_on) : null,
   expires_on: row.expires_on ? toIsoDate(row.expires_on) : null,
   uploaded_by_user_id: row.uploaded_by_user_id ? String(row.uploaded_by_user_id) : null,
+  is_active: row.is_active !== false,
+  is_protected: Boolean(row.is_protected),
   created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
+  updated_at: row.updated_at ? toIsoDateTime(row.updated_at) : undefined,
 });
 
 const buildDocumentQuery = () => `
-  SELECT d.*, k.code AS document_kind_code, k.name AS document_kind_name
+  SELECT d.*, k.code AS document_kind_code, k.name AS document_kind_name,
+    (
+      EXISTS (SELECT 1 FROM public.helpdesk_asset_lifecycle_events e WHERE e.generated_act_document_id = d.id)
+      OR EXISTS (SELECT 1 FROM public.helpdesk_maintenance_orders mo WHERE mo.constancia_document_id = d.id)
+      OR EXISTS (SELECT 1 FROM public.helpdesk_asset_maintenance_programs p WHERE p.source_asset_document_id = d.id)
+    ) AS is_protected
   FROM public.helpdesk_asset_documents d
   LEFT JOIN public.helpdesk_document_kinds k ON k.id = d.document_kind_id
 `;
@@ -112,7 +136,7 @@ export const listAssetDocuments = async (
 ): Promise<HelpdeskAssetDocumentRecord[]> => {
   await assertAssetDocumentsTable();
 
-  const filters: string[] = ['d.asset_id = $1'];
+  const filters: string[] = ['d.asset_id = $1', 'd.is_active = TRUE'];
   const params: unknown[] = [assetId];
 
   if (options.lifecycleEventId) {
@@ -222,6 +246,123 @@ export const uploadAssetDocument = async (
     throw error;
   }
   return created;
+};
+
+const assertEditableDocument = (document: HelpdeskAssetDocumentRecord | null): HelpdeskAssetDocumentRecord => {
+  if (!document || !document.is_active) {
+    const error = new Error('HELPDESK_ASSET_DOCUMENT_NOT_FOUND');
+    (error as any).code = 'HELPDESK_ASSET_DOCUMENT_NOT_FOUND';
+    throw error;
+  }
+  if (document.is_protected) {
+    const error = new Error('HELPDESK_ASSET_DOCUMENT_LOCKED');
+    (error as any).code = 'HELPDESK_ASSET_DOCUMENT_LOCKED';
+    throw error;
+  }
+  return document;
+};
+
+/**
+ * Corrige los datos de una evidencia cargada a mano (titulo, tipo, evento al
+ * que pertenece, fechas). El PDF y la version no cambian; para sustituir el
+ * archivo se carga una evidencia nueva y se da de baja la anterior.
+ */
+export const updateAssetDocumentMetadata = async (
+  documentId: number,
+  payload: HelpdeskAssetDocumentMetadataPayload,
+  userId?: string | null,
+): Promise<HelpdeskAssetDocumentRecord> => {
+  await assertAssetDocumentsTable();
+  const current = assertEditableDocument(await getAssetDocumentById(documentId));
+
+  if (payload.lifecycle_event_id) {
+    const event = await pool.query(
+      `SELECT id FROM public.helpdesk_asset_lifecycle_events WHERE id = $1 AND asset_id = $2 AND is_active = TRUE LIMIT 1;`,
+      [payload.lifecycle_event_id, current.asset_id],
+    );
+    if (event.rows.length === 0) {
+      const error = new Error('HELPDESK_LIFECYCLE_EVENT_NOT_FOUND');
+      (error as any).code = 'HELPDESK_LIFECYCLE_EVENT_NOT_FOUND';
+      throw error;
+    }
+  }
+
+  await pool.query(
+    `
+      UPDATE public.helpdesk_asset_documents
+      SET title = $2,
+          document_kind_id = $3,
+          lifecycle_event_id = $4,
+          issued_on = $5,
+          expires_on = $6,
+          updated_by_user_id = $7,
+          updated_at = NOW()
+      WHERE id = $1;
+    `,
+    [
+      documentId,
+      payload.title.trim(),
+      payload.document_kind_id ?? null,
+      payload.lifecycle_event_id ?? null,
+      normalizeOptionalText(payload.issued_on),
+      normalizeOptionalText(payload.expires_on),
+      userId ?? null,
+    ],
+  );
+
+  const updated = await getAssetDocumentById(documentId);
+  if (!updated) {
+    const error = new Error('HELPDESK_ASSET_DOCUMENT_NOT_FOUND');
+    (error as any).code = 'HELPDESK_ASSET_DOCUMENT_NOT_FOUND';
+    throw error;
+  }
+  return updated;
+};
+
+/** Baja logica de una evidencia cargada a mano: la fila y el PDF se conservan. */
+export const deactivateAssetDocument = async (
+  documentId: number,
+  userId: string | null | undefined,
+  reason: string | null,
+): Promise<HelpdeskAssetDocumentRecord> => {
+  await assertAssetDocumentsTable();
+  const current = assertEditableDocument(await getAssetDocumentById(documentId));
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `
+        UPDATE public.helpdesk_asset_documents
+        SET is_active = FALSE,
+            deleted_at = NOW(),
+            deleted_by_user_id = $2,
+            deleted_reason = $3,
+            updated_by_user_id = $2,
+            updated_at = NOW()
+        WHERE id = $1 AND is_active = TRUE;
+      `,
+      [documentId, userId ?? null, normalizeOptionalText(reason)],
+    );
+    await client.query(
+      `
+        INSERT INTO public.helpdesk_asset_history (asset_id, action, summary, new_values, created_by_user_id)
+        VALUES ($1, 'ASSET_DOCUMENT_DELETE', $2, $3, $4);
+      `,
+      [
+        current.asset_id,
+        `Evidencia "${current.title}" dada de baja del expediente.`,
+        { document_id: documentId, title: current.title, reason: normalizeOptionalText(reason) },
+        userId ?? null,
+      ],
+    );
+  });
+
+  const updated = await getAssetDocumentById(documentId);
+  if (!updated) {
+    const error = new Error('HELPDESK_ASSET_DOCUMENT_NOT_FOUND');
+    (error as any).code = 'HELPDESK_ASSET_DOCUMENT_NOT_FOUND';
+    throw error;
+  }
+  return updated;
 };
 
 export const resolveAssetDocumentPath = async (

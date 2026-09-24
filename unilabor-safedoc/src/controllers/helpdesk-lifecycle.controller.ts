@@ -9,6 +9,7 @@ import {
 import { getHelpdeskAssetById } from '../services/helpdesk-asset.service';
 import {
   createLifecycleEvent,
+  deactivateLifecycleEvent,
   getLifecycleEventById,
   listAssetLifecycleEvents,
   updateLifecycleEvent,
@@ -164,6 +165,38 @@ export const createLifecycleEventController = async (req: AuthRequest, res: Resp
     }
     console.error('Error creando evento de ciclo de vida:', error);
     return res.status(500).json({ message: 'No se pudo registrar el evento del equipo.' });
+  }
+};
+
+/** DELETE /helpdesk/lifecycle-events/:eventId - baja logica (body opcional: { reason }). */
+export const deactivateLifecycleEventController = async (req: AuthRequest, res: Response) => {
+  const eventId = getNumberId(req.params.eventId);
+  if (!eventId) {
+    return res.status(400).json({ message: 'ID de evento invalido.' });
+  }
+
+  try {
+    const event = await deactivateLifecycleEvent(eventId, req.user?.id ?? null, getText(req.body?.reason));
+    if (!event) {
+      return res.status(404).json({ message: 'Evento no encontrado o ya dado de baja.' });
+    }
+
+    await logHelpdeskAudit(
+      req.user?.id,
+      `HELPDESK_LIFECYCLE_EVENT_DELETE:${eventId}`,
+      req.ip,
+      eventId,
+      'helpdesk_lifecycle_event',
+    );
+
+    return res.json({ message: 'Evento dado de baja del expediente.', event });
+  } catch (error: any) {
+    const mapped = mapHelpdeskError(res, error);
+    if (mapped) {
+      return mapped;
+    }
+    console.error('Error dando de baja evento del ciclo de vida:', error);
+    return res.status(500).json({ message: 'No se pudo dar de baja el evento.' });
   }
 };
 

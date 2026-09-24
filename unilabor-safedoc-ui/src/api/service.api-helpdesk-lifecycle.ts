@@ -6,6 +6,7 @@ import type {
   HelpdeskAssetDocument,
   HelpdeskLifecycleEvent,
   HelpdeskLifecycleEventPayload,
+  HelpdeskAssetDocumentMetadataPayload,
 } from '../types/models';
 
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
@@ -54,6 +55,31 @@ export interface LifecycleEventDetail {
 }
 
 // Detalle de un evento + sus evidencias asociadas (documentos con ese lifecycle_event_id).
+/** Baja logica de un evento registrado a mano (la fila se conserva con is_active = false). */
+export const deleteLifecycleEvent = async (eventId: number, reason?: string | null): Promise<void> => {
+  await api.delete(`/helpdesk/lifecycle-events/${eventId}`, { data: { reason: reason ?? null } });
+};
+
+/** Corrige datos de una evidencia cargada a mano (no sustituye el PDF). */
+export const updateAssetDocument = async (
+  documentId: number,
+  payload: HelpdeskAssetDocumentMetadataPayload,
+): Promise<HelpdeskAssetDocument | null> => {
+  const response = await api.patch(`/helpdesk/asset-documents/${documentId}`, {
+    title: payload.title.trim(),
+    document_kind_id: payload.document_kind_id ?? null,
+    lifecycle_event_id: payload.lifecycle_event_id ?? null,
+    issued_on: payload.issued_on || null,
+    expires_on: payload.expires_on || null,
+  });
+  return (asRecord(unwrapPayload(response.data))?.document as HelpdeskAssetDocument) ?? null;
+};
+
+/** Baja logica de una evidencia cargada a mano (fila y PDF se conservan). */
+export const deleteAssetDocument = async (documentId: number, reason?: string | null): Promise<void> => {
+  await api.delete(`/helpdesk/asset-documents/${documentId}`, { data: { reason: reason ?? null } });
+};
+
 export const fetchLifecycleEventDetail = async (eventId: number): Promise<LifecycleEventDetail | null> => {
   const response = await api.get(`/helpdesk/lifecycle-events/${eventId}`);
   const payload = asRecord(unwrapPayload(response.data));

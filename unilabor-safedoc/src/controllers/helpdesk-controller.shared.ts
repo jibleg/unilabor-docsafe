@@ -48,6 +48,44 @@ export const getNumberId = (value: unknown): number | null => {
 };
 
 export const mapHelpdeskError = (res: Response, error: any) => {
+  if (error?.code === 'HELPDESK_LIFECYCLE_EVENT_LOCKED') {
+    return res.status(409).json({
+      message: 'Este evento lo genero otro proceso (ticket, mantenimiento, acta, movimiento o calibracion) y no puede editarse ni darse de baja desde el expediente.',
+    });
+  }
+
+  if (error?.code === 'HELPDESK_LIFECYCLE_EVENT_TYPE_LOCKED') {
+    return res.status(409).json({
+      message: 'El tipo de un evento ya registrado no puede cambiarse. Da de baja el evento y registra uno nuevo.',
+    });
+  }
+
+  if (error?.code === 'HELPDESK_LIFECYCLE_EVENT_DECOMMISSION_LOCKED') {
+    return res.status(409).json({
+      message: 'El evento de baja del equipo no puede eliminarse: el activo ya quedo dado de baja con esa evidencia.',
+    });
+  }
+
+  if (error?.code === 'HELPDESK_LIFECYCLE_EVENT_HAS_EVIDENCE') {
+    return res.status(409).json({
+      message: 'El evento tiene evidencias vigentes asociadas. Da de baja o reasigna esas evidencias antes de eliminar el evento.',
+    });
+  }
+
+  if (error?.code === 'HELPDESK_LIFECYCLE_EVENT_NOT_FOUND') {
+    return res.status(404).json({ message: 'Evento no encontrado o dado de baja.' });
+  }
+
+  if (error?.code === 'HELPDESK_ASSET_DOCUMENT_LOCKED') {
+    return res.status(409).json({
+      message: 'Esta evidencia la genero el sistema (acta, constancia o documento de programa) y no puede modificarse ni darse de baja.',
+    });
+  }
+
+  if (error?.code === 'HELPDESK_ASSET_DOCUMENT_NOT_FOUND') {
+    return res.status(404).json({ message: 'Evidencia no encontrada o dada de baja.' });
+  }
+
   if (error?.code === 'HELPDESK_ASSETS_TABLE_NOT_AVAILABLE') {
     return res.status(409).json({
       message: 'Las tablas de activos Helpdesk no existen. Ejecuta la migracion del Sprint 14.',

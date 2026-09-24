@@ -13,6 +13,7 @@ import {
   maintenanceOrderCloseSchema,
   maintenancePlanSchema,
 } from './helpdesk.schema';
+import { assetDocumentMetadataSchema, helpdeskDeactivateReasonSchema } from './helpdesk.schema';
 import {
   createCategorySchema,
   updateCategoryStatusSchema,
@@ -21,7 +22,11 @@ import {
   updateDocumentMetadataSchema,
   updateDocumentStatusSchema,
 } from './document.schema';
-import { createEmployeeSchema, updateEmployeeSchema } from './employee.schema';
+import {
+  createEmployeeSchema,
+  updateEmployeeDocumentMetadataSchema,
+  updateEmployeeSchema,
+} from './employee.schema';
 
 describe('auth.schema', () => {
   it('loginSchema acepta email no vacio y recorta', () => {
@@ -207,6 +212,27 @@ describe('employee.schema', () => {
   });
 });
 
+describe('employee.schema (updateEmployeeDocumentMetadataSchema)', () => {
+  it('exige titulo y normaliza descripcion vacia a null', () => {
+    expect(updateEmployeeDocumentMetadataSchema.safeParse({ title: '   ' }).success).toBe(false);
+    const result = updateEmployeeDocumentMetadataSchema.safeParse({ title: ' Acta de nacimiento ', description: '  ' });
+    expect(result.success).toBe(true);
+    expect((result as any).data).toEqual({ title: 'Acta de nacimiento', description: null });
+  });
+
+  it('descarta cualquier otro campo (no permite tocar fechas, archivo ni estado)', () => {
+    const result = updateEmployeeDocumentMetadataSchema.safeParse({
+      title: 'Titulo',
+      description: 'Nota',
+      expiry_date: '2030-01-01',
+      file_path: '/etc/passwd',
+      status: 'inactive',
+    });
+    expect(result.success).toBe(true);
+    expect(Object.keys((result as any).data).sort()).toEqual(['description', 'title']);
+  });
+});
+
 describe('helpdesk.schema (resto)', () => {
   it('helpdeskAssetSchema exige name; asset_code es opcional (autogenerado)', () => {
     // name sigue siendo obligatorio
@@ -232,5 +258,33 @@ describe('helpdesk.schema (resto)', () => {
         result: 'COMPLETED',
       }).success,
     ).toBe(true);
+  });
+});
+
+describe('helpdesk.schema (evidencias y bajas del expediente)', () => {
+  it('assetDocumentMetadataSchema exige titulo y descarta campos del archivo', () => {
+    expect(assetDocumentMetadataSchema.safeParse({ title: '' }).success).toBe(false);
+    const result = assetDocumentMetadataSchema.safeParse({
+      title: ' Factura ',
+      document_kind_id: '3',
+      lifecycle_event_id: null,
+      issued_on: '2026-01-01',
+      file_path: '/etc/passwd',
+      is_active: false,
+    });
+    expect(result.success).toBe(true);
+    expect((result as any).data).toEqual({
+      title: 'Factura',
+      document_kind_id: 3,
+      lifecycle_event_id: null,
+      issued_on: '2026-01-01',
+      expires_on: undefined,
+    });
+  });
+
+  it('helpdeskDeactivateReasonSchema acepta body vacio y normaliza el motivo', () => {
+    expect(helpdeskDeactivateReasonSchema.safeParse({}).success).toBe(true);
+    const result = helpdeskDeactivateReasonSchema.safeParse({ reason: '  duplicado  ' });
+    expect((result as any).data.reason).toBe('duplicado');
   });
 });

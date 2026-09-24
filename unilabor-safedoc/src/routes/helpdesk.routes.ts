@@ -79,6 +79,8 @@ import {
   calibrationOrderRescheduleSchema,
   calibrationPlanSchema,
   scheduleDatesSchema,
+  assetDocumentMetadataSchema,
+  helpdeskDeactivateReasonSchema,
   lifecycleEventSchema,
   unitAreasSchema,
   areaResponsiblesSchema,
@@ -93,6 +95,7 @@ import {
   getLifecycleEventDetailController,
   listAssetLifecycleEventsController,
   updateLifecycleEventController,
+  deactivateLifecycleEventController,
 } from '../controllers/helpdesk-lifecycle.controller';
 import {
   addCalibrationScheduleController,
@@ -144,6 +147,8 @@ import {
   listAssetDocumentsController,
   uploadAssetDocumentController,
   viewAssetDocumentController,
+  deactivateAssetDocumentController,
+  updateAssetDocumentController,
 } from '../controllers/helpdesk-asset-document.controller';
 import {
   listMyTicketDocumentsController,
@@ -667,6 +672,12 @@ router.patch(
   validate(lifecycleEventSchema),
   updateLifecycleEventController,
 );
+router.delete(
+  '/lifecycle-events/:eventId',
+  requirePermission('HELPDESK.ASSETS.WRITE'),
+  validate(helpdeskDeactivateReasonSchema),
+  deactivateLifecycleEventController,
+);
 
 // --- Evidencias documentales del equipo (PDF) ---
 router.get(
@@ -684,6 +695,18 @@ router.get(
   '/asset-documents/:documentId/view',
   requirePermission('HELPDESK.ASSETS.READ'),
   viewAssetDocumentController,
+);
+router.patch(
+  '/asset-documents/:documentId',
+  requirePermission('HELPDESK.ASSETS.WRITE'),
+  validate(assetDocumentMetadataSchema),
+  updateAssetDocumentController,
+);
+router.delete(
+  '/asset-documents/:documentId',
+  requirePermission('HELPDESK.ASSETS.WRITE'),
+  validate(helpdeskDeactivateReasonSchema),
+  deactivateAssetDocumentController,
 );
 
 // --- Evidencia documental de tickets (PDF o imagen; TCK-03) ---

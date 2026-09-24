@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { FileText, Loader2, Upload, Eye } from 'lucide-react';
+import { FileText, Loader2, Lock, PencilLine, Trash2, Upload, Eye } from 'lucide-react';
 import type { HelpdeskAssetDocument, HelpdeskCatalogs, HelpdeskLifecycleEvent } from '../../types/models';
 import { SearchableSelect } from '../SearchableSelect';
 
@@ -10,6 +10,9 @@ interface AssetEvidencePanelProps {
   uploading: boolean;
   onUpload: (file: File, fields: { title: string; document_kind_id?: number | null; lifecycle_event_id?: number | null }) => void;
   onView: (documentId: number) => void;
+  /** Editar/dar de baja una evidencia cargada a mano (las protegidas muestran candado). */
+  onEdit?: (document: HelpdeskAssetDocument) => void;
+  onDelete?: (document: HelpdeskAssetDocument) => void;
 }
 
 const inputClass =
@@ -23,6 +26,8 @@ export const AssetEvidencePanel = ({
   uploading,
   onUpload,
   onView,
+  onEdit,
+  onDelete,
 }: AssetEvidencePanelProps) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
@@ -129,13 +134,51 @@ export const AssetEvidencePanel = ({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => onView(doc.id)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.14)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.3)]"
-              >
-                <Eye size={14} /> Ver
-              </button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onView(doc.id)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.14)] px-2.5 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.3)]"
+                >
+                  <Eye size={14} /> Ver
+                </button>
+                {onEdit || onDelete ? (
+                  doc.is_protected ? (
+                    <span
+                      className="inline-flex items-center rounded-lg border border-transparent p-1.5 text-[var(--unilabor-neutral)]"
+                      title="Evidencia generada por el sistema: no se edita ni se da de baja"
+                      aria-label="Evidencia protegida"
+                    >
+                      <Lock size={14} />
+                    </span>
+                  ) : (
+                    <>
+                      {onEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(doc)}
+                          title="Editar datos de la evidencia"
+                          aria-label={`Editar evidencia ${doc.title}`}
+                          className="rounded-lg border border-transparent p-1.5 text-[var(--color-brand-500)] transition hover:border-[rgba(0,65,106,0.12)] hover:text-[var(--color-brand-700)]"
+                        >
+                          <PencilLine size={14} />
+                        </button>
+                      ) : null}
+                      {onDelete ? (
+                        <button
+                          type="button"
+                          onClick={() => onDelete(doc)}
+                          title="Dar de baja la evidencia"
+                          aria-label={`Dar de baja evidencia ${doc.title}`}
+                          className="rounded-lg border border-transparent p-1.5 text-[#b02a2a] transition hover:border-[rgba(176,42,42,0.25)] hover:bg-[rgba(190,40,40,0.08)]"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      ) : null}
+                    </>
+                  )
+                ) : null}
+              </div>
             </div>
           ))
         )}

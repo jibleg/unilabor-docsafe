@@ -100,6 +100,23 @@ export const assetDocumentSchema = z
   })
   .passthrough();
 
+// Correccion de datos de una evidencia ya cargada (sin tocar el PDF). Solo
+// estos campos; lo demas se descarta.
+export const assetDocumentMetadataSchema = z.object({
+  title: requiredText('El titulo del documento es obligatorio'),
+  document_kind_id: optionalPositiveId.optional(),
+  lifecycle_event_id: optionalPositiveId.optional(),
+  issued_on: optionalText.optional(),
+  expires_on: optionalText.optional(),
+});
+
+// Motivo opcional de una baja logica (evento o evidencia del expediente).
+export const helpdeskDeactivateReasonSchema = z
+  .object({
+    reason: optionalText.optional(),
+  })
+  .passthrough();
+
 // risk_level/result se exigen presentes pero NO se restringen a un enum, para no
 // endurecer mas que el controller actual (que solo valida no-vacio).
 export const helpdeskTicketIsoRiskSchema = z

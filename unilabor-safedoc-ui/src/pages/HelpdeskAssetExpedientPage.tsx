@@ -17,25 +17,35 @@ import {
   Move,
   Printer,
   Plus,
+  Lock,
+  PencilLine,
   X, CalendarDays } from 'lucide-react';
 import {
   fetchAssetExpedient,
   createLifecycleEvent,
+  updateLifecycleEvent,
+  deleteLifecycleEvent,
   uploadAssetDocument,
+  updateAssetDocument,
+  deleteAssetDocument,
   getAssetDocumentBlobUrl,
   listHelpdeskCatalogs,
   getApiErrorMessage,
 } from '../api/service';
 import type {
+  HelpdeskAssetDocument,
+  HelpdeskAssetDocumentMetadataPayload,
   HelpdeskAssetExpedient,
   HelpdeskCatalogs,
   HelpdeskLifecycleEvent,
   HelpdeskLifecycleEventPayload,
 } from '../types/models';
 import { notifyError, notifySuccess } from '../utils/notify';
+import { confirmAction } from '../utils/confirm';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { LifecycleEventForm } from '../components/helpdesk/LifecycleEventForm';
 import { AssetEvidencePanel } from '../components/helpdesk/AssetEvidencePanel';
+import { AssetEvidenceEditModal } from '../components/helpdesk/AssetEvidenceEditModal';
 import { AssetLabelModal } from '../components/helpdesk/AssetLabelModal';
 
 const EVENT_ICONS: Record<string, typeof PackagePlus> = {
@@ -72,6 +82,9 @@ export const HelpdeskAssetExpedientPage = () => {
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
   const [showLabel, setShowLabel] = useState(false);
   const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<HelpdeskLifecycleEvent | null>(null);
+  const [editingDocument, setEditingDocument] = useState<HelpdeskAssetDocument | null>(null);
+  const [savingDocument, setSavingDocument] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!assetId) {
@@ -104,6 +117,79 @@ export const HelpdeskAssetExpedientPage = () => {
       notifyError(getApiErrorMessage(error, 'No se pudo registrar el evento.'));
     } finally {
       setSavingEvent(false);
+    }
+  };
+
+  // Correccion de un evento registrado a mano (el tipo queda bloqueado en el formulario).
+  const handleUpdateEvent = async (payload: HelpdeskLifecycleEventPayload) => {
+    if (!editingEvent) {
+      return;
+    }
+    setSavingEvent(true);
+    try {
+      await updateLifecycleEvent(editingEvent.id, payload);
+      notifySuccess('Evento actualizado.');
+      setEditingEvent(null);
+      await loadData();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo actualizar el evento.'));
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  // Baja logica: el evento deja de verse en la linea de tiempo pero se conserva
+  // en la base de datos y queda en el historial/auditoria del equipo.
+  const handleDeleteEvent = async (ev: HelpdeskLifecycleEvent) => {
+    const ok = await confirmAction(
+      'Dar de baja el evento',
+      `Se retirara "${ev.event_code} — ${ev.title}" de la linea de tiempo. El registro se conserva en la auditoria del equipo y no se borra fisicamente.`,
+      'Dar de baja',
+    );
+    if (!ok) {
+      return;
+    }
+    try {
+      await deleteLifecycleEvent(ev.id);
+      notifySuccess('Evento dado de baja del expediente.');
+      await loadData();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo dar de baja el evento.'));
+    }
+  };
+
+  const handleUpdateDocument = async (payload: HelpdeskAssetDocumentMetadataPayload) => {
+    if (!editingDocument) {
+      return;
+    }
+    setSavingDocument(true);
+    try {
+      await updateAssetDocument(editingDocument.id, payload);
+      notifySuccess('Evidencia actualizada.');
+      setEditingDocument(null);
+      await loadData();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo actualizar la evidencia.'));
+    } finally {
+      setSavingDocument(false);
+    }
+  };
+
+  const handleDeleteDocument = async (doc: HelpdeskAssetDocument) => {
+    const ok = await confirmAction(
+      'Dar de baja la evidencia',
+      `Se retirara "${doc.title}" de las evidencias del equipo. El PDF y el registro se conservan en la auditoria; no se borran fisicamente.`,
+      'Dar de baja',
+    );
+    if (!ok) {
+      return;
+    }
+    try {
+      await deleteAssetDocument(doc.id);
+      notifySuccess('Evidencia dada de baja del expediente.');
+      await loadData();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo dar de baja la evidencia.'));
     }
   };
 
@@ -282,6 +368,44 @@ export const HelpdeskAssetExpedientPage = () => {
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-500)]">
                           Ver detalle <ChevronRight size={12} />
                         </span>
+                        <span className="ml-auto inline-flex items-center gap-1">
+                          {ev.is_system ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[11px] text-[var(--unilabor-neutral)]"
+                              title="Evento generado por otro proceso (ticket, mantenimiento, acta, movimiento o calibracion): no se edita ni se da de baja desde aqui"
+                              aria-label="Evento protegido"
+                            >
+                              <Lock size={12} />
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(clickEvent) => {
+                                  clickEvent.stopPropagation();
+                                  setEditingEvent(ev);
+                                }}
+                                title="Editar evento"
+                                aria-label={`Editar evento ${ev.event_code}`}
+                                className="rounded-lg border border-transparent p-1.5 text-[var(--color-brand-500)] transition hover:border-[rgba(0,65,106,0.12)] hover:bg-white hover:text-[var(--color-brand-700)]"
+                              >
+                                <PencilLine size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(clickEvent) => {
+                                  clickEvent.stopPropagation();
+                                  void handleDeleteEvent(ev);
+                                }}
+                                title="Dar de baja el evento"
+                                aria-label={`Dar de baja evento ${ev.event_code}`}
+                                className="rounded-lg border border-transparent p-1.5 text-[#b02a2a] transition hover:border-[rgba(176,42,42,0.25)] hover:bg-[rgba(190,40,40,0.08)]"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
+                          )}
+                        </span>
                       </div>
                     </div>
                   </li>
@@ -302,6 +426,8 @@ export const HelpdeskAssetExpedientPage = () => {
             uploading={uploading}
             onUpload={handleUpload}
             onView={handleView}
+            onEdit={(doc) => setEditingDocument(doc)}
+            onDelete={(doc) => void handleDeleteDocument(doc)}
           />
         </div>
       </div>
@@ -333,6 +459,47 @@ export const HelpdeskAssetExpedientPage = () => {
           brand={asset.brand?.name ?? asset.brand_name ?? null}
           model={asset.model ?? null}
           onClose={() => setShowLabel(false)}
+        />
+      )}
+
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="my-6 w-full max-w-xl overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-3">
+              <div className="text-sm font-bold text-[var(--color-brand-700)]">
+                Editar evento · {editingEvent.event_code}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingEvent(null)}
+                disabled={savingEvent}
+                className="rounded-full p-1 text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5">
+              <LifecycleEventForm
+                key={editingEvent.id}
+                catalogs={catalogs}
+                saving={savingEvent}
+                initialEvent={editingEvent}
+                onSubmit={handleUpdateEvent}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingDocument && (
+        <AssetEvidenceEditModal
+          key={editingDocument.id}
+          document={editingDocument}
+          catalogs={catalogs}
+          events={events}
+          saving={savingDocument}
+          onClose={() => setEditingDocument(null)}
+          onSubmit={handleUpdateDocument}
         />
       )}
 

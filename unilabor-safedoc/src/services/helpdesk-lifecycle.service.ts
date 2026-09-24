@@ -45,6 +45,13 @@ export interface HelpdeskLifecycleEventRecord {
   to_location_id: number | null;
   notes: string | null;
   generated_act_document_id: number | null;
+  is_active: boolean;
+  /**
+   * Evento generado o referenciado por otro proceso (ticket, orden de
+   * mantenimiento, acta de entrega-recepcion, movimiento, calibracion). Es
+   * evidencia derivada: no se edita ni se da de baja desde el expediente.
+   */
+  is_system: boolean;
   created_at?: string | undefined;
   updated_at?: string | undefined;
   event_type?: HelpdeskCatalogItem | null;
@@ -119,6 +126,8 @@ const mapEventRow = (row: any): HelpdeskLifecycleEventRecord => ({
   to_location_id: row.to_location_id ? Number(row.to_location_id) : null,
   notes: row.notes ? String(row.notes) : null,
   generated_act_document_id: row.generated_act_document_id ? Number(row.generated_act_document_id) : null,
+  is_active: row.is_active !== false,
+  is_system: Boolean(row.is_system),
   created_at: row.created_at ? toIsoDateTime(row.created_at) : undefined,
   updated_at: row.updated_at ? toIsoDateTime(row.updated_at) : undefined,
   event_type: mapCatalog(row.event_type_id, row.event_type_name, row.event_type_code, row.event_type_description),
@@ -139,6 +148,14 @@ const mapEventRow = (row: any): HelpdeskLifecycleEventRecord => ({
 const buildEventQuery = () => `
   SELECT
     e.*,
+    (
+      e.maintenance_order_id IS NOT NULL
+      OR e.ticket_id IS NOT NULL
+      OR e.generated_act_document_id IS NOT NULL
+      OR EXISTS (SELECT 1 FROM public.helpdesk_asset_movements m WHERE m.lifecycle_event_id = e.id)
+      OR EXISTS (SELECT 1 FROM public.helpdesk_calibration_orders c WHERE c.lifecycle_event_id = e.id)
+      OR EXISTS (SELECT 1 FROM public.helpdesk_maintenance_orders mo WHERE mo.lifecycle_event_id = e.id)
+    ) AS is_system,
     et.code AS event_type_code,
     et.name AS event_type_name,
     et.description AS event_type_description,
@@ -189,7 +206,7 @@ export const listAssetLifecycleEvents = async (
 ): Promise<HelpdeskLifecycleEventRecord[]> => {
   await assertLifecycleTable();
   const result = await pool.query(
-    `${buildEventQuery()} WHERE e.asset_id = $1 ORDER BY e.event_date DESC, e.id DESC;`,
+    `${buildEventQuery()} WHERE e.asset_id = $1 AND e.is_active = TRUE ORDER BY e.event_date DESC, e.id DESC;`,
     [assetId],
   );
   return result.rows.map(mapEventRow);
@@ -366,8 +383,20 @@ export const updateLifecycleEvent = async (
 ): Promise<HelpdeskLifecycleEventRecord | null> => {
   await assertLifecycleTable();
   const current = await getLifecycleEventById(eventId);
-  if (!current) {
+  if (!current || !current.is_active) {
     return null;
+  }
+  if (current.is_system) {
+    const error = new Error('HELPDESK_LIFECYCLE_EVENT_LOCKED');
+    (error as any).code = 'HELPDESK_LIFECYCLE_EVENT_LOCKED';
+    throw error;
+  }
+  // El tipo define efectos colaterales sobre el activo (puesta en servicio,
+  // reubicacion, baja) que solo se aplican al crear: no se cambia despues.
+  if (Number(payload.event_type_id) !== current.event_type_id) {
+    const error = new Error('HELPDESK_LIFECYCLE_EVENT_TYPE_LOCKED');
+    (error as any).code = 'HELPDESK_LIFECYCLE_EVENT_TYPE_LOCKED';
+    throw error;
   }
 
   await pool.query(
@@ -416,6 +445,72 @@ export const updateLifecycleEvent = async (
       eventId,
     ],
   );
+
+  return getLifecycleEventById(eventId);
+};
+
+/**
+ * Baja logica de un evento registrado a mano. Reglas:
+ * - eventos de sistema (ticket/mantenimiento/acta/movimiento/calibracion): no;
+ * - eventos de BAJA (DECOMMISSION): no, porque el activo ya quedo dado de baja;
+ * - con evidencias vigentes ligadas: primero hay que darlas de baja o reasignarlas.
+ * La fila se conserva (is_active = FALSE) y queda en el historial del activo.
+ */
+export const deactivateLifecycleEvent = async (
+  eventId: number,
+  userId: string | null | undefined,
+  reason: string | null,
+): Promise<HelpdeskLifecycleEventRecord | null> => {
+  await assertLifecycleTable();
+  const current = await getLifecycleEventById(eventId);
+  if (!current || !current.is_active) {
+    return null;
+  }
+  if (current.is_system) {
+    const error = new Error('HELPDESK_LIFECYCLE_EVENT_LOCKED');
+    (error as any).code = 'HELPDESK_LIFECYCLE_EVENT_LOCKED';
+    throw error;
+  }
+  if ((current.event_type?.code ?? '').toUpperCase() === 'DECOMMISSION') {
+    const error = new Error('HELPDESK_LIFECYCLE_EVENT_DECOMMISSION_LOCKED');
+    (error as any).code = 'HELPDESK_LIFECYCLE_EVENT_DECOMMISSION_LOCKED';
+    throw error;
+  }
+
+  await withTransaction(async (client) => {
+    const evidence = await client.query(
+      `SELECT COUNT(*)::int AS total FROM public.helpdesk_asset_documents WHERE lifecycle_event_id = $1 AND is_active = TRUE;`,
+      [eventId],
+    );
+    if (Number(evidence.rows[0]?.total ?? 0) > 0) {
+      const error = new Error('HELPDESK_LIFECYCLE_EVENT_HAS_EVIDENCE');
+      (error as any).code = 'HELPDESK_LIFECYCLE_EVENT_HAS_EVIDENCE';
+      throw error;
+    }
+
+    await client.query(
+      `
+        UPDATE public.helpdesk_asset_lifecycle_events
+        SET is_active = FALSE,
+            deleted_at = NOW(),
+            deleted_by_user_id = $2,
+            deleted_reason = $3,
+            updated_by_user_id = $2,
+            updated_at = NOW()
+        WHERE id = $1 AND is_active = TRUE;
+      `,
+      [eventId, userId ?? null, normalizeOptionalText(reason)],
+    );
+
+    await recordAssetHistory(
+      client,
+      current.asset_id,
+      'LIFECYCLE_EVENT_DELETE',
+      `Evento ${current.event_code} (${current.title}) dado de baja del expediente.`,
+      userId,
+      { event_id: eventId, event_code: current.event_code, reason: normalizeOptionalText(reason) },
+    );
+  });
 
   return getLifecycleEventById(eventId);
 };

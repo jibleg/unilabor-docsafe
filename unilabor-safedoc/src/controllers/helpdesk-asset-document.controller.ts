@@ -4,9 +4,12 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { getNumberId, getText, logHelpdeskAudit, mapHelpdeskError } from './helpdesk-controller.shared';
 import { registerAuditEvent } from '../services/audit.service';
 import {
+  deactivateAssetDocument,
   listAssetDocuments,
   resolveAssetDocumentPath,
+  updateAssetDocumentMetadata,
   uploadAssetDocument,
+  type HelpdeskAssetDocumentMetadataPayload,
   type HelpdeskAssetDocumentPayload,
 } from '../services/helpdesk-asset-document.service';
 
@@ -95,6 +98,67 @@ export const uploadAssetDocumentController = async (req: AuthRequest, res: Respo
     }
     console.error('Error cargando evidencia del activo:', error);
     return res.status(500).json({ message: 'No se pudo cargar la evidencia.' });
+  }
+};
+
+/** PATCH /helpdesk/asset-documents/:documentId - corrige datos de la evidencia (no el PDF). */
+export const updateAssetDocumentController = async (req: AuthRequest, res: Response) => {
+  const documentId = getNumberId(req.params.documentId);
+  if (!documentId) {
+    return res.status(400).json({ message: 'ID de documento invalido.' });
+  }
+
+  // req.body ya paso por assetDocumentMetadataSchema.
+  const payload = req.body as HelpdeskAssetDocumentMetadataPayload;
+
+  try {
+    const document = await updateAssetDocumentMetadata(documentId, payload, req.user?.id ?? null);
+
+    await logHelpdeskAudit(
+      req.user?.id,
+      `HELPDESK_ASSET_DOCUMENT_UPDATE:${documentId}`,
+      req.ip,
+      documentId,
+      'helpdesk_asset_document',
+    );
+
+    return res.json({ message: 'Evidencia actualizada correctamente.', document });
+  } catch (error: any) {
+    const mapped = mapHelpdeskError(res, error);
+    if (mapped) {
+      return mapped;
+    }
+    console.error('Error actualizando evidencia del activo:', error);
+    return res.status(500).json({ message: 'No se pudo actualizar la evidencia.' });
+  }
+};
+
+/** DELETE /helpdesk/asset-documents/:documentId - baja logica (body opcional: { reason }). */
+export const deactivateAssetDocumentController = async (req: AuthRequest, res: Response) => {
+  const documentId = getNumberId(req.params.documentId);
+  if (!documentId) {
+    return res.status(400).json({ message: 'ID de documento invalido.' });
+  }
+
+  try {
+    const document = await deactivateAssetDocument(documentId, req.user?.id ?? null, getText(req.body?.reason));
+
+    await logHelpdeskAudit(
+      req.user?.id,
+      `HELPDESK_ASSET_DOCUMENT_DELETE:${documentId}`,
+      req.ip,
+      documentId,
+      'helpdesk_asset_document',
+    );
+
+    return res.json({ message: 'Evidencia dada de baja del expediente.', document });
+  } catch (error: any) {
+    const mapped = mapHelpdeskError(res, error);
+    if (mapped) {
+      return mapped;
+    }
+    console.error('Error dando de baja evidencia del activo:', error);
+    return res.status(500).json({ message: 'No se pudo dar de baja la evidencia.' });
   }
 };
 

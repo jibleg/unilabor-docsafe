@@ -418,6 +418,9 @@ export interface HelpdeskLifecycleEvent {
   to_location_id?: number | null;
   notes?: string | null;
   generated_act_document_id?: number | null;
+  is_active?: boolean;
+  /** Generado/referenciado por otro proceso: no editable ni eliminable desde el expediente. */
+  is_system?: boolean;
   event_type?: HelpdeskCatalogItem | null;
   supplier?: HelpdeskCatalogItem | null;
   disposal_reason?: HelpdeskCatalogItem | null;
@@ -441,7 +444,18 @@ export interface HelpdeskAssetDocument {
   is_current: boolean;
   issued_on?: string | null;
   expires_on?: string | null;
+  is_active?: boolean;
+  /** Acta/constancia/documento de programa generado por el sistema: no editable ni eliminable. */
+  is_protected?: boolean;
   created_at?: string;
+}
+
+export interface HelpdeskAssetDocumentMetadataPayload {
+  title: string;
+  document_kind_id?: number | null;
+  lifecycle_event_id?: number | null;
+  issued_on?: string | null;
+  expires_on?: string | null;
 }
 
 export interface HelpdeskAssetExpedient {
