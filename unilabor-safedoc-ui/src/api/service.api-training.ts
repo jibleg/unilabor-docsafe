@@ -505,8 +505,12 @@ export const getEmployeeDocumentUrl = async (documentId: number): Promise<string
   return URL.createObjectURL(response.data as Blob);
 };
 
-export const getEvaluationDashboard = async (): Promise<EvaluationDashboard> => {
-  const response = await api.get('/rh/evaluations/dashboard');
+/** Filtro de estados compartido por el dashboard y el reporte: `status=a,b,c`. */
+const buildStatusParam = (statuses?: string[]): Record<string, string> =>
+  statuses && statuses.length > 0 ? { status: statuses.join(',') } : {};
+
+export const getEvaluationDashboard = async (statuses?: string[]): Promise<EvaluationDashboard> => {
+  const response = await api.get('/rh/evaluations/dashboard', { params: buildStatusParam(statuses) });
   const payload = asRecord(unwrapPayload(response.data));
   const totals = asRecord(payload?.totals) ?? {};
   const num = (source: Record<string, unknown>, key: string) => Number(source[key] ?? 0);
@@ -561,17 +565,17 @@ export const listTraceabilityEmployees = async (): Promise<TraceabilityEmployee[
 };
 
 export const getTraceabilityReport = async (
-  query: PageQuery & { course_id?: number; employee_id?: number; status?: string } = {},
+  query: PageQuery & { course_id?: number; employee_id?: number; statuses?: string[] } = {},
 ): Promise<PageResult<TraceabilityRow>> => {
-  const params: Record<string, string | number> = { ...buildPageParams(query) };
+  const params: Record<string, string | number> = {
+    ...buildPageParams(query),
+    ...buildStatusParam(query.statuses),
+  };
   if (query.course_id) {
     params.course_id = query.course_id;
   }
   if (query.employee_id) {
     params.employee_id = query.employee_id;
-  }
-  if (query.status) {
-    params.status = query.status;
   }
   const response = await api.get('/rh/evaluations/report', { params });
   const data = getArrayFromPayload(response.data, ['data', 'items'])

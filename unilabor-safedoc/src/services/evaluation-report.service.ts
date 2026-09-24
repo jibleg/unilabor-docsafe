@@ -56,7 +56,26 @@ const STATUS_AGG = `
 const compliance = (passed: number, total: number): number =>
   total > 0 ? Math.round((passed / total) * 10000) / 100 : 0;
 
-export const getEvaluationDashboard = async (): Promise<EvaluationDashboard> => {
+export interface DashboardFilters {
+  /** Estados a considerar; vacio o ausente = todos. */
+  statuses?: string[];
+}
+
+/**
+ * Condicion SQL por estado (`a.status = ANY($n)`), compartida por el dashboard
+ * y el reporte para que ambos respondan al mismo filtro de la pantalla.
+ */
+const buildStatusCondition = (statuses: string[] | undefined, values: unknown[]): string | null => {
+  if (!statuses || statuses.length === 0) {
+    return null;
+  }
+  values.push(statuses);
+  return `a.status = ANY($${values.length}::text[])`;
+};
+
+export const getEvaluationDashboard = async (
+  filters: DashboardFilters = {},
+): Promise<EvaluationDashboard> => {
   const tableExists = await pool.query(
     `SELECT to_regclass('public.evaluation_assignments') IS NOT NULL AS exists;`,
   );
@@ -67,13 +86,19 @@ export const getEvaluationDashboard = async (): Promise<EvaluationDashboard> => 
     };
   }
 
+  const values: unknown[] = [];
+  const statusCondition = buildStatusCondition(filters.statuses, values);
+  const whereClause = statusCondition ? `WHERE ${statusCondition}` : '';
+
   const byCourse = await pool.query(
     `SELECT c.id AS course_id, c.title AS course_title, ${STATUS_AGG}
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
        JOIN public.training_courses c ON c.id = t.training_course_id
+       ${whereClause}
       GROUP BY c.id, c.title
       ORDER BY c.title ASC;`,
+    values,
   );
 
   const courses: CourseEvaluationSummary[] = byCourse.rows.map((row) => ({
@@ -91,7 +116,8 @@ export const getEvaluationDashboard = async (): Promise<EvaluationDashboard> => 
   }));
 
   const totalsRow = await pool.query(
-    `SELECT ${STATUS_AGG} FROM public.evaluation_assignments a;`,
+    `SELECT ${STATUS_AGG} FROM public.evaluation_assignments a ${whereClause};`,
+    values,
   );
   const t = totalsRow.rows[0] ?? {};
   return {
@@ -155,7 +181,8 @@ export const listTraceabilityEmployees = async (): Promise<TraceabilityEmployee[
 export interface TraceabilityFilters extends PaginationInput {
   course_id?: number;
   employee_id?: number;
-  status?: string;
+  /** Estados a incluir; vacio o ausente = todos. */
+  statuses?: string[];
 }
 
 export const getTraceabilityReport = async (
@@ -174,9 +201,9 @@ export const getTraceabilityReport = async (
     values.push(filters.employee_id);
     conditions.push(`a.employee_id = $${values.length}`);
   }
-  if (filters.status) {
-    values.push(filters.status);
-    conditions.push(`a.status = $${values.length}`);
+  const statusCondition = buildStatusCondition(filters.statuses, values);
+  if (statusCondition) {
+    conditions.push(statusCondition);
   }
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 

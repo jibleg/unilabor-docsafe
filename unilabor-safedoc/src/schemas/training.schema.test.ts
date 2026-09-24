@@ -6,6 +6,7 @@ import {
   createTrainingCourseSchema,
   gradeEvaluationSchema,
   replaceQuestionsSchema,
+  evaluationStatusFilterSchema,
   submitEvaluationSchema,
 } from './training.schema';
 
@@ -243,6 +244,34 @@ describe('gradeEvaluationSchema', () => {
 
   it('rechaza lista vacia', () => {
     const result = gradeEvaluationSchema.safeParse({ grades: [] });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('evaluationStatusFilterSchema', () => {
+  it('sin parametro devuelve lista vacia (sin filtro)', () => {
+    expect(evaluationStatusFilterSchema.parse(undefined)).toEqual([]);
+    expect(evaluationStatusFilterSchema.parse('')).toEqual([]);
+  });
+
+  it('acepta un solo estado', () => {
+    expect(evaluationStatusFilterSchema.parse('passed')).toEqual(['passed']);
+  });
+
+  it('acepta lista separada por comas, recorta espacios y quita duplicados', () => {
+    expect(evaluationStatusFilterSchema.parse('passed, failed,passed,,expired')).toEqual([
+      'passed',
+      'failed',
+      'expired',
+    ]);
+  });
+
+  it('acepta el parametro repetido (array de Express)', () => {
+    expect(evaluationStatusFilterSchema.parse(['pending', 'grading'])).toEqual(['pending', 'grading']);
+  });
+
+  it('rechaza un estado desconocido', () => {
+    const result = evaluationStatusFilterSchema.safeParse('passed,aprobado');
     expect(result.success).toBe(false);
   });
 });

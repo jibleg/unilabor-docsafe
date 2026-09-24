@@ -6,17 +6,39 @@ import {
   getTraceabilityReport,
   listTraceabilityEmployees,
 } from '../api/service';
-import type { EvaluationDashboard, TraceabilityEmployee, TraceabilityRow } from '../types/models';
+import type {
+  EvaluationAssignmentStatus,
+  EvaluationDashboard,
+  TraceabilityEmployee,
+  TraceabilityRow,
+} from '../types/models';
 import { notifyError } from '../utils/notify';
 import { EVALUATION_STATUS_META } from '../utils/evaluations';
 import { EvaluationResponsesModal } from '../components/rh/EvaluationResponsesModal';
 import { Pagination } from '../components/Pagination';
 import { SearchableSelect, type SearchableOption } from '../components/SearchableSelect';
+import { MultiSelectFilter, type MultiSelectOption } from '../components/MultiSelectFilter';
 
 /** Estados cuyas evaluaciones ya tienen respuestas registradas para consultar. */
 const ANSWERED_STATUSES = new Set(['submitted', 'grading', 'passed', 'failed']);
 
 const TRACEABILITY_PAGE_SIZE = 10;
+
+/**
+ * Filtro principal de la pantalla: los estados marcados aplican a las tarjetas
+ * del encabezado, al resumen por capacitacion y a la trazabilidad. Por defecto
+ * se omiten las evaluaciones no acreditadas (pedido de RH, 2026-09-24).
+ */
+const ALL_STATUSES = Object.keys(EVALUATION_STATUS_META) as EvaluationAssignmentStatus[];
+const DEFAULT_STATUSES: string[] = ALL_STATUSES.filter((status) => status !== 'failed');
+const STATUS_OPTIONS: MultiSelectOption[] = ALL_STATUSES.map((status) => ({
+  value: status,
+  label: EVALUATION_STATUS_META[status].label,
+  className: EVALUATION_STATUS_META[status].className,
+}));
+
+const excludedStatusLabels = (selected: string[]): string[] =>
+  ALL_STATUSES.filter((status) => !selected.includes(status)).map((status) => EVALUATION_STATUS_META[status].label);
 
 /** Opciones del filtro de colaborador: '' = todos (convencion de SearchableSelect). */
 const buildEmployeeOptions = (employees: TraceabilityEmployee[]): SearchableOption[] =>
@@ -55,7 +77,8 @@ export const RhTrainingDashboardPage = () => {
   const [courseFilter, setCourseFilter] = useState<number | ''>('');
   const [employeeFilter, setEmployeeFilter] = useState<string>('');
   const [employees, setEmployees] = useState<TraceabilityEmployee[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string[]>(DEFAULT_STATUSES);
+  const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -63,15 +86,15 @@ export const RhTrainingDashboardPage = () => {
   const [responsesAssignmentId, setResponsesAssignmentId] = useState<number | null>(null);
 
   const loadReport = useCallback(
-    async (courseId: number | '', employeeId: string, status: string, targetPage: number) => {
+    async (courseId: number | '', employeeId: string, statuses: string[], targetPage: number) => {
       setLoadingReport(true);
       try {
         const result = await getTraceabilityReport({
           page: targetPage,
           limit: TRACEABILITY_PAGE_SIZE,
+          statuses,
           ...(courseId ? { course_id: courseId } : {}),
           ...(employeeId ? { employee_id: Number(employeeId) } : {}),
-          ...(status ? { status } : {}),
         });
         setRows(result.data);
         setPage(result.pagination.page);
@@ -90,9 +113,9 @@ export const RhTrainingDashboardPage = () => {
       setLoading(true);
       try {
         const [dash, employeeList] = await Promise.all([
-          getEvaluationDashboard(),
+          getEvaluationDashboard(DEFAULT_STATUSES),
           listTraceabilityEmployees(),
-          loadReport('', '', '', 1),
+          loadReport('', '', DEFAULT_STATUSES, 1),
         ]);
         if (active) {
           setDashboard(dash);
@@ -132,12 +155,21 @@ export const RhTrainingDashboardPage = () => {
     }
   };
 
-  const onStatusChange = async (value: string) => {
-    setStatusFilter(value);
+  // Cambiar los estados recarga TODO el panel (tarjetas, resumen por
+  // capacitacion y trazabilidad), no solo la tabla.
+  const onStatusFilterChange = async (values: string[]) => {
+    setStatusFilter(values);
+    setRefreshing(true);
     try {
-      await loadReport(courseFilter, employeeFilter, value, 1);
+      const [dash] = await Promise.all([
+        getEvaluationDashboard(values),
+        loadReport(courseFilter, employeeFilter, values, 1),
+      ]);
+      setDashboard(dash);
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo filtrar el reporte.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo aplicar el filtro de estados.'));
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -152,6 +184,7 @@ export const RhTrainingDashboardPage = () => {
   const totals = dashboard?.totals;
   const courses = useMemo(() => dashboard?.courses ?? [], [dashboard]);
   const employeeOptions = useMemo(() => buildEmployeeOptions(employees), [employees]);
+  const excludedLabels = useMemo(() => excludedStatusLabels(statusFilter), [statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -167,6 +200,24 @@ export const RhTrainingDashboardPage = () => {
             Cumplimiento y trazabilidad de las evaluaciones de competencia del personal.
           </p>
         </div>
+        <div className="w-full sm:w-80">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+            Estados incluidos
+          </label>
+          <MultiSelectFilter
+            values={statusFilter}
+            options={STATUS_OPTIONS}
+            defaultValues={DEFAULT_STATUSES}
+            allLabel="Todos los estados"
+            onChange={(values) => void onStatusFilterChange(values)}
+            disabled={loading || refreshing}
+          />
+          <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
+            {excludedLabels.length > 0
+              ? `Excluye: ${excludedLabels.join(', ')}. Aplica a tarjetas, resumen y trazabilidad.`
+              : 'Aplica a tarjetas, resumen y trazabilidad.'}
+          </p>
+        </div>
       </div>
 
       {loading ? (
@@ -174,7 +225,7 @@ export const RhTrainingDashboardPage = () => {
           <Loader2 className="mr-2 animate-spin" size={18} /> Cargando panel...
         </div>
       ) : (
-        <>
+        <div className={`space-y-6 transition-opacity ${refreshing ? 'opacity-60' : ''}`} aria-busy={refreshing}>
           {totals && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <StatCard label="Total" value={totals.total} />
@@ -255,18 +306,6 @@ export const RhTrainingDashboardPage = () => {
                     </option>
                   ))}
                 </select>
-                <select
-                  value={statusFilter}
-                  onChange={(event) => void onStatusChange(event.target.value)}
-                  className="rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2 text-sm outline-none"
-                >
-                  <option value="">Todos los estados</option>
-                  {Object.entries(EVALUATION_STATUS_META).map(([value, meta]) => (
-                    <option key={value} value={value}>
-                      {meta.label}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
             {rows.length === 0 ? (
@@ -337,7 +376,7 @@ export const RhTrainingDashboardPage = () => {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {responsesAssignmentId !== null && (

@@ -14,6 +14,7 @@ import {
   getTraceabilityReport,
   listTraceabilityEmployees,
 } from '../services/evaluation-report.service';
+import { evaluationStatusFilterSchema } from '../schemas/training.schema';
 
 const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -83,9 +84,29 @@ export const listNotificationLogController = async (req: AuthRequest, res: Respo
   }
 };
 
-export const evaluationDashboardController = async (_req: AuthRequest, res: Response) => {
+/**
+ * Lee el filtro `status` (lista de estados) de la query. Si trae un valor
+ * desconocido responde 400 y devuelve null para que el controller corte.
+ */
+const parseStatusFilter = (req: AuthRequest, res: Response): string[] | null => {
+  const parsed = evaluationStatusFilterSchema.safeParse(req.query.status);
+  if (!parsed.success) {
+    res.status(400).json({
+      message: 'Datos de entrada invalidos',
+      errors: parsed.error.issues.map((issue) => ({ field: 'status', message: issue.message })),
+    });
+    return null;
+  }
+  return parsed.data;
+};
+
+export const evaluationDashboardController = async (req: AuthRequest, res: Response) => {
   try {
-    const dashboard = await getEvaluationDashboard();
+    const statuses = parseStatusFilter(req, res);
+    if (!statuses) {
+      return res;
+    }
+    const dashboard = await getEvaluationDashboard({ statuses });
     return res.json(dashboard);
   } catch (error) {
     console.error('Error obteniendo dashboard de evaluaciones:', error);
@@ -118,18 +139,12 @@ export const traceabilityReportController = async (req: AuthRequest, res: Respon
     if (Number.isFinite(employeeId) && employeeId > 0) {
       filters.employee_id = employeeId;
     }
-    const validStatuses = [
-      'pending',
-      'in_progress',
-      'submitted',
-      'grading',
-      'passed',
-      'failed',
-      'expired',
-      'authorized_late',
-    ];
-    if (typeof req.query.status === 'string' && validStatuses.includes(req.query.status)) {
-      filters.status = req.query.status;
+    const statuses = parseStatusFilter(req, res);
+    if (!statuses) {
+      return res;
+    }
+    if (statuses.length > 0) {
+      filters.statuses = statuses;
     }
     const result = await getTraceabilityReport(filters);
     return res.json(result);

@@ -258,3 +258,33 @@ export const upsertCertificateTemplateSchema = z
     signatures: z.array(certificateSignatureSchema).max(4, 'Maximo 4 firmas').optional(),
   })
   .passthrough();
+
+// --- Filtro por estado del panel de capacitacion / reporte de trazabilidad ---
+
+export const EVALUATION_ASSIGNMENT_STATUSES = [
+  'pending',
+  'in_progress',
+  'submitted',
+  'grading',
+  'passed',
+  'failed',
+  'expired',
+  'authorized_late',
+] as const;
+
+export type EvaluationAssignmentStatus = (typeof EVALUATION_ASSIGNMENT_STATUSES)[number];
+
+/**
+ * Query `status` del dashboard y del reporte: admite un solo valor, una lista
+ * separada por comas (`status=passed,failed`) o el parametro repetido
+ * (`status=passed&status=failed`). Devuelve la lista sin duplicados; vacia
+ * significa "sin filtro".
+ */
+export const evaluationStatusFilterSchema = z.preprocess(
+  (value) => {
+    const raw = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+    const cleaned = raw.map((item) => String(item ?? '').trim()).filter((item) => item.length > 0);
+    return Array.from(new Set(cleaned));
+  },
+  z.array(z.enum(EVALUATION_ASSIGNMENT_STATUSES, { message: 'Estado de evaluacion invalido' })),
+);
