@@ -57,3 +57,16 @@ export const uploadEmployeeDocumentSchema = z
     title: requiredText('El titulo es obligatorio'),
   })
   .passthrough();
+
+// Correccion de texto de un documento ya cargado (titulo / descripcion). Solo
+// esos dos campos: el PDF, la version, las fechas y el estado no se tocan.
+export const updateEmployeeDocumentMetadataSchema = z.object({
+  title: requiredText('El titulo es obligatorio').max(255, 'El titulo es demasiado largo'),
+  description: z
+    .string()
+    .trim()
+    .max(2000, 'La descripcion es demasiado larga')
+    .nullable()
+    .optional()
+    .transform((value) => (value ? value : null)),
+});

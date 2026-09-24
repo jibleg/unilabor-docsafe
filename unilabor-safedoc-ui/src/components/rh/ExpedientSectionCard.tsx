@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarDays, Eye, FileClock, FilePlus2, FileText, RefreshCw, Shield } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Eye, FileClock, FilePlus2, FileText, PencilLine, RefreshCw, Shield } from 'lucide-react';
 import type { EmployeeExpedientSection, ExpedientItemStatus } from '../../types/models';
 
 const getStatusLabel = (status: ExpedientItemStatus): string => {
@@ -38,6 +38,9 @@ interface ExpedientSectionCardProps {
   onUpload: (item: EmployeeExpedientSection['items'][number]) => void;
   onView: (documentId: number) => void;
   onHistory?: (item: EmployeeExpedientSection['items'][number]) => void;
+  /** Correccion de titulo/descripcion del documento vigente (solo RH; el
+      portal del colaborador no lo pasa y por eso no ve el lapiz). */
+  onEdit?: (item: EmployeeExpedientSection['items'][number]) => void;
 }
 
 export const ExpedientSectionCard = ({
@@ -45,6 +48,7 @@ export const ExpedientSectionCard = ({
   onUpload,
   onView,
   onHistory,
+  onEdit,
 }: ExpedientSectionCardProps) => {
   return (
     <div className="overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/92 shadow-xl shadow-[rgba(0,65,106,0.08)]">
@@ -94,7 +98,20 @@ export const ExpedientSectionCard = ({
             <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.82)] px-4 py-3 text-xs text-[var(--unilabor-neutral)]">
               {item.current_document ? (
                 <div className="space-y-1.5">
-                  <p className="font-semibold text-[var(--color-brand-700)]">{item.current_document.title}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-[var(--color-brand-700)]">{item.current_document.title}</p>
+                    {onEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(item)}
+                        title="Corregir título o descripción"
+                        aria-label={`Corregir título o descripción de ${item.current_document.title}`}
+                        className="shrink-0 rounded-lg border border-transparent p-1 text-[var(--color-brand-500)] transition hover:border-[rgba(0,65,106,0.12)] hover:bg-white hover:text-[var(--color-brand-700)]"
+                      >
+                        <PencilLine size={14} />
+                      </button>
+                    ) : null}
+                  </div>
                   <p>Versión {item.current_document.version}</p>
                   <p>Emitido: {item.current_document.issue_date || 'Sin fecha'}</p>
                   <p>Vence: {item.current_document.expiry_date || 'No aplica'}</p>

@@ -8,7 +8,9 @@ import {
   listEmployeeDocumentHistory,
   listEmployeeDocuments,
   resolveEmployeeDocumentPath,
+  updateEmployeeDocumentMetadata,
   uploadEmployeeDocument,
+  type EmployeeDocumentMetadataPayload,
   type EmployeeDocumentPayload,
 } from '../services/employee-document.service';
 import { registerAuditEvent } from '../services/audit.service';
@@ -254,6 +256,39 @@ export const uploadEmployeeDocumentController = async (req: AuthRequest, res: Re
 
     console.error('Error cargando documento RH:', error);
     return res.status(500).json({ message: 'No se pudo cargar el documento RH.' });
+  }
+};
+
+/** PATCH /rh/employees/:id/documents/:documentId - corrige titulo/descripcion. */
+export const updateEmployeeDocumentMetadataController = async (req: AuthRequest, res: Response) => {
+  const employeeId = parsePositiveInt(req.params.id);
+  const documentId = parsePositiveInt(req.params.documentId);
+  if (!employeeId || !documentId) {
+    return res.status(400).json({ message: 'ID de colaborador o documento invalido.' });
+  }
+
+  const user = req.user;
+  if (!user?.id) {
+    return res.status(401).json({ message: 'Sesion invalida o expirada.' });
+  }
+
+  // req.body ya viene validado/normalizado por updateEmployeeDocumentMetadataSchema.
+  const payload = req.body as EmployeeDocumentMetadataPayload;
+
+  try {
+    const document = await updateEmployeeDocumentMetadata(employeeId, documentId, user.id, payload);
+    return res.json({
+      message: 'Datos del documento RH actualizados.',
+      document,
+    });
+  } catch (error: any) {
+    const mappedError = mapEmployeeDocumentError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+
+    console.error('Error actualizando datos del documento RH:', error);
+    return res.status(500).json({ message: 'No se pudieron actualizar los datos del documento RH.' });
   }
 };
 

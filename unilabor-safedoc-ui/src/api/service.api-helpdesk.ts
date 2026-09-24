@@ -774,6 +774,24 @@ export const listEmployeeDocumentsByEmployeeId = async (
     .filter((document): document is EmployeeDocument => document !== null);
 };
 
+/** Corrige solo titulo/descripcion de un documento RH ya cargado (sin nueva version). */
+export const updateEmployeeDocumentMetadataByEmployeeId = async (
+  employeeId: number,
+  documentId: number,
+  payload: { title: string; description?: string | null },
+): Promise<EmployeeDocument> => {
+  const response = await api.patch(`/rh/employees/${employeeId}/documents/${documentId}`, {
+    title: payload.title.trim(),
+    description: payload.description?.trim() || null,
+  });
+  const parsed =
+    normalizeEmployeeDocument(asRecord(unwrapPayload(response.data))?.document ?? unwrapPayload(response.data));
+  if (!parsed) {
+    throw new Error('No se pudo interpretar el documento RH actualizado');
+  }
+  return parsed;
+};
+
 export const uploadEmployeeDocumentByEmployeeId = async (
   employeeId: number,
   payload: EmployeeDocumentPayload,

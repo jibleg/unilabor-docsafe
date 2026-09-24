@@ -161,6 +161,7 @@ const mapActionToLabel = (action: string): string => {
       return 'DELETE';
     case 'UPDATE':
     case 'RH_EMPLOYEE_UPDATE':
+    case 'RH_DOCUMENT_UPDATE':
       return 'UPDATE';
     case 'ENABLE':
       return 'ENABLE';

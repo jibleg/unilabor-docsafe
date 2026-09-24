@@ -8,11 +8,13 @@ import {
   listEmployeeDocumentHistoryByEmployeeId,
   listEmployees,
   listRhAuditLogs,
+  updateEmployeeDocumentMetadataByEmployeeId,
   uploadEmployeeDocumentByEmployeeId,
   type EmployeeDocumentPayload,
 } from '../api/service';
 import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { EmployeeAlertsSummaryPanel } from '../components/rh/EmployeeAlertsSummaryPanel';
+import { EmployeeDocumentEditModal } from '../components/rh/EmployeeDocumentEditModal';
 import { EmployeeDocumentHistoryModal } from '../components/rh/EmployeeDocumentHistoryModal';
 import { EmployeeDocumentUploadModal } from '../components/rh/EmployeeDocumentUploadModal';
 import { EmployeeInductionHistoryPanel } from '../components/rh/EmployeeInductionHistoryPanel';
@@ -71,6 +73,8 @@ export const EmployeeExpedientPage = () => {
   const [expedient, setExpedient] = useState<EmployeeExpedient | null>(null);
   const [selectedItem, setSelectedItem] = useState<EmployeeExpedientItem | null>(null);
   const [savingDocument, setSavingDocument] = useState(false);
+  const [editItem, setEditItem] = useState<EmployeeExpedientItem | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
   const [alertsSummary, setAlertsSummary] = useState<EmployeeAlertsSummary>(EMPTY_ALERTS_SUMMARY);
   const [alerts, setAlerts] = useState<EmployeeAlert[]>([]);
@@ -237,6 +241,32 @@ export const EmployeeExpedientPage = () => {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar el documento RH.'));
     } finally {
       setSavingDocument(false);
+    }
+  };
+
+  // Corrige solo titulo/descripcion del documento vigente (ortografia,
+  // redaccion). No genera version ni toca PDF/fechas.
+  const handleEditMetadata = async (payload: { title: string; description: string }) => {
+    if (!selectedEmployeeId || !editItem?.current_document) {
+      return;
+    }
+
+    if (!payload.title.trim()) {
+      notifyWarning('El titulo del documento es obligatorio.');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      await updateEmployeeDocumentMetadataByEmployeeId(selectedEmployeeId, editItem.current_document.id, payload);
+      notifySuccess('Titulo y descripcion del documento actualizados.');
+      setEditItem(null);
+      await loadExpedient(selectedEmployeeId);
+      await loadRecentMovements(selectedEmployeeId);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo actualizar el documento RH.'));
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -418,6 +448,7 @@ export const EmployeeExpedientPage = () => {
                     key={section.section.id}
                     section={section}
                     onUpload={(item) => setSelectedItem(item)}
+                    onEdit={(item) => setEditItem(item)}
                     onHistory={(item) => {
                       setHistoryItem(item);
                       void loadDocumentHistory(
@@ -457,6 +488,16 @@ export const EmployeeExpedientPage = () => {
         saving={savingDocument}
         onClose={() => setSelectedItem(null)}
         onSubmit={handleUpload}
+      />
+
+      <EmployeeDocumentEditModal
+        isOpen={editItem !== null && currentEmployee !== null}
+        employee={currentEmployee}
+        documentType={editItem?.document_type ?? null}
+        document={editItem?.current_document ?? null}
+        saving={savingEdit}
+        onClose={() => setEditItem(null)}
+        onSubmit={handleEditMetadata}
       />
 
       <EmployeeDocumentHistoryModal

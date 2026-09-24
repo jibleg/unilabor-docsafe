@@ -5,6 +5,7 @@ import {
   getMyExpedientController,
   listEmployeeDocumentsController,
   listMyDocumentsController,
+  updateEmployeeDocumentMetadataController,
   uploadEmployeeDocumentController,
   uploadMyDocumentController,
   viewEmployeeDocumentController,
@@ -12,7 +13,10 @@ import {
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { upload as uploadMiddleware } from '../middlewares/upload.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { uploadEmployeeDocumentSchema } from '../schemas/employee.schema';
+import {
+  updateEmployeeDocumentMetadataSchema,
+  uploadEmployeeDocumentSchema,
+} from '../schemas/employee.schema';
 
 const router = Router();
 
@@ -46,6 +50,14 @@ router.post(
   uploadMiddleware.single('file'),
   validate(uploadEmployeeDocumentSchema),
   uploadEmployeeDocumentController,
+);
+
+// Correccion de titulo/descripcion de un documento ya cargado (sin nueva version).
+router.patch(
+  '/employees/:id/documents/:documentId',
+  requirePermission('RH.EMPLOYEE_DOCS.WRITE'),
+  validate(updateEmployeeDocumentMetadataSchema),
+  updateEmployeeDocumentMetadataController,
 );
 
 router.post(

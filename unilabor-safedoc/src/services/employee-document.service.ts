@@ -742,6 +742,70 @@ export const uploadEmployeeDocument = async (
   }
 };
 
+export interface EmployeeDocumentMetadataPayload {
+  title: string;
+  description: string | null;
+}
+
+/**
+ * Corrige titulo y/o descripcion de un documento RH ya cargado (p. ej. una
+ * falta de ortografia) sin generar version nueva ni tocar el PDF, las fechas
+ * o el estado. Se exige que el documento pertenezca al colaborador indicado y
+ * queda auditado con los valores anteriores.
+ */
+export const updateEmployeeDocumentMetadata = async (
+  employeeId: number,
+  documentId: number,
+  updatedByUserId: string,
+  payload: EmployeeDocumentMetadataPayload,
+): Promise<EmployeeDocumentRecord> => {
+  await assertEmployeeDocumentsTable();
+
+  const existing = await getEmployeeDocumentById(documentId);
+  if (!existing || existing.employee_id !== employeeId) {
+    const error = new Error('EMPLOYEE_DOCUMENT_NOT_FOUND');
+    (error as any).code = 'EMPLOYEE_DOCUMENT_NOT_FOUND';
+    throw error;
+  }
+
+  const title = payload.title.trim();
+  const description = payload.description?.trim() || null;
+
+  await pool.query(
+    `
+      UPDATE public.employee_documents
+      SET title = $2, description = $3, updated_at = NOW()
+      WHERE id = $1;
+    `,
+    [documentId, title, description],
+  );
+
+  await registerAuditEvent({
+    user_id: updatedByUserId,
+    action: `RH_DOCUMENT_UPDATE:${documentId}`,
+    module_code: 'RH',
+    entity_type: 'employee_document',
+    entity_id: documentId,
+    employee_id: employeeId,
+    metadata: {
+      document_type_id: existing.document_type_id,
+      version: existing.version,
+      previous_title: existing.title,
+      previous_description: existing.description,
+      title,
+      description,
+    },
+  });
+
+  const updated = await getEmployeeDocumentById(documentId);
+  if (!updated) {
+    const error = new Error('EMPLOYEE_DOCUMENT_NOT_FOUND');
+    (error as any).code = 'EMPLOYEE_DOCUMENT_NOT_FOUND';
+    throw error;
+  }
+  return updated;
+};
+
 export const resolveEmployeeDocumentPath = async (documentId: number): Promise<{
   document: EmployeeDocumentRecord;
   absolutePath: string;
