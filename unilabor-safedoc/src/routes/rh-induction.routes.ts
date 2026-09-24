@@ -10,6 +10,7 @@ import {
   enrollEmployeeInPhaseController,
   unenrollEmployeeFromPhaseController,
   authorizeInductionRetryController,
+  reopenInductionReadingController,
   getEmployeeInductionMasterRecordController,
   getEmployeeInductionMasterRecordPdfController,
   getEmployeeInductionProgressController,
@@ -41,6 +42,7 @@ import {
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { authorizeInductionRetrySchema } from '../schemas/rh-induction-retry.schema';
+import { reopenInductionReadingSchema } from '../schemas/rh-induction-reopen-reading.schema';
 import { updatePhaseAutoChecklistSchema } from '../schemas/rh-induction-phase.schema';
 import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
 import { closeInductionRecordSchema } from '../schemas/rh-induction-closure.schema';
@@ -86,6 +88,12 @@ router.post(
   requirePermission('RH.INDUCTION.MANAGE'),
   validate(authorizeInductionRetrySchema),
   authorizeInductionRetryController,
+);
+router.post(
+  '/induction/enrollments/:enrollmentId/reopen-reading',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(reopenInductionReadingSchema),
+  reopenInductionReadingController,
 );
 
 router.get('/employees/:employeeId/induction/effectiveness', requirePermission('RH.INDUCTION.MANAGE'), listEffectivenessReviewsController);

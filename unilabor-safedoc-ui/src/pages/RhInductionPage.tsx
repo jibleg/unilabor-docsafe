@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CheckSquare, Eye, EyeOff, FileText, GraduationCap, ListChecks, Loader2, Phone, RotateCcw, Square, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { BookOpen, CheckSquare, Eye, EyeOff, FileText, GraduationCap, ListChecks, Loader2, Phone, RotateCcw, Square, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { listEmployees } from '../api/service';
 import {
@@ -31,6 +31,7 @@ import {
 import { confirmAction } from '../utils/confirm';
 import { EnrollmentCertificateDataModal } from '../components/rh/EnrollmentCertificateDataModal';
 import { InductionRetryModal } from '../components/rh/InductionRetryModal';
+import { InductionReopenReadingModal } from '../components/rh/InductionReopenReadingModal';
 import { listPositions, type DocumentSearchResult } from '../api/service.api-rh-position';
 import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
 import { getApiErrorMessage } from '../api/service.parsers';
@@ -63,6 +64,17 @@ const RETRYABLE_EVALUATION_STATUSES = ['failed', 'expired'];
 const canAuthorizeRetry = (item: RhInductionPhaseEnrollmentSummary): boolean =>
   item.evaluation_status !== null && RETRYABLE_EVALUATION_STATUSES.includes(item.evaluation_status);
 
+// "Reabrir lectura": lectura incompleta con documentos asignados y sin un
+// cuestionario en curso (sin examen, o examen abierto por vencimiento que nadie
+// inicio: el backend verifica que siga sin iniciar).
+const canReopenReading = (item: RhInductionPhaseEnrollmentSummary): boolean =>
+  item.reading_total > 0 &&
+  !item.reading_completed_at &&
+  (item.evaluation_status === null || item.evaluation_status === 'pending');
+
+const isReadingExpired = (item: RhInductionPhaseEnrollmentSummary): boolean =>
+  Boolean(item.reading_deadline_at) && new Date(item.reading_deadline_at as string) < new Date();
+
 export const RhInductionPage = () => {
   const [phases, setPhases] = useState<RhInductionPhase[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -88,6 +100,7 @@ export const RhInductionPage = () => {
   const [certReadiness, setCertReadiness] = useState<RhInductionCertificateReadiness | null>(null);
   const [certDataTarget, setCertDataTarget] = useState<RhInductionPhaseEnrollmentSummary | null>(null);
   const [retryEnrollment, setRetryEnrollment] = useState<RhInductionPhaseEnrollmentSummary | null>(null);
+  const [reopenEnrollment, setReopenEnrollment] = useState<RhInductionPhaseEnrollmentSummary | null>(null);
 
   const refreshCertReadiness = useCallback((phaseId: number) => {
     getPhaseCertificateReadiness(phaseId)
@@ -1063,6 +1076,25 @@ export const RhInductionPage = () => {
                               <ListChecks size={12} />
                               Checklist: {item.checklist_completed}/{item.checklist_total}
                             </button>
+                            {canReopenReading(item) ? (
+                              <button
+                                type="button"
+                                onClick={() => setReopenEnrollment(item)}
+                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ring-1 transition ${
+                                  isReadingExpired(item)
+                                    ? 'bg-rose-50 text-rose-700 ring-rose-200 hover:bg-rose-100'
+                                    : 'bg-sky-50 text-sky-800 ring-sky-200 hover:bg-sky-100'
+                                }`}
+                                title={
+                                  isReadingExpired(item)
+                                    ? 'El plazo de lectura venció: dar horas adicionales para terminar de leer antes del cuestionario'
+                                    : 'Ampliar el plazo de lectura de este colaborador'
+                                }
+                              >
+                                <BookOpen size={12} />
+                                {isReadingExpired(item) ? 'Reabrir lectura' : 'Ampliar lectura'}
+                              </button>
+                            ) : null}
                             {canAuthorizeRetry(item) ? (
                               <button
                                 type="button"
@@ -1135,6 +1167,13 @@ export const RhInductionPage = () => {
             void loadEnrollments(selectedPhase.id);
             refreshCertReadiness(selectedPhase.id);
           }}
+        />
+      ) : null}
+      {reopenEnrollment && selectedPhase ? (
+        <InductionReopenReadingModal
+          enrollment={reopenEnrollment}
+          onClose={() => setReopenEnrollment(null)}
+          onReopened={() => void loadEnrollments(selectedPhase.id)}
         />
       ) : null}
       {retryEnrollment && selectedPhase ? (

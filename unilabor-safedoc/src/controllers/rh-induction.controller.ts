@@ -38,6 +38,8 @@ import {
 import { registerAuditEvent } from '../services/audit.service';
 import { authorizeInductionRetry } from '../services/rh-induction-retry.service';
 import type { AuthorizeInductionRetryInput } from '../schemas/rh-induction-retry.schema';
+import type { ReopenInductionReadingInput } from '../schemas/rh-induction-reopen-reading.schema';
+import { reopenInductionReading } from '../services/rh-induction-reopen-reading.service';
 import { updatePhaseReadingLimit } from '../services/rh-induction-reading-limit.service';
 import { formatInductionDeadline } from '../services/rh-induction-notification.service';
 
@@ -72,6 +74,9 @@ const ERROR_STATUS: Record<string, number> = {
   RH_INDUCTION_RETRY_NO_EVALUATION: 409,
   RH_INDUCTION_RETRY_NOT_ALLOWED: 409,
   RH_INDUCTION_RETRY_ASSIGNMENT_FAILED: 500,
+  RH_INDUCTION_REOPEN_NO_READING: 409,
+  RH_INDUCTION_REOPEN_READING_COMPLETED: 409,
+  RH_INDUCTION_REOPEN_EVALUATION_STARTED: 409,
 };
 
 const mapError = (res: Response, error: any): Response | null => {
@@ -193,6 +198,52 @@ export const authorizeInductionRetryController = async (req: AuthRequest, res: R
     if (mapped) return mapped;
     console.error('Error autorizando nuevo intento de induccion:', error);
     return res.status(500).json({ message: 'No se pudo autorizar el nuevo intento.' });
+  }
+};
+
+/** POST /rh/induction/enrollments/:enrollmentId/reopen-reading - N horas mas de lectura. */
+export const reopenInductionReadingController = async (req: AuthRequest, res: Response) => {
+  const enrollmentId = parsePositiveInt(req.params.enrollmentId);
+  if (!enrollmentId) {
+    return res.status(400).json({ message: 'ID de inscripcion invalido.' });
+  }
+  const { hours, note } = (req.body ?? {}) as ReopenInductionReadingInput;
+  try {
+    const result = await reopenInductionReading({
+      enrollmentId,
+      hours,
+      actorUserId: req.user?.id ?? null,
+      note,
+    });
+    await registerAuditEvent({
+      user_id: req.user?.id ?? null,
+      action: `RH_INDUCTION_READING_REOPENED:${enrollmentId}`,
+      ip_address: req.ip ?? null,
+      module_code: 'RH',
+      entity_type: 'induction_enrollment',
+      entity_id: enrollmentId,
+      employee_id: result.employee_id,
+      metadata: {
+        phase_number: result.phase_number,
+        hours,
+        previous_deadline_at: result.previous_deadline_at,
+        new_deadline_at: result.new_deadline_at,
+        removed_assignment_id: result.removed_assignment_id,
+        acknowledgements_reactivated: result.acknowledgements_reactivated,
+        reading_signed: result.reading_signed,
+        reading_total: result.reading_total,
+        note: note ?? null,
+      },
+    });
+    return res.status(200).json({
+      message: `Lectura reabierta por ${hours} h (vence ${formatInductionDeadline(result.new_deadline_at)}).`,
+      reopen: result,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error reabriendo lectura de induccion:', error);
+    return res.status(500).json({ message: 'No se pudo reabrir la lectura.' });
   }
 };
 

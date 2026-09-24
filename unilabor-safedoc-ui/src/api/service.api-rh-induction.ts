@@ -179,6 +179,36 @@ export const authorizeInductionRetry = async (
   return ((payload as { retry?: InductionRetryResult }).retry ?? payload) as InductionRetryResult;
 };
 
+export interface InductionReopenReadingResult {
+  enrollment_id: number;
+  employee_id: number;
+  phase_number: number;
+  previous_deadline_at: string | null;
+  new_deadline_at: string;
+  removed_assignment_id: number | null;
+  acknowledgements_reactivated: number;
+  reading_signed: number;
+  reading_total: number;
+}
+
+/**
+ * Reabre N horas la lectura de una fase a un inscrito con lectura incompleta;
+ * si el cuestionario se abrio por vencimiento y nadie lo inicio, se retira y
+ * volvera a abrirse al terminar de leer o al vencer el nuevo plazo. Sin SMS.
+ */
+export const reopenInductionReading = async (
+  enrollmentId: number,
+  hours: number,
+  note?: string,
+): Promise<InductionReopenReadingResult> => {
+  const response = await api.post(`/rh/induction/enrollments/${enrollmentId}/reopen-reading`, {
+    hours,
+    note: note ?? '',
+  });
+  const payload = unwrapPayload(response.data) as { reopen?: InductionReopenReadingResult } | InductionReopenReadingResult;
+  return ((payload as { reopen?: InductionReopenReadingResult }).reopen ?? payload) as InductionReopenReadingResult;
+};
+
 export const setEnrollmentSupervisor = async (
   enrollmentId: number,
   supervisorEmployeeId: number | null,
