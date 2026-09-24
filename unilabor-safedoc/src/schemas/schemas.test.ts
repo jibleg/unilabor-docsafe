@@ -234,12 +234,18 @@ describe('employee.schema (updateEmployeeDocumentMetadataSchema)', () => {
 });
 
 describe('helpdesk.schema (resto)', () => {
-  it('helpdeskAssetSchema exige name; asset_code es opcional (autogenerado)', () => {
+  it('helpdeskAssetSchema exige name y clasificacion; asset_code es opcional (autogenerado)', () => {
+    // Desde la estructura organizacional (Unidad-Area-Responsable) el activo
+    // exige categoria, unidad, area y responsable tecnico ademas del nombre.
+    const base = { category_id: 1, unit_id: 2, area_id: 3, responsible_employee_id: 4 };
     // name sigue siendo obligatorio
-    expect(helpdeskAssetSchema.safeParse({ asset_code: 'PC1' }).success).toBe(false);
+    expect(helpdeskAssetSchema.safeParse({ ...base, asset_code: 'PC1' }).success).toBe(false);
     // asset_code opcional: el backend autogenera el codigo ISO si no viene
-    expect(helpdeskAssetSchema.safeParse({ name: 'PC' }).success).toBe(true);
-    expect(helpdeskAssetSchema.safeParse({ asset_code: 'PC1', name: 'PC' }).success).toBe(true);
+    expect(helpdeskAssetSchema.safeParse({ ...base, name: 'PC' }).success).toBe(true);
+    expect(helpdeskAssetSchema.safeParse({ ...base, asset_code: 'PC1', name: 'PC' }).success).toBe(true);
+    // Sin clasificacion completa se rechaza (p. ej. falta la categoria)
+    const { category_id: _omit, ...withoutCategory } = base;
+    expect(helpdeskAssetSchema.safeParse({ ...withoutCategory, name: 'PC' }).success).toBe(false);
   });
 
   it('helpdeskTicketSchema exige titulo y descripcion', () => {
