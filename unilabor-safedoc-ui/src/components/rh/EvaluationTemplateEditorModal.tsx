@@ -499,8 +499,8 @@ export const EvaluationTemplateEditorModal = ({
 
             {!isPractical && inductionPhase && (
               <QuestionBankPanel
-                phaseId={inductionPhase.id}
-                phaseDocuments={inductionPhase.documents}
+                scope={{ phaseId: inductionPhase.id }}
+                documents={inductionPhase.documents}
                 onUseQuestion={useGeneratedQuestion}
               />
             )}

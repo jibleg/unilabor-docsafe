@@ -65,6 +65,8 @@ const CRITICALITY_VALUE: Record<CompetencyCriticality, number> = { A: 5, M: 3, B
 export interface CompetencyEvaluationItem {
   id?: number;
   section: CompetencySection;
+  /** Pregunta real del cuestionario de Conocimiento de la que deriva el item (solo CONOCIMIENTO con cuestionario). */
+  question_id?: number | null;
   item_text: string;
   criticality: CompetencyCriticality;
   method: string | null;
@@ -159,6 +161,19 @@ export const computeResults = (items: CompetencyEvaluationItem[]): CompetencyEva
 
 // --- Registros -----------------------------------------------------------------
 
+/** Cuestionario de Conocimiento (seccion 3) asignado al colaborador en el sistema. */
+export interface CompetencyKnowledgeQuiz {
+  assignment_id: number;
+  status: string;
+  selection_mode: 'random' | 'fixed' | null;
+  question_count: number;
+  deadline_at: string | null;
+  started_at: string | null;
+  submitted_at: string | null;
+  percentage: number | null;
+  synced_at: string | null;
+}
+
 export interface CompetencyEvaluationRecord {
   id: number;
   employee_id: number;
@@ -180,8 +195,11 @@ export interface CompetencyEvaluationRecord {
   rh_signatory_name: string | null;
   director_signatory_name: string | null;
   document_id: number | null;
+  /** Constancia de competencia archivada en el expediente (null si no se emitio / NO COMPETENTE). */
+  certificate_document_id: number | null;
   closed_at: string | null;
   created_at: string;
+  knowledge_quiz: CompetencyKnowledgeQuiz | null;
   items?: CompetencyEvaluationItem[];
   actions?: CompetencyEvaluationAction[];
 }
@@ -189,12 +207,22 @@ export interface CompetencyEvaluationRecord {
 const BASE_QUERY = `
   SELECT
     ev.*, e.full_name AS employee_name, e.employee_code, p.name AS position_name,
-    tc.title AS reference_course_title
+    tc.title AS reference_course_title,
+    ka.status AS knowledge_status, ka.deadline_at AS knowledge_deadline_at, ka.started_at AS knowledge_started_at,
+    ka.submitted_at AS knowledge_submitted_at, ka.percentage AS knowledge_percentage,
+    (SELECT COUNT(*)::int FROM public.evaluation_assignment_questions aq WHERE aq.assignment_id = ka.id) AS knowledge_question_count
   FROM public.rh_competency_evaluations ev
   JOIN public.employees e ON e.id = ev.employee_id
   JOIN public.rh_positions p ON p.id = ev.position_id
   LEFT JOIN public.training_courses tc ON tc.id = ev.reference_course_id
+  LEFT JOIN public.evaluation_assignments ka ON ka.id = ev.knowledge_assignment_id
 `;
+
+const toIso = (value: unknown): string | null => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
 
 const toDateString = (value: unknown): string | null => {
   if (!value) return null;
@@ -231,13 +259,29 @@ const mapRow = (row: any): CompetencyEvaluationRecord => ({
   rh_signatory_name: row.rh_signatory_name ? String(row.rh_signatory_name) : null,
   director_signatory_name: row.director_signatory_name ? String(row.director_signatory_name) : null,
   document_id: row.document_id ? Number(row.document_id) : null,
+  certificate_document_id: row.certificate_document_id ? Number(row.certificate_document_id) : null,
   closed_at: row.closed_at ? String(row.closed_at) : null,
   created_at: String(row.created_at),
+  knowledge_quiz: row.knowledge_assignment_id
+    ? {
+        assignment_id: Number(row.knowledge_assignment_id),
+        status: row.knowledge_status ? String(row.knowledge_status) : 'unknown',
+        selection_mode: row.knowledge_selection_mode ? (String(row.knowledge_selection_mode) as 'random' | 'fixed') : null,
+        question_count: Number(row.knowledge_question_count ?? 0),
+        deadline_at: toIso(row.knowledge_deadline_at),
+        started_at: toIso(row.knowledge_started_at),
+        submitted_at: toIso(row.knowledge_submitted_at),
+        percentage:
+          row.knowledge_percentage !== null && row.knowledge_percentage !== undefined ? Number(row.knowledge_percentage) : null,
+        synced_at: toIso(row.knowledge_synced_at),
+      }
+    : null,
 });
 
 const mapItemRow = (row: any): CompetencyEvaluationItem => ({
   id: Number(row.id),
   section: String(row.section) as CompetencySection,
+  question_id: row.question_id ? Number(row.question_id) : null,
   item_text: String(row.item_text),
   criticality: String(row.criticality) as CompetencyCriticality,
   method: row.method ? String(row.method) : null,
@@ -399,12 +443,91 @@ export const listEvaluations = async (
   return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };
 
+/** Estados del cuestionario en los que ya hay respuestas definitivas que volcar a la seccion 3. */
+const KNOWLEDGE_ANSWERED_STATUSES = ['passed', 'failed'];
+/** Estados en los que el cuestionario sigue vivo (no se puede reasignar ni capturar a mano). */
+export const KNOWLEDGE_ACTIVE_STATUSES = ['pending', 'in_progress', 'authorized_late', 'submitted', 'grading'];
+
+/**
+ * Vuelca al REH-REG-003 lo que el colaborador contesto en el cuestionario de
+ * Conocimiento: por cada item ligado a una pregunta, la respuesta dada (texto
+ * de las opciones marcadas) y el acierto. Sin respuesta = incorrecta (el
+ * colaborador dejo la pregunta en blanco). Idempotente; se ejecuta al leer la
+ * evaluacion en borrador mientras no este sincronizada.
+ */
+export const syncKnowledgeFromAssignment = async (evaluationId: number, assignmentId: number): Promise<boolean> => {
+  const assignment = await pool.query(`SELECT status FROM public.evaluation_assignments WHERE id = $1 LIMIT 1;`, [
+    assignmentId,
+  ]);
+  if (assignment.rows.length === 0 || !KNOWLEDGE_ANSWERED_STATUSES.includes(String(assignment.rows[0].status))) {
+    return false;
+  }
+  const responses = await pool.query(
+    `SELECT r.question_id, r.is_correct, r.selected_option_ids,
+            COALESCE(
+              (SELECT string_agg(o.text, ' | ' ORDER BY o.sort_order, o.id)
+                 FROM public.evaluation_question_options o
+                WHERE o.question_id = r.question_id
+                  AND o.id IN (SELECT (jsonb_array_elements_text(r.selected_option_ids))::bigint)),
+              '') AS given_text
+       FROM public.evaluation_responses r
+      WHERE r.assignment_id = $1;`,
+    [assignmentId],
+  );
+  const byQuestion = new Map<number, { is_correct: boolean; given: string }>();
+  for (const row of responses.rows) {
+    byQuestion.set(Number(row.question_id), {
+      is_correct: Boolean(row.is_correct),
+      given: row.given_text ? String(row.given_text) : '',
+    });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const items = await client.query(
+      `SELECT id, question_id FROM public.rh_competency_evaluation_items
+        WHERE evaluation_id = $1 AND section = 'CONOCIMIENTO' AND question_id IS NOT NULL;`,
+      [evaluationId],
+    );
+    for (const item of items.rows) {
+      const answer = byQuestion.get(Number(item.question_id));
+      await client.query(
+        `UPDATE public.rh_competency_evaluation_items SET given_answer = $2, is_correct = $3 WHERE id = $1;`,
+        [Number(item.id), answer && answer.given ? answer.given : 'Sin respuesta', answer ? answer.is_correct : false],
+      );
+    }
+    await client.query(
+      `UPDATE public.rh_competency_evaluations SET knowledge_synced_at = NOW(), updated_at = NOW() WHERE id = $1;`,
+      [evaluationId],
+    );
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 export const getEvaluationById = async (evaluationId: number): Promise<CompetencyEvaluationRecord | null> => {
   const result = await pool.query(`${BASE_QUERY} WHERE ev.id = $1 LIMIT 1;`, [evaluationId]);
   if (result.rows.length === 0) {
     return null;
   }
-  const record = mapRow(result.rows[0]);
+  let record = mapRow(result.rows[0]);
+  // Sincronizacion perezosa: si el colaborador ya contesto y aun no se volco
+  // a la seccion 3, se hace aqui (una sola vez) antes de devolver los items.
+  if (
+    record.status === 'DRAFT' &&
+    record.knowledge_quiz &&
+    !record.knowledge_quiz.synced_at &&
+    KNOWLEDGE_ANSWERED_STATUSES.includes(record.knowledge_quiz.status)
+  ) {
+    await syncKnowledgeFromAssignment(evaluationId, record.knowledge_quiz.assignment_id);
+    const refreshed = await pool.query(`${BASE_QUERY} WHERE ev.id = $1 LIMIT 1;`, [evaluationId]);
+    record = mapRow(refreshed.rows[0]);
+  }
   record.items = await listEvaluationItems(evaluationId);
   record.actions = await listEvaluationActions(evaluationId);
   // En borrador, los resultados se calculan en vivo para que la UI muestre el
@@ -473,7 +596,15 @@ export const replaceSectionItems = async (
   section: CompetencySection,
   items: SectionItemInput[],
 ): Promise<CompetencyEvaluationRecord> => {
-  await loadDraft(evaluationId);
+  const record = await loadDraft(evaluationId);
+  // Con cuestionario asignado, la seccion 3 la llena el sistema desde las
+  // respuestas del colaborador: no se captura a mano (evidencia).
+  if (section === 'CONOCIMIENTO' && record.knowledge_quiz) {
+    throwCoded(
+      'RH_COMP_EVAL_KNOWLEDGE_LOCKED',
+      'La seccion Conocimiento se llena desde el cuestionario asignado al colaborador. Para capturarla a mano, cancela primero el cuestionario.',
+    );
+  }
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -586,6 +717,13 @@ const addMonths = (date: Date, months: number): Date => {
 export const closeEvaluation = async (input: CloseEvaluationInput): Promise<CompetencyEvaluationRecord> => {
   const record = await loadDraft(input.evaluationId);
   const items = record.items ?? [];
+
+  if (record.knowledge_quiz && !KNOWLEDGE_ANSWERED_STATUSES.includes(record.knowledge_quiz.status)) {
+    throwCoded(
+      'RH_COMP_EVAL_KNOWLEDGE_PENDING',
+      'El colaborador aun no contesta el cuestionario de Conocimiento (o esta vencido). Espera la respuesta, o cancela el cuestionario y reasignalo.',
+    );
+  }
 
   const bySection = (section: CompetencySection) => items.filter((item) => item.section === section);
   if (bySection('COMPETENCIA').length === 0 || bySection('DESEMPENO').length === 0 || bySection('CONOCIMIENTO').length === 0) {

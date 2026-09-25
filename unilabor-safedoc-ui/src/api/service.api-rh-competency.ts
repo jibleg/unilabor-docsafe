@@ -135,3 +135,35 @@ export const closeCompetencyEvaluation = async (
 export const deleteCompetencyEvaluationDraft = async (id: number): Promise<void> => {
   await api.delete(`/rh/competency-evaluations/${id}`);
 };
+
+export interface AssignKnowledgeQuizPayload {
+  mode: 'random' | 'fixed';
+  count?: number;
+  item_ids?: number[];
+  window_hours: number;
+  attempt_time_limit_minutes?: number | null;
+}
+
+/** Asigna al colaborador el cuestionario de Conocimiento (seccion 3) desde el banco del puesto. */
+export const assignKnowledgeQuiz = async (
+  id: number,
+  payload: AssignKnowledgeQuizPayload,
+): Promise<RhCompetencyEvaluation> => {
+  const response = await api.post(`/rh/competency-evaluations/${id}/knowledge-quiz`, payload);
+  const data = asRecord(unwrapPayload(response.data));
+  return data?.evaluation as RhCompetencyEvaluation;
+};
+
+/** Cancela un cuestionario de Conocimiento que el colaborador nunca inicio. */
+export const cancelKnowledgeQuiz = async (id: number): Promise<RhCompetencyEvaluation> => {
+  const response = await api.delete(`/rh/competency-evaluations/${id}/knowledge-quiz`);
+  const data = asRecord(unwrapPayload(response.data));
+  return data?.evaluation as RhCompetencyEvaluation;
+};
+
+/** Emite (o reemite con force) la constancia de competencia de una evaluación cerrada y la archiva en el expediente. */
+export const issueCompetencyCertificate = async (id: number, force = false): Promise<RhCompetencyEvaluation> => {
+  const response = await api.post(`/rh/competency-evaluations/${id}/certificate`, { force });
+  const data = asRecord(unwrapPayload(response.data));
+  return data?.evaluation as RhCompetencyEvaluation;
+};

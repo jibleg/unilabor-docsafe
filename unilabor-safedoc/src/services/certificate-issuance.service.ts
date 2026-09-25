@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import pool from '../config/db';
+import { isCompetencyKnowledgeCourseCode } from './rh-competency-knowledge.constants';
 import { renderCertificatePdf } from './certificate-render.service';
 import { renderInductionCertificatePdf } from './certificate-render-induction.service';
 import {
@@ -55,7 +56,7 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
             a.created_by_user_id, a.submitted_at,
             e.full_name AS employee_name,
             bu.name AS branch_name,
-            c.id AS course_id, c.title AS course_title, c.certificate_validity_months
+            c.id AS course_id, c.title AS course_title, c.code AS course_code, c.certificate_validity_months
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
        JOIN public.training_courses c ON c.id = t.training_course_id
@@ -71,6 +72,11 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
 
   // Solo se emite para evaluaciones acreditadas; idempotente.
   if (String(row.status) !== 'passed') {
+    return null;
+  }
+  // El cuestionario de Conocimiento del REH-REG-003 no es una capacitacion:
+  // su resultado se sella en la evaluacion de competencia, no hay constancia.
+  if (isCompetencyKnowledgeCourseCode(row.course_code ? String(row.course_code) : null)) {
     return null;
   }
   if (row.certificate_document_id) {

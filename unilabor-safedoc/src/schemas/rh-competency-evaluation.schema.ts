@@ -84,3 +84,33 @@ export const closeCompetencyEvaluationSchema = z
     director_signatory_name: requiredText('El nombre del Director General es obligatorio'),
   })
   .passthrough();
+
+/**
+ * Asignar el cuestionario de Conocimiento (seccion 3) al colaborador: N
+ * preguntas aleatorias del banco aprobado del puesto o una seleccion fija; la
+ * ventana en horas y el limite por intento los define el evaluador cada vez.
+ */
+export const assignKnowledgeQuizSchema = z
+  .object({
+    mode: z.enum(['random', 'fixed']),
+    count: z.coerce.number().int().min(1, 'Pide al menos 1 pregunta').max(50, 'Maximo 50 preguntas').optional(),
+    item_ids: z.array(z.coerce.number().int().positive()).max(50, 'Maximo 50 preguntas').optional(),
+    window_hours: z.coerce
+      .number({ message: 'La ventana en horas es obligatoria' })
+      .int('La ventana debe ser un numero entero de horas')
+      .min(1, 'La ventana minima es 1 hora')
+      .max(720, 'La ventana maxima es 720 horas (30 dias)'),
+    attempt_time_limit_minutes: z.coerce
+      .number()
+      .int('Los minutos deben ser un numero entero')
+      .min(5, 'Minimo 5 minutos por intento')
+      .max(240, 'Maximo 240 minutos por intento')
+      .nullable()
+      .optional()
+      .transform((value) => value ?? null),
+  })
+  .refine((data) => (data.mode === 'random' ? typeof data.count === 'number' : (data.item_ids?.length ?? 0) > 0), {
+    message: 'En modo aleatorio indica la cantidad; en modo fijo elige al menos una pregunta',
+  });
+
+export type AssignKnowledgeQuizInput = z.infer<typeof assignKnowledgeQuizSchema>;

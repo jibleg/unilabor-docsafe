@@ -1053,10 +1053,14 @@ export interface EvaluationTemplate {
 // pregunta se copie al arreglo real de la plantilla (ver QuestionBankPanel).
 export type QuestionBankItemStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
 
+/** Ambito del banco de preguntas IA: fase de Induccion o puesto (REH-REG-003). */
+export type QuestionBankScope = { phaseId: number; positionId?: undefined } | { positionId: number; phaseId?: undefined };
+
 export interface QuestionBankItem {
   id: number;
   batch_id: number;
-  phase_id: number;
+  phase_id: number | null;
+  position_id: number | null;
   document_id: string | null;
   type: EvaluationQuestionType;
   text: string;
@@ -1075,7 +1079,8 @@ export interface QuestionBankCounts {
 
 export interface QuestionBankBatch {
   id: number;
-  phase_id: number;
+  phase_id: number | null;
+  position_id: number | null;
   document_ids: string[];
   model: string;
   status: 'running' | 'completed' | 'failed';
@@ -1567,6 +1572,8 @@ export type RhCompetencyDictamen =
 export interface RhCompetencyEvaluationItem {
   id?: number;
   section: RhCompetencySection;
+  /** Pregunta real del cuestionario de Conocimiento (solo cuando la seccion 3 viene del cuestionario). */
+  question_id?: number | null;
   item_text: string;
   criticality: RhCompetencyCriticality;
   method: string | null;
@@ -1598,6 +1605,19 @@ export interface RhCompetencyEvaluationResults {
   authorization_result: string | null;
 }
 
+/** Cuestionario de Conocimiento (seccion 3) asignado al colaborador en el sistema. */
+export interface RhCompetencyKnowledgeQuiz {
+  assignment_id: number;
+  status: string;
+  selection_mode: 'random' | 'fixed' | null;
+  question_count: number;
+  deadline_at: string | null;
+  started_at: string | null;
+  submitted_at: string | null;
+  percentage: number | null;
+  synced_at: string | null;
+}
+
 export interface RhCompetencyEvaluation {
   id: number;
   employee_id: number;
@@ -1619,8 +1639,11 @@ export interface RhCompetencyEvaluation {
   rh_signatory_name: string | null;
   director_signatory_name: string | null;
   document_id: number | null;
+  /** Constancia de competencia archivada en el expediente (null si no se emitió). */
+  certificate_document_id?: number | null;
   closed_at: string | null;
   created_at: string;
+  knowledge_quiz?: RhCompetencyKnowledgeQuiz | null;
   items?: RhCompetencyEvaluationItem[];
   actions?: RhCompetencyEvaluationAction[];
 }

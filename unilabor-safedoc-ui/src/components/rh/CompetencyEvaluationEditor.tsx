@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, FileCheck2, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Award, Check, Eye, FileCheck2, FileText, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
+import { KnowledgeQuizPanel } from './KnowledgeQuizPanel';
 import { toast } from 'react-toastify';
 import {
   closeCompetencyEvaluation,
+  issueCompetencyCertificate,
   replaceCompetencyActions,
   replaceCompetencySectionItems,
   type CompetencyActionPayload,
   type CompetencySectionItemPayload,
 } from '../../api/service.api-rh-competency';
+import { getEmployeeDocumentUrl } from '../../api/service.api-training';
 import { getApiErrorMessage } from '../../api/service.parsers';
+import { PdfSafeViewer } from '../PdfSafeViewerSafe';
 import { DICTAMEN_UI, formatDateOnly } from '../../utils/competency';
 import { SignaturePad } from '../helpdesk/SignaturePad';
 import type {
@@ -58,9 +62,12 @@ const SECTION_META: Record<RhCompetencySection, { title: string; weight: string;
   CONOCIMIENTO: {
     title: '3. Conocimiento',
     weight: '30%',
-    hint: 'Captura las preguntas (10 sugeridas) y marca si la respuesta del evaluado fue correcta.',
+    hint: 'Asigna el cuestionario del banco del puesto (arriba) o captura las preguntas a mano y marca si la respuesta fue correcta.',
   },
 };
+
+const KNOWLEDGE_QUIZ_HINT =
+  'Preguntas tomadas del banco del puesto. La respuesta del evaluado y el resultado se llenan solos cuando el colaborador envía el cuestionario.';
 
 const toPayload = (item: RhCompetencyEvaluationItem): CompetencySectionItemPayload => ({
   item_text: item.item_text,
@@ -85,6 +92,9 @@ const SectionEditor = ({
   onChanged: (updated: RhCompetencyEvaluation) => void;
 }) => {
   const meta = SECTION_META[section];
+  // Con cuestionario asignado la seccion 3 es de solo lectura: la llena el sistema.
+  const quizLocked = section === 'CONOCIMIENTO' && Boolean(evaluation.knowledge_quiz);
+  const locked = readOnly || quizLocked;
   const [items, setItems] = useState<RhCompetencyEvaluationItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -151,9 +161,9 @@ const SectionEditor = ({
           <h3 className="text-sm font-bold text-[var(--color-brand-700)]">
             {meta.title} · peso {meta.weight} · {scoredCount}/{items.length} calificados
           </h3>
-          <p className="text-xs text-[var(--unilabor-neutral)]">{meta.hint}</p>
+          <p className="text-xs text-[var(--unilabor-neutral)]">{quizLocked ? KNOWLEDGE_QUIZ_HINT : meta.hint}</p>
         </div>
-        {!readOnly && (
+        {!locked && (
           <div className="flex items-center gap-2">
             <button type="button" onClick={addItem} className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-700)] hover:underline">
               <Plus size={13} /> Agregar
@@ -182,11 +192,11 @@ const SectionEditor = ({
                   value={item.item_text}
                   onChange={(event) => patchItem(index, { item_text: event.target.value })}
                   rows={1}
-                  disabled={readOnly}
+                  disabled={locked}
                   placeholder={section === 'CONOCIMIENTO' ? 'Pregunta...' : 'Competencia / criterio a evaluar...'}
                   className={inputClass}
                 />
-                {!readOnly && (
+                {!locked && (
                   <button type="button" onClick={() => removeItem(index)} className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[rgba(220,38,38,0.2)] text-red-600 transition hover:bg-red-50" aria-label="Eliminar item">
                     <Trash2 size={14} />
                   </button>
@@ -196,7 +206,7 @@ const SectionEditor = ({
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div>
                   <label className={labelClass}>Criticidad</label>
-                  <select value={item.criticality} onChange={(event) => patchItem(index, { criticality: event.target.value as RhCompetencyCriticality })} disabled={readOnly} className={inputClass}>
+                  <select value={item.criticality} onChange={(event) => patchItem(index, { criticality: event.target.value as RhCompetencyCriticality })} disabled={locked} className={inputClass}>
                     {(Object.keys(CRITICALITY_LABELS) as RhCompetencyCriticality[]).map((key) => (
                       <option key={key} value={key}>{CRITICALITY_LABELS[key]}</option>
                     ))}
@@ -205,7 +215,7 @@ const SectionEditor = ({
                 {section === 'COMPETENCIA' && (
                   <div>
                     <label className={labelClass}>Método</label>
-                    <select value={item.method ?? ''} onChange={(event) => patchItem(index, { method: event.target.value || null })} disabled={readOnly} className={inputClass}>
+                    <select value={item.method ?? ''} onChange={(event) => patchItem(index, { method: event.target.value || null })} disabled={locked} className={inputClass}>
                       <option value="">—</option>
                       {Object.keys(METHOD_LABELS).map((key) => (
                         <option key={key} value={key}>{METHOD_LABELS[key]}</option>
@@ -219,7 +229,7 @@ const SectionEditor = ({
                     <select
                       value={item.score ?? ''}
                       onChange={(event) => patchItem(index, { score: event.target.value ? Number(event.target.value) : null })}
-                      disabled={readOnly}
+                      disabled={locked}
                       className={inputClass}
                     >
                       <option value="">Sin calificar</option>
@@ -235,7 +245,7 @@ const SectionEditor = ({
                     <select
                       value={item.is_correct === null ? '' : item.is_correct ? 'true' : 'false'}
                       onChange={(event) => patchItem(index, { is_correct: event.target.value === '' ? null : event.target.value === 'true' })}
-                      disabled={readOnly}
+                      disabled={locked}
                       className={inputClass}
                     >
                       <option value="">Sin calificar</option>
@@ -246,7 +256,7 @@ const SectionEditor = ({
                 )}
                 <div className={section === 'COMPETENCIA' ? '' : 'sm:col-span-2'}>
                   <label className={labelClass}>Observaciones / evidencia</label>
-                  <input value={item.observations ?? ''} onChange={(event) => patchItem(index, { observations: event.target.value || null })} disabled={readOnly} placeholder="Qué se observó, cuándo, en qué actividad" className={inputClass} />
+                  <input value={item.observations ?? ''} onChange={(event) => patchItem(index, { observations: event.target.value || null })} disabled={locked} placeholder="Qué se observó, cuándo, en qué actividad" className={inputClass} />
                 </div>
               </div>
 
@@ -254,11 +264,11 @@ const SectionEditor = ({
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>Respuesta correcta</label>
-                    <input value={item.expected_answer ?? ''} onChange={(event) => patchItem(index, { expected_answer: event.target.value || null })} disabled={readOnly} className={inputClass} />
+                    <input value={item.expected_answer ?? ''} onChange={(event) => patchItem(index, { expected_answer: event.target.value || null })} disabled={locked} className={inputClass} />
                   </div>
                   <div>
                     <label className={labelClass}>Respuesta del evaluado</label>
-                    <input value={item.given_answer ?? ''} onChange={(event) => patchItem(index, { given_answer: event.target.value || null })} disabled={readOnly} className={inputClass} />
+                    <input value={item.given_answer ?? ''} onChange={(event) => patchItem(index, { given_answer: event.target.value || null })} disabled={locked} className={inputClass} />
                   </div>
                 </div>
               )}
@@ -493,9 +503,34 @@ const CloseModal = ({
 /** Editor completo de una evaluación REH-REG-003 (3 secciones + plan + resultados + cierre). */
 export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: CompetencyEvaluationEditorProps) => {
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
+  const [issuingCertificate, setIssuingCertificate] = useState(false);
   const readOnly = evaluation.status === 'CLOSED';
   const results = evaluation.results;
   const dictamenUi = results.dictamen ? DICTAMEN_UI[results.dictamen] : null;
+  // Constancia: solo con dictamen competente (cualquiera de los tres grados).
+  const certificateEligible = readOnly && results.dictamen !== null && results.dictamen !== 'NO_COMPETENTE';
+
+  const openDocument = async (documentId: number, title: string) => {
+    try {
+      setViewer({ url: await getEmployeeDocumentUrl(documentId), title });
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo abrir el documento.'));
+    }
+  };
+
+  const handleIssueCertificate = async () => {
+    setIssuingCertificate(true);
+    try {
+      const updated = await issueCompetencyCertificate(evaluation.id);
+      onChanged(updated);
+      toast.success('Constancia de competencia archivada en el expediente del colaborador.');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo emitir la constancia.'));
+    } finally {
+      setIssuingCertificate(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -528,9 +563,36 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: Competency
               </span>
             )}
             {evaluation.status === 'CLOSED' ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                <Check size={13} /> Cerrada {evaluation.valid_until ? `· vigente hasta ${formatDateOnly(evaluation.valid_until)}` : ''}
-              </span>
+              <>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                  <Check size={13} /> Cerrada {evaluation.valid_until ? `· vigente hasta ${formatDateOnly(evaluation.valid_until)}` : ''}
+                </span>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {evaluation.document_id ? (
+                    <button
+                      type="button"
+                      onClick={() => void openDocument(evaluation.document_id as number, 'REH-REG-003 · Evaluación de competencia')}
+                      className={buttonClass}
+                    >
+                      <FileText size={14} /> Ver registro
+                    </button>
+                  ) : null}
+                  {evaluation.certificate_document_id ? (
+                    <button
+                      type="button"
+                      onClick={() => void openDocument(evaluation.certificate_document_id as number, 'Constancia de competencia')}
+                      className={buttonClass}
+                    >
+                      <Award size={14} /> Ver constancia
+                    </button>
+                  ) : certificateEligible ? (
+                    <button type="button" onClick={() => void handleIssueCertificate()} disabled={issuingCertificate} className={buttonClass}>
+                      {issuingCertificate ? <Loader2 size={14} className="animate-spin" /> : <Award size={14} />}
+                      Emitir constancia
+                    </button>
+                  ) : null}
+                </div>
+              </>
             ) : (
               <button type="button" onClick={() => setShowCloseModal(true)} className={buttonClass}>
                 <FileCheck2 size={14} /> Cerrar evaluación
@@ -547,11 +609,32 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: Competency
 
       <SectionEditor evaluation={evaluation} section="COMPETENCIA" readOnly={readOnly} onChanged={onChanged} />
       <SectionEditor evaluation={evaluation} section="DESEMPENO" readOnly={readOnly} onChanged={onChanged} />
+      <KnowledgeQuizPanel evaluation={evaluation} onChanged={onChanged} />
       <SectionEditor evaluation={evaluation} section="CONOCIMIENTO" readOnly={readOnly} onChanged={onChanged} />
       <ActionsEditor evaluation={evaluation} readOnly={readOnly} onChanged={onChanged} />
 
       {showCloseModal && (
         <CloseModal evaluation={evaluation} onClose={() => setShowCloseModal(false)} onClosed={onChanged} />
+      )}
+
+      {viewer && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
+          <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
+                <Eye size={16} /> {viewer.title}
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewer(null)}
+                className="rounded-full px-3 py-1.5 text-sm text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)]"
+              >
+                Cerrar
+              </button>
+            </div>
+            <PdfSafeViewer key={viewer.url} fileUrl={viewer.url} />
+          </div>
+        </div>
       )}
     </div>
   );

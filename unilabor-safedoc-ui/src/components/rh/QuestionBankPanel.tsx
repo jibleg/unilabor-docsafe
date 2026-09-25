@@ -13,14 +13,30 @@ import type {
   EvaluationQuestionType,
   QuestionBankCounts,
   QuestionBankItem,
-  RhInductionPhaseDocument,
+  QuestionBankScope,
 } from '../../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
 
+/** Documento fuente del banco (fase de Induccion o puesto): lo minimo para listar y ligar. */
+export interface QuestionBankSourceDocument {
+  document_id: string;
+  code: string | null;
+  title: string;
+}
+
 interface QuestionBankPanelProps {
-  phaseId: number;
-  phaseDocuments: RhInductionPhaseDocument[];
-  onUseQuestion: (question: EvaluationQuestion) => void;
+  scope: QuestionBankScope;
+  documents: QuestionBankSourceDocument[];
+  /**
+   * Induccion: "Usar" copia la pregunta a la plantilla y la marca APPROVED.
+   * Competencia (sin onUseQuestion): "Aprobar" la deja en el banco vivo del
+   * puesto, de donde se sortean los cuestionarios de Conocimiento.
+   */
+  onUseQuestion?: (question: EvaluationQuestion) => void;
+  /** Se invoca cuando cambia el conjunto de preguntas aprobadas (competencia). */
+  onApprovedChanged?: () => void;
+  /** Ambito de la explicacion en pantalla. */
+  sourceLabel?: string;
 }
 
 const TYPE_LABELS: Record<EvaluationQuestionType, string> = {
@@ -42,8 +58,19 @@ const inputClass =
 const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]';
 
 const DEFAULT_COUNTS: QuestionBankCounts = { boolean: 5, multiple: 5, single: 3, open: 2 };
+// Competencia: solo tipos autocalificables (el colaborador contesta en el sistema).
+const DEFAULT_COUNTS_COMPETENCY: QuestionBankCounts = { boolean: 5, multiple: 5, single: 5, open: 0 };
 
-export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: QuestionBankPanelProps) => {
+export const QuestionBankPanel = ({
+  scope,
+  documents: phaseDocuments,
+  onUseQuestion,
+  onApprovedChanged,
+  sourceLabel,
+}: QuestionBankPanelProps) => {
+  const competencyMode = !onUseQuestion;
+  const scopeKey = scope.phaseId !== undefined ? `phase:${scope.phaseId}` : `position:${scope.positionId}`;
+  const sourceText = sourceLabel ?? (competencyMode ? 'los documentos obligatorios de este puesto' : 'los documentos de esta fase');
   const [expanded, setExpanded] = useState(false);
   const [showGenerateForm, setShowGenerateForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -52,14 +79,14 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(
     new Set(phaseDocuments.map((doc) => doc.document_id)),
   );
-  const [counts, setCounts] = useState<QuestionBankCounts>(DEFAULT_COUNTS);
+  const [counts, setCounts] = useState<QuestionBankCounts>(competencyMode ? DEFAULT_COUNTS_COMPETENCY : DEFAULT_COUNTS);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [usedIds, setUsedIds] = useState<Set<number>>(new Set());
 
   const loadItems = async () => {
     setLoading(true);
     try {
-      const pending = await listQuestionBankItems(phaseId, 'PENDING_REVIEW');
+      const pending = await listQuestionBankItems(scope, 'PENDING_REVIEW');
       setItems(pending);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar el banco de preguntas generado por IA.'));
@@ -73,7 +100,7 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
       void loadItems();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanded, phaseId]);
+  }, [expanded, scopeKey]);
 
   const toggleDocument = (documentId: string) =>
     setSelectedDocIds((current) => {
@@ -98,7 +125,7 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
     }
     setGenerating(true);
     try {
-      const result = await generateQuestionBank(phaseId, [...selectedDocIds], counts);
+      const result = await generateQuestionBank(scope, [...selectedDocIds], counts);
       notifySuccess(`Se generaron ${result.question_count} preguntas candidatas. Revísalas abajo.`);
       setShowGenerateForm(false);
       await loadItems();
@@ -110,6 +137,18 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
   };
 
   const handleUse = async (item: QuestionBankItem) => {
+    if (!onUseQuestion) {
+      // Competencia: aprobar = dejarla en el banco vivo del puesto.
+      try {
+        await reviewQuestionBankItem(scope, item.id, { status: 'APPROVED' });
+        setItems((current) => current.filter((entry) => entry.id !== item.id));
+        setUsedIds((current) => new Set(current).add(item.id));
+        onApprovedChanged?.();
+      } catch (error) {
+        notifyError(getApiErrorMessage(error, 'No se pudo aprobar la pregunta.'));
+      }
+      return;
+    }
     // Evaluacion guiada: la pregunta conserva el documento del que la IA la
     // derivo, para mostrarlo como pista al colaborador durante el examen.
     const sourceDocument = item.document_id
@@ -126,7 +165,7 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
     });
     setUsedIds((current) => new Set(current).add(item.id));
     try {
-      await reviewQuestionBankItem(item.id, { status: 'APPROVED' });
+      await reviewQuestionBankItem(scope, item.id, { status: 'APPROVED' });
       setItems((current) => current.filter((entry) => entry.id !== item.id));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'La pregunta se agregó a la evaluación, pero no se pudo marcar como usada en el banco.'));
@@ -135,7 +174,7 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
 
   const handleDiscard = async (item: QuestionBankItem) => {
     try {
-      await reviewQuestionBankItem(item.id, { status: 'REJECTED' });
+      await reviewQuestionBankItem(scope, item.id, { status: 'REJECTED' });
       setItems((current) => current.filter((entry) => entry.id !== item.id));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo descartar la pregunta.'));
@@ -144,7 +183,7 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
 
   const handleSaveEdit = async (item: QuestionBankItem, text: string, options: QuestionBankItem['options']) => {
     try {
-      const updated = await reviewQuestionBankItem(item.id, { text, options });
+      const updated = await reviewQuestionBankItem(scope, item.id, { text, options });
       if (updated) {
         setItems((current) => current.map((entry) => (entry.id === item.id ? updated : entry)));
       }
@@ -156,7 +195,7 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
 
   const handleDelete = async (item: QuestionBankItem) => {
     try {
-      await deleteQuestionBankItem(item.id);
+      await deleteQuestionBankItem(scope, item.id);
       setItems((current) => current.filter((entry) => entry.id !== item.id));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo eliminar la pregunta.'));
@@ -198,7 +237,7 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
               Banco de preguntas con IA
             </p>
             <p className="text-xs text-[var(--unilabor-neutral)]">
-              Genera preguntas automáticamente desde los documentos de esta fase
+              Genera preguntas automáticamente desde {sourceText}
             </p>
           </div>
         </div>
@@ -218,8 +257,18 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
           >
             <div className="space-y-4 border-t border-[rgba(124,92,191,0.2)] bg-white/55 px-5 py-4">
               <p className="text-xs text-[var(--unilabor-neutral)]">
-                Genera preguntas candidatas a partir de los documentos de esta fase. Ninguna se agrega a la
-                evaluación hasta que la revises y hagas clic en <strong>Usar</strong>.
+                {competencyMode ? (
+                  <>
+                    Genera preguntas candidatas a partir de {sourceText}. Ninguna entra al banco del puesto
+                    hasta que la revises y hagas clic en <strong>Aprobar</strong>; de las aprobadas se arma el
+                    cuestionario de Conocimiento de cada colaborador.
+                  </>
+                ) : (
+                  <>
+                    Genera preguntas candidatas a partir de {sourceText}. Ninguna se agrega a la evaluación
+                    hasta que la revises y hagas clic en <strong>Usar</strong>.
+                  </>
+                )}
               </p>
 
               <AnimatePresence mode="wait" initial={false}>
@@ -299,17 +348,19 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
                           className={inputClass}
                         />
                       </div>
-                      <div>
-                        <label className={labelClass}>Abiertas</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={15}
-                          value={counts.open}
-                          onChange={(event) => setCounts((c) => ({ ...c, open: Number(event.target.value) }))}
-                          className={inputClass}
-                        />
-                      </div>
+                      {!competencyMode && (
+                        <div>
+                          <label className={labelClass}>Abiertas</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={15}
+                            value={counts.open}
+                            onChange={(event) => setCounts((c) => ({ ...c, open: Number(event.target.value) }))}
+                            className={inputClass}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-end gap-2">
@@ -343,8 +394,9 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
               ) : items.length > 0 ? (
                 <div className="space-y-3">
                   <p className="text-xs font-semibold text-[#5b3fa6]">
-                    {usedIds.size} de {items.length + usedIds.size} preguntas generadas ya agregadas a esta
-                    evaluación.
+                    {competencyMode
+                      ? `${usedIds.size} de ${items.length + usedIds.size} preguntas generadas ya aprobadas en el banco del puesto.`
+                      : `${usedIds.size} de ${items.length + usedIds.size} preguntas generadas ya agregadas a esta evaluación.`}
                   </p>
                   <AnimatePresence initial={false}>
                     {items.map((item, index) => (
@@ -368,6 +420,7 @@ export const QuestionBankPanel = ({ phaseId, phaseDocuments, onUseQuestion }: Qu
                           onUse={() => void handleUse(item)}
                           onDiscard={() => void handleDiscard(item)}
                           onDelete={() => void handleDelete(item)}
+                          useLabel={competencyMode ? 'Aprobar' : 'Usar'}
                         />
                       </motion.div>
                     ))}
@@ -395,6 +448,7 @@ interface QuestionBankCardProps {
   onUse: () => void;
   onDiscard: () => void;
   onDelete: () => void;
+  useLabel: string;
 }
 
 const QuestionBankCard = ({
@@ -406,6 +460,7 @@ const QuestionBankCard = ({
   onUse,
   onDiscard,
   onDelete,
+  useLabel,
 }: QuestionBankCardProps) => {
   const [draftText, setDraftText] = useState(item.text);
   const [draftOptions, setDraftOptions] = useState(item.options);
@@ -513,7 +568,7 @@ const QuestionBankCard = ({
               onClick={onUse}
               className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-brand-300)] bg-[rgba(56,161,105,0.14)] px-3 py-1.5 text-xs font-semibold text-[#2f7a4d] transition hover:bg-[rgba(56,161,105,0.24)]"
             >
-              <Check size={13} /> Usar
+              <Check size={13} /> {useLabel}
             </button>
           </div>
         </>

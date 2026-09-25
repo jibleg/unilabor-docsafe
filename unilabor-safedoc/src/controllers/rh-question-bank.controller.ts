@@ -7,6 +7,7 @@ import {
   listQuestionBankBatches,
   listQuestionBankItems,
   reviewQuestionBankItem,
+  type QuestionBankScope,
   type QuestionCounts,
 } from '../services/rh-question-bank.service';
 
@@ -25,6 +26,7 @@ const parseId = (value: unknown): number | null => {
 const ERROR_STATUS: Record<string, number> = {
   QUESTION_BANK_NOT_CONFIGURED: 409,
   QUESTION_BANK_PHASE_NOT_FOUND: 404,
+  QUESTION_BANK_POSITION_NOT_FOUND: 404,
   QUESTION_BANK_DOCUMENTS_NOT_FOUND: 400,
   QUESTION_BANK_FILE_MISSING: 409,
   QUESTION_BANK_TEXT_EMPTY: 409,
@@ -42,7 +44,7 @@ const mapError = (res: Response, error: any): Response | null => {
   return res.status(status).json({ message: error?.publicMessage || 'No se pudo completar la operacion.' });
 };
 
-const logBankAudit = async (userId: string | undefined, action: string, phaseId: number, ipAddress: string | undefined) => {
+const logBankAudit = async (userId: string | undefined, action: string, entityId: number, ipAddress: string | undefined) => {
   if (!userId) {
     return;
   }
@@ -52,14 +54,35 @@ const logBankAudit = async (userId: string | undefined, action: string, phaseId:
     ip_address: ipAddress ?? null,
     module_code: 'RH',
     entity_type: 'question_bank',
-    entity_id: phaseId,
+    entity_id: entityId,
   });
 };
 
-export const generateQuestionBankController = async (req: AuthRequest, res: Response) => {
+/**
+ * Ambito del banco segun la ruta: /induction/phases/:phaseId/... (fase) o
+ * /competency-evaluations/positions/:positionId/... (puesto).
+ */
+const resolveScope = (req: AuthRequest): QuestionBankScope | null => {
   const phaseId = parseId(req.params.phaseId);
-  if (!phaseId) {
-    return res.status(400).json({ message: 'ID de fase invalido.' });
+  if (phaseId) {
+    return { phaseId };
+  }
+  const positionId = parseId(req.params.positionId);
+  if (positionId) {
+    return { positionId };
+  }
+  return null;
+};
+
+const scopeLabel = (scope: QuestionBankScope): string =>
+  scope.phaseId !== undefined ? `PHASE:${scope.phaseId}` : `POSITION:${scope.positionId}`;
+const scopeEntityId = (scope: QuestionBankScope): number =>
+  scope.phaseId !== undefined ? scope.phaseId : scope.positionId;
+
+export const generateQuestionBankController = async (req: AuthRequest, res: Response) => {
+  const scope = resolveScope(req);
+  if (!scope) {
+    return res.status(400).json({ message: 'ID de fase o puesto invalido.' });
   }
   try {
     const { document_ids: documentIds, counts } = req.body as {
@@ -67,12 +90,12 @@ export const generateQuestionBankController = async (req: AuthRequest, res: Resp
       counts: QuestionCounts;
     };
     const result = await generateQuestions({
-      phaseId,
+      scope,
       documentIds,
       counts,
       requestedByUserId: req.user?.id ?? null,
     });
-    await logBankAudit(req.user?.id, `RH_QUESTION_BANK_GENERATE:${phaseId}:${result.batchId}`, phaseId, req.ip);
+    await logBankAudit(req.user?.id, `RH_QUESTION_BANK_GENERATE:${scopeLabel(scope)}:${result.batchId}`, scopeEntityId(scope), req.ip);
     return res.status(201).json({
       message: `Se generaron ${result.questionCount} preguntas candidatas.`,
       batch_id: result.batchId,
@@ -87,13 +110,13 @@ export const generateQuestionBankController = async (req: AuthRequest, res: Resp
 };
 
 export const listQuestionBankItemsController = async (req: AuthRequest, res: Response) => {
-  const phaseId = parseId(req.params.phaseId);
-  if (!phaseId) {
-    return res.status(400).json({ message: 'ID de fase invalido.' });
+  const scope = resolveScope(req);
+  if (!scope) {
+    return res.status(400).json({ message: 'ID de fase o puesto invalido.' });
   }
   try {
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-    const items = await listQuestionBankItems(phaseId, status);
+    const items = await listQuestionBankItems(scope, status);
     return res.json({ items });
   } catch (error) {
     console.error('Error listando banco de preguntas IA:', error);
@@ -111,7 +134,7 @@ export const reviewQuestionBankItemController = async (req: AuthRequest, res: Re
     if (!item) {
       return res.status(404).json({ message: 'La pregunta indicada no existe.' });
     }
-    await logBankAudit(req.user?.id, `RH_QUESTION_BANK_REVIEW:${itemId}:${item.status}`, item.phase_id, req.ip);
+    await logBankAudit(req.user?.id, `RH_QUESTION_BANK_REVIEW:${itemId}:${item.status}`, item.phase_id ?? item.position_id ?? itemId, req.ip);
     return res.json({ item });
   } catch (error) {
     console.error('Error actualizando pregunta del banco IA:', error);
@@ -137,12 +160,12 @@ export const deleteQuestionBankItemController = async (req: AuthRequest, res: Re
 };
 
 export const listQuestionBankBatchesController = async (req: AuthRequest, res: Response) => {
-  const phaseId = parseId(req.params.phaseId);
-  if (!phaseId) {
-    return res.status(400).json({ message: 'ID de fase invalido.' });
+  const scope = resolveScope(req);
+  if (!scope) {
+    return res.status(400).json({ message: 'ID de fase o puesto invalido.' });
   }
   try {
-    const batches = await listQuestionBankBatches(phaseId);
+    const batches = await listQuestionBankBatches(scope);
     return res.json({ batches });
   } catch (error) {
     console.error('Error listando corridas del banco de preguntas IA:', error);

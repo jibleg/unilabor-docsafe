@@ -6,14 +6,25 @@ import type { EvaluationQuestionType } from '../types';
 import { resolveStoredDocumentPath } from './document.service';
 
 /**
- * Banco de preguntas generado por IA para las evaluaciones de Induccion
- * (RH). Genera preguntas candidatas con la API de Claude a partir del texto
- * de los documentos obligatorios de una fase, y las deja en
- * rh_question_bank_items como PENDING_REVIEW. Nunca escribe en
- * evaluation_questions: RH aprueba/edita desde el frontend y ahi se copian al
- * arreglo real de la plantilla, que se persiste con el endpoint ya existente
- * PUT /rh/trainings/templates/:templateId/questions.
+ * Banco de preguntas generado por IA (RH). Genera preguntas candidatas con la
+ * API de Claude a partir del texto de los documentos obligatorios de un AMBITO
+ * y las deja en rh_question_bank_items como PENDING_REVIEW:
+ *  - ambito FASE de Induccion: RH aprueba/edita y "usa" cada pregunta, que se
+ *    copia a la plantilla del cuestionario de la fase;
+ *  - ambito PUESTO (REH-REG-003, seccion 3 Conocimiento): RH aprueba y las
+ *    preguntas APPROVED quedan como banco vivo del puesto; el cuestionario de
+ *    cada evaluacion de competencia sortea/elige de ahi
+ *    (rh-competency-knowledge.service.ts).
+ * Nunca escribe en evaluation_questions directamente.
  */
+
+/** Ambito del banco: exactamente uno de los dos. */
+export type QuestionBankScope = { phaseId: number; positionId?: undefined } | { positionId: number; phaseId?: undefined };
+
+const scopeColumn = (scope: QuestionBankScope): 'phase_id' | 'position_id' =>
+  scope.phaseId !== undefined ? 'phase_id' : 'position_id';
+const scopeId = (scope: QuestionBankScope): number =>
+  scope.phaseId !== undefined ? scope.phaseId : scope.positionId;
 
 const MAX_CHARS_PER_DOCUMENT = 12_000;
 // Tope de salida holgado: con varios documentos y decenas de preguntas, 8k se
@@ -73,23 +84,34 @@ interface PhaseDocumentSource {
   text: string;
 }
 
-/** Extrae el texto de los documentos indicados, validando que pertenezcan a la fase. */
-const loadPhaseDocumentTexts = async (
-  phaseId: number,
+/** Extrae el texto de los documentos indicados, validando que pertenezcan al ambito (fase o puesto). */
+const loadScopeDocumentTexts = async (
+  scope: QuestionBankScope,
   documentIds: string[],
 ): Promise<PhaseDocumentSource[]> => {
-  const result = await pool.query(
-    `SELECT pd.document_id, d.title, d.file_path
-       FROM public.rh_induction_phase_documents pd
-       INNER JOIN public.documents d ON d.id = pd.document_id
-      WHERE pd.phase_id = $1 AND pd.document_id = ANY($2::uuid[]);`,
-    [phaseId, documentIds],
-  );
+  const result =
+    scope.phaseId !== undefined
+      ? await pool.query(
+          `SELECT pd.document_id, d.title, d.file_path
+             FROM public.rh_induction_phase_documents pd
+             INNER JOIN public.documents d ON d.id = pd.document_id
+            WHERE pd.phase_id = $1 AND pd.document_id = ANY($2::uuid[]);`,
+          [scope.phaseId, documentIds],
+        )
+      : await pool.query(
+          `SELECT pd.document_id, d.title, d.file_path
+             FROM public.rh_position_documents pd
+             INNER JOIN public.documents d ON d.id = pd.document_id
+            WHERE pd.position_id = $1 AND pd.document_id = ANY($2::uuid[]);`,
+          [scope.positionId, documentIds],
+        );
 
   if (result.rows.length === 0) {
     throwCoded(
       'QUESTION_BANK_DOCUMENTS_NOT_FOUND',
-      'Los documentos seleccionados no pertenecen a los documentos obligatorios de esta fase.',
+      scope.phaseId !== undefined
+        ? 'Los documentos seleccionados no pertenecen a los documentos obligatorios de esta fase.'
+        : 'Los documentos seleccionados no pertenecen a los documentos obligatorios de este puesto.',
     );
   }
 
@@ -125,13 +147,21 @@ export interface QuestionCounts {
   open: number;
 }
 
-const buildPrompt = (documents: PhaseDocumentSource[], counts: QuestionCounts): string => {
+interface PromptContext {
+  /** Nombre del puesto cuando el banco es por puesto (REH-REG-003); null para fases de Induccion. */
+  positionName: string | null;
+}
+
+const buildPrompt = (documents: PhaseDocumentSource[], counts: QuestionCounts, context: PromptContext): string => {
   const documentsBlock = documents
     .map((doc) => `### ${doc.title}\n${doc.text}`)
     .join('\n\n');
   const titles = documents.map((doc) => `"${doc.title}"`).join(', ');
+  const intro = context.positionName
+    ? `Eres un experto en evaluacion de competencia tecnica del personal de un laboratorio clinico certificado bajo ISO 15189:2022 (Unilabor). Las preguntas alimentan la seccion "Conocimiento" del registro REH-REG-003 (Evaluacion de competencia) del puesto "${context.positionName}": deben medir si quien ocupa ese puesto domina los procedimientos y requisitos que aplican a su trabajo diario.`
+    : 'Eres un experto en diseno de evaluaciones de induccion para personal de un laboratorio clinico certificado bajo ISO 15189:2022 (Unilabor).';
 
-  return `Eres un experto en diseno de evaluaciones de induccion para personal de un laboratorio clinico certificado bajo ISO 15189:2022 (Unilabor).
+  return `${intro}
 
 A partir UNICAMENTE del contenido de los documentos institucionales que se listan abajo, genera exactamente:
 - ${counts.boolean} preguntas de Verdadero/Falso
@@ -242,7 +272,7 @@ const parseAiResponse = (rawText: string, documents: PhaseDocumentSource[]): Gen
 // --- Generacion ---------------------------------------------------------------
 
 export interface GenerateQuestionBankInput {
-  phaseId: number;
+  scope: QuestionBankScope;
   documentIds: string[];
   counts: QuestionCounts;
   requestedByUserId: string | null;
@@ -257,19 +287,33 @@ export const generateQuestions = async (input: GenerateQuestionBankInput): Promi
     );
   }
 
-  const phaseResult = await pool.query(`SELECT id FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`, [
-    input.phaseId,
-  ]);
-  if (phaseResult.rows.length === 0) {
-    throwCoded('QUESTION_BANK_PHASE_NOT_FOUND', 'La fase indicada no existe.');
+  let positionName: string | null = null;
+  if (input.scope.phaseId !== undefined) {
+    const phaseResult = await pool.query(`SELECT id FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`, [
+      input.scope.phaseId,
+    ]);
+    if (phaseResult.rows.length === 0) {
+      throwCoded('QUESTION_BANK_PHASE_NOT_FOUND', 'La fase indicada no existe.');
+    }
+  } else {
+    const positionResult = await pool.query(
+      `SELECT name FROM public.rh_positions WHERE id = $1 AND is_active = TRUE LIMIT 1;`,
+      [input.scope.positionId],
+    );
+    if (positionResult.rows.length === 0) {
+      throwCoded('QUESTION_BANK_POSITION_NOT_FOUND', 'El puesto indicado no existe o esta inactivo.');
+    }
+    positionName = String(positionResult.rows[0].name);
   }
 
-  const documents = await loadPhaseDocumentTexts(input.phaseId, input.documentIds);
+  const documents = await loadScopeDocumentTexts(input.scope, input.documentIds);
+  const column = scopeColumn(input.scope);
+  const ownerId = scopeId(input.scope);
 
   const batchResult = await pool.query(
-    `INSERT INTO public.rh_question_bank_batches (phase_id, document_ids, requested_by_user_id, model, status)
+    `INSERT INTO public.rh_question_bank_batches (${column}, document_ids, requested_by_user_id, model, status)
      VALUES ($1, $2, $3, $4, 'running') RETURNING id;`,
-    [input.phaseId, input.documentIds, input.requestedByUserId, anthropicConfig!.model],
+    [ownerId, input.documentIds, input.requestedByUserId, anthropicConfig!.model],
   );
   const batchId = Number(batchResult.rows[0].id);
 
@@ -287,7 +331,7 @@ export const generateQuestions = async (input: GenerateQuestionBankInput): Promi
       .stream({
         model: anthropicConfig!.model,
         max_tokens: MAX_OUTPUT_TOKENS,
-        messages: [{ role: 'user', content: buildPrompt(documents, input.counts) }],
+        messages: [{ role: 'user', content: buildPrompt(documents, input.counts, { positionName }) }],
       })
       .finalMessage();
 
@@ -307,9 +351,9 @@ export const generateQuestions = async (input: GenerateQuestionBankInput): Promi
     for (const question of questions) {
       await pool.query(
         `INSERT INTO public.rh_question_bank_items
-           (batch_id, phase_id, document_id, type, text, points, options, status)
+           (batch_id, ${column}, document_id, type, text, points, options, status)
          VALUES ($1, $2, $3, $4, $5, 1, $6::jsonb, 'PENDING_REVIEW');`,
-        [batchId, input.phaseId, question.document_id, question.type, question.text, JSON.stringify(question.options)],
+        [batchId, ownerId, question.document_id, question.type, question.text, JSON.stringify(question.options)],
       );
     }
 
@@ -334,7 +378,8 @@ export const generateQuestions = async (input: GenerateQuestionBankInput): Promi
 export interface QuestionBankItemRecord {
   id: number;
   batch_id: number;
-  phase_id: number;
+  phase_id: number | null;
+  position_id: number | null;
   document_id: string | null;
   type: EvaluationQuestionType;
   text: string;
@@ -347,7 +392,8 @@ export interface QuestionBankItemRecord {
 const mapItemRow = (row: any): QuestionBankItemRecord => ({
   id: Number(row.id),
   batch_id: Number(row.batch_id),
-  phase_id: Number(row.phase_id),
+  phase_id: row.phase_id ? Number(row.phase_id) : null,
+  position_id: row.position_id ? Number(row.position_id) : null,
   document_id: row.document_id ? String(row.document_id) : null,
   type: String(row.type) as EvaluationQuestionType,
   text: String(row.text),
@@ -358,19 +404,19 @@ const mapItemRow = (row: any): QuestionBankItemRecord => ({
 });
 
 export const listQuestionBankItems = async (
-  phaseId: number,
+  scope: QuestionBankScope,
   status?: string,
 ): Promise<QuestionBankItemRecord[]> => {
-  const values: unknown[] = [phaseId];
+  const values: unknown[] = [scopeId(scope)];
   let statusClause = '';
   if (status) {
     values.push(status);
     statusClause = `AND status = $${values.length}`;
   }
   const result = await pool.query(
-    `SELECT id, batch_id, phase_id, document_id, type, text, points, options, status, created_at
+    `SELECT id, batch_id, phase_id, position_id, document_id, type, text, points, options, status, created_at
        FROM public.rh_question_bank_items
-      WHERE phase_id = $1 ${statusClause}
+      WHERE ${scopeColumn(scope)} = $1 ${statusClause}
       ORDER BY created_at DESC, id DESC;`,
     values,
   );
@@ -412,7 +458,7 @@ export const reviewQuestionBankItem = async (
   );
 
   const refreshed = await pool.query(
-    `SELECT id, batch_id, phase_id, document_id, type, text, points, options, status, created_at
+    `SELECT id, batch_id, phase_id, position_id, document_id, type, text, points, options, status, created_at
        FROM public.rh_question_bank_items WHERE id = $1 LIMIT 1;`,
     [itemId],
   );
@@ -426,7 +472,8 @@ export const deleteQuestionBankItem = async (itemId: number): Promise<boolean> =
 
 export interface QuestionBankBatchRecord {
   id: number;
-  phase_id: number;
+  phase_id: number | null;
+  position_id: number | null;
   document_ids: string[];
   requested_by_user_id: string | null;
   model: string;
@@ -436,17 +483,18 @@ export interface QuestionBankBatchRecord {
   created_at: string;
 }
 
-export const listQuestionBankBatches = async (phaseId: number): Promise<QuestionBankBatchRecord[]> => {
+export const listQuestionBankBatches = async (scope: QuestionBankScope): Promise<QuestionBankBatchRecord[]> => {
   const result = await pool.query(
-    `SELECT id, phase_id, document_ids, requested_by_user_id, model, status, error_message, question_count, created_at
+    `SELECT id, phase_id, position_id, document_ids, requested_by_user_id, model, status, error_message, question_count, created_at
        FROM public.rh_question_bank_batches
-      WHERE phase_id = $1
+      WHERE ${scopeColumn(scope)} = $1
       ORDER BY created_at DESC, id DESC;`,
-    [phaseId],
+    [scopeId(scope)],
   );
   return result.rows.map((row) => ({
     id: Number(row.id),
-    phase_id: Number(row.phase_id),
+    phase_id: row.phase_id ? Number(row.phase_id) : null,
+    position_id: row.position_id ? Number(row.position_id) : null,
     document_ids: Array.isArray(row.document_ids) ? row.document_ids.map(String) : [],
     requested_by_user_id: row.requested_by_user_id ? String(row.requested_by_user_id) : null,
     model: String(row.model),

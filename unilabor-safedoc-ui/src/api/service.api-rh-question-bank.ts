@@ -7,12 +7,23 @@ import type {
   QuestionBankCounts,
   QuestionBankItem,
   QuestionBankItemStatus,
+  QuestionBankScope,
 } from '../types/models';
 
 /**
- * Banco de preguntas generado por IA (Induccion, RH). Staging previo al
- * banco real de la evaluacion: ver QuestionBankPanel.tsx.
+ * Banco de preguntas generado por IA (RH). Dos ambitos: fase de Induccion
+ * (staging previo al cuestionario de la fase) o puesto (banco vivo para la
+ * seccion 3 Conocimiento del REH-REG-003). Ver QuestionBankPanel.tsx.
  */
+
+/** Prefijo de rutas segun el ambito (cada uno con su permiso en el backend). */
+const scopeBase = (scope: QuestionBankScope): string =>
+  scope.phaseId !== undefined
+    ? `/rh/induction/phases/${scope.phaseId}/question-bank`
+    : `/rh/competency-evaluations/positions/${scope.positionId}/question-bank`;
+
+const itemBase = (scope: QuestionBankScope): string =>
+  scope.phaseId !== undefined ? '/rh/induction/question-bank' : '/rh/competency-evaluations/question-bank';
 
 const normalizeOption = (input: unknown): EvaluationQuestionOption => {
   const source = asRecord(input) ?? {};
@@ -35,7 +46,8 @@ const normalizeItem = (input: unknown): QuestionBankItem | null => {
   return {
     id,
     batch_id: getNumber(source, ['batch_id']),
-    phase_id: getNumber(source, ['phase_id']),
+    phase_id: getNumber(source, ['phase_id']) || null,
+    position_id: getNumber(source, ['position_id']) || null,
     document_id: getString(source, ['document_id']) || null,
     type: (getString(source, ['type']) as EvaluationQuestionType) || 'single',
     text: getString(source, ['text']),
@@ -57,7 +69,8 @@ const normalizeBatch = (input: unknown): QuestionBankBatch | null => {
   }
   return {
     id,
-    phase_id: getNumber(source, ['phase_id']),
+    phase_id: getNumber(source, ['phase_id']) || null,
+    position_id: getNumber(source, ['position_id']) || null,
     document_ids: Array.isArray(source.document_ids) ? source.document_ids.map(String) : [],
     model: getString(source, ['model']),
     status: (getString(source, ['status']) as QuestionBankBatch['status']) || 'running',
@@ -68,10 +81,10 @@ const normalizeBatch = (input: unknown): QuestionBankBatch | null => {
 };
 
 export const listQuestionBankItems = async (
-  phaseId: number,
+  scope: QuestionBankScope,
   status?: QuestionBankItemStatus,
 ): Promise<QuestionBankItem[]> => {
-  const response = await api.get(`/rh/induction/phases/${phaseId}/question-bank`, {
+  const response = await api.get(scopeBase(scope), {
     params: status ? { status } : undefined,
   });
   return getArrayFromPayload(response.data, ['items'])
@@ -85,11 +98,11 @@ export interface GenerateQuestionBankResult {
 }
 
 export const generateQuestionBank = async (
-  phaseId: number,
+  scope: QuestionBankScope,
   documentIds: string[],
   counts: QuestionBankCounts,
 ): Promise<GenerateQuestionBankResult> => {
-  const response = await api.post(`/rh/induction/phases/${phaseId}/question-bank/generate`, {
+  const response = await api.post(`${scopeBase(scope)}/generate`, {
     document_ids: documentIds,
     counts,
   });
@@ -108,19 +121,28 @@ export interface ReviewQuestionBankItemPayload {
 }
 
 export const reviewQuestionBankItem = async (
+  scope: QuestionBankScope,
   itemId: number,
   payload: ReviewQuestionBankItemPayload,
 ): Promise<QuestionBankItem | null> => {
-  const response = await api.patch(`/rh/induction/question-bank/${itemId}`, payload);
+  const response = await api.patch(`${itemBase(scope)}/${itemId}`, payload);
   return normalizeItem(asRecord(unwrapPayload(response.data))?.item);
 };
 
-export const deleteQuestionBankItem = async (itemId: number): Promise<void> => {
-  await api.delete(`/rh/induction/question-bank/${itemId}`);
+export const deleteQuestionBankItem = async (scope: QuestionBankScope, itemId: number): Promise<void> => {
+  await api.delete(`${itemBase(scope)}/${itemId}`);
 };
 
-export const listQuestionBankBatches = async (phaseId: number): Promise<QuestionBankBatch[]> => {
-  const response = await api.get(`/rh/induction/phases/${phaseId}/question-bank/batches`);
+/** Banco APROBADO y autocalificable de un puesto (para armar el cuestionario de Conocimiento). */
+export const listApprovedPositionQuestions = async (positionId: number): Promise<QuestionBankItem[]> => {
+  const response = await api.get(`/rh/competency-evaluations/positions/${positionId}/question-bank/approved`);
+  return getArrayFromPayload(response.data, ['items'])
+    .map((raw) => normalizeItem({ ...(asRecord(raw) ?? {}), status: 'APPROVED', position_id: positionId, batch_id: 0 }))
+    .filter((item): item is QuestionBankItem => item !== null);
+};
+
+export const listQuestionBankBatches = async (scope: QuestionBankScope): Promise<QuestionBankBatch[]> => {
+  const response = await api.get(`${scopeBase(scope)}/batches`);
   return getArrayFromPayload(response.data, ['batches'])
     .map(normalizeBatch)
     .filter((batch): batch is QuestionBankBatch => batch !== null);
