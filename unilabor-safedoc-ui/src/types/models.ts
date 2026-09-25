@@ -2113,6 +2113,9 @@ export interface ProviderDocument {
   status: ProviderDocumentStatus;
   replaces_document_id: number | null;
   replaced_by_document_id: number | null;
+  /** Borrado lógico (solo documentos con histórico): oculto de la ficha, PDF y cadena intactos. */
+  deleted_at?: string | null;
+  deleted_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -2196,6 +2199,9 @@ export interface ClientDocument {
   status: ClientDocumentStatus;
   replaces_document_id: number | null;
   replaced_by_document_id: number | null;
+  /** Borrado lógico (solo documentos con histórico): oculto de la ficha, PDF y cadena intactos. */
+  deleted_at?: string | null;
+  deleted_by_name?: string | null;
   created_at: string;
   updated_at: string;
 }

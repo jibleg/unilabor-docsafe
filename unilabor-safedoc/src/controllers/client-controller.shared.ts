@@ -56,7 +56,7 @@ export const mapClientDocumentError = (res: Response, error: any) => {
 
   if (error?.code === 'CLIENT_DOCUMENT_NOT_ACTIVE' || error?.code === 'CLIENT_DOCUMENT_ALREADY_SUPERSEDED') {
     return res.status(409).json({
-      message: 'El documento ya no esta vigente y no puede reemplazarse nuevamente.',
+      message: 'El documento ya no esta vigente: solo los documentos vigentes se pueden reemplazar o editar.',
     });
   }
 
@@ -83,6 +83,7 @@ export const logClientAudit = async (
   ipAddress: string | undefined,
   entityId: number,
   entityType = 'client_document',
+  metadata?: Record<string, unknown>,
 ) => {
   if (!userId) {
     return;
@@ -95,5 +96,6 @@ export const logClientAudit = async (
     module_code: 'PROVIDERS',
     entity_type: entityType,
     entity_id: entityId,
+    metadata: metadata ?? null,
   });
 };

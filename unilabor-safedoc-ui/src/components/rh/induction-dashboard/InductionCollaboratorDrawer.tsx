@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Award, BookOpenCheck, CheckCircle2, Circle, FileText, History, Loader2, Lock, User, X } from 'lucide-react';
+import { Award, BookOpenCheck, CheckCircle2, Circle, FileText, History, ListChecks, Loader2, Lock, User, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getInductionEmployee360 } from '../../../api/service.api-rh-induction-dashboard';
 import { getApiErrorMessage } from '../../../api/service.parsers';
+import { EvaluationResponsesModal } from '../EvaluationResponsesModal';
 import type { InductionAction, InductionEmployee360, InductionRosterRow } from '../../../types/models';
 import { EVALUATION_STATUS_META } from '../../../utils/evaluations';
 import {
@@ -59,6 +60,8 @@ export const InductionCollaboratorDrawer = ({ employeeId, focusPhaseNumber, refr
   const [detail, setDetail] = useState<InductionEmployee360 | null>(null);
   const [loading, setLoading] = useState(true);
   const [openPhase, setOpenPhase] = useState<number | null>(focusPhaseNumber ?? null);
+  /** Intento cuyas preguntas y respuestas se muestran en el modal de revisión. */
+  const [responsesAssignmentId, setResponsesAssignmentId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -283,6 +286,15 @@ export const InductionCollaboratorDrawer = ({ employeeId, focusPhaseNumber, refr
                                 {attempt.submitted_at ? ` · enviado ${formatDateTime(attempt.submitted_at)}` : ''}
                                 {` · ${attempt.response_count}/${attempt.question_count} respuestas`}
                               </p>
+                              {attempt.response_count > 0 || ['submitted', 'grading', 'passed', 'failed'].includes(attempt.status) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setResponsesAssignmentId(attempt.assignment_id)}
+                                  className="mt-1.5 inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]"
+                                >
+                                  <ListChecks size={12} /> Ver preguntas y respuestas
+                                </button>
+                              ) : null}
                             </li>
                           );
                         })}
@@ -331,6 +343,11 @@ export const InductionCollaboratorDrawer = ({ employeeId, focusPhaseNumber, refr
           </div>
         ) : null}
       </motion.aside>
+      {responsesAssignmentId !== null ? (
+        <div className="relative z-[70]">
+          <EvaluationResponsesModal assignmentId={responsesAssignmentId} onClose={() => setResponsesAssignmentId(null)} />
+        </div>
+      ) : null}
     </div>
   );
 };

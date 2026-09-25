@@ -6,6 +6,7 @@ import type {
   ClientContactPayload,
   ClientDocumentCategoryPayload,
   ClientDocumentReplacePayload,
+  ClientDocumentUpdatePayload,
   ClientDocumentUploadPayload,
   ClientPayload,
 } from './service.shared';
@@ -208,14 +209,37 @@ export const replaceClientDocument = async (
   };
 };
 
+export const updateClientDocument = async (
+  documentId: number,
+  payload: ClientDocumentUpdatePayload,
+): Promise<ClientDocument> => {
+  const response = await api.patch(`/providers/clients/documents/${documentId}`, payload);
+  const data = asRecord(unwrapPayload(response.data));
+  return (data?.document ?? unwrapPayload(response.data)) as ClientDocument;
+};
+
 export const deactivateClientDocument = async (documentId: number): Promise<ClientDocument> => {
   const response = await api.post(`/providers/clients/documents/${documentId}/deactivate`);
   const data = asRecord(unwrapPayload(response.data));
   return (data?.document ?? unwrapPayload(response.data)) as ClientDocument;
 };
 
-export const deleteClientDocument = async (documentId: number): Promise<void> => {
-  await api.delete(`/providers/clients/documents/${documentId}`);
+export const deleteClientDocument = async (
+  documentId: number,
+): Promise<{ message: string; kind: 'physical' | 'logical' }> => {
+  const response = await api.delete(`/providers/clients/documents/${documentId}`);
+  const data = asRecord(unwrapPayload(response.data)) ?? {};
+  return {
+    message: String(data.message ?? 'Documento eliminado.'),
+    kind: data.kind === 'logical' ? 'logical' : 'physical',
+  };
+};
+
+/** Deshace el borrado lógico de un documento con histórico. */
+export const restoreClientDocument = async (documentId: number): Promise<ClientDocument> => {
+  const response = await api.post(`/providers/clients/documents/${documentId}/restore`);
+  const data = asRecord(unwrapPayload(response.data));
+  return (data?.document ?? unwrapPayload(response.data)) as ClientDocument;
 };
 
 // Descarga protegida (blob), mismo patron que el visor de Proveedores.

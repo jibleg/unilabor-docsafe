@@ -51,6 +51,9 @@ export interface ProviderDocumentRecord {
   status: string;
   replaces_document_id: number | null;
   replaced_by_document_id: number | null;
+  /** Borrado logico (documento con historico oculto de la ficha); el PDF y la cadena se conservan. */
+  deleted_at: string | null;
+  deleted_by_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -87,6 +90,8 @@ const mapDocumentRow = (row: any): ProviderDocumentRecord => ({
   status: String(row.status),
   replaces_document_id: row.replaces_document_id ? Number(row.replaces_document_id) : null,
   replaced_by_document_id: row.replaced_by_document_id ? Number(row.replaced_by_document_id) : null,
+  deleted_at: row.deleted_at ? formatTimestamp(row.deleted_at) : null,
+  deleted_by_name: row.deleted_by_name ? String(row.deleted_by_name) : null,
   created_at: formatTimestamp(row.created_at),
   updated_at: formatTimestamp(row.updated_at),
 });
@@ -99,11 +104,13 @@ const DOCUMENT_SELECT = `
     d.uploaded_by, u.full_name AS uploaded_by_name,
     d.document_date, d.effective_from, d.expiry_date,
     d.status, d.replaces_document_id, d.replaced_by_document_id,
+    d.deleted_at, du.full_name AS deleted_by_name,
     d.created_at, d.updated_at
   FROM public.provider_documents d
   INNER JOIN public.helpdesk_suppliers s ON s.id = d.provider_id
   LEFT JOIN public.provider_document_categories c ON c.id = d.category_id
   LEFT JOIN public.users u ON u.id = d.uploaded_by
+  LEFT JOIN public.users du ON du.id = d.deleted_by
 `;
 
 export const resolveStoredProviderDocumentPath = (storedPath: string): string => {
@@ -172,7 +179,7 @@ export const listActiveProviderDocuments = async (
   const result = await pool.query(
     `
       ${DOCUMENT_SELECT}
-      WHERE d.provider_id = $1 AND d.status = 'active'
+      WHERE d.provider_id = $1 AND d.status = 'active' AND d.deleted_at IS NULL
       ORDER BY c.sort_order ASC NULLS LAST, d.created_at DESC;
     `,
     [providerId],
@@ -186,7 +193,7 @@ export const listAllProviderDocuments = async (providerId: number): Promise<Prov
   const result = await pool.query(
     `
       ${DOCUMENT_SELECT}
-      WHERE d.provider_id = $1
+      WHERE d.provider_id = $1 AND d.deleted_at IS NULL
       ORDER BY d.created_at DESC;
     `,
     [providerId],
@@ -249,26 +256,54 @@ export const deactivateProviderDocument = async (
   return findProviderDocumentById(documentId);
 };
 
-// Borrado DEFINITIVO. Un documento que forma parte de una cadena de versiones
-// (fue reemplazado o reemplaza a otro) no se puede eliminar para no romper la
-// trazabilidad documental; en ese caso se debe desactivar en su lugar.
+export type ProviderDocumentDeleteResult =
+  | { kind: 'physical'; file_path: string }
+  | { kind: 'logical'; document: ProviderDocumentRecord };
+
+// "Eliminar": un documento SIN historico (no reemplaza ni fue reemplazado) se
+// borra fisicamente como siempre. Uno que forma parte de una cadena de versiones
+// se oculta de la ficha (borrado logico: deleted_at/deleted_by) conservando el
+// PDF y la cadena replaces/replaced_by para la trazabilidad; sigue visible en
+// el historico con la etiqueta "Eliminado" y puede restaurarse.
 export const deleteProviderDocument = async (
   documentId: number,
-): Promise<{ file_path: string } | null> => {
+  deletedByUserId: string | null,
+): Promise<ProviderDocumentDeleteResult | null> => {
   const existing = await findProviderDocumentById(documentId);
   if (!existing) {
     return null;
   }
 
   if (existing.replaces_document_id || existing.replaced_by_document_id) {
-    const error = new Error('PROVIDER_DOCUMENT_HAS_HISTORY');
-    (error as any).code = 'PROVIDER_DOCUMENT_HAS_HISTORY';
-    throw error;
+    await pool.query(
+      `UPDATE public.provider_documents SET deleted_at = NOW(), deleted_by = $2, updated_at = NOW() WHERE id = $1;`,
+      [documentId, deletedByUserId],
+    );
+    const hidden = await findProviderDocumentById(documentId);
+    return { kind: 'logical', document: hidden ?? existing };
   }
 
   await pool.query('DELETE FROM public.provider_documents WHERE id = $1;', [documentId]);
 
-  return { file_path: existing.file_path };
+  return { kind: 'physical', file_path: existing.file_path };
+};
+
+// Deshace el borrado logico: el documento vuelve a la ficha con su estado original.
+export const restoreProviderDocument = async (documentId: number): Promise<ProviderDocumentRecord | null> => {
+  const existing = await findProviderDocumentById(documentId);
+  if (!existing) {
+    return null;
+  }
+  if (!existing.deleted_at) {
+    const error = new Error('PROVIDER_DOCUMENT_NOT_DELETED');
+    (error as any).code = 'PROVIDER_DOCUMENT_NOT_DELETED';
+    throw error;
+  }
+  await pool.query(
+    `UPDATE public.provider_documents SET deleted_at = NULL, deleted_by = NULL, updated_at = NOW() WHERE id = $1;`,
+    [documentId],
+  );
+  return findProviderDocumentById(documentId);
 };
 
 export const replaceProviderDocumentWithNewVersion = async (
@@ -365,4 +400,61 @@ export const replaceProviderDocumentWithNewVersion = async (
   } finally {
     client.release();
   }
+};
+
+export interface UpdateProviderDocumentMetadataInput {
+  category_id?: number | undefined;
+  title?: string | undefined;
+  description?: string | null | undefined;
+  document_date?: string | null | undefined;
+  effective_from?: string | null | undefined;
+  expiry_date?: string | null | undefined;
+}
+
+// Correccion de metadatos del documento VIGENTE (titulo, categoria, descripcion,
+// fechas) sin tocar el PDF ni la cadena de versiones: no crea version nueva ni
+// altera derogados. Devuelve el registro previo y el actualizado para auditar
+// exactamente que cambio.
+export const updateProviderDocumentMetadata = async (
+  documentId: number,
+  data: UpdateProviderDocumentMetadataInput,
+): Promise<{ previousDocument: ProviderDocumentRecord; document: ProviderDocumentRecord }> => {
+  const existing = await findProviderDocumentById(documentId);
+  if (!existing) {
+    const error = new Error('PROVIDER_DOCUMENT_NOT_FOUND');
+    (error as any).code = 'PROVIDER_DOCUMENT_NOT_FOUND';
+    throw error;
+  }
+  if (existing.status !== 'active') {
+    const error = new Error('PROVIDER_DOCUMENT_NOT_ACTIVE');
+    (error as any).code = 'PROVIDER_DOCUMENT_NOT_ACTIVE';
+    throw error;
+  }
+
+  await pool.query(
+    `
+      UPDATE public.provider_documents
+      SET category_id = $2, title = $3, description = $4,
+          document_date = $5, effective_from = $6, expiry_date = $7,
+          updated_at = NOW()
+      WHERE id = $1;
+    `,
+    [
+      documentId,
+      data.category_id ?? existing.category_id,
+      data.title !== undefined ? data.title : existing.title,
+      data.description !== undefined ? data.description : existing.description,
+      data.document_date !== undefined ? data.document_date : existing.document_date,
+      data.effective_from !== undefined ? data.effective_from : existing.effective_from,
+      data.expiry_date !== undefined ? data.expiry_date : existing.expiry_date,
+    ],
+  );
+
+  const updated = await findProviderDocumentById(documentId);
+  if (!updated) {
+    const error = new Error('PROVIDER_DOCUMENT_NOT_FOUND');
+    (error as any).code = 'PROVIDER_DOCUMENT_NOT_FOUND';
+    throw error;
+  }
+  return { previousDocument: existing, document: updated };
 };

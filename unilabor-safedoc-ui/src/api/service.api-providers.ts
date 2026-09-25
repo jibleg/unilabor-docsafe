@@ -6,6 +6,7 @@ import type {
   ProviderContactPayload,
   ProviderDocumentCategoryPayload,
   ProviderDocumentReplacePayload,
+  ProviderDocumentUpdatePayload,
   ProviderDocumentUploadPayload,
   ProviderPayload,
 } from './service.shared';
@@ -210,14 +211,37 @@ export const replaceProviderDocument = async (
   };
 };
 
+export const updateProviderDocument = async (
+  documentId: number,
+  payload: ProviderDocumentUpdatePayload,
+): Promise<ProviderDocument> => {
+  const response = await api.patch(`/providers/documents/${documentId}`, payload);
+  const data = asRecord(unwrapPayload(response.data));
+  return (data?.document ?? unwrapPayload(response.data)) as ProviderDocument;
+};
+
 export const deactivateProviderDocument = async (documentId: number): Promise<ProviderDocument> => {
   const response = await api.post(`/providers/documents/${documentId}/deactivate`);
   const data = asRecord(unwrapPayload(response.data));
   return (data?.document ?? unwrapPayload(response.data)) as ProviderDocument;
 };
 
-export const deleteProviderDocument = async (documentId: number): Promise<void> => {
-  await api.delete(`/providers/documents/${documentId}`);
+export const deleteProviderDocument = async (
+  documentId: number,
+): Promise<{ message: string; kind: 'physical' | 'logical' }> => {
+  const response = await api.delete(`/providers/documents/${documentId}`);
+  const data = asRecord(unwrapPayload(response.data)) ?? {};
+  return {
+    message: String(data.message ?? 'Documento eliminado.'),
+    kind: data.kind === 'logical' ? 'logical' : 'physical',
+  };
+};
+
+/** Deshace el borrado lógico de un documento con histórico. */
+export const restoreProviderDocument = async (documentId: number): Promise<ProviderDocument> => {
+  const response = await api.post(`/providers/documents/${documentId}/restore`);
+  const data = asRecord(unwrapPayload(response.data));
+  return (data?.document ?? unwrapPayload(response.data)) as ProviderDocument;
 };
 
 // Descarga protegida (blob), mismo patron que el visor de evidencias de Activos.

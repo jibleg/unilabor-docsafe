@@ -338,6 +338,16 @@ export interface ProviderDocumentUploadPayload {
   file: File;
 }
 
+/** Corrección de metadatos del documento vigente: el PDF y el histórico no se tocan. */
+export interface ProviderDocumentUpdatePayload {
+  category_id?: number;
+  title?: string;
+  description?: string | null;
+  document_date?: string | null;
+  effective_from?: string | null;
+  expiry_date?: string | null;
+}
+
 export interface ProviderDocumentReplacePayload {
   category_id?: number | null;
   title?: string | null;
@@ -396,6 +406,16 @@ export interface ClientDocumentUploadPayload {
   effective_from?: string | null;
   expiry_date?: string | null;
   file: File;
+}
+
+/** Corrección de metadatos del documento vigente: el PDF y el histórico no se tocan. */
+export interface ClientDocumentUpdatePayload {
+  category_id?: number;
+  title?: string;
+  description?: string | null;
+  document_date?: string | null;
+  effective_from?: string | null;
+  expiry_date?: string | null;
 }
 
 export interface ClientDocumentReplacePayload {

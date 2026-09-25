@@ -20,6 +20,8 @@ import {
   getProviderDocumentController,
   listProviderDocumentsController,
   replaceProviderDocumentController,
+  updateProviderDocumentController,
+  restoreProviderDocumentController,
   uploadProviderDocumentController,
   viewProviderDocumentController,
 } from '../controllers/provider-document.controller';
@@ -37,6 +39,7 @@ import {
   providerNotificationRecipientSchema,
   providerSchema,
   replaceProviderDocumentSchema,
+  updateProviderDocumentSchema,
   uploadProviderDocumentSchema,
 } from '../schemas/provider.schema';
 
@@ -119,7 +122,10 @@ router.patch(
   validate(replaceProviderDocumentSchema),
   replaceProviderDocumentController,
 );
+// Correccion de metadatos del vigente (JSON): el PDF y el historico no se tocan.
+router.patch('/documents/:id', documentsWrite, validate(updateProviderDocumentSchema), updateProviderDocumentController);
 router.post('/documents/:id/deactivate', documentsWrite, deactivateProviderDocumentController);
 router.delete('/documents/:id', documentsWrite, deleteProviderDocumentController);
+router.post('/documents/:id/restore', documentsWrite, restoreProviderDocumentController);
 
 export default router;

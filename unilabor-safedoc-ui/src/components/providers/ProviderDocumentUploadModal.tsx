@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { FileCheck2, Loader2, PencilLine, UploadCloud } from 'lucide-react';
 import type { ProviderDocument, ProviderDocumentCategory, ProviderSummary } from '../../types/models';
 
 export interface ProviderDocumentUploadSubmitPayload {
@@ -17,6 +17,8 @@ interface ProviderDocumentUploadModalProps {
   provider: ProviderSummary | null;
   categories: ProviderDocumentCategory[];
   currentDocument?: ProviderDocument | null;
+  /** 'edit' = corregir datos del documento vigente sin cambiar el PDF ni el histórico. */
+  mode?: 'create' | 'replace' | 'edit';
   saving: boolean;
   onClose: () => void;
   onSubmit: (payload: ProviderDocumentUploadSubmitPayload) => Promise<void>;
@@ -27,11 +29,14 @@ export const ProviderDocumentUploadModal = ({
   provider,
   categories,
   currentDocument,
+  mode,
   saving,
   onClose,
   onSubmit,
 }: ProviderDocumentUploadModalProps) => {
-  const isReplace = Boolean(currentDocument);
+  const resolvedMode: 'create' | 'replace' | 'edit' = mode ?? (currentDocument ? 'replace' : 'create');
+  const isEdit = resolvedMode === 'edit';
+  const isReplace = resolvedMode === 'replace';
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -42,12 +47,13 @@ export const ProviderDocumentUploadModal = ({
   const [lastSync, setLastSync] = useState<{
     doc: ProviderDocument | null | undefined;
     open: boolean;
-  }>({ doc: currentDocument, open: isOpen });
+    mode: string;
+  }>({ doc: currentDocument, open: isOpen, mode: resolvedMode });
 
   // Reinicia el formulario al abrir el modal o al cambiar de documento,
   // durante el render (en vez de un efecto que llama setState).
-  if (lastSync.doc !== currentDocument || lastSync.open !== isOpen) {
-    setLastSync({ doc: currentDocument, open: isOpen });
+  if (lastSync.doc !== currentDocument || lastSync.open !== isOpen || lastSync.mode !== resolvedMode) {
+    setLastSync({ doc: currentDocument, open: isOpen, mode: resolvedMode });
     if (isOpen) {
       setCategoryId(currentDocument?.category_id ?? '');
       setTitle(currentDocument?.title ?? '');
@@ -65,6 +71,7 @@ export const ProviderDocumentUploadModal = ({
 
   const selectedCategory = categories.find((item) => item.id === categoryId) ?? null;
   const canSubmit = isReplace || categoryId !== '';
+  const titleText = isEdit ? 'Editar datos del documento' : isReplace ? 'Reemplazar documento' : 'Cargar documento';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
@@ -74,7 +81,7 @@ export const ProviderDocumentUploadModal = ({
             Acuerdos
           </p>
           <h2 className="mt-2 text-xl font-bold text-[var(--color-brand-700)]">
-            {currentDocument ? 'Reemplazar documento' : 'Cargar documento'}
+            {titleText}
           </h2>
           <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
             {provider.name}
@@ -120,12 +127,24 @@ export const ProviderDocumentUploadModal = ({
             </div>
           </div>
 
-          <div>
+          {isEdit ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <FileCheck2 size={18} className="shrink-0" />
+              <div>
+                <p className="font-semibold">El PDF actual se conserva</p>
+                <p className="text-xs text-emerald-700">
+                  Solo se corrigen los datos (título, categoría, descripción y fechas). No se crea una versión nueva ni se altera el histórico. Para
+                  cambiar el archivo usa “Reemplazar”.
+                </p>
+              </div>
+            </div>
+          ) : null}
+          <div className={isEdit ? 'hidden' : ''}>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
               Archivo PDF
             </label>
             <label className="flex min-h-[52px] cursor-pointer items-center justify-between rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-[rgba(239,245,250,0.72)] px-4 py-3 text-sm text-[var(--unilabor-ink)] transition hover:border-[var(--color-brand-300)]">
-              <span className="truncate pr-3">{file ? file.name : 'Selecciona el PDF del documento'}</span>
+              <span className="truncate pr-3">{file ? file.name : 'Selecciona el PDF del documento (máx. 50 MB)'}</span>
               <UploadCloud size={18} className="text-[var(--color-brand-500)]" />
               <input
                 type="file"
@@ -186,9 +205,11 @@ export const ProviderDocumentUploadModal = ({
           </div>
 
           <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.88)] px-4 py-3 text-xs text-[var(--unilabor-neutral)]">
-            {currentDocument
-              ? 'La nueva carga sustituye la versión vigente: el documento actual quedará derogado y visible en el histórico.'
-              : 'Este documento quedará como vigente para esta categoría.'}
+            {isEdit
+              ? 'El cambio queda registrado en la auditoría con los valores anterior y nuevo.'
+              : isReplace
+                ? 'La nueva carga sustituye la versión vigente: el documento actual quedará derogado y visible en el histórico.'
+                : 'Este documento quedará como vigente para esta categoría.'}
           </div>
         </div>
 
@@ -203,7 +224,7 @@ export const ProviderDocumentUploadModal = ({
           </button>
           <button
             type="button"
-            disabled={saving || !canSubmit || !title.trim() || (!isReplace && !file)}
+            disabled={saving || !canSubmit || !title.trim() || (!isReplace && !isEdit && !file)}
             onClick={() =>
               void onSubmit({
                 category_id: isReplace ? (currentDocument?.category_id as number) : (categoryId as number),
@@ -224,8 +245,8 @@ export const ProviderDocumentUploadModal = ({
               </>
             ) : (
               <>
-                <UploadCloud size={16} />
-                {currentDocument ? 'Reemplazar documento' : 'Cargar documento'}
+                {isEdit ? <PencilLine size={16} /> : <UploadCloud size={16} />}
+                {isEdit ? 'Guardar cambios' : isReplace ? 'Reemplazar documento' : 'Cargar documento'}
               </>
             )}
           </button>

@@ -59,7 +59,7 @@ export const processClientDocumentReminders = async (): Promise<number> => {
       FROM public.client_documents d
       INNER JOIN public.clients cl ON cl.id = d.client_id
       LEFT JOIN public.client_document_categories cat ON cat.id = d.category_id
-      WHERE d.status = 'active'
+      WHERE d.status = 'active' AND d.deleted_at IS NULL
         AND d.reminder_sent_at IS NULL
         AND d.expiry_date IS NOT NULL
         AND d.expiry_date <= (CURRENT_DATE + ($1 || ' days')::interval)

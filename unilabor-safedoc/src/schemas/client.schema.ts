@@ -40,6 +40,30 @@ export const replaceClientDocumentSchema = z
   })
   .passthrough();
 
+// --- Documentos: correccion de metadatos (JSON), sin tocar el PDF ---
+const optionalDateOnly = z
+  .union([z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD'), z.literal(''), z.null()])
+  .optional()
+  .transform((value) => (value === undefined ? undefined : value === '' ? null : value));
+
+export const updateClientDocumentSchema = z
+  .object({
+    category_id: z.coerce.number().int().positive('La categoria debe ser un ID valido').optional(),
+    title: z.string().trim().min(2, 'El titulo debe tener al menos 2 caracteres').max(255).optional(),
+    description: z
+      .union([z.string().trim().max(2000, 'La descripcion no puede exceder 2000 caracteres'), z.null()])
+      .optional()
+      .transform((value) => (value === undefined ? undefined : value === '' ? null : value)),
+    document_date: optionalDateOnly,
+    effective_from: optionalDateOnly,
+    expiry_date: optionalDateOnly,
+  })
+  .refine((value) => Object.values(value).some((item) => item !== undefined), {
+    message: 'No hay cambios que guardar.',
+  });
+
+export type UpdateClientDocumentInput = z.infer<typeof updateClientDocumentSchema>;
+
 // --- Destinatarios de alerta de vencimiento ---
 export const clientNotificationRecipientSchema = z
   .object({

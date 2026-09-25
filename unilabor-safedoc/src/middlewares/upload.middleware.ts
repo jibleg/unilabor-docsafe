@@ -17,9 +17,32 @@ const storage = multer.diskStorage({
   },
 });
 
+const MB = 1024 * 1024;
+
+/** Topes de tamano por tipo de carga (MB). Acuerdos armonizado con Calidad el 2026-09-25. */
+export const UPLOAD_LIMITS_MB = {
+  document: 50,
+  providerDocument: 50,
+  clientDocument: 50,
+  avatar: 5,
+  ticketDocument: 10,
+  certificateImage: 3,
+} as const;
+
+/**
+ * Tope aplicable a una URL de carga (para informar el limite exacto cuando
+ * multer rechaza por LIMIT_FILE_SIZE, que no expone el limite configurado).
+ */
+export const resolveUploadLimitMb = (url: string): number => {
+  if (url.includes('/me/avatar')) return UPLOAD_LIMITS_MB.avatar;
+  if (url.includes('/certificate/image')) return UPLOAD_LIMITS_MB.certificateImage;
+  if (/\/tickets\/\d+\/documents/.test(url)) return UPLOAD_LIMITS_MB.ticketDocument;
+  return UPLOAD_LIMITS_MB.document;
+};
+
 export const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_LIMITS_MB.document * MB },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
@@ -41,9 +64,10 @@ const providerDocumentStorage = multer.diskStorage({
   },
 });
 
+// Acuerdos: mismo tope que Calidad/documentos generales (50 MB), armonizado 2026-09-25.
 export const uploadProviderDocument = multer({
   storage: providerDocumentStorage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_LIMITS_MB.providerDocument * MB },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
@@ -67,7 +91,7 @@ const clientDocumentStorage = multer.diskStorage({
 
 export const uploadClientDocument = multer({
   storage: clientDocumentStorage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_LIMITS_MB.clientDocument * MB },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
@@ -100,7 +124,7 @@ const allowedAvatarMimeTypes = new Set([
 
 export const uploadAvatar = multer({
   storage: avatarStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_LIMITS_MB.avatar * MB },
   fileFilter: (_req, file, cb) => {
     if (allowedAvatarMimeTypes.has(file.mimetype)) {
       cb(null, true);
@@ -130,7 +154,7 @@ const allowedTicketDocumentMimeTypes = new Set(['application/pdf', 'image/jpeg',
 
 export const uploadTicketDocument = multer({
   storage: ticketDocumentStorage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_LIMITS_MB.ticketDocument * MB },
   fileFilter: (_req, file, cb) => {
     if (allowedTicketDocumentMimeTypes.has(file.mimetype)) {
       cb(null, true);
@@ -156,7 +180,7 @@ const certificateImageStorage = multer.diskStorage({
 
 export const uploadCertificateImage = multer({
   storage: certificateImageStorage,
-  limits: { fileSize: 3 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_LIMITS_MB.certificateImage * MB },
   fileFilter: (_req, file, cb) => {
     if (allowedAvatarMimeTypes.has(file.mimetype)) {
       cb(null, true);

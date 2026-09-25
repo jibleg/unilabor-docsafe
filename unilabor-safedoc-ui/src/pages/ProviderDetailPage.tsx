@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Clock3,
+  PencilLine,
   Eye,
   FileWarning,
   Plus,
@@ -16,11 +17,13 @@ import { getApiErrorMessage } from '../api/service';
 import {
   deactivateProviderDocument,
   deleteProviderDocument,
+  restoreProviderDocument,
   getProviderDocument,
   getProviderDocumentBlobUrl,
   listProviderDocumentCategories,
   listProviderDocuments,
   replaceProviderDocument,
+  updateProviderDocument,
   uploadProviderDocument,
 } from '../api/service.api-providers';
 import type { ProviderDocument, ProviderDocumentCategory, ProviderSummary } from '../types/models';
@@ -88,7 +91,8 @@ export const ProviderDetailPage = () => {
   const [uploadState, setUploadState] = useState<{
     open: boolean;
     currentDocument: ProviderDocument | null;
-  }>({ open: false, currentDocument: null });
+    mode: 'create' | 'replace' | 'edit';
+  }>({ open: false, currentDocument: null, mode: 'create' });
   const [saving, setSaving] = useState(false);
 
   const [historyState, setHistoryState] = useState<{
@@ -131,19 +135,40 @@ export const ProviderDetailPage = () => {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [documents, categoryFilter, statusFilter]);
 
-  const openUpload = (currentDocument: ProviderDocument | null) => {
-    setUploadState({ open: true, currentDocument });
+  const openUpload = (currentDocument: ProviderDocument | null, mode: 'create' | 'replace' | 'edit' = currentDocument ? 'replace' : 'create') => {
+    setUploadState({ open: true, currentDocument, mode });
   };
 
   const closeUpload = () => {
     if (saving) {
       return;
     }
-    setUploadState({ open: false, currentDocument: null });
+    setUploadState({ open: false, currentDocument: null, mode: 'create' });
   };
 
   const handleUploadSubmit = async (payload: ProviderDocumentUploadSubmitPayload) => {
-    const { currentDocument } = uploadState;
+    const { currentDocument, mode } = uploadState;
+    if (mode === 'edit' && currentDocument) {
+      setSaving(true);
+      try {
+        await updateProviderDocument(currentDocument.id, {
+          category_id: payload.category_id,
+          title: payload.title,
+          description: payload.description || null,
+          document_date: payload.document_date || null,
+          effective_from: payload.effective_from || null,
+          expiry_date: payload.expiry_date || null,
+        });
+        notifySuccess('Datos del documento actualizados. El PDF y el histórico se conservan.');
+        setUploadState({ open: false, currentDocument: null, mode: 'create' });
+        await loadData();
+      } catch (error) {
+        notifyError(getApiErrorMessage(error, 'No se pudieron actualizar los datos del documento.'));
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     if (!payload.file && !currentDocument) {
       notifyError('Debes seleccionar un archivo PDF.');
       return;
@@ -178,12 +203,32 @@ export const ProviderDetailPage = () => {
         });
         notifySuccess('Documento cargado correctamente.');
       }
-      setUploadState({ open: false, currentDocument: null });
+      setUploadState({ open: false, currentDocument: null, mode: 'create' });
       await loadData();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo guardar el documento.'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRestore = async (document: ProviderDocument) => {
+    const confirmed = await confirmAction(
+      `Restaurar: ${document.title}`,
+      'El documento volverá a mostrarse en la ficha con su estado original.',
+      'Restaurar',
+      'primary',
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await restoreProviderDocument(document.id);
+      notifySuccess('Documento restaurado en la ficha.');
+      closeHistory();
+      await loadData();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo restaurar el documento.'));
     }
   };
 
@@ -233,9 +278,12 @@ export const ProviderDetailPage = () => {
   };
 
   const handleDelete = async (document: ProviderDocument) => {
+    const hasHistory = Boolean(document.replaces_document_id || document.replaced_by_document_id);
     const confirmed = await confirmAction(
       `Eliminar: ${document.title}`,
-      'Esta acción borra el documento y su archivo de forma definitiva. No se puede deshacer.',
+      hasHistory
+        ? 'Este documento forma parte de una cadena de versiones: se ocultará de la ficha, pero su PDF y su histórico se conservan y podrás restaurarlo desde la trazabilidad.'
+        : 'Esta acción borra el documento y su archivo de forma definitiva. No se puede deshacer.',
       'Eliminar',
       'danger',
     );
@@ -244,8 +292,8 @@ export const ProviderDetailPage = () => {
     }
 
     try {
-      await deleteProviderDocument(document.id);
-      notifySuccess('Documento eliminado definitivamente.');
+      const result = await deleteProviderDocument(document.id);
+      notifySuccess(result.message);
       await loadData();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo eliminar el documento.'));
@@ -407,7 +455,16 @@ export const ProviderDetailPage = () => {
                       <>
                         <button
                           type="button"
-                          onClick={() => openUpload(document)}
+                          onClick={() => openUpload(document, 'edit')}
+                          title="Corregir título, categoría, descripción o fechas sin cambiar el PDF"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                        >
+                          <PencilLine size={14} />
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openUpload(document, 'replace')}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
                         >
                           <UploadCloud size={14} />
@@ -446,6 +503,7 @@ export const ProviderDetailPage = () => {
         provider={provider}
         categories={categories}
         currentDocument={uploadState.currentDocument}
+        mode={uploadState.mode}
         saving={saving}
         onClose={closeUpload}
         onSubmit={handleUploadSubmit}
@@ -458,6 +516,7 @@ export const ProviderDetailPage = () => {
         loading={historyState.loading}
         onClose={closeHistory}
         onView={(document) => void handleView(document)}
+        onRestore={canWrite ? (document) => void handleRestore(document) : undefined}
       />
 
       {selectedPdfUrl && (

@@ -1,4 +1,4 @@
-import { Clock3, Eye, X } from 'lucide-react';
+import { Clock3, Eye, RotateCcw, X } from 'lucide-react';
 import type { ProviderDocument, ProviderDocumentCategory } from '../../types/models';
 
 interface ProviderDocumentHistoryModalProps {
@@ -8,6 +8,8 @@ interface ProviderDocumentHistoryModalProps {
   loading?: boolean;
   onClose: () => void;
   onView: (document: ProviderDocument) => void;
+  /** Restaurar un documento eliminado lógicamente (solo con permiso de escritura). */
+  onRestore?: (document: ProviderDocument) => void;
 }
 
 const formatDisplayDate = (value?: string | null): string => {
@@ -42,6 +44,7 @@ export const ProviderDocumentHistoryModal = ({
   loading = false,
   onClose,
   onView,
+  onRestore,
 }: ProviderDocumentHistoryModalProps) => {
   if (!isOpen || !category) {
     return null;
@@ -86,7 +89,17 @@ export const ProviderDocumentHistoryModal = ({
                       >
                         {STATUS_LABEL[document.status] ?? document.status}
                       </span>
+                      {document.deleted_at ? (
+                        <span className="rounded-full border border-rose-300 bg-rose-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-rose-800">
+                          Eliminado
+                        </span>
+                      ) : null}
                     </div>
+                    {document.deleted_at ? (
+                      <p className="mt-1 text-xs text-rose-700">
+                        Eliminado de la ficha por {document.deleted_by_name || 'Sistema'} el {formatDisplayDate(document.deleted_at)}. El PDF y la cadena de versiones se conservan.
+                      </p>
+                    ) : null}
                     <p className="mt-2 text-xs text-[var(--unilabor-neutral)]">
                       Documento: {formatDisplayDate(document.document_date)} | Vigencia desde:{' '}
                       {formatDisplayDate(document.effective_from)} | Vence: {formatDisplayDate(document.expiry_date)}
@@ -105,6 +118,16 @@ export const ProviderDocumentHistoryModal = ({
                       <Eye size={14} />
                       Ver documento
                     </button>
+                    {document.deleted_at && onRestore ? (
+                      <button
+                        type="button"
+                        onClick={() => onRestore(document)}
+                        className="mt-3 ml-2 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                      >
+                        <RotateCcw size={14} />
+                        Restaurar
+                      </button>
+                    ) : null}
                   </div>
 
                   <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.82)] px-4 py-3 text-xs text-[var(--unilabor-neutral)]">

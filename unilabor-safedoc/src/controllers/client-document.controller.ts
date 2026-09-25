@@ -12,7 +12,10 @@ import {
   replaceClientDocumentWithNewVersion,
   resolveStoredClientDocumentPath,
   createClientDocument,
+  updateClientDocumentMetadata,
+  restoreClientDocument,
 } from '../services/client-document.service';
+import type { UpdateClientDocumentInput } from '../schemas/client.schema';
 import {
   getNumberId,
   getOptionalDate,
@@ -251,15 +254,28 @@ export const deleteClientDocumentController = async (req: AuthRequest, res: Resp
   }
 
   try {
-    const removed = await deleteClientDocument(documentId);
+    const removed = await deleteClientDocument(documentId, user?.id ?? null);
     if (!removed) {
       return res.status(404).json({ message: 'Documento no encontrado.' });
+    }
+
+    if (removed.kind === 'logical') {
+      await logClientAudit(user?.id, `CLIENT_DOCUMENT_HIDE:${documentId}`, req.ip, documentId, 'client_document', {
+        status: removed.document.status,
+        replaces_document_id: removed.document.replaces_document_id,
+        replaced_by_document_id: removed.document.replaced_by_document_id,
+      });
+      return res.json({
+        message: 'Documento eliminado de la ficha. Su PDF y su historico de versiones se conservan; puedes restaurarlo desde la trazabilidad.',
+        kind: 'logical',
+        document: removed.document,
+      });
     }
 
     await removeUploadedFileIfExists(removed.file_path);
     await logClientAudit(user?.id, 'CLIENT_DOCUMENT_DELETE', req.ip, documentId);
 
-    return res.json({ message: 'Documento eliminado definitivamente.' });
+    return res.json({ message: 'Documento eliminado definitivamente.', kind: 'physical' });
   } catch (error: any) {
     const mappedError = mapClientDocumentError(res, error);
     if (mappedError) {
@@ -313,5 +329,65 @@ export const viewClientDocumentController = async (req: AuthRequest, res: Respon
 
     console.error('Error visualizando documento de cliente:', error);
     res.status(500).json({ message: 'Error interno al visualizar el documento.' });
+  }
+};
+
+/**
+ * PATCH /clients/documents/:id — corrige metadatos del documento vigente (titulo,
+ * categoria, descripcion, fechas). El PDF y el historico de versiones no se
+ * tocan; el cambio queda en la auditoria con los valores anterior y nuevo.
+ */
+export const updateClientDocumentController = async (req: AuthRequest, res: Response) => {
+  const user = req.user;
+  const documentId = getNumberId(req.params.id);
+  if (!documentId) {
+    return res.status(400).json({ message: 'ID de documento invalido.' });
+  }
+  const input = req.body as UpdateClientDocumentInput;
+  try {
+    const { previousDocument, document } = await updateClientDocumentMetadata(documentId, input);
+    const fields = ['category_id', 'title', 'description', 'document_date', 'effective_from', 'expiry_date'] as const;
+    const changes: Record<string, { before: unknown; after: unknown }> = {};
+    for (const field of fields) {
+      if (previousDocument[field] !== document[field]) {
+        changes[field] = { before: previousDocument[field], after: document[field] };
+      }
+    }
+    await logClientAudit(user?.id, `CLIENT_DOCUMENT_UPDATE:${documentId}`, req.ip, documentId, 'client_document', { changes });
+    return res.json({
+      message: Object.keys(changes).length > 0 ? 'Datos del documento actualizados. El PDF y el historico se conservan.' : 'Sin cambios.',
+      document,
+      changes,
+    });
+  } catch (error: any) {
+    const mappedError = mapClientDocumentError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+    console.error('Error actualizando datos del documento de client:', error);
+    return res.status(500).json({ message: 'No se pudieron actualizar los datos del documento.' });
+  }
+};
+
+/** POST /clients/documents/:id/restore — deshace el borrado logico. */
+export const restoreClientDocumentController = async (req: AuthRequest, res: Response) => {
+  const user = req.user;
+  const documentId = getNumberId(req.params.id);
+  if (!documentId) {
+    return res.status(400).json({ message: 'ID de documento invalido.' });
+  }
+  try {
+    const document = await restoreClientDocument(documentId);
+    if (!document) {
+      return res.status(404).json({ message: 'Documento no encontrado.' });
+    }
+    await logClientAudit(user?.id, `CLIENT_DOCUMENT_RESTORE:${documentId}`, req.ip, documentId);
+    return res.json({ message: 'Documento restaurado en la ficha.', document });
+  } catch (error: any) {
+    if (error?.code === 'CLIENT_DOCUMENT_NOT_DELETED') {
+      return res.status(409).json({ message: 'El documento no esta eliminado.' });
+    }
+    console.error('Error restaurando documento de client:', error);
+    return res.status(500).json({ message: 'No se pudo restaurar el documento.' });
   }
 };

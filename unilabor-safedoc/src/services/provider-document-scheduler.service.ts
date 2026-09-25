@@ -59,7 +59,7 @@ export const processProviderDocumentReminders = async (): Promise<number> => {
       FROM public.provider_documents d
       INNER JOIN public.helpdesk_suppliers s ON s.id = d.provider_id
       LEFT JOIN public.provider_document_categories c ON c.id = d.category_id
-      WHERE d.status = 'active'
+      WHERE d.status = 'active' AND d.deleted_at IS NULL
         AND d.reminder_sent_at IS NULL
         AND d.expiry_date IS NOT NULL
         AND d.expiry_date <= (CURRENT_DATE + ($1 || ' days')::interval)

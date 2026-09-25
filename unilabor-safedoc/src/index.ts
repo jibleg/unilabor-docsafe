@@ -31,6 +31,7 @@ import { startQualityReadingScheduler } from './services/quality-reading-schedul
 import { startInductionScheduler } from './services/rh-induction-scheduler.service';
 import { startProviderDocumentReminderScheduler } from './services/provider-document-scheduler.service';
 import { startClientDocumentReminderScheduler } from './services/client-document-scheduler.service';
+import { resolveUploadLimitMb } from './middlewares/upload.middleware';
 
 dotenv.config();
 
@@ -81,7 +82,7 @@ app.use('/api/providers/classifications', classificationRoutes);
 app.use('/api/providers/clients', clientRoutes);
 
 // Global error handler
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (err?.type === 'entity.parse.failed' || err instanceof SyntaxError) {
     return res.status(400).json({
       message: 'JSON invalido en el body de la solicitud',
@@ -90,7 +91,8 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
   if (err?.name === 'MulterError') {
     if (err?.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ message: 'El archivo excede el tamano maximo permitido' });
+      const limitMb = resolveUploadLimitMb(String(req.originalUrl ?? req.url ?? ''));
+      return res.status(400).json({ message: `El archivo excede el tamano maximo permitido (${limitMb} MB).` });
     }
 
     return res.status(400).json({ message: err?.message || 'Error al procesar archivo' });
