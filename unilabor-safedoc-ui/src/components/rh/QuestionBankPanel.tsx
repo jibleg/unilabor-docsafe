@@ -57,6 +57,14 @@ const inputClass =
   'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]';
 const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]';
 
+/** Tope del backend por tipo de pregunta en cada generacion (rh-question-bank.schema). */
+const MAX_PER_TYPE = 15;
+const clampCount = (raw: string): number => {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(MAX_PER_TYPE, Math.max(0, Math.floor(value)));
+};
+
 const DEFAULT_COUNTS: QuestionBankCounts = { boolean: 5, multiple: 5, single: 3, open: 2 };
 // Competencia: solo tipos autocalificables (el colaborador contesta en el sistema).
 const DEFAULT_COUNTS_COMPETENCY: QuestionBankCounts = { boolean: 5, multiple: 5, single: 5, open: 0 };
@@ -314,6 +322,7 @@ export const QuestionBankPanel = ({
                       </div>
                     </div>
 
+                    <p className="mb-2 text-[11px] text-[var(--unilabor-neutral)]">Máximo {MAX_PER_TYPE} preguntas por tipo en cada generación; puedes generar varias veces.</p>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <div>
                         <label className={labelClass}>V/F</label>
@@ -322,7 +331,7 @@ export const QuestionBankPanel = ({
                           min={0}
                           max={15}
                           value={counts.boolean}
-                          onChange={(event) => setCounts((c) => ({ ...c, boolean: Number(event.target.value) }))}
+                          onChange={(event) => setCounts((c) => ({ ...c, boolean: clampCount(event.target.value) }))}
                           className={inputClass}
                         />
                       </div>
@@ -333,7 +342,7 @@ export const QuestionBankPanel = ({
                           min={0}
                           max={15}
                           value={counts.multiple}
-                          onChange={(event) => setCounts((c) => ({ ...c, multiple: Number(event.target.value) }))}
+                          onChange={(event) => setCounts((c) => ({ ...c, multiple: clampCount(event.target.value) }))}
                           className={inputClass}
                         />
                       </div>
@@ -344,7 +353,7 @@ export const QuestionBankPanel = ({
                           min={0}
                           max={15}
                           value={counts.single}
-                          onChange={(event) => setCounts((c) => ({ ...c, single: Number(event.target.value) }))}
+                          onChange={(event) => setCounts((c) => ({ ...c, single: clampCount(event.target.value) }))}
                           className={inputClass}
                         />
                       </div>
@@ -356,7 +365,7 @@ export const QuestionBankPanel = ({
                             min={0}
                             max={15}
                             value={counts.open}
-                            onChange={(event) => setCounts((c) => ({ ...c, open: Number(event.target.value) }))}
+                            onChange={(event) => setCounts((c) => ({ ...c, open: clampCount(event.target.value) }))}
                             className={inputClass}
                           />
                         </div>

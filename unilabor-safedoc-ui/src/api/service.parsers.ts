@@ -579,6 +579,18 @@ export const getApiErrorMessage = (
     const payload = asRecord(responseData);
     if (payload) {
       const message = getString(payload, ['message', 'error', 'detail', 'title']);
+      // Validacion Zod del backend: { message, errors: [{ field, message }] } -> se muestra el detalle.
+      const details = Array.isArray(payload.errors)
+        ? (payload.errors as unknown[])
+            .map((item) => {
+              const record = asRecord(item);
+              return record ? getString(record, ['message']) : '';
+            })
+            .filter((text) => text.length > 0)
+        : [];
+      if (message && details.length > 0) {
+        return `${message}: ${details.join(' · ')}`;
+      }
       if (message) {
         return message;
       }

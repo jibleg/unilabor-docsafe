@@ -6,7 +6,13 @@ import { z } from 'zod';
  * del modelo (esa vive junto a la llamada, no aqui: no es input de endpoint).
  */
 
-const questionCount = z.coerce.number().int().min(0).max(15);
+export const QUESTION_BANK_MAX_PER_TYPE = 15;
+
+const questionCount = z.coerce
+  .number({ message: 'La cantidad debe ser un numero' })
+  .int('La cantidad debe ser un numero entero')
+  .min(0, 'La cantidad no puede ser negativa')
+  .max(QUESTION_BANK_MAX_PER_TYPE, `Maximo ${QUESTION_BANK_MAX_PER_TYPE} preguntas por tipo en cada generacion`);
 
 export const generateQuestionBankSchema = z.object({
   document_ids: z.array(z.string().uuid('ID de documento invalido')).min(1, 'Selecciona al menos un documento'),
