@@ -1420,6 +1420,10 @@ export interface RhInductionPhase {
   published_at: string | null;
   /** Interruptor "Completar checklist al aprobar": al acreditar la evaluación se marcan todos los contenidos. */
   auto_complete_checklist_on_pass: boolean;
+  /** Interruptor "Avanzar automáticamente al aprobar": al acreditar esta fase se inscribe en la siguiente (1-3). */
+  auto_advance_on_pass: boolean;
+  /** Periodo de descanso (horas) antes de iniciar esta fase al avanzar desde la anterior; null = sin descanso. */
+  advance_grace_hours: number | null;
   documents: RhInductionPhaseDocument[];
 }
 
@@ -1452,6 +1456,256 @@ export interface RhInductionProgressItem {
   checklist_completed: number;
   /** false = la fase sigue en borrador (RH aún no la publica). */
   phase_published?: boolean;
+  /** Descanso entre fases: cuándo se activan tus lecturas (null si ya arrancó o no aplica). */
+  readings_start_at?: string | null;
+}
+
+// --- Tablero de Inducción (Fases 1-4) ---------------------------------------
+
+export type InductionStage =
+  | 'EN_ESPERA_PUBLICACION'
+  | 'EN_DESCANSO'
+  | 'SIN_LECTURAS'
+  | 'SIN_INICIAR'
+  | 'LEYENDO'
+  | 'LECTURA_VENCIDA'
+  | 'LECTURA_COMPLETA'
+  | 'EVALUACION_DISPONIBLE'
+  | 'EVALUACION_EN_CURSO'
+  | 'EVALUACION_TRUNCADA'
+  | 'EN_CALIFICACION'
+  | 'EVALUACION_VENCIDA'
+  | 'NO_ACREDITADA'
+  | 'APROBADA';
+
+export type InductionAlert =
+  | 'LECTURA_VENCIDA'
+  | 'LECTURA_POR_VENCER'
+  | 'EVALUACION_TRUNCADA'
+  | 'EVALUACION_VENCIDA'
+  | 'EVALUACION_POR_VENCER'
+  | 'NO_ACREDITADA'
+  | 'EN_CALIFICACION'
+  | 'SIN_CUESTIONARIO'
+  | 'AVANCE_PENDIENTE'
+  | 'SIN_CONSTANCIA'
+  | 'DATOS_CONSTANCIA';
+
+export type InductionAction =
+  | 'REOPEN_READING'
+  | 'EXTEND_READING'
+  | 'RESEND_NOTICE'
+  | 'RESET_ATTEMPT'
+  | 'AUTHORIZE_RETRY'
+  | 'GRADE'
+  | 'ADVANCE'
+  | 'ISSUE_CERTIFICATE'
+  | 'COMPLETE_DATA'
+  | 'START_NOW'
+  | 'UNENROLL';
+
+export type InductionEnrollmentOrigin = 'MANUAL' | 'BULK' | 'AUTO_ADVANCE' | 'RECONCILE' | 'ADVANCE';
+
+/** Fila del roster del tablero: superconjunto de RhInductionPhaseEnrollmentSummary. */
+export interface InductionRosterRow extends RhInductionPhaseEnrollmentSummary {
+  phase_id: number;
+  phase_number: number;
+  employee_email: string | null;
+  area: string | null;
+  branch_name: string | null;
+  position_name: string | null;
+  origin: InductionEnrollmentOrigin | string;
+  enrolled_at: string;
+  phase_published: boolean;
+  /** Descanso entre fases: cuándo se activan las lecturas (null si ya arrancó o no aplica). */
+  readings_start_at: string | null;
+  reading_pages_total: number;
+  reading_pages_seen: number;
+  reading_active_seconds: number;
+  reading_started_at: string | null;
+  evaluation_assignment_id: number | null;
+  evaluation_available_at: string | null;
+  evaluation_deadline_at: string | null;
+  evaluation_started_at: string | null;
+  evaluation_submitted_at: string | null;
+  evaluation_question_count: number;
+  evaluation_response_count: number;
+  attempt_time_limit_minutes: number | null;
+  attempts_total: number;
+  certificate_document_id: number | null;
+  next_phase_id: number | null;
+  next_phase_enrolled: boolean;
+  next_phase_published: boolean | null;
+  quiz_published: boolean;
+  stage: InductionStage;
+  alerts: InductionAlert[];
+  actions: InductionAction[];
+  elapsed_hours: number;
+}
+
+export interface InductionRosterPage {
+  rows: InductionRosterRow[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  stage_counts: Record<InductionStage, number>;
+}
+
+export interface InductionPhaseRules {
+  reading_time_limit_hours: number | null;
+  duration_hours: number | null;
+  auto_complete_checklist_on_pass: boolean;
+  auto_advance_on_pass: boolean;
+  advance_grace_hours: number | null;
+  responsible_label: string;
+  responsible_name: string | null;
+  responsible_phone: string | null;
+  quiz_template_id: number | null;
+  quiz_title: string | null;
+  quiz_published: boolean;
+  evaluation_window_hours: number | null;
+  attempt_time_limit_minutes: number | null;
+  passing_score: number | null;
+  selection_mode: string | null;
+  random_count: number | null;
+  question_bank_size: number;
+  certificate_signatures: number;
+}
+
+export interface InductionPhaseReadiness {
+  documents_ok: boolean;
+  quiz_ok: boolean;
+  duration_ok: boolean;
+  signatures_ok: boolean;
+  published: boolean;
+  ready: boolean;
+}
+
+export interface InductionPhaseOverview {
+  phase_id: number;
+  phase_number: number;
+  name: string;
+  published_at: string | null;
+  documents_total: number;
+  checklist_items_total: number;
+  rules: InductionPhaseRules;
+  readiness: InductionPhaseReadiness;
+  enrolled: number;
+  stage_counts: Record<InductionStage, number>;
+  alert_counts: Record<InductionAlert, number>;
+  pass_rate: number | null;
+  average_percentage: number | null;
+  average_hours_to_pass: number | null;
+  reading_progress_pct: number;
+  pending_advance: number;
+  origin_counts: Record<string, number>;
+}
+
+export interface InductionProgramOverview {
+  generated_at: string;
+  employees_active: number;
+  employees_in_program: number;
+  employees_completed_1_4: number;
+  employees_by_current_phase: Record<string, number>;
+  totals: {
+    enrollments: number;
+    passed: number;
+    in_reading: number;
+    in_evaluation: number;
+    needs_attention: number;
+  };
+  phases: InductionPhaseOverview[];
+}
+
+export type InductionTrackAccess = 'ENROLLED' | 'AVAILABLE' | 'LOCKED';
+
+export interface InductionTrackPhase {
+  phase_id: number;
+  phase_number: number;
+  phase_name: string;
+  published: boolean;
+  auto_advance_on_pass: boolean;
+  reading_time_limit_hours: number | null;
+  advance_grace_hours: number | null;
+  evaluation_window_hours: number | null;
+  attempt_time_limit_minutes: number | null;
+  passing_score: number | null;
+  documents_total: number;
+  access: InductionTrackAccess;
+  enrollment_id: number | null;
+  readings_start_at: string | null;
+  passed: boolean;
+  passed_at: string | null;
+}
+
+export interface InductionReadingDocumentDetail {
+  enrollment_id: number;
+  document_id: string;
+  document_code: string | null;
+  title: string;
+  acknowledgement_id: number | null;
+  status: string | null;
+  pages_total: number;
+  pages_seen: number;
+  active_seconds: number;
+  current_page: number | null;
+  started_at: string | null;
+  read_completed_at: string | null;
+  signed_at: string | null;
+  deadline_at: string | null;
+  last_progress_at: string | null;
+}
+
+export interface InductionAttemptDetail {
+  assignment_id: number;
+  phase_number: number;
+  template_id: number;
+  template_title: string;
+  is_current: boolean;
+  status: string;
+  attempt_no: number;
+  available_at: string | null;
+  deadline_at: string | null;
+  started_at: string | null;
+  submitted_at: string | null;
+  graded_at: string | null;
+  score: number | null;
+  max_score: number | null;
+  percentage: number | null;
+  question_count: number;
+  response_count: number;
+  certificate_document_id: number | null;
+}
+
+export interface InductionAuditEntry {
+  id: number;
+  action: string;
+  occurred_at: string;
+  actor_name: string | null;
+  entity_type: string | null;
+  entity_id: number | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface InductionEmployee360 {
+  employee: {
+    id: number;
+    full_name: string;
+    employee_code: string;
+    email: string | null;
+    phone: string | null;
+    area: string | null;
+    branch_name: string | null;
+    position_name: string | null;
+    is_active: boolean;
+    user_linked: boolean;
+  };
+  track: InductionTrackPhase[];
+  enrollments: InductionRosterRow[];
+  documents: InductionReadingDocumentDetail[];
+  attempts: InductionAttemptDetail[];
+  audit: InductionAuditEntry[];
 }
 
 export interface RhInductionPhaseEnrollmentSummary {

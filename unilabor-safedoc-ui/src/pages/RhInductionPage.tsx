@@ -519,7 +519,15 @@ export const RhInductionPage = () => {
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-brand-500)]">
           Inducción por puesto
         </p>
-        <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Fases de inducción</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-bold text-[var(--color-brand-700)]">Fases de inducción</h1>
+          <a
+            href="/rh/induction/dashboard"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+          >
+            Abrir Tablero de inducción (Fases 1-4)
+          </a>
+        </div>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--unilabor-neutral)]">
           Fases 1-4 (institucionales, iguales para todo colaborador). Cada fase reutiliza el motor de
           Evaluaciones y Sala de Lectura ya existentes: configura aquí los documentos obligatorios y

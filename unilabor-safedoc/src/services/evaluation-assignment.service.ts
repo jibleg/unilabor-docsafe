@@ -365,6 +365,22 @@ export const authorizeLateAttempt = async (
   if (String(result.rows[0].status) !== 'expired') {
     throwAssignmentCoded('EVAL_NOT_EXPIRED');
   }
+  // Candado: si RH ya autorizo un intento posterior (Induccion: "Autorizar nuevo
+  // intento" / "Reabrir intento") o ese intento ya se presento, la vencida quedo
+  // superada y reabrirla crearia dos intentos vivos (caso prod 197/218).
+  const superseded = await pool.query(
+    `SELECT 1 FROM public.evaluation_assignments later
+      WHERE later.template_id = (SELECT template_id FROM public.evaluation_assignments WHERE id = $1)
+        AND later.employee_id = (SELECT employee_id FROM public.evaluation_assignments WHERE id = $1)
+        AND later.id <> $1
+        AND later.created_at > (SELECT created_at FROM public.evaluation_assignments WHERE id = $1)
+        AND later.status IN ('pending', 'in_progress', 'submitted', 'grading', 'authorized_late', 'passed')
+      LIMIT 1;`,
+    [assignmentId],
+  );
+  if (superseded.rows.length > 0) {
+    throwAssignmentCoded('EVAL_LATE_SUPERSEDED');
+  }
   const windowHours =
     Number.isFinite(reopenHours) && (reopenHours as number) > 0
       ? Math.floor(reopenHours as number)
@@ -389,7 +405,15 @@ export const listExpiredAssignments = async (
   await assertTable();
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
-  const whereClause = `WHERE a.status = 'expired'`;
+  // Solo vencidas que siguen siendo el ultimo intento del colaborador (las superadas
+  // por un nuevo intento autorizado no se reabren desde aqui).
+  const whereClause = `WHERE a.status = 'expired'
+      AND NOT EXISTS (
+        SELECT 1 FROM public.evaluation_assignments later
+         WHERE later.template_id = a.template_id AND later.employee_id = a.employee_id
+           AND later.id <> a.id AND later.created_at > a.created_at
+           AND later.status IN ('pending', 'in_progress', 'submitted', 'grading', 'authorized_late', 'passed')
+      )`;
   const limitSql = paginate ? 'LIMIT $1 OFFSET $2' : '';
   const dataResult = await pool.query(
     `${ASSIGNMENT_BASE_QUERY} ${whereClause}
@@ -401,7 +425,7 @@ export const listExpiredAssignments = async (
     return buildPaginatedResult(data, data.length, 1, data.length || 1);
   }
   const countResult = await pool.query(
-    `SELECT COUNT(*)::int AS total FROM public.evaluation_assignments a WHERE a.status = 'expired';`,
+    `SELECT COUNT(*)::int AS total FROM public.evaluation_assignments a ${whereClause};`,
   );
   return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };

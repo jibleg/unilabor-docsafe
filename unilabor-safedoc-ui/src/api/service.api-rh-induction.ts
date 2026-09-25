@@ -1,6 +1,7 @@
 import api from './axios';
 import { unwrapPayload, asRecord } from './service.shared';
 import type {
+  InductionTrackPhase,
   RhInductionChecklistItem,
   RhInductionChecklistProgressItem,
   RhInductionClosure,
@@ -322,4 +323,19 @@ export const getMyInductionProgress = async (): Promise<RhInductionProgressItem[
   const response = await api.get('/rh/me/induction');
   const payload = asRecord(unwrapPayload(response.data));
   return (payload?.progress as RhInductionProgressItem[]) ?? [];
+};
+
+export interface MyInductionOverview {
+  progress: RhInductionProgressItem[];
+  /** Ruta institucional (Fases 1-4) incluyendo las fases aún no inscritas. */
+  track: InductionTrackPhase[];
+}
+
+export const getMyInductionOverview = async (): Promise<MyInductionOverview> => {
+  const response = await api.get('/rh/me/induction');
+  const payload = asRecord(unwrapPayload(response.data));
+  return {
+    progress: (payload?.progress as RhInductionProgressItem[]) ?? [],
+    track: (payload?.track as InductionTrackPhase[]) ?? [],
+  };
 };

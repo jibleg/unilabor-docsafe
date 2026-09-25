@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import pool from '../config/db';
+import { activateDeferredEnrollments } from './rh-induction-grace.service';
 import { sweepExpiredInductionReadings } from './rh-induction.service';
 
 /**
@@ -20,6 +21,11 @@ export const runInductionReadingSweep = async (): Promise<void> => {
   try {
     if (!(await tablesExist())) {
       return;
+    }
+    // Descanso entre fases: activa lecturas/plazo/SMS de quien ya termino su descanso.
+    const activated = await activateDeferredEnrollments();
+    if (activated > 0) {
+      console.log(`Induccion: ${activated} inscripcion(es) terminaron su descanso y recibieron sus lecturas.`);
     }
     const opened = await sweepExpiredInductionReadings();
     if (opened > 0) {

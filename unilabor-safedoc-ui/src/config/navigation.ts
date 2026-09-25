@@ -100,6 +100,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: FileText, label: 'Documentos institucionales', path: '/rh/institutional-documents', permission: 'RH.ACKNOWLEDGEMENTS.MANAGE' },
         { icon: Signature, label: 'Seguimiento de acuses', path: '/rh/acknowledgements', permission: 'RH.ACKNOWLEDGEMENTS.MANAGE' },
         { icon: Briefcase, label: 'Puestos (inducción)', path: '/rh/positions', permission: 'RH.INDUCTION.MANAGE' },
+        { icon: LayoutDashboard, label: 'Tablero de inducción', path: '/rh/induction/dashboard', permission: 'RH.INDUCTION.MANAGE' },
         { icon: GraduationCap, label: 'Fases de inducción', path: '/rh/induction', permission: 'RH.INDUCTION.MANAGE' },
         { icon: ClipboardCheck, label: 'Evaluación de competencia', path: '/rh/competency-evaluations', permission: 'RH.COMPETENCY.MANAGE' },
       ],

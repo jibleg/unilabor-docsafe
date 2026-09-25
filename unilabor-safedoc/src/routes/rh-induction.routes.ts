@@ -46,6 +46,27 @@ import { reopenInductionReadingSchema } from '../schemas/rh-induction-reopen-rea
 import { updatePhaseAutoChecklistSchema } from '../schemas/rh-induction-phase.schema';
 import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
 import { closeInductionRecordSchema } from '../schemas/rh-induction-closure.schema';
+import {
+  advanceEnrollmentController,
+  getInductionDashboardOverviewController,
+  getInductionEmployee360Controller,
+  getInductionEnrollmentRowController,
+  getInductionPhaseRosterController,
+  issueEnrollmentCertificateController,
+  reconcilePhaseAdvanceController,
+  resendReadingNoticeController,
+  resetTruncatedAttemptController,
+  startDeferredEnrollmentController,
+  updatePhaseAdvanceGraceController,
+  updatePhaseAutoAdvanceController,
+  updatePhaseEvaluationRulesController,
+} from '../controllers/rh-induction-dashboard.controller';
+import {
+  resetTruncatedAttemptSchema,
+  updatePhaseAdvanceGraceSchema,
+  updatePhaseAutoAdvanceSchema,
+  updatePhaseEvaluationRulesSchema,
+} from '../schemas/rh-induction-dashboard.schema';
 
 const router = Router();
 
@@ -95,6 +116,41 @@ router.post(
   validate(reopenInductionReadingSchema),
   reopenInductionReadingController,
 );
+
+// Tablero de gestion integral (Fases 1-4): panorama, roster por fase, vista 360 y acciones.
+router.get('/induction/dashboard/overview', requirePermission('RH.INDUCTION.MANAGE'), getInductionDashboardOverviewController);
+router.get('/induction/dashboard/phases/:phaseId/roster', requirePermission('RH.INDUCTION.MANAGE'), getInductionPhaseRosterController);
+router.get('/induction/dashboard/employees/:employeeId', requirePermission('RH.INDUCTION.MANAGE'), getInductionEmployee360Controller);
+router.get('/induction/dashboard/enrollments/:enrollmentId', requirePermission('RH.INDUCTION.MANAGE'), getInductionEnrollmentRowController);
+router.patch(
+  '/induction/phases/:phaseId/auto-advance',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(updatePhaseAutoAdvanceSchema),
+  updatePhaseAutoAdvanceController,
+);
+router.patch(
+  '/induction/phases/:phaseId/evaluation-rules',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(updatePhaseEvaluationRulesSchema),
+  updatePhaseEvaluationRulesController,
+);
+router.patch(
+  '/induction/phases/:phaseId/advance-grace',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(updatePhaseAdvanceGraceSchema),
+  updatePhaseAdvanceGraceController,
+);
+router.post('/induction/enrollments/:enrollmentId/start-now', requirePermission('RH.INDUCTION.MANAGE'), startDeferredEnrollmentController);
+router.post('/induction/phases/:phaseId/reconcile-advance', requirePermission('RH.INDUCTION.MANAGE'), reconcilePhaseAdvanceController);
+router.post('/induction/enrollments/:enrollmentId/advance', requirePermission('RH.INDUCTION.MANAGE'), advanceEnrollmentController);
+router.post(
+  '/induction/enrollments/:enrollmentId/reset-attempt',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(resetTruncatedAttemptSchema),
+  resetTruncatedAttemptController,
+);
+router.post('/induction/enrollments/:enrollmentId/issue-certificate', requirePermission('RH.INDUCTION.MANAGE'), issueEnrollmentCertificateController);
+router.post('/induction/enrollments/:enrollmentId/resend-notice', requirePermission('RH.INDUCTION.MANAGE'), resendReadingNoticeController);
 
 router.get('/employees/:employeeId/induction/effectiveness', requirePermission('RH.INDUCTION.MANAGE'), listEffectivenessReviewsController);
 router.post('/employees/:employeeId/induction/effectiveness', requirePermission('RH.INDUCTION.MANAGE'), createEffectivenessReviewController);

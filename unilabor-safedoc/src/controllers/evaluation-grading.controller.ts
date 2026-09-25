@@ -216,6 +216,11 @@ export const authorizeLateController = async (req: AuthRequest, res: Response) =
     if (error?.code === 'EVAL_NOT_EXPIRED') {
       return res.status(409).json({ message: 'Solo se pueden autorizar evaluaciones vencidas.' });
     }
+    if (error?.code === 'EVAL_LATE_SUPERSEDED') {
+      return res.status(409).json({
+        message: 'Esta evaluacion vencida ya fue superada por un intento posterior del colaborador; no se puede reabrir.',
+      });
+    }
     console.error('Error autorizando extemporaneo:', error);
     return res.status(500).json({ message: 'No se pudo autorizar la evaluacion.' });
   }

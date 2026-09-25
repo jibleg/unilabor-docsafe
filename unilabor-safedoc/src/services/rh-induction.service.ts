@@ -44,6 +44,10 @@ export interface RhInductionPhase {
   published_at: string | null;
   /** Interruptor "Completar checklist al aprobar": al acreditar la evaluacion se marcan todos los contenidos. */
   auto_complete_checklist_on_pass: boolean;
+  /** Interruptor "Avanzar automaticamente al aprobar": al acreditar esta fase se inscribe en la siguiente (solo 1-3). */
+  auto_advance_on_pass: boolean;
+  /** Periodo de descanso (horas) antes de iniciar ESTA fase al avanzar desde la anterior; NULL/0 = sin descanso. */
+  advance_grace_hours: number | null;
   documents: RhInductionPhaseDocument[];
 }
 
@@ -52,7 +56,7 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
     SELECT
       p.id, p.phase_number, p.name, p.responsible_label, p.responsible_name, p.responsible_phone,
       p.scope, p.training_course_id, p.duration_hours, p.reading_time_limit_hours, p.published_at,
-      p.auto_complete_checklist_on_pass,
+      p.auto_complete_checklist_on_pass, p.auto_advance_on_pass, p.advance_grace_hours,
       tc.title AS training_course_title
     FROM public.rh_induction_phases p
     LEFT JOIN public.training_courses tc ON tc.id = p.training_course_id
@@ -76,6 +80,8 @@ export const listInductionPhases = async (): Promise<RhInductionPhase[]> => {
           : null,
       published_at: row.published_at ? new Date(row.published_at).toISOString() : null,
       auto_complete_checklist_on_pass: Boolean(row.auto_complete_checklist_on_pass),
+      auto_advance_on_pass: Boolean(row.auto_advance_on_pass),
+      advance_grace_hours: row.advance_grace_hours ? Number(row.advance_grace_hours) : null,
       documents: await listPhaseDocuments(Number(row.id)),
     })),
   );
@@ -255,7 +261,7 @@ interface PhaseDocumentRow {
   title: string;
 }
 
-const getPhaseDocuments = async (phaseId: number): Promise<PhaseDocumentRow[]> => {
+export const getPhaseDocuments = async (phaseId: number): Promise<PhaseDocumentRow[]> => {
   const result = await pool.query(
     `SELECT pd.document_id, d.title
        FROM public.rh_induction_phase_documents pd
@@ -332,7 +338,7 @@ export const removePhaseDocument = async (phaseDocumentId: number): Promise<bool
  * (inscritos que quedaron en espera). Idempotente por acuse: si el colaborador
  * ya tenia una lectura vigente/firmada del documento, se reusa.
  */
-const assignEnrollmentReadings = async (
+export const assignEnrollmentReadings = async (
   enrollmentId: number,
   employeeUserId: string,
   documents: PhaseDocumentRow[],
@@ -406,7 +412,7 @@ export interface RhInductionPhasePublishResult {
  */
 export const publishInductionPhase = async (phaseId: number, userId: string): Promise<RhInductionPhasePublishResult> => {
   const phaseResult = await pool.query(
-    `SELECT id, phase_number, scope, training_course_id, reading_time_limit_hours, published_at
+    `SELECT id, phase_number, scope, training_course_id, reading_time_limit_hours, published_at, advance_grace_hours
        FROM public.rh_induction_phases WHERE id = $1 LIMIT 1;`,
     [phaseId],
   );
@@ -478,12 +484,27 @@ export const publishInductionPhase = async (phaseId: number, userId: string): Pr
   if (phaseNumber !== 6) {
     const readingLimitHours = phase.reading_time_limit_hours ? Number(phase.reading_time_limit_hours) : null;
     const phaseDocuments = phaseScope === 'INSTITUTIONAL' ? await getPhaseDocuments(phaseId) : [];
+    // Descanso entre fases: quienes llegaron por avance (y siguen sin lecturas)
+    // empiezan su descanso ahora que la fase se publica; el cron los activa.
+    const graceHours = phase.advance_grace_hours ? Number(phase.advance_grace_hours) : 0;
+    if (graceHours > 0 && phaseScope === 'INSTITUTIONAL') {
+      await pool.query(
+        `UPDATE public.rh_induction_enrollments e
+            SET readings_start_at = NOW() + make_interval(hours => $2::int), updated_at = NOW()
+          WHERE e.phase_id = $1 AND e.evaluation_assignment_id IS NULL AND e.reading_completed_at IS NULL
+            AND e.origin IN ('AUTO_ADVANCE', 'RECONCILE', 'ADVANCE')
+            AND NOT EXISTS (SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id);`,
+        [phaseId, graceHours],
+      );
+    }
     const pending = await pool.query(
       `SELECT e.id, e.employee_id, emp.user_id, e.reading_completed_at,
               EXISTS (SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id) AS has_readings
          FROM public.rh_induction_enrollments e
          INNER JOIN public.employees emp ON emp.id = e.employee_id
         WHERE e.phase_id = $1 AND e.evaluation_assignment_id IS NULL
+          AND (e.readings_start_at IS NULL OR e.readings_start_at <= NOW()
+               OR EXISTS (SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id))
         ORDER BY e.id ASC;`,
       [phaseId],
     );
@@ -632,11 +653,26 @@ export interface RhInductionEnrollment {
  * Fase 6 es practica supervisada, sin lectura (RH captura la calificacion).
  * La Fase 7 no se inscribe aqui: su instrumento es el REH-REG-003.
  */
+export type RhInductionEnrollmentOrigin = 'MANUAL' | 'BULK' | 'AUTO_ADVANCE' | 'RECONCILE' | 'ADVANCE';
+
+export interface EnrollEmployeeOptions {
+  /** Como se creo la inscripcion (trazabilidad REH-REG-005). Default MANUAL. */
+  origin?: RhInductionEnrollmentOrigin;
+  /** Inscripcion aprobada de la fase anterior que origino este avance automatico. */
+  advancedFromEnrollmentId?: number | null;
+  /**
+   * Periodo de descanso (horas) antes de activar lecturas/plazo/SMS. Solo lo
+   * pasan los avances entre fases; 0/undefined = arranque inmediato.
+   */
+  graceHours?: number | null;
+}
+
 export const enrollEmployeeInPhase = async (
   employeeId: number,
   phaseId: number,
   userId: string,
   supervisorEmployeeId?: number | null,
+  options: EnrollEmployeeOptions = {},
 ): Promise<RhInductionEnrollment> => {
   const phaseResult = await pool.query(
     `SELECT id, phase_number, scope, reading_time_limit_hours, published_at
@@ -770,15 +806,32 @@ export const enrollEmployeeInPhase = async (
   // Fecha limite de lectura: se congela al inscribir (cambios posteriores en la
   // config de la fase no mueven inscripciones existentes). Solo aplica cuando
   // la fase lleva lectura y ya esta publicada (en borrador arranca al publicar).
-  const readingDeadlineHours = phasePublished && documents.length > 0 && readingLimitHours ? readingLimitHours : null;
+  // Descanso entre fases: la inscripcion existe desde ya, pero lecturas, plazo
+  // y SMS se activan cuando termina (cron de induccion / auto-sanado).
+  const deferredHours =
+    phasePublished && documents.length > 0 && options.graceHours && options.graceHours > 0 ? Math.floor(options.graceHours) : null;
+  const readingDeadlineHours =
+    phasePublished && documents.length > 0 && readingLimitHours && deferredHours === null ? readingLimitHours : null;
 
   const enrollmentId = await withTransaction(async (client) => {
     const inserted = await client.query(
       `INSERT INTO public.rh_induction_enrollments
-         (employee_id, phase_id, enrolled_by_user_id, supervisor_employee_id, training_course_id, reading_deadline_at)
-       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE NOW() + make_interval(hours => $6::int) END)
+         (employee_id, phase_id, enrolled_by_user_id, supervisor_employee_id, training_course_id, reading_deadline_at,
+          origin, advanced_from_enrollment_id, readings_start_at)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6::int IS NULL THEN NULL ELSE NOW() + make_interval(hours => $6::int) END,
+               $7, $8, CASE WHEN $9::int IS NULL THEN NULL ELSE NOW() + make_interval(hours => $9::int) END)
        RETURNING id;`,
-      [employeeId, phaseId, userId, supervisorEmployeeId ?? null, positionCourseId, readingDeadlineHours],
+      [
+        employeeId,
+        phaseId,
+        userId,
+        supervisorEmployeeId ?? null,
+        positionCourseId,
+        readingDeadlineHours,
+        options.origin ?? 'MANUAL',
+        options.advancedFromEnrollmentId ?? null,
+        deferredHours,
+      ],
     );
     return Number(inserted.rows[0].id);
   });
@@ -792,7 +845,7 @@ export const enrollEmployeeInPhase = async (
     );
   }
 
-  if (phasePublished) {
+  if (phasePublished && deferredHours === null) {
     await assignEnrollmentReadings(enrollmentId, employeeUserId, documents, userId);
     await syncInductionReadingDeadlines({ enrollmentId });
     if (documents.length > 0) {
@@ -801,7 +854,9 @@ export const enrollEmployeeInPhase = async (
     }
   }
 
-  await refreshEnrollmentReadingStatus(enrollmentId);
+  if (deferredHours === null) {
+    await refreshEnrollmentReadingStatus(enrollmentId);
+  }
 
   const result = await pool.query(
     `SELECT id, employee_id, phase_id, reading_completed_at, evaluation_assignment_id, supervisor_employee_id
@@ -932,7 +987,7 @@ export const enrollAllEmployeesInPhase = async (
   for (const row of employees.rows) {
     const employeeId = Number(row.id);
     try {
-      await enrollEmployeeInPhase(employeeId, phaseId, userId);
+      await enrollEmployeeInPhase(employeeId, phaseId, userId, null, { origin: 'BULK' });
       result.enrolled += 1;
     } catch (error: any) {
       result.skipped.push({
@@ -1111,6 +1166,8 @@ export interface RhInductionProgressItem {
   checklist_completed: number;
   /** false = la fase sigue en borrador: aun no hay lecturas ni evaluacion disponibles. */
   phase_published: boolean;
+  /** Descanso entre fases: fecha en que se activan las lecturas (null si ya arranco o no aplica). */
+  readings_start_at: string | null;
 }
 
 export const getEmployeeInductionProgress = async (employeeId: number): Promise<RhInductionProgressItem[]> => {
@@ -1131,7 +1188,7 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
   const result = await pool.query(
     `SELECT
         e.id AS enrollment_id, p.id AS phase_id, p.phase_number, p.name AS phase_name, p.responsible_label,
-        p.published_at,
+        p.published_at, e.readings_start_at,
         e.reading_completed_at, e.reading_deadline_at, e.evaluation_assignment_id,
         e.supervisor_employee_id, sup.full_name AS supervisor_name,
         ea.status AS evaluation_status, ea.percentage AS evaluation_percentage,
@@ -1167,6 +1224,10 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
     checklist_total: Number(row.checklist_total ?? 0),
     checklist_completed: Number(row.checklist_completed ?? 0),
     phase_published: Boolean(row.published_at),
+    readings_start_at:
+      row.readings_start_at && !row.reading_completed_at && !row.evaluation_assignment_id && Number(row.reading_total ?? 0) === 0
+        ? new Date(row.readings_start_at).toISOString()
+        : null,
   }));
 };
 

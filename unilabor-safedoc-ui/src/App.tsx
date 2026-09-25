@@ -127,6 +127,11 @@ const RhCompetencyEvaluationsPage = lazy(() =>
     default: module.RhCompetencyEvaluationsPage,
   })),
 );
+const RhInductionDashboardPage = lazy(() =>
+  import('./pages/RhInductionDashboardPage').then((module) => ({
+    default: module.RhInductionDashboardPage,
+  })),
+);
 const RhMyInductionPage = lazy(() =>
   import('./pages/RhMyInductionPage').then((module) => ({
     default: module.RhMyInductionPage,
@@ -460,6 +465,14 @@ function App() {
           element={
             <PermissionGate permission="RH.INDUCTION.MANAGE" redirectTo="/rh">
               <RhInductionPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="induction/dashboard"
+          element={
+            <PermissionGate permission="RH.INDUCTION.MANAGE" redirectTo="/rh">
+              <RhInductionDashboardPage />
             </PermissionGate>
           }
         />

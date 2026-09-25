@@ -42,6 +42,12 @@ import type { ReopenInductionReadingInput } from '../schemas/rh-induction-reopen
 import { reopenInductionReading } from '../services/rh-induction-reopen-reading.service';
 import { updatePhaseReadingLimit } from '../services/rh-induction-reading-limit.service';
 import { formatInductionDeadline } from '../services/rh-induction-notification.service';
+import {
+  getInstitutionalTrack,
+  tryAdvanceEmployeeIfEligible,
+  tryReconcilePhaseAdvance,
+} from '../services/rh-induction-progression.service';
+import { tryActivateDeferredEnrollments } from '../services/rh-induction-grace.service';
 
 const parsePositiveInt = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -267,6 +273,8 @@ export const getEmployeeInductionProgressController = async (req: AuthRequest, r
     return res.status(400).json({ message: 'ID de colaborador invalido.' });
   }
   try {
+    await tryAdvanceEmployeeIfEligible(employeeId);
+    await tryActivateDeferredEnrollments({ employeeId });
     return res.json({ progress: await getEmployeeInductionProgress(employeeId) });
   } catch (error: any) {
     console.error('Error consultando progreso de induccion:', error);
@@ -283,7 +291,14 @@ export const getMyInductionProgressController = async (req: AuthRequest, res: Re
     if (!employee) {
       return res.status(409).json({ message: 'Tu usuario no esta vinculado a un colaborador activo de RH.' });
     }
-    return res.json({ progress: await getEmployeeInductionProgress(employee.id) });
+    // Progresion autonoma (auto-sanado): si aprobo una fase y aun no esta en la siguiente, lo avanza.
+    await tryAdvanceEmployeeIfEligible(employee.id);
+    await tryActivateDeferredEnrollments({ employeeId: employee.id });
+    const [progress, track] = await Promise.all([
+      getEmployeeInductionProgress(employee.id),
+      getInstitutionalTrack(employee.id),
+    ]);
+    return res.json({ progress, track });
   } catch (error: any) {
     console.error('Error consultando mi progreso de induccion:', error);
     return res.status(500).json({ message: 'No se pudo consultar tu progreso de induccion.' });
@@ -389,7 +404,12 @@ export const publishPhaseController = async (req: AuthRequest, res: Response) =>
   }
   try {
     const result = await publishInductionPhase(phaseId, req.user?.id ?? '');
+    // Progresion autonoma: quienes ya aprobaron la fase anterior entran a esta al publicarla.
+    const reconciled = await tryReconcilePhaseAdvance(phaseId, req.user?.id ?? null);
     const parts = ['Fase publicada.'];
+    if (reconciled && reconciled.advanced > 0) {
+      parts.push(`${reconciled.advanced} colaborador(es) que ya aprobaron la fase anterior fueron inscritos automaticamente.`);
+    }
     if (result.readings_assigned > 0) {
       parts.push(`Se asignaron las lecturas a ${result.readings_assigned} inscrito(s) en espera.`);
     }
@@ -403,7 +423,7 @@ export const publishPhaseController = async (req: AuthRequest, res: Response) =>
     if (result.notified > 0) {
       parts.push(`Se esta avisando por SMS a ${result.notified} colaborador(es).`);
     }
-    return res.json({ message: parts.join(' '), ...result });
+    return res.json({ message: parts.join(' '), ...result, advanced: reconciled?.advanced ?? 0 });
   } catch (error: any) {
     const mapped = mapError(res, error);
     if (mapped) return mapped;

@@ -10,6 +10,7 @@ import {
   type InductionCertificatePhaseContext,
 } from './rh-induction.service';
 import { autoCompleteChecklistForPassedAssignment } from './rh-induction-checklist.service';
+import { tryAdvanceInductionAfterPass } from './rh-induction-progression.service';
 
 /**
  * Generacion REAL de la constancia al acreditar una evaluacion (>= passing_score)
@@ -88,6 +89,8 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
   // solo mientras la constancia no exista (asi RH conserva sus desmarcados
   // posteriores) y nunca bloquea la emision.
   await tryAutoCompleteInductionChecklist(assignmentId);
+  // Gancho de Induccion: progresion autonoma (Fases 1-3 -> siguiente) al acreditar.
+  await tryAdvanceInductionAfterPass(assignmentId);
 
   // Fase de Induccion (o null si es una capacitacion normal): decide el motor de
   // render Y la seccion del expediente donde se archiva la constancia.
