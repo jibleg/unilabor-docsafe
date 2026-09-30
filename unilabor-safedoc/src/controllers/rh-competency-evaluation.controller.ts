@@ -1,4 +1,6 @@
 import type { Response } from 'express';
+import { assignCourseKnowledge, listKnowledgeCourseOptions } from '../services/rh-competency-course-knowledge.service';
+import type { AssignCourseKnowledgeInput } from '../schemas/rh-competency-evaluation.schema';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import {
@@ -51,6 +53,9 @@ const ERROR_STATUS: Record<string, number> = {
   RH_COMP_EVAL_NOT_CLOSED: 409,
   RH_COMP_EVAL_CERT_NOT_ELIGIBLE: 409,
   RH_COMP_EVAL_USER_NOT_FOUND: 409,
+  RH_COMP_EVAL_COURSE_NOT_LINKED: 409,
+  RH_COMP_EVAL_COURSE_NO_QUIZ: 409,
+  RH_COMP_EVAL_COURSE_NO_ATTEMPT: 409,
 };
 
 const mapError = (res: Response, error: any): Response | null => {
@@ -325,5 +330,56 @@ export const issueCompetencyCertificateController = async (req: AuthRequest, res
     if (mapped) return mapped;
     console.error('Error emitiendo constancia de competencia:', error);
     return res.status(500).json({ message: 'No se pudo emitir la constancia de competencia.' });
+  }
+};
+
+/** GET /rh/competency-evaluations/:id/knowledge-courses - capacitaciones del puesto evaluado con el ultimo intento del colaborador. */
+export const listKnowledgeCourseOptionsController = async (req: AuthRequest, res: Response) => {
+  const evaluationId = parseId(req.params.id);
+  if (!evaluationId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    return res.json({ courses: await listKnowledgeCourseOptions(evaluationId) });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error listando capacitaciones del puesto para Conocimiento:', error);
+    return res.status(500).json({ message: 'No se pudieron cargar las capacitaciones del puesto.' });
+  }
+};
+
+/** POST /rh/competency-evaluations/:id/knowledge-course {course_id, mode} - seccion 3 desde la capacitacion del puesto. */
+export const assignCourseKnowledgeController = async (req: AuthRequest, res: Response) => {
+  const evaluationId = parseId(req.params.id);
+  if (!evaluationId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  const body = req.body as AssignCourseKnowledgeInput;
+  try {
+    const evaluation = await assignCourseKnowledge({
+      evaluationId,
+      courseId: body.course_id,
+      mode: body.mode,
+      actorUserId: req.user?.id ?? null,
+    });
+    await logAudit(
+      req.user?.id,
+      `RH_COMP_EVAL_KNOWLEDGE_COURSE:${evaluationId}:${body.course_id}:${evaluation.knowledge_quiz?.assignment_id ?? 0}:${body.mode}`,
+      evaluationId,
+      req.ip,
+    );
+    const answered = ['passed', 'failed'].includes(evaluation.knowledge_quiz?.status ?? '');
+    return res.status(201).json({
+      message: answered
+        ? `Seccion 3 llenada con la evaluacion ya presentada de la capacitacion (${evaluation.knowledge_quiz?.question_count ?? 0} preguntas).`
+        : `Evaluacion de la capacitacion asignada al colaborador (${evaluation.knowledge_quiz?.question_count ?? 0} preguntas); la seccion 3 se llenara al contestarla.`,
+      evaluation,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error ligando la capacitacion a Conocimiento:', error);
+    return res.status(500).json({ message: 'No se pudo ligar la capacitacion a la seccion 3.' });
   }
 };

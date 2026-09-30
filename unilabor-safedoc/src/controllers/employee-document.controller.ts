@@ -239,6 +239,7 @@ export const uploadEmployeeDocumentController = async (req: AuthRequest, res: Re
       ...(getText(req.body?.description) ? { description: getText(req.body?.description) } : {}),
       ...(issueDate !== undefined ? { issue_date: issueDate } : {}),
       ...(expiryDate !== undefined ? { expiry_date: expiryDate } : {}),
+      ...(getText(req.body?.reference_key) ? { reference_key: getText(req.body?.reference_key) } : {}),
     };
 
     const document = await uploadEmployeeDocument(employeeId, user.id, req.file, payload);
@@ -479,6 +480,7 @@ export const uploadMyDocumentController = async (req: AuthRequest, res: Response
       ...(getText(req.body?.description) ? { description: getText(req.body?.description) } : {}),
       ...(issueDate !== undefined ? { issue_date: issueDate } : {}),
       ...(expiryDate !== undefined ? { expiry_date: expiryDate } : {}),
+      ...(getText(req.body?.reference_key) ? { reference_key: getText(req.body?.reference_key) } : {}),
     };
 
     const document = await uploadEmployeeDocument(employee.id, user.id, req.file, payload);

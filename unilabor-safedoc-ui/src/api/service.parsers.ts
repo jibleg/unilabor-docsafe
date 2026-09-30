@@ -57,6 +57,8 @@ export const normalizeDocumentSection = (input: unknown): DocumentSection | null
     is_active: getBoolean(source, ['is_active', 'isActive'], true),
     is_system_defined: getBoolean(source, ['is_system_defined', 'isSystemDefined'], false),
     sort_order: getNumber(source, ['sort_order', 'sortOrder'], 0),
+    is_open: getBoolean(source, ['is_open', 'isOpen'], false),
+    open_document_type_id: getNumber(source, ['open_document_type_id', 'openDocumentTypeId']) || null,
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),
   };
@@ -180,10 +182,12 @@ export const normalizeEmployeeExpedientSummary = (input: unknown): EmployeeExped
       completion_percent: 0,
       expiring_count: 0,
       expired_count: 0,
+      open_documents: 0,
     };
   }
 
   return {
+    open_documents: getNumber(source, ['open_documents', 'openDocuments'], 0),
     total_types: getNumber(source, ['total_types', 'totalTypes']),
     required_types: getNumber(source, ['required_types', 'requiredTypes']),
     uploaded_types: getNumber(source, ['uploaded_types', 'uploadedTypes']),
@@ -228,6 +232,7 @@ export const normalizeEmployeeExpedientSection = (input: unknown): EmployeeExped
     items: getArrayFromPayload(source.items ?? source.types ?? [], ['items'])
       .map(normalizeEmployeeExpedientItem)
       .filter((item): item is EmployeeExpedientItem => item !== null),
+    open_document_type: normalizeDocumentType(source.open_document_type),
   };
 };
 

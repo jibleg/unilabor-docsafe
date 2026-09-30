@@ -48,6 +48,8 @@ const METHOD_LABELS: Record<string, string> = {
 };
 
 
+const SECTION_TABS: RhCompetencySection[] = ['COMPETENCIA', 'DESEMPENO', 'CONOCIMIENTO'];
+
 const SECTION_META: Record<RhCompetencySection, { title: string; weight: string; hint: string }> = {
   COMPETENCIA: {
     title: '1. Competencia',
@@ -62,12 +64,14 @@ const SECTION_META: Record<RhCompetencySection, { title: string; weight: string;
   CONOCIMIENTO: {
     title: '3. Conocimiento',
     weight: '30%',
-    hint: 'Asigna el cuestionario del banco del puesto (arriba) o captura las preguntas a mano y marca si la respuesta fue correcta.',
+    hint: 'Se llena con la evaluación de la capacitación del puesto o con el cuestionario del banco (arriba); también puedes capturar las preguntas a mano.',
   },
 };
 
-const KNOWLEDGE_QUIZ_HINT =
-  'Preguntas tomadas del banco del puesto. La respuesta del evaluado y el resultado se llenan solos cuando el colaborador envía el cuestionario.';
+const knowledgeQuizHint = (evaluation: RhCompetencyEvaluation): string =>
+  evaluation.knowledge_quiz?.selection_mode === 'course'
+    ? `Preguntas de la evaluación de la capacitación "${evaluation.reference_course_title ?? ''}". La respuesta del evaluado y el resultado se llenan solos cuando el colaborador la envía.`
+    : 'Preguntas tomadas del banco del puesto. La respuesta del evaluado y el resultado se llenan solos cuando el colaborador envía el cuestionario.';
 
 const toPayload = (item: RhCompetencyEvaluationItem): CompetencySectionItemPayload => ({
   item_text: item.item_text,
@@ -161,7 +165,7 @@ const SectionEditor = ({
           <h3 className="text-sm font-bold text-[var(--color-brand-700)]">
             {meta.title} · peso {meta.weight} · {scoredCount}/{items.length} calificados
           </h3>
-          <p className="text-xs text-[var(--unilabor-neutral)]">{quizLocked ? KNOWLEDGE_QUIZ_HINT : meta.hint}</p>
+          <p className="text-xs text-[var(--unilabor-neutral)]">{quizLocked ? knowledgeQuizHint(evaluation) : meta.hint}</p>
         </div>
         {!locked && (
           <div className="flex items-center gap-2">
@@ -505,6 +509,9 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: Competency
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
   const [issuingCertificate, setIssuingCertificate] = useState(false);
+  // Secciones 1-3 en pestañas para acortar el scroll. Todas se mantienen montadas
+  // (solo se ocultan) para no perder cambios sin guardar al cambiar de pestaña.
+  const [activeSection, setActiveSection] = useState<RhCompetencySection>('COMPETENCIA');
   const readOnly = evaluation.status === 'CLOSED';
   const results = evaluation.results;
   const dictamenUi = results.dictamen ? DICTAMEN_UI[results.dictamen] : null;
@@ -607,10 +614,55 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: Competency
         )}
       </section>
 
-      <SectionEditor evaluation={evaluation} section="COMPETENCIA" readOnly={readOnly} onChanged={onChanged} />
-      <SectionEditor evaluation={evaluation} section="DESEMPENO" readOnly={readOnly} onChanged={onChanged} />
-      <KnowledgeQuizPanel evaluation={evaluation} onChanged={onChanged} />
-      <SectionEditor evaluation={evaluation} section="CONOCIMIENTO" readOnly={readOnly} onChanged={onChanged} />
+      <div className="sticky top-0 z-20 -mx-1 rounded-2xl bg-[rgba(238,245,250,0.92)] px-1 py-1.5 backdrop-blur" role="tablist" aria-label="Secciones de la evaluación">
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+          {SECTION_TABS.map((section) => {
+            const meta = SECTION_META[section];
+            const sectionItems = (evaluation.items ?? []).filter((item) => item.section === section);
+            const scored = sectionItems.filter((item) => (section === 'CONOCIMIENTO' ? item.is_correct !== null : item.score !== null)).length;
+            const pct =
+              section === 'COMPETENCIA' ? results.competency_pct : section === 'DESEMPENO' ? results.performance_pct : results.knowledge_pct;
+            const complete = sectionItems.length > 0 && scored === sectionItems.length;
+            const active = activeSection === section;
+            return (
+              <button
+                key={section}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveSection(section)}
+                className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-left transition ${
+                  active
+                    ? 'border-[var(--color-brand-700)] bg-[var(--color-brand-700)] text-white shadow-md'
+                    : 'border-[rgba(0,65,106,0.12)] bg-white text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]'
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold">{meta.title}</span>
+                  <span className={`block text-[11px] ${active ? 'text-white/80' : 'text-[var(--unilabor-neutral)]'}`}>
+                    Peso {meta.weight} · {scored}/{sectionItems.length} calificados
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <span className="text-base font-black tabular-nums">{pct ?? '—'}{pct !== null && pct !== undefined ? '%' : ''}</span>
+                  {complete ? <Check size={15} className={active ? 'text-white' : 'text-emerald-600'} /> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className={activeSection === 'COMPETENCIA' ? 'space-y-4' : 'hidden'} role="tabpanel">
+        <SectionEditor evaluation={evaluation} section="COMPETENCIA" readOnly={readOnly} onChanged={onChanged} />
+      </div>
+      <div className={activeSection === 'DESEMPENO' ? 'space-y-4' : 'hidden'} role="tabpanel">
+        <SectionEditor evaluation={evaluation} section="DESEMPENO" readOnly={readOnly} onChanged={onChanged} />
+      </div>
+      <div className={activeSection === 'CONOCIMIENTO' ? 'space-y-4' : 'hidden'} role="tabpanel">
+        <KnowledgeQuizPanel evaluation={evaluation} onChanged={onChanged} />
+        <SectionEditor evaluation={evaluation} section="CONOCIMIENTO" readOnly={readOnly} onChanged={onChanged} />
+      </div>
       <ActionsEditor evaluation={evaluation} readOnly={readOnly} onChanged={onChanged} />
 
       {showCloseModal && (

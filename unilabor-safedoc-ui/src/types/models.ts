@@ -817,6 +817,9 @@ export interface DocumentSection {
   description?: string | null;
   is_active: boolean;
   is_system_defined: boolean;
+  /** Sección abierta: lista documentos reales (varios por tipo), sin casillas vacías. */
+  is_open?: boolean;
+  open_document_type_id?: number | null;
   sort_order: number;
   created_at?: string;
   updated_at?: string;
@@ -874,6 +877,8 @@ export interface EmployeeExpedientSummary {
   completion_percent: number;
   expiring_count: number;
   expired_count: number;
+  /** Documentos vigentes de las secciones abiertas (constancias). */
+  open_documents?: number;
 }
 
 export interface EmployeeExpedientItem {
@@ -885,6 +890,8 @@ export interface EmployeeExpedientItem {
 export interface EmployeeExpedientSection {
   section: DocumentSection;
   items: EmployeeExpedientItem[];
+  /** Solo secciones abiertas: tipo con el que se crea un documento nuevo. */
+  open_document_type?: DocumentType | null;
 }
 
 export interface EmployeeExpedient {
@@ -1401,6 +1408,11 @@ export interface RhInductionPhaseDocument {
   document_id: string;
   title: string;
   code: string | null;
+  /** Tipo del expediente donde se archiva la copia firmada (null = no se archiva). */
+  expedient_document_type_id: number | null;
+  expedient_document_type_code: string | null;
+  expedient_document_type_name: string | null;
+  expedient_section_name: string | null;
   sort_order: number;
 }
 
@@ -1863,7 +1875,8 @@ export interface RhCompetencyEvaluationResults {
 export interface RhCompetencyKnowledgeQuiz {
   assignment_id: number;
   status: string;
-  selection_mode: 'random' | 'fixed' | null;
+  /** 'course' = evaluación de una capacitación del puesto; 'random'/'fixed' = banco IA del puesto. */
+  selection_mode: 'random' | 'fixed' | 'course' | null;
   question_count: number;
   deadline_at: string | null;
   started_at: string | null;
@@ -2211,4 +2224,101 @@ export interface ClientNotificationRecipient {
   user_id: string;
   full_name: string | null;
   email: string | null;
+}
+
+// --- Panorama ejecutivo de Acuerdos (contratos con proveedores y clientes) ---
+export type AgreementPartyType = 'provider' | 'client';
+export type AgreementBucket = 'expired' | 'critical' | 'warning' | 'upcoming' | 'ok' | 'no_expiry';
+
+export interface AgreementItem {
+  id: number;
+  party_type: AgreementPartyType;
+  party_id: number;
+  party_name: string;
+  party_rfc: string | null;
+  classification: string | null;
+  category_code: string | null;
+  category_name: string | null;
+  title: string;
+  description: string | null;
+  document_date: string | null;
+  effective_from: string | null;
+  expiry_date: string | null;
+  days_to_expiry: number | null;
+  bucket: AgreementBucket;
+  version_chain: number;
+  uploaded_by_name: string | null;
+  created_at: string;
+  detail_path: string;
+}
+
+export interface AgreementPartySummary {
+  party_type: AgreementPartyType;
+  party_id: number;
+  party_name: string;
+  classification: string | null;
+  agreements: number;
+  worst_bucket: AgreementBucket;
+  next_expiry_date: string | null;
+}
+
+export interface AgreementDashboard {
+  generated_at: string;
+  today: string;
+  includes: { providers: boolean; clients: boolean };
+  kpis: {
+    agreements: number;
+    providers_with_agreements: number;
+    clients_with_agreements: number;
+    providers_active: number;
+    clients_active: number;
+    expired: number;
+    critical_30: number;
+    warning_60: number;
+    upcoming_90: number;
+    ok: number;
+    no_expiry: number;
+    expiring_this_year: number;
+    next_expiry: AgreementItem | null;
+  };
+  by_bucket: Record<AgreementBucket, number>;
+  by_category: Array<{ category: string; providers: number; clients: number }>;
+  by_month: Array<{ month: string; providers: number; clients: number; expired: number }>;
+  by_party: AgreementPartySummary[];
+  alert_recipients: { providers: number; clients: number };
+  items: AgreementItem[];
+}
+
+// --- Capacitaciones del puesto (Fase 7) como fuente de la sección 3 del REH-REG-003 ---
+export interface PositionTrainingCourse {
+  link_id: number;
+  position_id: number;
+  course_id: number;
+  course_code: string;
+  course_title: string;
+  published_template_id: number | null;
+  published_template_title: string | null;
+  question_count: number;
+  created_at: string;
+}
+
+export interface TrainingCourseOption {
+  id: number;
+  code: string;
+  title: string;
+  has_published_quiz: boolean;
+}
+
+export interface CourseAttemptSummary {
+  assignment_id: number;
+  status: string;
+  attempt_no: number;
+  percentage: number | null;
+  submitted_at: string | null;
+  deadline_at: string | null;
+  question_count: number;
+}
+
+export interface KnowledgeCourseOption extends PositionTrainingCourse {
+  last_attempt: CourseAttemptSummary | null;
 }

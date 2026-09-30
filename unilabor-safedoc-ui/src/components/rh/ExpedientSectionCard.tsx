@@ -1,4 +1,5 @@
 import { AlertTriangle, CalendarDays, Eye, FileClock, FilePlus2, FileText, PencilLine, RefreshCw, Shield } from 'lucide-react';
+import type { EmployeeExpedientItem } from '../../types/models';
 import type { EmployeeExpedientSection, ExpedientItemStatus } from '../../types/models';
 
 const getStatusLabel = (status: ExpedientItemStatus): string => {
@@ -50,6 +51,15 @@ export const ExpedientSectionCard = ({
   onHistory,
   onEdit,
 }: ExpedientSectionCardProps) => {
+  // Sección abierta (Constancias): lista documentos reales y ofrece "Nueva constancia"
+  // con el tipo genérico de la sección; cada fila es un documento con su propia línea.
+  const isOpen = Boolean(section.section.is_open);
+  const openType = section.open_document_type ?? null;
+  const newItem: EmployeeExpedientItem | null = openType ? { document_type: openType, current_document: null, status: 'missing' } : null;
+  const countLabel = isOpen
+    ? `${section.items.length} documento${section.items.length === 1 ? '' : 's'}`
+    : `${section.items.length} tipo${section.items.length === 1 ? '' : 's'}`;
+
   return (
     <div className="overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.08)] bg-white/92 shadow-xl shadow-[rgba(0,65,106,0.08)]">
       <div className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.92)] px-5 py-4">
@@ -63,22 +73,50 @@ export const ExpedientSectionCard = ({
               {section.section.description || 'Sección documental del expediente RH.'}
             </p>
           </div>
-          <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.34)] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
-            {section.items.length} tipo{section.items.length === 1 ? '' : 's'}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.34)] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
+              {countLabel}
+            </span>
+            {newItem ? (
+              <button
+                type="button"
+                onClick={() => onUpload(newItem)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-brand-700)] px-3 py-2 text-xs font-bold text-white shadow-md transition hover:opacity-90"
+              >
+                <FilePlus2 size={14} />
+                Nueva {openType?.name.toLowerCase() ?? 'documento'}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
       <div className="divide-y divide-[rgba(0,65,106,0.08)]">
+        {isOpen && section.items.length === 0 ? (
+          <div className="flex items-start gap-3 px-5 py-8 text-sm text-[var(--unilabor-neutral)]">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[var(--color-brand-500)]" />
+            <p>
+              Todavía no hay {section.section.name.toLowerCase()} en este expediente.
+              {newItem ? ` Usa "Nueva ${openType?.name.toLowerCase()}" para agregar la primera con su PDF.` : ''}
+            </p>
+          </div>
+        ) : null}
         {section.items.map((item) => (
-          <div key={item.document_type.id} className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.7fr)_auto] lg:items-center">
+          <div key={isOpen && item.current_document ? `doc-${item.current_document.id}` : `type-${item.document_type.id}`} className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.7fr)_auto] lg:items-center">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="text-sm font-bold text-[var(--color-brand-700)]">{item.document_type.name}</h4>
+                <h4 className="text-sm font-bold text-[var(--color-brand-700)]">
+                  {isOpen && item.current_document ? item.current_document.title : item.document_type.name}
+                </h4>
                 <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getStatusClassName(item.status)}`}>
                   {getStatusLabel(item.status)}
                 </span>
-                {item.document_type.is_required && (
+                {isOpen && item.document_type.code ? (
+                  <span className="rounded-full border border-[rgba(0,65,106,0.1)] bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+                    {item.document_type.name}
+                  </span>
+                ) : null}
+                {!isOpen && item.document_type.is_required && (
                   <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.22)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
                     Obligatorio
                   </span>
@@ -91,7 +129,9 @@ export const ExpedientSectionCard = ({
                 )}
               </div>
               <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-                {item.document_type.description || 'Sin descripción adicional.'}
+                {isOpen && item.current_document
+                  ? item.current_document.description || 'Sin descripción adicional.'
+                  : item.document_type.description || 'Sin descripción adicional.'}
               </p>
             </div>
 
@@ -156,7 +196,7 @@ export const ExpedientSectionCard = ({
               </button>
             </div>
 
-            {item.current_document?.description ? (
+            {!isOpen && item.current_document?.description ? (
               <div className="lg:col-span-3">
                 <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/80 px-4 py-3 text-xs text-[var(--unilabor-neutral)]">
                   <div className="mb-1 flex items-center gap-2 font-semibold text-[var(--color-brand-700)]">

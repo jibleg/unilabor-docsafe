@@ -802,6 +802,7 @@ export const uploadEmployeeDocumentByEmployeeId = async (
   formData.append('description', payload.description?.trim() ?? '');
   formData.append('issue_date', payload.issue_date?.trim() || '');
   formData.append('expiry_date', payload.expiry_date?.trim() || '');
+  if (payload.reference_key) formData.append('reference_key', payload.reference_key);
   formData.append('file', payload.file);
 
   const response = await api.post(`/rh/employees/${employeeId}/documents`, formData, {
@@ -828,6 +829,7 @@ export const uploadMyEmployeeDocument = async (
   formData.append('description', payload.description?.trim() ?? '');
   formData.append('issue_date', payload.issue_date?.trim() || '');
   formData.append('expiry_date', payload.expiry_date?.trim() || '');
+  if (payload.reference_key) formData.append('reference_key', payload.reference_key);
   formData.append('file', payload.file);
 
   const response = await api.post('/rh/me/documents', formData, {

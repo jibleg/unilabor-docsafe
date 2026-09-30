@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
   assignKnowledgeQuizController,
+  assignCourseKnowledgeController,
+  listKnowledgeCourseOptionsController,
   cancelKnowledgeQuizController,
   issueCompetencyCertificateController,
   listApprovedPositionQuestionsController,
@@ -25,6 +27,7 @@ import { validate } from '../middlewares/validate.middleware';
 import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
 import {
   assignKnowledgeQuizSchema,
+  assignCourseKnowledgeSchema,
   closeCompetencyEvaluationSchema,
   createCompetencyEvaluationSchema,
   replaceActionsSchema,
@@ -61,6 +64,8 @@ router.put('/:id/actions', validate(replaceActionsSchema), replaceCompetencyActi
 router.post('/:id/close', validate(closeCompetencyEvaluationSchema), closeCompetencyEvaluationController);
 router.post('/:id/knowledge-quiz', validate(assignKnowledgeQuizSchema), assignKnowledgeQuizController);
 router.delete('/:id/knowledge-quiz', cancelKnowledgeQuizController);
+router.get('/:id/knowledge-courses', listKnowledgeCourseOptionsController);
+router.post('/:id/knowledge-course', validate(assignCourseKnowledgeSchema), assignCourseKnowledgeController);
 router.post('/:id/certificate', issueCompetencyCertificateController);
 router.delete('/:id', deleteCompetencyEvaluationController);
 

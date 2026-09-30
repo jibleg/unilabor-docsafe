@@ -11,6 +11,8 @@ import { PdfSafeViewer } from '../components/PdfSafeViewerSafe';
 import { EmployeeDocumentUploadModal } from '../components/rh/EmployeeDocumentUploadModal';
 import { InductionHeroBanner } from '../components/rh/InductionHeroBanner';
 import { ExpedientSectionCard } from '../components/rh/ExpedientSectionCard';
+import { ExpedientTabs } from '../components/rh/ExpedientTabs';
+import { sectionToTab } from '../utils/expedientTabs';
 import type { EmployeeExpedient, EmployeeExpedientItem } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 
@@ -24,7 +26,7 @@ const summaryCards = (
   },
   {
     label: 'Documentos cargados',
-    value: summary.uploaded_types,
+    value: summary.uploaded_types + (summary.open_documents ?? 0),
     accent: 'bg-emerald-50 text-emerald-700',
   },
   {
@@ -42,6 +44,7 @@ const summaryCards = (
 export const MyExpedientPage = () => {
   const [loading, setLoading] = useState(false);
   const [expedient, setExpedient] = useState<EmployeeExpedient | null>(null);
+  const [activeSectionTab, setActiveSectionTab] = useState('');
   const [selectedItem, setSelectedItem] = useState<EmployeeExpedientItem | null>(null);
   const [savingDocument, setSavingDocument] = useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = useState<string | null>(null);
@@ -109,6 +112,8 @@ export const MyExpedientPage = () => {
       description: payload.description,
       issue_date: payload.issue_date || undefined,
       expiry_date: selectedItem.document_type.has_expiry ? payload.expiry_date || undefined : undefined,
+      // Sección abierta: al reemplazar se conserva la línea del documento; nuevo = sin clave.
+      reference_key: selectedItem.current_document?.reference_key ?? undefined,
       file: payload.file,
     };
 
@@ -155,6 +160,10 @@ export const MyExpedientPage = () => {
   if (!expedient) {
     return null;
   }
+
+  // Una pestaña por sección documental (se abre la primera por defecto).
+  const sectionTabs = expedient.sections.map(sectionToTab);
+  const currentSectionTab = sectionTabs.some((tab) => tab.key === activeSectionTab) ? activeSectionTab : (sectionTabs[0]?.key ?? '');
 
   return (
     <div className="space-y-6">
@@ -232,16 +241,20 @@ export const MyExpedientPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {expedient.sections.map((section) => (
-          <ExpedientSectionCard
-            key={section.section.id}
-            section={section}
-            onUpload={(item) => setSelectedItem(item)}
-            onView={(documentId) => setSelectedPdfUrl(`${API_BASE_URL}/rh/documents/${documentId}/view`)}
-          />
-        ))}
-      </div>
+      {expedient.sections.length > 0 ? (
+        <ExpedientTabs tabs={sectionTabs} active={currentSectionTab} onChange={setActiveSectionTab} />
+      ) : null}
+      {expedient.sections.map((section) =>
+        currentSectionTab === `section-${section.section.id}` ? (
+          <div key={section.section.id} role="tabpanel">
+            <ExpedientSectionCard
+              section={section}
+              onUpload={(item) => setSelectedItem(item)}
+              onView={(documentId) => setSelectedPdfUrl(`${API_BASE_URL}/rh/documents/${documentId}/view`)}
+            />
+          </div>
+        ) : null,
+      )}
 
       <EmployeeDocumentUploadModal
         isOpen={selectedItem !== null}

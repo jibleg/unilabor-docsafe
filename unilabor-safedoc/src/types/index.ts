@@ -262,6 +262,10 @@ export interface DocumentSectionRecord {
   is_active: boolean;
   is_system_defined: boolean;
   sort_order: number;
+  /** Seccion abierta: lista documentos reales (varios por tipo), sin casillas vacias. */
+  is_open?: boolean;
+  /** Tipo generico con el que se crean documentos nuevos en una seccion abierta. */
+  open_document_type_id?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -317,6 +321,8 @@ export interface EmployeeExpedientSummary {
   completion_percent: number;
   expiring_count: number;
   expired_count: number;
+  /** Documentos vigentes de las secciones abiertas (p. ej. constancias); no cuentan como tipos/pendientes. */
+  open_documents: number;
 }
 
 export interface EmployeeExpedientTypeItem {
@@ -328,6 +334,8 @@ export interface EmployeeExpedientTypeItem {
 export interface EmployeeExpedientSection {
   section: DocumentSectionRecord;
   items: EmployeeExpedientTypeItem[];
+  /** Solo secciones abiertas: tipo con el que se crea un documento nuevo. */
+  open_document_type?: DocumentTypeRecord | null;
 }
 
 export interface EmployeeDocumentAccessTypeItem {

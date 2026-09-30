@@ -13,6 +13,7 @@ import type {
   RhCompetencyEvaluation,
   RhCompetencyEvaluationType,
   RhCompetencySection,
+  KnowledgeCourseOption,
 } from '../types/models';
 
 /** API del modulo Evaluacion de competencia (REH-REG-003). */
@@ -166,4 +167,21 @@ export const issueCompetencyCertificate = async (id: number, force = false): Pro
   const response = await api.post(`/rh/competency-evaluations/${id}/certificate`, { force });
   const data = asRecord(unwrapPayload(response.data));
   return data?.evaluation as RhCompetencyEvaluation;
+};
+
+/** Capacitaciones ligadas al puesto evaluado, con el último intento del colaborador en cada una. */
+export const listKnowledgeCourseOptions = async (id: number): Promise<KnowledgeCourseOption[]> => {
+  const response = await api.get(`/rh/competency-evaluations/${id}/knowledge-courses`);
+  return (asRecord(unwrapPayload(response.data))?.courses as KnowledgeCourseOption[]) ?? [];
+};
+
+/** Sección 3 desde la capacitación del puesto: 'new' asigna su cuestionario, 'existing' usa el último intento. */
+export const assignCourseKnowledge = async (
+  id: number,
+  courseId: number,
+  mode: 'new' | 'existing',
+): Promise<{ evaluation: RhCompetencyEvaluation; message: string }> => {
+  const response = await api.post(`/rh/competency-evaluations/${id}/knowledge-course`, { course_id: courseId, mode });
+  const data = asRecord(unwrapPayload(response.data));
+  return { evaluation: data?.evaluation as RhCompetencyEvaluation, message: String(data?.message ?? '') };
 };

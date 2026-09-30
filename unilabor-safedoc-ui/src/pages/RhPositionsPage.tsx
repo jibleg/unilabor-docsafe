@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Briefcase, FileText, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useSearchParams } from 'react-router-dom';
 import {
   addPositionCompetency,
   addPositionDocument,
@@ -12,7 +13,9 @@ import {
   updatePositionCompetency,
   type DocumentSearchResult,
 } from '../api/service.api-rh-position';
+import { CompactListPager } from '../components/CompactListPager';
 import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
+import { PositionTrainingCoursesPanel } from '../components/rh/PositionTrainingCoursesPanel';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { confirmAction } from '../utils/confirm';
 import type { RhPosition } from '../types/models';
@@ -23,10 +26,15 @@ const inputClass =
 const buttonClass =
   'inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50';
 
+/** Tamaños de página del listado de puestos. */
+const POSITION_PAGE_SIZES = [10, 20, 30];
+
 export const RhPositionsPage = () => {
   const [positions, setPositions] = useState<RhPosition[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // ?position=ID abre directamente ese puesto (p. ej. desde el aviso de la evaluación de competencia).
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<number | null>(() => Number(searchParams.get('position')) || null);
 
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
@@ -56,6 +64,9 @@ export const RhPositionsPage = () => {
   const selectedPosition = positions.find((position) => position.id === selectedId) ?? null;
 
   const [positionQuery, setPositionQuery] = useState('');
+  // null = página automática: la que contiene el puesto seleccionado (p. ej. al llegar con ?position=ID).
+  const [listPage, setListPage] = useState<number | null>(null);
+  const [listPageSize, setListPageSize] = useState(POSITION_PAGE_SIZES[0]);
 
   const normalize = (value: string) =>
     value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -70,6 +81,12 @@ export const RhPositionsPage = () => {
       )
       .sort((a, b) => a.name.localeCompare(b.name, 'es'));
   }, [positions, positionQuery]);
+
+  const listTotalPages = Math.max(1, Math.ceil(visiblePositions.length / listPageSize));
+  const selectedIndex = visiblePositions.findIndex((position) => position.id === selectedId);
+  const autoListPage = selectedIndex >= 0 ? Math.floor(selectedIndex / listPageSize) + 1 : 1;
+  const currentListPage = Math.min(listPage ?? autoListPage, listTotalPages);
+  const pagedPositions = visiblePositions.slice((currentListPage - 1) * listPageSize, currentListPage * listPageSize);
 
   // Competencias del puesto seleccionado en orden A-Z (pedido del usuario;
   // el orden del manual sigue guardado en sort_order por si se quiere volver).
@@ -96,6 +113,7 @@ export const RhPositionsPage = () => {
       toast.success('Puesto creado correctamente.');
       await load();
       setSelectedId(created.id);
+      setListPage(null);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo crear el puesto.'));
     } finally {
@@ -217,7 +235,10 @@ export const RhPositionsPage = () => {
             <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" />
             <input
               value={positionQuery}
-              onChange={(event) => setPositionQuery(event.target.value)}
+              onChange={(event) => {
+                setPositionQuery(event.target.value);
+                setListPage(1);
+              }}
               placeholder="Buscar puesto por nombre o código..."
               className={`${inputClass} pl-9`}
             />
@@ -231,7 +252,7 @@ export const RhPositionsPage = () => {
             </p>
           ) : (
             <div className="space-y-2">
-              {visiblePositions.map((position) => (
+              {pagedPositions.map((position) => (
                 <div
                   key={position.id}
                   className={`flex items-center justify-between rounded-xl border px-3 py-2 transition ${
@@ -255,6 +276,22 @@ export const RhPositionsPage = () => {
               ))}
             </div>
           )}
+          {!loading ? (
+            <div className="-mx-5 -mb-5 mt-4 overflow-hidden rounded-b-2xl">
+              <CompactListPager
+                page={currentListPage}
+                pageSize={listPageSize}
+                total={visiblePositions.length}
+                pageSizeOptions={POSITION_PAGE_SIZES}
+                onPageChange={setListPage}
+                sizeLabel="Puestos por página"
+                onPageSizeChange={(size) => {
+                  setListPageSize(size);
+                  setListPage(null);
+                }}
+              />
+            </div>
+          ) : null}
         </section>
 
         <section className={cardClass}>
@@ -357,6 +394,13 @@ export const RhPositionsPage = () => {
                   />
                 </div>
               </div>
+
+              <PositionTrainingCoursesPanel
+                key={selectedPosition.id}
+                positionId={selectedPosition.id}
+                positionName={selectedPosition.name}
+                focus={searchParams.get('focus') === 'courses' && Number(searchParams.get('position')) === selectedPosition.id}
+              />
             </div>
           )}
         </section>

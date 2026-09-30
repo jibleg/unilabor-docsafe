@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eye, FileStack, Loader2, RefreshCw, ShieldCheck, UserSquare2 } from 'lucide-react';
+import { Bell, Briefcase, Eye, FileStack, Loader2, RefreshCw, ShieldCheck, UserSquare2 } from 'lucide-react';
 import { API_BASE_URL } from '../api/axios';
 import {
   fetchEmployeeExpedientById,
@@ -21,6 +21,9 @@ import { EmployeeInductionHistoryPanel } from '../components/rh/EmployeeInductio
 import { EmployeePositionsPanel } from '../components/rh/EmployeePositionsPanel';
 import { EmployeeRecentMovementsPanel } from '../components/rh/EmployeeRecentMovementsPanel';
 import { ExpedientSectionCard } from '../components/rh/ExpedientSectionCard';
+import { CompactListPager } from '../components/CompactListPager';
+import { ExpedientTabs } from '../components/rh/ExpedientTabs';
+import { sectionToTab, type ExpedientTab } from '../utils/expedientTabs';
 import type {
   AuditLog,
   Employee,
@@ -49,7 +52,7 @@ const summaryCards = (
   },
   {
     label: 'Documentos cargados',
-    value: summary.uploaded_types,
+    value: summary.uploaded_types + (summary.open_documents ?? 0),
     accent: 'bg-emerald-50 text-emerald-700',
   },
   {
@@ -64,11 +67,16 @@ const summaryCards = (
   },
 ];
 
+/** Tamaños de página del listado de colaboradores. */
+const EMPLOYEE_PAGE_SIZES = [10, 20, 30];
+
 export const EmployeeExpedientPage = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingExpedient, setLoadingExpedient] = useState(false);
   const [query, setQuery] = useState('');
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(EMPLOYEE_PAGE_SIZES[0]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
   const [expedient, setExpedient] = useState<EmployeeExpedient | null>(null);
   const [selectedItem, setSelectedItem] = useState<EmployeeExpedientItem | null>(null);
@@ -185,7 +193,26 @@ export const EmployeeExpedientPage = () => {
     );
   }, [employees, query]);
 
+  const listTotalPages = Math.max(1, Math.ceil(filteredEmployees.length / listPageSize));
+  const currentListPage = Math.min(listPage, listTotalPages);
+  const pagedEmployees = useMemo(
+    () => filteredEmployees.slice((currentListPage - 1) * listPageSize, currentListPage * listPageSize),
+    [currentListPage, filteredEmployees, listPageSize],
+  );
+
   const currentEmployee = expedient?.employee ?? employees.find((employee) => employee.id === selectedEmployeeId) ?? null;
+
+  // Pestañas del expediente: Resumen, Puestos e inducción y una por sección documental.
+  const [activeTab, setActiveTab] = useState('summary');
+  const expedientTabs = useMemo<ExpedientTab[]>(() => {
+    const alertCount = alerts.length;
+    return [
+      { key: 'summary', label: 'Alertas y movimientos', icon: <Bell size={14} />, badge: alertCount ? String(alertCount) : undefined, attention: alertCount ? 'warning' : null },
+      { key: 'induction', label: 'Puestos e inducción', icon: <Briefcase size={14} /> },
+      ...(expedient?.sections ?? []).map(sectionToTab),
+    ];
+  }, [alerts, expedient]);
+  const currentTab = expedientTabs.some((tab) => tab.key === activeTab) ? activeTab : 'summary';
 
   const handleUpload = async (payload: {
     title: string;
@@ -226,6 +253,8 @@ export const EmployeeExpedientPage = () => {
       description: payload.description,
       issue_date: payload.issue_date || undefined,
       expiry_date: selectedItem.document_type.has_expiry ? payload.expiry_date || undefined : undefined,
+      // Sección abierta: al reemplazar se conserva la línea del documento; nuevo = sin clave.
+      reference_key: selectedItem.current_document?.reference_key ?? undefined,
       file: payload.file,
     };
 
@@ -311,7 +340,10 @@ export const EmployeeExpedientPage = () => {
           <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setListPage(1);
+              }}
               placeholder="Buscar colaborador por codigo, nombre, correo..."
               className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
             />
@@ -335,7 +367,7 @@ export const EmployeeExpedientPage = () => {
                   No hay colaboradores para mostrar.
                 </div>
               ) : (
-                filteredEmployees.map((employee) => {
+                pagedEmployees.map((employee) => {
                   const isSelected = employee.id === selectedEmployeeId;
                   return (
                     <button
@@ -365,6 +397,20 @@ export const EmployeeExpedientPage = () => {
                 })
               )}
             </div>
+            {!loadingEmployees ? (
+              <CompactListPager
+                page={currentListPage}
+                pageSize={listPageSize}
+                total={filteredEmployees.length}
+                pageSizeOptions={EMPLOYEE_PAGE_SIZES}
+                onPageChange={setListPage}
+                sizeLabel="Colaboradores por página"
+                onPageSizeChange={(size) => {
+                  setListPageSize(size);
+                  setListPage(1);
+                }}
+              />
+            ) : null}
           </div>
         </div>
 
@@ -426,43 +472,46 @@ export const EmployeeExpedientPage = () => {
                 </div>
               </div>
 
-              <EmployeeAlertsSummaryPanel
-                title="Alertas del colaborador seleccionado"
-                summary={alertsSummary}
-                alerts={alerts}
-                loading={loadingAlerts}
-              />
+              <ExpedientTabs tabs={expedientTabs} active={currentTab} onChange={setActiveTab} />
 
-              <EmployeeRecentMovementsPanel
-                logs={recentMovements}
-                loading={loadingMovements}
-              />
-
-              {selectedEmployeeId ? <EmployeePositionsPanel employeeId={selectedEmployeeId} /> : null}
-
-              {selectedEmployeeId ? <EmployeeInductionHistoryPanel employeeId={selectedEmployeeId} /> : null}
-
-              <div className="grid grid-cols-1 gap-6">
-                {expedient.sections.map((section) => (
-                  <ExpedientSectionCard
-                    key={section.section.id}
-                    section={section}
-                    onUpload={(item) => setSelectedItem(item)}
-                    onEdit={(item) => setEditItem(item)}
-                    onHistory={(item) => {
-                      setHistoryItem(item);
-                      void loadDocumentHistory(
-                        currentEmployee.id,
-                        item.document_type.id,
-                        item.current_document?.reference_key,
-                      );
-                    }}
-                    onView={(documentId) =>
-                      setSelectedPdfUrl(`${API_BASE_URL}/rh/documents/${documentId}/view`)
-                    }
-                  />
-                ))}
+              {/* Los paneles se mantienen montados y solo se ocultan: no se recargan al cambiar de pestaña. */}
+              <div className={currentTab === 'summary' ? 'space-y-6' : 'hidden'} role="tabpanel">
+                <EmployeeAlertsSummaryPanel
+                  title="Alertas del colaborador seleccionado"
+                  summary={alertsSummary}
+                  alerts={alerts}
+                  loading={loadingAlerts}
+                />
+                <EmployeeRecentMovementsPanel logs={recentMovements} loading={loadingMovements} />
               </div>
+
+              <div className={currentTab === 'induction' ? 'space-y-6' : 'hidden'} role="tabpanel">
+                {selectedEmployeeId ? <EmployeePositionsPanel employeeId={selectedEmployeeId} /> : null}
+                {selectedEmployeeId ? <EmployeeInductionHistoryPanel employeeId={selectedEmployeeId} /> : null}
+              </div>
+
+              {expedient.sections.map((section) =>
+                currentTab === `section-${section.section.id}` ? (
+                  <div key={section.section.id} role="tabpanel">
+                    <ExpedientSectionCard
+                      section={section}
+                      onUpload={(item) => setSelectedItem(item)}
+                      onEdit={(item) => setEditItem(item)}
+                      onHistory={(item) => {
+                        setHistoryItem(item);
+                        void loadDocumentHistory(
+                          currentEmployee.id,
+                          item.document_type.id,
+                          item.current_document?.reference_key,
+                        );
+                      }}
+                      onView={(documentId) =>
+                        setSelectedPdfUrl(`${API_BASE_URL}/rh/documents/${documentId}/view`)
+                      }
+                    />
+                  </div>
+                ) : null,
+              )}
             </>
           ) : (
             <div className="rounded-3xl border border-dashed border-[rgba(0,65,106,0.14)] bg-white/88 p-10 text-center shadow-xl shadow-[rgba(0,65,106,0.08)]">

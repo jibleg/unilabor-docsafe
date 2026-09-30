@@ -272,6 +272,24 @@ export const cancelKnowledgeQuiz = async (
   }
   const assignmentId = evaluation.knowledge_quiz.assignment_id;
 
+  // Capacitacion del puesto: el intento pertenece a una capacitacion real (evidencia
+  // de curso), asi que solo se desliga de la seccion 3; nunca se elimina.
+  if (evaluation.knowledge_quiz.selection_mode === 'course') {
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE public.rh_competency_evaluations
+            SET knowledge_assignment_id = NULL, knowledge_selection_mode = NULL, knowledge_synced_at = NULL, updated_at = NOW()
+          WHERE id = $1;`,
+        [evaluationId],
+      );
+      await client.query(`DELETE FROM public.rh_competency_evaluation_items WHERE evaluation_id = $1 AND section = 'CONOCIMIENTO';`, [
+        evaluationId,
+      ]);
+    });
+    void actorUserId;
+    return (await getEvaluationById(evaluationId)) as CompetencyEvaluationRecord;
+  }
+
   await withTransaction(async (client) => {
     const assignment = await client.query(
       `SELECT a.status, a.started_at,

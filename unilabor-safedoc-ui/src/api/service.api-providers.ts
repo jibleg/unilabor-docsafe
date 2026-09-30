@@ -16,6 +16,7 @@ import type {
   ProviderDocumentCategory,
   ProviderNotificationRecipient,
   ProviderSummary,
+  AgreementDashboard,
 } from '../types/models';
 
 // Modulo Proveedores: gestion documental de contratos/convenios con vigencia
@@ -267,4 +268,10 @@ export const addProviderNotificationRecipient = async (
 
 export const removeProviderNotificationRecipient = async (recipientId: number): Promise<void> => {
   await api.delete(`/providers/config/recipients/${recipientId}`);
+};
+
+/** Panorama ejecutivo de contratos y convenios (proveedores y/o clientes segun permisos). */
+export const getAgreementDashboard = async (): Promise<AgreementDashboard> => {
+  const response = await api.get('/providers/dashboard/contracts');
+  return asRecord(unwrapPayload(response.data))?.dashboard as AgreementDashboard;
 };

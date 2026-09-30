@@ -262,6 +262,8 @@ export interface EmployeeDocumentPayload {
   description?: string;
   issue_date?: string;
   expiry_date?: string;
+  /** Secciones abiertas: línea del documento que se reemplaza (vacío = documento nuevo). */
+  reference_key?: string | null;
   file: File;
 }
 

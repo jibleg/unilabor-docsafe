@@ -8,6 +8,7 @@ import { withTransaction } from '../utils/transaction';
 import { resolveStoredDocumentPath } from './document.service';
 import { buildReadingAnnexPdf, extractReadingAnnexPage } from './reading/reading-annex.pdf';
 import { refreshInductionForAcknowledgement } from './rh-induction.service';
+import { tryArchiveInductionAcknowledgement } from './rh-induction-expedient-archive.service';
 import {
   creditReadingHeartbeat,
   isValidPage,
@@ -405,6 +406,9 @@ export const signReading = async (
     // revisa si con esta firma ya se completo la lectura de la fase (fuera de
     // la transaccion de Calidad, es un modulo distinto).
     void refreshInductionForAcknowledgement(readingId);
+    // Best-effort: si el documento de la fase tiene tipo de expediente configurado,
+    // la copia firmada se archiva como nueva version en el expediente del lector.
+    tryArchiveInductionAcknowledgement(readingId);
 
     return result;
   } catch (error) {

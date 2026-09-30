@@ -1,6 +1,13 @@
 import api from './axios';
 import { unwrapPayload, asRecord } from './service.shared';
-import type { RhEmployeePosition, RhPosition, RhPositionCompetency, RhPositionDocument } from '../types/models';
+import type {
+  PositionTrainingCourse,
+  RhEmployeePosition,
+  RhPosition,
+  RhPositionCompetency,
+  RhPositionDocument,
+  TrainingCourseOption,
+} from '../types/models';
 
 // Catalogo minimo de puesto/categoria (REH-MAN-001) para el modulo de
 // induccion: nombre + competencias tecnicas + documentos obligatorios.
@@ -139,4 +146,25 @@ export const assignEmployeePosition = async (
 
 export const endEmployeePosition = async (employeePositionId: number): Promise<void> => {
   await api.delete(`/rh/employee-positions/${employeePositionId}`);
+};
+
+// --- Capacitaciones del puesto (Fase 7): fuente de la sección 3 del REH-REG-003 ---
+export const listPositionTrainingCourses = async (positionId: number): Promise<PositionTrainingCourse[]> => {
+  const response = await api.get(`/rh/positions/${positionId}/training-courses`);
+  return (asRecord(unwrapPayload(response.data))?.courses as PositionTrainingCourse[]) ?? [];
+};
+
+export const listLinkableTrainingCourses = async (): Promise<TrainingCourseOption[]> => {
+  const response = await api.get('/rh/training-courses/linkable');
+  return (asRecord(unwrapPayload(response.data))?.courses as TrainingCourseOption[]) ?? [];
+};
+
+export const linkPositionTrainingCourse = async (positionId: number, courseId: number): Promise<PositionTrainingCourse[]> => {
+  const response = await api.post(`/rh/positions/${positionId}/training-courses`, { course_id: courseId });
+  return (asRecord(unwrapPayload(response.data))?.courses as PositionTrainingCourse[]) ?? [];
+};
+
+export const unlinkPositionTrainingCourse = async (linkId: number): Promise<PositionTrainingCourse[]> => {
+  const response = await api.delete(`/rh/position-training-courses/${linkId}`);
+  return (asRecord(unwrapPayload(response.data))?.courses as PositionTrainingCourse[]) ?? [];
 };

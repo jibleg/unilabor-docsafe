@@ -174,6 +174,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
     {
       title: 'Acuerdos',
       items: [
+        { icon: LayoutDashboard, label: 'Panorama de contratos', path: '/providers/dashboard', permission: ['PROVIDERS.DOCUMENTS.READ', 'PROVIDERS.CLIENTS.DOCUMENTS.READ'] },
         { icon: Truck, label: 'De proveedores', path: '/providers', permission: 'PROVIDERS.CATALOG.READ' },
         { icon: Truck, label: 'De clientes', path: '/providers/clients', permission: 'PROVIDERS.CLIENTS.CATALOG.READ' },
       ],

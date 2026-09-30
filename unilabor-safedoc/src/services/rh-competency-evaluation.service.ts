@@ -165,7 +165,8 @@ export const computeResults = (items: CompetencyEvaluationItem[]): CompetencyEva
 export interface CompetencyKnowledgeQuiz {
   assignment_id: number;
   status: string;
-  selection_mode: 'random' | 'fixed' | null;
+  /** 'course' = evaluacion de una capacitacion del puesto; 'random'/'fixed' = banco IA del puesto. */
+  selection_mode: 'random' | 'fixed' | 'course' | null;
   question_count: number;
   deadline_at: string | null;
   started_at: string | null;
@@ -266,7 +267,7 @@ const mapRow = (row: any): CompetencyEvaluationRecord => ({
     ? {
         assignment_id: Number(row.knowledge_assignment_id),
         status: row.knowledge_status ? String(row.knowledge_status) : 'unknown',
-        selection_mode: row.knowledge_selection_mode ? (String(row.knowledge_selection_mode) as 'random' | 'fixed') : null,
+        selection_mode: row.knowledge_selection_mode ? (String(row.knowledge_selection_mode) as 'random' | 'fixed' | 'course') : null,
         question_count: Number(row.knowledge_question_count ?? 0),
         deadline_at: toIso(row.knowledge_deadline_at),
         started_at: toIso(row.knowledge_started_at),
@@ -463,12 +464,16 @@ export const syncKnowledgeFromAssignment = async (evaluationId: number, assignme
     return false;
   }
   const responses = await pool.query(
-    `SELECT r.question_id, r.is_correct, r.selected_option_ids,
+    `SELECT r.question_id,
+            -- Preguntas abiertas (capacitaciones): acierto = puntos otorgados por RH al calificar.
+            COALESCE(r.is_correct, COALESCE(r.points_awarded, 0) > 0) AS is_correct,
+            r.selected_option_ids,
             COALESCE(
-              (SELECT string_agg(o.text, ' | ' ORDER BY o.sort_order, o.id)
+              NULLIF((SELECT string_agg(o.text, ' | ' ORDER BY o.sort_order, o.id)
                  FROM public.evaluation_question_options o
                 WHERE o.question_id = r.question_id
-                  AND o.id IN (SELECT (jsonb_array_elements_text(r.selected_option_ids))::bigint)),
+                  AND o.id IN (SELECT (jsonb_array_elements_text(COALESCE(r.selected_option_ids, '[]'::jsonb)))::bigint)), ''),
+              NULLIF(TRIM(r.text_answer), ''),
               '') AS given_text
        FROM public.evaluation_responses r
       WHERE r.assignment_id = $1;`,

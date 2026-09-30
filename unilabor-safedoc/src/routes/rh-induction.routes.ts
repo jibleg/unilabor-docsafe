@@ -23,6 +23,8 @@ import {
   listPhasePositionsController,
   removePhaseChecklistItemController,
   removePhaseDocumentController,
+  setPhaseDocumentExpedientTypeController,
+  archivePhaseDocumentSignedReadingsController,
   setEnrollmentSupervisorController,
   toggleChecklistItemController,
   updatePhaseAutoChecklistController,
@@ -43,7 +45,7 @@ import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { authorizeInductionRetrySchema } from '../schemas/rh-induction-retry.schema';
 import { reopenInductionReadingSchema } from '../schemas/rh-induction-reopen-reading.schema';
-import { updatePhaseAutoChecklistSchema } from '../schemas/rh-induction-phase.schema';
+import { setPhaseDocumentExpedientTypeSchema, updatePhaseAutoChecklistSchema } from '../schemas/rh-induction-phase.schema';
 import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
 import { closeInductionRecordSchema } from '../schemas/rh-induction-closure.schema';
 import {
@@ -86,6 +88,17 @@ router.get('/induction/phases/:phaseId/positions', requirePermission('RH.INDUCTI
 router.post('/induction/phases/:phaseId/positions/:positionId/enable', requirePermission('RH.INDUCTION.MANAGE'), enablePhaseForPositionController);
 router.post('/induction/phases/:phaseId/documents', requirePermission('RH.INDUCTION.MANAGE'), addPhaseDocumentController);
 router.delete('/induction/phase-documents/:phaseDocumentId', requirePermission('RH.INDUCTION.MANAGE'), removePhaseDocumentController);
+router.patch(
+  '/induction/phase-documents/:phaseDocumentId/expedient-type',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(setPhaseDocumentExpedientTypeSchema),
+  setPhaseDocumentExpedientTypeController,
+);
+router.post(
+  '/induction/phase-documents/:phaseDocumentId/archive-signed',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  archivePhaseDocumentSignedReadingsController,
+);
 router.post('/induction/phases/:phaseId/enroll', requirePermission('RH.INDUCTION.MANAGE'), enrollEmployeeInPhaseController);
 router.post('/induction/phases/:phaseId/enroll-all', requirePermission('RH.INDUCTION.MANAGE'), enrollAllEmployeesInPhaseController);
 router.get('/induction/phases/:phaseId/enrollments', requirePermission('RH.INDUCTION.MANAGE'), listPhaseEnrollmentsController);

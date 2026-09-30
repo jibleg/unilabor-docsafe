@@ -279,24 +279,61 @@ export interface RhInductionPhaseDocument {
   title: string;
   code: string | null;
   sort_order: number;
+  /** Tipo del expediente donde se archiva la copia firmada (null = no se archiva). */
+  expedient_document_type_id: number | null;
+  expedient_document_type_code: string | null;
+  expedient_document_type_name: string | null;
+  expedient_section_name: string | null;
 }
 
+const PHASE_DOCUMENT_SELECT = `
+  SELECT pd.id, pd.document_id, pd.sort_order, d.title, d.code,
+         pd.expedient_document_type_id, dt.code AS expedient_document_type_code,
+         dt.name AS expedient_document_type_name, ds.name AS expedient_section_name
+    FROM public.rh_induction_phase_documents pd
+   INNER JOIN public.documents d ON d.id = pd.document_id
+    LEFT JOIN public.document_types dt ON dt.id = pd.expedient_document_type_id
+    LEFT JOIN public.document_sections ds ON ds.id = dt.section_id`;
+
+const mapPhaseDocumentRow = (row: any): RhInductionPhaseDocument => ({
+  id: Number(row.id),
+  document_id: String(row.document_id),
+  title: String(row.title),
+  code: row.code ? String(row.code) : null,
+  sort_order: Number(row.sort_order ?? 0),
+  expedient_document_type_id: row.expedient_document_type_id === null ? null : Number(row.expedient_document_type_id),
+  expedient_document_type_code: row.expedient_document_type_code ? String(row.expedient_document_type_code) : null,
+  expedient_document_type_name: row.expedient_document_type_name ? String(row.expedient_document_type_name) : null,
+  expedient_section_name: row.expedient_section_name ? String(row.expedient_section_name) : null,
+});
+
 export const listPhaseDocuments = async (phaseId: number): Promise<RhInductionPhaseDocument[]> => {
-  const result = await pool.query(
-    `SELECT pd.id, pd.document_id, pd.sort_order, d.title, d.code
-       FROM public.rh_induction_phase_documents pd
-       INNER JOIN public.documents d ON d.id = pd.document_id
-      WHERE pd.phase_id = $1
-      ORDER BY pd.sort_order ASC, pd.id ASC;`,
-    [phaseId],
+  const result = await pool.query(`${PHASE_DOCUMENT_SELECT} WHERE pd.phase_id = $1 ORDER BY pd.sort_order ASC, pd.id ASC;`, [phaseId]);
+  return result.rows.map(mapPhaseDocumentRow);
+};
+
+/**
+ * Configura (o quita, con null) el tipo del expediente donde se archivara la
+ * copia firmada de este documento de fase. Configurable por RH: no hay mapeo
+ * fijo en codigo. Devuelve null si el registro no existe.
+ */
+export const setPhaseDocumentExpedientType = async (
+  phaseDocumentId: number,
+  documentTypeId: number | null,
+): Promise<RhInductionPhaseDocument | null> => {
+  if (documentTypeId !== null) {
+    const type = await pool.query(`SELECT id FROM public.document_types WHERE id = $1 AND is_active = TRUE;`, [documentTypeId]);
+    if (type.rows.length === 0) {
+      throwCoded('RH_INDUCTION_EXPEDIENT_TYPE_NOT_FOUND', 'El tipo documental del expediente no existe o esta inactivo.');
+    }
+  }
+  const updated = await pool.query(
+    `UPDATE public.rh_induction_phase_documents SET expedient_document_type_id = $2 WHERE id = $1 RETURNING id;`,
+    [phaseDocumentId, documentTypeId],
   );
-  return result.rows.map((row) => ({
-    id: Number(row.id),
-    document_id: String(row.document_id),
-    title: String(row.title),
-    code: row.code ? String(row.code) : null,
-    sort_order: Number(row.sort_order ?? 0),
-  }));
+  if (updated.rows.length === 0) return null;
+  const result = await pool.query(`${PHASE_DOCUMENT_SELECT} WHERE pd.id = $1;`, [phaseDocumentId]);
+  return result.rows[0] ? mapPhaseDocumentRow(result.rows[0]) : null;
 };
 
 export const addPhaseDocument = async (

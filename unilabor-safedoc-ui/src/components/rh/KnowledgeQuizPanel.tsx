@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpenCheck, Clock3, Loader2, RefreshCw, Shuffle, ListChecks, X, XCircle } from 'lucide-react';
+import { BookOpenCheck, Clock3, GraduationCap, Loader2, RefreshCw, Shuffle, ListChecks, Sparkles, X, XCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { getApiErrorMessage } from '../../api/service';
 import { assignKnowledgeQuiz, cancelKnowledgeQuiz, getCompetencyEvaluation } from '../../api/service.api-rh-competency';
@@ -8,6 +8,8 @@ import { getPositionById } from '../../api/service.api-rh-position';
 import type { QuestionBankItem, RhCompetencyEvaluation, RhPositionDocument } from '../../types/models';
 import { confirmAction } from '../../utils/confirm';
 import { QuestionBankPanel } from './QuestionBankPanel';
+import { EvaluationResponsesModal } from './EvaluationResponsesModal';
+import { KnowledgeCourseSource } from './KnowledgeCourseSource';
 
 interface KnowledgeQuizPanelProps {
   evaluation: RhCompetencyEvaluation;
@@ -56,6 +58,10 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
   const [loadingBank, setLoadingBank] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [showResponses, setShowResponses] = useState(false);
+  const isCourse = quiz?.selection_mode === 'course';
+  // Fuente de la sección 3: la capacitación del puesto es la opción preferida; el banco IA queda como alternativa.
+  const [source, setSource] = useState<'course' | 'bank'>(quiz && !isCourse ? 'bank' : 'course');
 
   const loadBank = useCallback(async () => {
     setLoadingBank(true);
@@ -74,10 +80,10 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
   }, [evaluation.position_id]);
 
   useEffect(() => {
-    if (!readOnly) {
+    if (!readOnly && source === 'bank') {
       void loadBank();
     }
-  }, [loadBank, readOnly]);
+  }, [loadBank, readOnly, source]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -100,9 +106,11 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
 
   const handleCancel = async () => {
     const ok = await confirmAction(
-      'Cancelar cuestionario de Conocimiento',
-      'Se retirará el cuestionario que el colaborador aún no ha iniciado y la sección 3 volverá a captura manual. Podrás asignar uno nuevo después.',
-      'Cancelar cuestionario',
+      isCourse ? 'Desligar la capacitación de la sección 3' : 'Cancelar cuestionario de Conocimiento',
+      isCourse
+        ? 'La sección 3 dejará de usar esta evaluación y volverá a captura manual. La evaluación de la capacitación del colaborador NO se elimina (es evidencia de su curso).'
+        : 'Se retirará el cuestionario que el colaborador aún no ha iniciado y la sección 3 volverá a captura manual. Podrás asignar uno nuevo después.',
+      isCourse ? 'Desligar' : 'Cancelar cuestionario',
     );
     if (!ok) return;
     try {
@@ -116,7 +124,8 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
 
   const status = quiz ? QUIZ_STATUS[quiz.status] ?? { label: quiz.status, className: 'bg-slate-100 text-slate-600 ring-slate-200' } : null;
   const canReassign = quiz ? ['failed', 'expired'].includes(quiz.status) : true;
-  const canCancel = quiz ? ['pending', 'expired'].includes(quiz.status) : false;
+  const canCancel = quiz ? (isCourse ? quiz.status !== 'passed' : ['pending', 'expired'].includes(quiz.status)) : false;
+  const hasAnswers = quiz ? ['submitted', 'grading', 'passed', 'failed'].includes(quiz.status) : false;
 
   if (readOnly && !quiz) {
     return null;
@@ -127,12 +136,17 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
-            <BookOpenCheck size={15} /> Cuestionario de Conocimiento (banco del puesto)
+            {isCourse ? <GraduationCap size={15} /> : <BookOpenCheck size={15} />}
+            {quiz
+              ? isCourse
+                ? `Evaluación de la capacitación: ${evaluation.reference_course_title ?? ''}`
+                : 'Cuestionario de Conocimiento (banco del puesto)'
+              : 'Fuente de la sección 3 · Conocimiento'}
           </h3>
           <p className="text-xs text-[var(--unilabor-neutral)]">
             {quiz
-              ? 'El colaborador lo contesta en "Mis evaluaciones"; al enviarlo, la sección 3 se llena sola con sus respuestas.'
-              : 'Genera y aprueba preguntas desde los documentos obligatorios del puesto y asigna al colaborador un cuestionario autocalificable.'}
+              ? 'El colaborador la contesta en "Mis evaluaciones"; al enviarla, la sección 3 se llena sola con sus preguntas y respuestas.'
+              : 'Usa la evaluación de una capacitación ligada al puesto, o arma un cuestionario con el banco de preguntas IA del puesto.'}
           </p>
         </div>
         {quiz && status ? (
@@ -145,7 +159,7 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
           <div>
             <p className="font-semibold text-[var(--unilabor-neutral)]">Preguntas</p>
             <p className="text-sm font-bold text-[var(--unilabor-ink)]">
-              {quiz.question_count} · {quiz.selection_mode === 'fixed' ? 'selección fija' : 'al azar'}
+              {quiz.question_count} · {isCourse ? 'de la capacitación' : quiz.selection_mode === 'fixed' ? 'selección fija' : 'al azar'}
             </p>
           </div>
           <div>
@@ -173,7 +187,12 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
               Actualizar estado
             </button>
           ) : null}
-          {canReassign ? (
+          {hasAnswers ? (
+            <button type="button" onClick={() => setShowResponses(true)} className={buttonClass}>
+              <ListChecks size={14} /> Ver preguntas y respuestas
+            </button>
+          ) : null}
+          {canReassign && source === 'bank' ? (
             <button
               type="button"
               onClick={() => setShowAssign(true)}
@@ -189,16 +208,43 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
               onClick={() => void handleCancel()}
               className="inline-flex items-center gap-1 rounded-xl border border-[rgba(176,42,42,0.25)] px-3 py-2 text-sm font-semibold text-[#b02a2a] transition hover:bg-[rgba(190,40,40,0.08)]"
             >
-              <XCircle size={14} /> Cancelar cuestionario
+              <XCircle size={14} /> {isCourse ? 'Desligar capacitación' : 'Cancelar cuestionario'}
             </button>
           ) : null}
-          <span className="text-xs text-[var(--unilabor-neutral)]">
-            {loadingBank ? 'Cargando banco…' : `${approved.length} pregunta(s) aprobada(s) en el banco del puesto`}
-          </span>
+          {source === 'bank' ? (
+            <span className="text-xs text-[var(--unilabor-neutral)]">
+              {loadingBank ? 'Cargando banco…' : `${approved.length} pregunta(s) aprobada(s) en el banco del puesto`}
+            </span>
+          ) : null}
         </div>
       )}
 
-      {!readOnly && (
+      {!readOnly && canReassign ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSource('course')}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${source === 'course' ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'}`}
+          >
+            <GraduationCap size={13} /> Capacitación del puesto
+          </button>
+          <button
+            type="button"
+            onClick={() => setSource('bank')}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${source === 'bank' ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'}`}
+          >
+            <Sparkles size={13} /> Banco de preguntas IA del puesto
+          </button>
+        </div>
+      ) : null}
+
+      {!readOnly && canReassign && source === 'course' ? (
+        <div className="mt-3">
+          <KnowledgeCourseSource evaluation={evaluation} onChanged={onChanged} />
+        </div>
+      ) : null}
+
+      {!readOnly && source === 'bank' && (
         <div className="mt-4">
           <QuestionBankPanel
             scope={{ positionId: evaluation.position_id }}
@@ -214,6 +260,12 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
           ) : null}
         </div>
       )}
+
+      {showResponses && quiz ? (
+        <div className="relative z-[70]">
+          <EvaluationResponsesModal assignmentId={quiz.assignment_id} onClose={() => setShowResponses(false)} />
+        </div>
+      ) : null}
 
       {showAssign ? (
         <AssignQuizModal

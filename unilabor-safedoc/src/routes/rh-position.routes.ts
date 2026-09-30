@@ -26,6 +26,14 @@ import {
   positionSchema,
 } from '../schemas/rh-position.schema';
 
+import {
+  linkPositionTrainingCourseController,
+  listLinkableTrainingCoursesController,
+  listPositionTrainingCoursesController,
+  unlinkPositionTrainingCourseController,
+} from '../controllers/rh-position-training-course.controller';
+import { linkPositionTrainingCourseSchema } from '../schemas/rh-competency-evaluation.schema';
+
 const router = Router();
 
 router.use(verifyToken);
@@ -92,5 +100,16 @@ router.delete(
   requirePermission('RH.INDUCTION.MANAGE'),
   endEmployeePositionController,
 );
+
+// --- Capacitaciones del puesto (Fase 7): fuente de la seccion 3 del REH-REG-003 ---
+router.get('/training-courses/linkable', requirePermission(['RH.INDUCTION.MANAGE', 'RH.COMPETENCY.MANAGE']), listLinkableTrainingCoursesController);
+router.get('/positions/:id/training-courses', requirePermission(['RH.INDUCTION.MANAGE', 'RH.COMPETENCY.MANAGE']), listPositionTrainingCoursesController);
+router.post(
+  '/positions/:id/training-courses',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(linkPositionTrainingCourseSchema),
+  linkPositionTrainingCourseController,
+);
+router.delete('/position-training-courses/:linkId', requirePermission('RH.INDUCTION.MANAGE'), unlinkPositionTrainingCourseController);
 
 export default router;

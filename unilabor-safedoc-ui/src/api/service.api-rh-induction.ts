@@ -125,6 +125,34 @@ export const removePhaseDocument = async (phaseDocumentId: number): Promise<void
   await api.delete(`/rh/induction/phase-documents/${phaseDocumentId}`);
 };
 
+/** Configura (o quita con null) el tipo del expediente donde se archiva la copia firmada. */
+export const setPhaseDocumentExpedientType = async (
+  phaseDocumentId: number,
+  documentTypeId: number | null,
+): Promise<{ message: string; document: RhInductionPhaseDocument }> => {
+  const response = await api.patch(`/rh/induction/phase-documents/${phaseDocumentId}/expedient-type`, {
+    document_type_id: documentTypeId,
+  });
+  return response.data as { message: string; document: RhInductionPhaseDocument };
+};
+
+export interface InductionArchiveBatchSummary {
+  total: number;
+  archived: number;
+  already_archived: number;
+  file_missing: number;
+  not_signed: number;
+  failed: number;
+}
+
+/** Archiva en los expedientes las firmas ya existentes del documento de fase (idempotente). */
+export const archivePhaseDocumentSignedReadings = async (
+  phaseDocumentId: number,
+): Promise<{ message: string; summary: InductionArchiveBatchSummary }> => {
+  const response = await api.post(`/rh/induction/phase-documents/${phaseDocumentId}/archive-signed`);
+  return response.data as { message: string; summary: InductionArchiveBatchSummary };
+};
+
 export const enrollEmployeeInPhase = async (
   phaseId: number,
   employeeId: number,

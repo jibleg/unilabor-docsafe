@@ -192,6 +192,9 @@ const UsersPage = lazy(() => import('./pages/UsersPage').then((module) => ({ def
 const ProvidersListPage = lazy(() =>
   import('./pages/ProvidersListPage').then((module) => ({ default: module.ProvidersListPage })),
 );
+const ProvidersDashboardPage = lazy(() =>
+  import('./pages/ProvidersDashboardPage').then((module) => ({ default: module.ProvidersDashboardPage })),
+);
 const ProviderDetailPage = lazy(() =>
   import('./pages/ProviderDetailPage').then((module) => ({ default: module.ProviderDetailPage })),
 );
@@ -686,6 +689,14 @@ function App() {
         }
       >
         <Route index element={<ProvidersListPage />} />
+        <Route
+          path="dashboard"
+          element={
+            <PermissionGate permission={['PROVIDERS.DOCUMENTS.READ', 'PROVIDERS.CLIENTS.DOCUMENTS.READ']} redirectTo="/providers">
+              <ProvidersDashboardPage />
+            </PermissionGate>
+          }
+        />
         <Route path=":id" element={<ProviderDetailPage />} />
         <Route
           path="catalog"

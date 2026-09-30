@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import pool from '../config/db';
 import type {
   DocumentSectionRecord,
@@ -20,6 +21,8 @@ export interface EmployeeDocumentPayload {
   description?: string | null;
   issue_date?: string | null;
   expiry_date?: string | null;
+  /** Secciones abiertas: linea del documento que se reemplaza (vacio = documento nuevo). */
+  reference_key?: string | null;
 }
 
 export interface EmployeeDocumentFilters {
@@ -135,6 +138,12 @@ const mapSectionRow = (row: any): DocumentSectionRecord => {
     is_active: Boolean(row.section_is_active ?? row.is_active),
     is_system_defined: Boolean(row.section_is_system_defined ?? row.is_system_defined),
     sort_order: Number(row.section_sort_order ?? row.sort_order ?? 0),
+    is_open: Boolean(row.section_is_open ?? row.is_open ?? false),
+    open_document_type_id:
+      (row.section_open_document_type_id ?? row.open_document_type_id) === null ||
+      (row.section_open_document_type_id ?? row.open_document_type_id) === undefined
+        ? null
+        : Number(row.section_open_document_type_id ?? row.open_document_type_id),
   };
 
   if (row.section_created_at) {
@@ -481,6 +490,8 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
         s.is_active AS section_is_active,
         s.is_system_defined AS section_is_system_defined,
         s.sort_order AS section_sort_order,
+        s.is_open AS section_is_open,
+        s.open_document_type_id AS section_open_document_type_id,
         s.created_at AS section_created_at,
         s.updated_at AS section_updated_at,
         dt.id AS document_type_id,
@@ -532,7 +543,8 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
        AND ed.is_current = TRUE
       LEFT JOIN public.users u ON u.id = ed.uploaded_by_user_id
       WHERE s.is_active = TRUE
-      ORDER BY s.sort_order ASC, s.name ASC, dt.sort_order ASC, dt.name ASC;
+      ORDER BY s.sort_order ASC, s.name ASC, dt.sort_order ASC, dt.name ASC,
+               ed.issue_date DESC NULLS LAST, ed.created_at DESC;
     `,
     [employeeId],
   );
@@ -544,6 +556,7 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
   let uploadedTypes = 0;
   let expiringCount = 0;
   let expiredCount = 0;
+  let openDocuments = 0;
 
   for (const row of result.rows) {
     const section = mapSectionRow(row);
@@ -553,6 +566,25 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
         ? mapEmployeeDocumentRow(row)
         : null;
     const itemStatus = calculateItemStatus(documentType, currentDocument);
+
+    const currentSection = sectionMap.get(section.id) ?? {
+      section,
+      items: [],
+    };
+    sectionMap.set(section.id, currentSection);
+
+    // Seccion abierta (p. ej. Constancias): solo documentos reales, sin casillas
+    // vacias; no cuentan como tipos configurados ni como pendientes.
+    if (section.is_open) {
+      if (!currentDocument) {
+        continue;
+      }
+      openDocuments += 1;
+      if (itemStatus === 'expiring') expiringCount += 1;
+      if (itemStatus === 'expired') expiredCount += 1;
+      currentSection.items.push({ document_type: documentType, current_document: currentDocument, status: itemStatus });
+      continue;
+    }
 
     totalTypes += 1;
     if (documentType.is_required) {
@@ -568,18 +600,18 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
       expiredCount += 1;
     }
 
-    const currentSection = sectionMap.get(section.id) ?? {
-      section,
-      items: [],
-    };
-
     currentSection.items.push({
       document_type: documentType,
       current_document: currentDocument,
       status: itemStatus,
     });
+  }
 
-    sectionMap.set(section.id, currentSection);
+  // Tipo generico de cada seccion abierta, para que la UI ofrezca "Nuevo documento".
+  for (const entry of sectionMap.values()) {
+    if (entry.section.is_open && entry.section.open_document_type_id) {
+      entry.open_document_type = await ensureDocumentTypeExists(entry.section.open_document_type_id).catch(() => null);
+    }
   }
 
   const missingTypes = Math.max(totalTypes - uploadedTypes, 0);
@@ -595,6 +627,7 @@ export const buildEmployeeExpedient = async (employeeId: number): Promise<{
       completion_percent: completionPercent,
       expiring_count: expiringCount,
       expired_count: expiredCount,
+      open_documents: openDocuments,
     },
     sections: Array.from(sectionMap.values()),
   };
@@ -611,6 +644,12 @@ export const uploadEmployeeDocument = async (
   await ensureEmployeeExists(employeeId);
   const documentType = await ensureDocumentTypeExists(payload.document_type_id);
   await ensureDocumentTypeAssignedToEmployee(employeeId, documentType.id);
+
+  // Seccion abierta (Constancias): cada documento es una linea propia por
+  // reference_key; reemplazar solo supera la linea indicada y "nuevo" crea otra.
+  const sectionResult = await pool.query(`SELECT is_open FROM public.document_sections WHERE id = $1;`, [documentType.section_id]);
+  const openSection = Boolean(sectionResult.rows[0]?.is_open);
+  const referenceKey = openSection ? payload.reference_key?.trim() || `constancia:${randomUUID()}` : null;
 
   const client = await pool.connect();
 
@@ -647,10 +686,11 @@ export const uploadEmployeeDocument = async (
         WHERE employee_id = $1
           AND document_type_id = $2
           AND is_current = TRUE
+          AND ($3::text IS NULL OR reference_key = $3)
         LIMIT 1
         FOR UPDATE;
       `,
-      [employeeId, documentType.id],
+      [employeeId, documentType.id, referenceKey],
     );
 
     const currentDocument = currentResult.rows[0] ?? null;
@@ -686,10 +726,11 @@ export const uploadEmployeeDocument = async (
           status,
           version,
           is_current,
-          replaces_document_id
+          replaces_document_id,
+          reference_key
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, TRUE, $12
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, TRUE, $12, $13
         )
         RETURNING id;
       `,
@@ -706,6 +747,7 @@ export const uploadEmployeeDocument = async (
         payload.expiry_date ?? null,
         nextVersion,
         currentDocument ? Number(currentDocument.id) : null,
+        referenceKey,
       ],
     );
 

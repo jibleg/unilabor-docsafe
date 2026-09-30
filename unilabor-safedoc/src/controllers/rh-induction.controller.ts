@@ -14,6 +14,7 @@ import {
   listPhaseEnrollments,
   listPhasePositions,
   removePhaseDocument,
+  setPhaseDocumentExpedientType,
   setEnrollmentSupervisor,
   publishInductionPhase,
   unpublishInductionPhase,
@@ -26,7 +27,8 @@ import {
   setPhaseAutoCompleteChecklist,
   toggleChecklistItem,
 } from '../services/rh-induction-checklist.service';
-import type { UpdatePhaseAutoChecklistInput } from '../schemas/rh-induction-phase.schema';
+import type { SetPhaseDocumentExpedientTypeInput, UpdatePhaseAutoChecklistInput } from '../schemas/rh-induction-phase.schema';
+import { archiveSignedReadingsForPhaseDocument } from '../services/rh-induction-expedient-archive.service';
 import { createEffectivenessReview, listEffectivenessReviews } from '../services/rh-induction-effectiveness.service';
 import { getEmployeeInductionMasterRecord } from '../services/rh-induction-master-record.service';
 import { buildInductionMasterRecordPdf } from '../services/rh-induction-master-record.pdf';
@@ -67,6 +69,7 @@ const ERROR_STATUS: Record<string, number> = {
   RH_INDUCTION_BULK_ONLY_INSTITUTIONAL: 409,
   RH_INDUCTION_PHASE_DOCUMENT_DUPLICATE: 409,
   RH_INDUCTION_PHASE_DOCUMENT_NOT_FOUND: 400,
+  RH_INDUCTION_EXPEDIENT_TYPE_NOT_FOUND: 404,
   RH_INDUCTION_PREVIOUS_PHASE_NOT_APPROVED: 409,
   RH_INDUCTION_ENROLLMENT_NOT_FOUND: 404,
   RH_INDUCTION_ENROLLMENT_ALREADY_PASSED: 409,
@@ -319,6 +322,51 @@ export const addPhaseDocumentController = async (req: AuthRequest, res: Response
     if (mapped) return mapped;
     console.error('Error agregando documento a la fase:', error);
     return res.status(500).json({ message: 'No se pudo agregar el documento.' });
+  }
+};
+
+export const setPhaseDocumentExpedientTypeController = async (req: AuthRequest, res: Response) => {
+  const phaseDocumentId = parsePositiveInt(req.params.phaseDocumentId);
+  if (!phaseDocumentId) {
+    return res.status(400).json({ message: 'ID invalido.' });
+  }
+  const { document_type_id: documentTypeId } = req.body as SetPhaseDocumentExpedientTypeInput;
+  try {
+    const document = await setPhaseDocumentExpedientType(phaseDocumentId, documentTypeId);
+    if (!document) {
+      return res.status(404).json({ message: 'Registro no encontrado.' });
+    }
+    return res.json({
+      message: documentTypeId
+        ? 'Las firmas de este documento se archivaran en el expediente.'
+        : 'Este documento ya no se archivara en el expediente.',
+      document,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error configurando el tipo de expediente del documento de fase:', error);
+    return res.status(500).json({ message: 'No se pudo guardar la configuracion.' });
+  }
+};
+
+/** Archiva en los expedientes las firmas ya existentes del documento de fase (historico, idempotente). */
+export const archivePhaseDocumentSignedReadingsController = async (req: AuthRequest, res: Response) => {
+  const phaseDocumentId = parsePositiveInt(req.params.phaseDocumentId);
+  if (!phaseDocumentId) {
+    return res.status(400).json({ message: 'ID invalido.' });
+  }
+  try {
+    const summary = await archiveSignedReadingsForPhaseDocument(phaseDocumentId);
+    const parts = [`${summary.archived} archivada(s)`];
+    if (summary.already_archived) parts.push(`${summary.already_archived} ya estaban en el expediente`);
+    if (summary.not_signed) parts.push(`${summary.not_signed} sin firmar`);
+    if (summary.file_missing) parts.push(`${summary.file_missing} sin archivo de evidencia`);
+    if (summary.failed) parts.push(`${summary.failed} con error`);
+    return res.json({ message: `Firmas revisadas: ${summary.total}. ${parts.join(', ')}.`, summary });
+  } catch (error: any) {
+    console.error('Error archivando firmas historicas del documento de fase:', error);
+    return res.status(500).json({ message: 'No se pudieron archivar las firmas existentes.' });
   }
 };
 

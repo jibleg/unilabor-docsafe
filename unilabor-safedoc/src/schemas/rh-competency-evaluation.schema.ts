@@ -114,3 +114,16 @@ export const assignKnowledgeQuizSchema = z
   });
 
 export type AssignKnowledgeQuizInput = z.infer<typeof assignKnowledgeQuizSchema>;
+
+/** Seccion 3 desde la capacitacion del puesto: 'new' asigna su cuestionario, 'existing' toma el ultimo intento. */
+export const assignCourseKnowledgeSchema = z.object({
+  course_id: z.coerce.number({ message: 'Elige la capacitacion' }).int().positive('Elige la capacitacion'),
+  mode: z.enum(['new', 'existing'], { message: 'Indica si se asigna una evaluacion nueva o se usa la ya presentada' }),
+});
+export type AssignCourseKnowledgeInput = z.infer<typeof assignCourseKnowledgeSchema>;
+
+/** Liga una capacitacion a un puesto (catalogo de Puestos). */
+export const linkPositionTrainingCourseSchema = z.object({
+  course_id: z.coerce.number({ message: 'Elige la capacitacion' }).int().positive('Elige la capacitacion'),
+});
+export type LinkPositionTrainingCourseInput = z.infer<typeof linkPositionTrainingCourseSchema>;

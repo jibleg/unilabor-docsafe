@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, CheckSquare, Eye, EyeOff, FileText, GraduationCap, ListChecks, Loader2, Phone, RotateCcw, Square, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Eye, EyeOff, FileText, GraduationCap, Info, ListChecks, Loader2, Phone, UserPlus, Users, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { listEmployees } from '../api/service';
 import {
@@ -33,7 +33,15 @@ import { EnrollmentCertificateDataModal } from '../components/rh/EnrollmentCerti
 import { InductionRetryModal } from '../components/rh/InductionRetryModal';
 import { InductionReopenReadingModal } from '../components/rh/InductionReopenReadingModal';
 import { listPositions, type DocumentSearchResult } from '../api/service.api-rh-position';
-import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
+import { CompactListPager } from '../components/CompactListPager';
+import { ExpedientTabs } from '../components/rh/ExpedientTabs';
+import { InductionCertReadinessNotice } from '../components/rh/induction-phase/InductionCertReadinessNotice';
+import { InductionEnrollmentCard } from '../components/rh/induction-phase/InductionEnrollmentCard';
+import { InductionPhaseChecklistTab } from '../components/rh/induction-phase/InductionPhaseChecklistTab';
+import { InductionPhaseDocumentsTab } from '../components/rh/induction-phase/InductionPhaseDocumentsTab';
+import { buttonClass, inputClass, sectionTitleClass } from '../components/rh/induction-phase/styles';
+import { certReadinessIssues } from '../utils/inductionCertReadiness';
+import type { ExpedientTab } from '../utils/expedientTabs';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { SearchableSelect } from '../components/SearchableSelect';
 import type {
@@ -47,36 +55,10 @@ import type {
 } from '../types/models';
 
 const cardClass = 'rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-5 shadow-xl shadow-[rgba(0,65,106,0.08)]';
-const inputClass =
-  'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]';
-const buttonClass =
-  'inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50';
+/** Tamaños de página del listado de inscritos. */
+const ENROLLMENT_PAGE_SIZES = [10, 20, 30];
 
-const formatPercentage = (item: RhInductionPhaseEnrollmentSummary): string => {
-  if (item.evaluation_percentage === null) return 'Sin evaluación';
-  return `${item.evaluation_percentage}%`;
-};
-
-// Solo estos estados admiten "Autorizar nuevo intento" (politica: intento unico,
-// RH reabre tras retroalimentacion). El backend valida lo mismo.
-const RETRYABLE_EVALUATION_STATUSES = ['failed', 'expired'];
-
-const canAuthorizeRetry = (item: RhInductionPhaseEnrollmentSummary): boolean =>
-  item.evaluation_status !== null && RETRYABLE_EVALUATION_STATUSES.includes(item.evaluation_status);
-
-// "Reabrir lectura": lectura incompleta con documentos asignados y sin un
-// cuestionario en curso: sin examen, o examen abierto por vencimiento que nadie
-// inicio (pending, o expired si ademas se agoto su ventana). El backend
-// verifica que siga sin iniciar ni contestar.
-const REOPENABLE_EVALUATION_STATUSES: Array<string | null> = [null, 'pending', 'expired'];
-
-const canReopenReading = (item: RhInductionPhaseEnrollmentSummary): boolean =>
-  item.reading_total > 0 &&
-  !item.reading_completed_at &&
-  REOPENABLE_EVALUATION_STATUSES.includes(item.evaluation_status);
-
-const isReadingExpired = (item: RhInductionPhaseEnrollmentSummary): boolean =>
-  Boolean(item.reading_deadline_at) && new Date(item.reading_deadline_at as string) < new Date();
+type PhaseTabKey = 'info' | 'documents' | 'checklist' | 'enrollment';
 
 export const RhInductionPage = () => {
   const [phases, setPhases] = useState<RhInductionPhase[]>([]);
@@ -134,6 +116,11 @@ export const RhInductionPage = () => {
   const [editingSupervisorId, setEditingSupervisorId] = useState<number | null>(null);
   const [supervisorSelection, setSupervisorSelection] = useState('');
 
+  // Columna derecha en pestañas + listado de inscritos paginado (10/20/30).
+  const [activeTab, setActiveTab] = useState<PhaseTabKey>('info');
+  const [enrollPage, setEnrollPage] = useState(1);
+  const [enrollPageSize, setEnrollPageSize] = useState(ENROLLMENT_PAGE_SIZES[0]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -162,6 +149,48 @@ export const RhInductionPage = () => {
   const pendingReaders = enrollments.filter((item) => !item.evaluation_status && !item.reading_completed_at);
   const formatDeadline = (value: Date): string =>
     value.toLocaleString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  const employeeOptions = useMemo(
+    () => employees.map((employee) => ({ value: String(employee.id), label: employee.full_name, hint: employee.employee_code })),
+    [employees],
+  );
+
+  const enrollTotalPages = Math.max(1, Math.ceil(enrollments.length / enrollPageSize));
+  const currentEnrollPage = Math.min(enrollPage, enrollTotalPages);
+  const pagedEnrollments = enrollments.slice((currentEnrollPage - 1) * enrollPageSize, currentEnrollPage * enrollPageSize);
+
+  const phaseTabs = useMemo<ExpedientTab[]>(() => {
+    if (!selectedPhase) return [];
+    const readinessIssues = certReadiness ? certReadinessIssues(certReadiness).length : 0;
+    const institutional = selectedPhase.scope === 'INSTITUTIONAL';
+    return [
+      {
+        key: 'info',
+        label: 'Información de la fase',
+        icon: <Info size={14} />,
+        attention: readinessIssues > 0 ? 'warning' : null,
+      },
+      {
+        key: 'documents',
+        label: 'Documentos obligatorios',
+        icon: <FileText size={14} />,
+        badge: institutional ? String(selectedPhase.documents.length) : undefined,
+        attention: institutional && selectedPhase.documents.length === 0 ? 'warning' : null,
+      },
+      {
+        key: 'checklist',
+        label: 'Checklist',
+        icon: <ListChecks size={14} />,
+        badge: String(checklistItems.length),
+      },
+      {
+        key: 'enrollment',
+        label: 'Inscripción de colaboradores',
+        icon: <GraduationCap size={14} />,
+        badge: String(enrollments.length),
+      },
+    ];
+  }, [certReadiness, checklistItems.length, enrollments.length, selectedPhase]);
 
   const loadEnrollments = useCallback(
     async (phaseId: number) => {
@@ -194,6 +223,7 @@ export const RhInductionPage = () => {
     setDurationHours(phase.duration_hours !== null ? String(phase.duration_hours) : '');
     setReadingLimitHours(phase.reading_time_limit_hours !== null ? String(phase.reading_time_limit_hours) : '');
     setExpandedEnrollmentId(null);
+    setEnrollPage(1);
     setBulkResult(null);
     setPhasePositions([]);
     setEnablePositionId('');
@@ -586,7 +616,7 @@ export const RhInductionPage = () => {
               resultado se refleja automáticamente en esta fase del Formato de Inducción.
             </p>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-[var(--color-brand-700)]">
@@ -613,555 +643,318 @@ export const RhInductionPage = () => {
                       ? `Publicada el ${new Date(selectedPhase.published_at).toLocaleDateString('es-MX', { dateStyle: 'medium' })}: los inscritos ya ven sus documentos.`
                       : 'En borrador: puedes inscribir, pero nadie ve documentos hasta publicar.'}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => void handleToggleAutoChecklist()}
-                    disabled={togglingAutoChecklist}
-                    className={
-                      selectedPhase.auto_complete_checklist_on_pass
-                        ? 'inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60'
-                        : 'inline-flex items-center gap-2 rounded-xl border border-[rgba(191,212,230,0.8)] bg-white px-3 py-2 text-xs font-semibold text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.2)] disabled:opacity-60'
-                    }
-                    title="Al aprobar la evaluación de la fase, el sistema marca todos los contenidos del checklist"
-                  >
-                    {togglingAutoChecklist ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : selectedPhase.auto_complete_checklist_on_pass ? (
-                      <CheckSquare size={14} />
-                    ) : (
-                      <Square size={14} />
-                    )}
-                    Completar checklist al aprobar
-                  </button>
-                  <p className="text-[11px] text-[var(--unilabor-neutral)]">
-                    {selectedPhase.auto_complete_checklist_on_pass
-                      ? 'Activo: al aprobar la evaluación se marcan todos los contenidos (autor: Recursos Humanos).'
-                      : 'Inactivo: el checklist de contenidos se marca a mano por inscrito.'}
-                  </p>
                 </div>
               </div>
 
-              <div>
-                <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
-                  <Phone size={14} />
-                  Contacto del responsable (para el aviso por WhatsApp)
-                </h3>
-                <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                  <input
-                    value={responsibleName}
-                    onChange={(event) => setResponsibleName(event.target.value)}
-                    placeholder="Nombre del responsable"
-                    className={inputClass}
-                  />
-                  <input
-                    value={responsiblePhone}
-                    onChange={(event) => setResponsiblePhone(event.target.value)}
-                    placeholder="Teléfono (10 dígitos)"
-                    className={inputClass}
-                  />
-                  <button type="button" onClick={() => void handleSaveContact()} disabled={savingContact} className={buttonClass}>
-                    {savingContact ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
-                  </button>
-                </div>
-              </div>
+              <ExpedientTabs
+                tabs={phaseTabs}
+                active={activeTab}
+                onChange={(key) => setActiveTab(key as PhaseTabKey)}
+                ariaLabel="Secciones de la fase"
+              />
 
-              <div>
-                <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
-                  Duración de la fase (horas)
-                </h3>
-                <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
-                  Se muestra en la constancia; es la misma para todos los colaboradores de esta fase.
-                </p>
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.5"
-                    value={durationHours}
-                    onChange={(event) => setDurationHours(event.target.value)}
-                    placeholder="Horas (ej. 8)"
-                    className={inputClass}
-                  />
-                  <button type="button" onClick={() => void handleSaveDuration()} disabled={savingDuration} className={buttonClass}>
-                    {savingDuration ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
-                  </button>
-                </div>
-              </div>
-
-              {selectedPhase.phase_number !== 6 && selectedPhase.phase_number !== 7 ? (
-                <div>
-                  <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
-                    Límite de lectura (horas)
-                  </h3>
-                  <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
-                    Horas corridas (incluyen fines de semana) que tiene el colaborador para leer y firmar los
-                    documentos desde que recibe sus lecturas: al publicar la fase o al inscribirlo si ya está
-                    publicada. Al vencer (o al terminar antes la lectura) se abre el cuestionario de la fase.
-                    Vacío = sin límite. La fecha de cada inscrito se fija en ese momento y no cambia sola al
-                    editar este campo.
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                    <input
-                      type="number"
-                      min={1}
-                      value={readingLimitHours}
-                      onChange={(event) => setReadingLimitHours(event.target.value)}
-                      placeholder="Horas (ej. 24) — vacío: sin límite"
-                      className={inputClass}
-                    />
-                    <button type="button" onClick={() => void handleSaveReadingLimit()} disabled={savingReadingLimit} className={buttonClass}>
-                      {savingReadingLimit ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
-                    </button>
-                  </div>
-                  {selectedPhase.published_at && pendingReaders.length > 0 ? (
-                    <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-[var(--unilabor-neutral)]">
+              {activeTab === 'info' ? (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
+                      <Phone size={14} />
+                      Contacto del responsable (para el aviso por WhatsApp)
+                    </h3>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                       <input
-                        type="checkbox"
-                        checked={applyLimitToEnrolled}
-                        onChange={(event) => setApplyLimitToEnrolled(event.target.checked)}
-                        className="mt-0.5"
+                        value={responsibleName}
+                        onChange={(event) => setResponsibleName(event.target.value)}
+                        placeholder="Nombre del responsable"
+                        className={inputClass}
                       />
-                      <span>
-                        Aplicar también a los {pendingReaders.length} inscrito(s) que aún no terminan la lectura
-                        (recalcula su fecha límite desde que recibieron sus lecturas). Sin marcar, solo aplica a
-                        inscripciones nuevas.
-                      </span>
-                    </label>
-                  ) : null}
-                </div>
-              ) : null}
+                      <input
+                        value={responsiblePhone}
+                        onChange={(event) => setResponsiblePhone(event.target.value)}
+                        placeholder="Teléfono (10 dígitos)"
+                        className={inputClass}
+                      />
+                      <button type="button" onClick={() => void handleSaveContact()} disabled={savingContact} className={buttonClass}>
+                        {savingContact ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
+                      </button>
+                    </div>
+                  </div>
 
-              {certReadiness ? (
-                (() => {
-                  const missingSignatures = certReadiness.courses.filter((course) => course.signatures_count < 3);
-                  const issues: string[] = [];
-                  if (!certReadiness.duration_ok) {
-                    issues.push('Falta capturar la Duración de la fase: el campo DURACIÓN saldrá vacío ("—").');
-                  }
-                  missingSignatures.forEach((course) => {
-                    issues.push(
-                      `${course.label}: solo ${course.signatures_count} de 3 firmas configuradas en la plantilla de constancia (Capacitaciones).`,
-                    );
-                  });
-                  const nameList = (people: Array<{ full_name: string }>) => {
-                    const names = people.slice(0, 6).map((person) => person.full_name).join(', ');
-                    return people.length > 6 ? `${names} y ${people.length - 6} más` : names;
-                  };
-                  if (certReadiness.employees_missing_branch.length > 0) {
-                    issues.push(
-                      `${certReadiness.employees_missing_branch.length} inscrito(s) sin SUCURSAL capturada (RH → Empleados): ${nameList(certReadiness.employees_missing_branch)}.`,
-                    );
-                  }
-                  if (certReadiness.employees_missing_position.length > 0) {
-                    issues.push(
-                      `${certReadiness.employees_missing_position.length} inscrito(s) sin PUESTO activo asignado: ${nameList(certReadiness.employees_missing_position)}.`,
-                    );
-                  }
-                  return (
+                  <div>
+                    <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
+                      Duración de la fase (horas)
+                    </h3>
+                    <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
+                      Se muestra en la constancia; es la misma para todos los colaboradores de esta fase.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.5"
+                        value={durationHours}
+                        onChange={(event) => setDurationHours(event.target.value)}
+                        placeholder="Horas (ej. 8)"
+                        className={inputClass}
+                      />
+                      <button type="button" onClick={() => void handleSaveDuration()} disabled={savingDuration} className={buttonClass}>
+                        {savingDuration ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {selectedPhase.phase_number !== 6 && selectedPhase.phase_number !== 7 ? (
                     <div>
                       <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
-                        Preparación de la constancia
+                        Límite de lectura (horas)
                       </h3>
-                      {issues.length === 0 ? (
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs text-emerald-700">
-                          ✓ Constancia completa: puesto, sucursal, duración y firmas están capturados para los{' '}
-                          {certReadiness.pending_enrollments} inscrito(s) pendientes de aprobar.
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-                          <p className="font-bold">
-                            ⚠ Las constancias de esta fase saldrían incompletas — falta información:
-                          </p>
-                          {issues.map((issue) => (
-                            <p key={issue}>• {issue}</p>
-                          ))}
-                        </div>
-                      )}
+                      <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
+                        Horas corridas (incluyen fines de semana) que tiene el colaborador para leer y firmar los
+                        documentos desde que recibe sus lecturas: al publicar la fase o al inscribirlo si ya está
+                        publicada. Al vencer (o al terminar antes la lectura) se abre el cuestionario de la fase.
+                        Vacío = sin límite. La fecha de cada inscrito se fija en ese momento y no cambia sola al
+                        editar este campo.
+                      </p>
+                      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <input
+                          type="number"
+                          min={1}
+                          value={readingLimitHours}
+                          onChange={(event) => setReadingLimitHours(event.target.value)}
+                          placeholder="Horas (ej. 24) — vacío: sin límite"
+                          className={inputClass}
+                        />
+                        <button type="button" onClick={() => void handleSaveReadingLimit()} disabled={savingReadingLimit} className={buttonClass}>
+                          {savingReadingLimit ? <Loader2 size={14} className="animate-spin" /> : 'Guardar'}
+                        </button>
+                      </div>
+                      {selectedPhase.published_at && pendingReaders.length > 0 ? (
+                        <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs text-[var(--unilabor-neutral)]">
+                          <input
+                            type="checkbox"
+                            checked={applyLimitToEnrolled}
+                            onChange={(event) => setApplyLimitToEnrolled(event.target.checked)}
+                            className="mt-0.5"
+                          />
+                          <span>
+                            Aplicar también a los {pendingReaders.length} inscrito(s) que aún no terminan la lectura
+                            (recalcula su fecha límite desde que recibieron sus lecturas). Sin marcar, solo aplica a
+                            inscripciones nuevas.
+                          </span>
+                        </label>
+                      ) : null}
                     </div>
-                  );
-                })()
+                  ) : null}
+
+                  {certReadiness ? <InductionCertReadinessNotice readiness={certReadiness} /> : null}
+
+                  {selectedPhase.scope === 'POSITION' && (
+                    <div>
+                      <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
+                        Puestos habilitados ({phasePositions.length})
+                      </h3>
+                      <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
+                        {selectedPhase.phase_number === 5
+                          ? 'Cada puesto lleva su propio curso: el colaborador lee los documentos obligatorios de SU puesto y presenta el cuestionario del curso del puesto.'
+                          : 'Cada puesto lleva su propio curso de práctica supervisada: RH captura la calificación (0-10) en "Capacitación práctica".'}
+                      </p>
+                      <div className="space-y-1.5">
+                        {phasePositions.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
+                          >
+                            <span className="text-[var(--unilabor-ink)]">
+                              {entry.position_name}
+                              <span className="ml-2 text-xs text-[var(--unilabor-neutral)]">({entry.course_code})</span>
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                entry.has_published_template
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              {entry.has_published_template ? 'Evaluación publicada' : 'Falta diseñar evaluación'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <select
+                          value={enablePositionId}
+                          onChange={(event) => setEnablePositionId(event.target.value)}
+                          className={inputClass}
+                        >
+                          <option value="">Habilitar un puesto...</option>
+                          {allPositions
+                            .filter((position) => !phasePositions.some((entry) => entry.position_id === position.id))
+                            .map((position) => (
+                              <option key={position.id} value={position.id}>
+                                {position.name}
+                              </option>
+                            ))}
+                        </select>
+                        <button type="button" onClick={() => void handleEnablePosition()} disabled={enablingPosition} className={buttonClass}>
+                          {enablingPosition ? <Loader2 size={14} className="animate-spin" /> : 'Habilitar'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : null}
 
-              {selectedPhase.scope === 'POSITION' && (
-                <div>
-                  <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
-                    Puestos habilitados ({phasePositions.length})
-                  </h3>
-                  <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
-                    {selectedPhase.phase_number === 5
-                      ? 'Cada puesto lleva su propio curso: el colaborador lee los documentos obligatorios de SU puesto y presenta el cuestionario del curso del puesto.'
-                      : 'Cada puesto lleva su propio curso de práctica supervisada: RH captura la calificación (0-10) en "Capacitación práctica".'}
-                  </p>
-                  <div className="space-y-1.5">
-                    {phasePositions.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
-                      >
-                        <span className="text-[var(--unilabor-ink)]">
-                          {entry.position_name}
-                          <span className="ml-2 text-xs text-[var(--unilabor-neutral)]">({entry.course_code})</span>
-                        </span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                            entry.has_published_template
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-amber-50 text-amber-700'
-                          }`}
+              {activeTab === 'documents' ? (
+                <InductionPhaseDocumentsTab
+                  phase={selectedPhase}
+                  saving={savingDocument}
+                  onAdd={(document) => void handleAddDocument(document)}
+                  onRemove={(phaseDocumentId) => void handleRemoveDocument(phaseDocumentId)}
+                  onChanged={() => void load()}
+                />
+              ) : null}
+
+              {activeTab === 'checklist' ? (
+                <InductionPhaseChecklistTab
+                  phase={selectedPhase}
+                  items={checklistItems}
+                  newText={newChecklistText}
+                  saving={savingChecklistItem}
+                  togglingAuto={togglingAutoChecklist}
+                  onNewTextChange={setNewChecklistText}
+                  onAdd={() => void handleAddChecklistItem()}
+                  onRemove={(checklistItemId) => void handleRemoveChecklistItem(checklistItemId)}
+                  onToggleAuto={() => void handleToggleAutoChecklist()}
+                />
+              ) : null}
+
+              {activeTab === 'enrollment' ? (
+                <div className="space-y-6">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <h3 className="flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
+                        <GraduationCap size={14} />
+                        Inscribir colaborador
+                      </h3>
+                      {selectedPhase.scope === 'INSTITUTIONAL' ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleEnrollAll()}
+                          disabled={enrollingAll}
+                          className={buttonClass}
+                          title="Inscribe a todos los colaboradores activos; omite a los ya inscritos y a quienes no han aprobado la fase anterior"
                         >
-                          {entry.has_published_template ? 'Evaluación publicada' : 'Falta diseñar evaluación'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-                    <select
-                      value={enablePositionId}
-                      onChange={(event) => setEnablePositionId(event.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">Habilitar un puesto...</option>
-                      {allPositions
-                        .filter((position) => !phasePositions.some((entry) => entry.position_id === position.id))
-                        .map((position) => (
-                          <option key={position.id} value={position.id}>
-                            {position.name}
-                          </option>
-                        ))}
-                    </select>
-                    <button type="button" onClick={() => void handleEnablePosition()} disabled={enablingPosition} className={buttonClass}>
-                      {enablingPosition ? <Loader2 size={14} className="animate-spin" /> : 'Habilitar'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {selectedPhase.scope === 'POSITION' ? (
-                <div className="rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.28)] px-3 py-2 text-xs text-[var(--color-brand-700)]">
-                  {selectedPhase.phase_number === 5
-                    ? 'Los documentos a leer se toman automáticamente del catálogo del puesto del colaborador (Puestos → Documentos obligatorios).'
-                    : 'Esta fase no lleva lectura: al inscribir al colaborador queda lista para que RH capture la calificación práctica.'}
-                </div>
-              ) : (
-              <div>
-                <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
-                  Documentos obligatorios ({selectedPhase.documents.length})
-                </h3>
-                <div className="space-y-1.5">
-                  {selectedPhase.documents.map((document) => (
-                    <div
-                      key={document.id}
-                      className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
-                    >
-                      <span className="inline-flex items-center gap-2 text-[var(--unilabor-ink)]">
-                        <FileText size={14} className="text-[var(--color-brand-500)]" />
-                        {document.code ? `${document.code} — ` : ''}
-                        {document.title}
-                      </span>
-                      <button type="button" onClick={() => void handleRemoveDocument(document.id)} className="text-rose-500 hover:text-rose-700">
-                        <Trash2 size={13} />
-                      </button>
+                          {enrollingAll ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
+                          Inscribir a todos
+                        </button>
+                      ) : null}
                     </div>
-                  ))}
-                </div>
-                <div className="mt-2">
-                  <DocumentSearchPicker
-                    excludeIds={selectedPhase.documents.map((document) => document.document_id)}
-                    onPick={handleAddDocument}
-                    placeholder="Buscar documento vigente por código o título..."
-                  />
-                  {savingDocument ? (
-                    <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">Agregando documento a la fase...</p>
-                  ) : null}
-                </div>
-              </div>
-              )}
-
-              <div>
-                <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
-                  <ListChecks size={14} />
-                  Checklist de contenidos ({checklistItems.length})
-                </h3>
-                <div className="space-y-1.5">
-                  {checklistItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
-                    >
-                      <span className="text-[var(--unilabor-ink)]">{item.item_text}</span>
-                      <button type="button" onClick={() => void handleRemoveChecklistItem(item.id)} className="text-rose-500 hover:text-rose-700">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={newChecklistText}
-                    onChange={(event) => setNewChecklistText(event.target.value)}
-                    placeholder="Nuevo contenido del checklist"
-                    className={inputClass}
-                  />
-                  <button type="button" onClick={() => void handleAddChecklistItem()} disabled={savingChecklistItem} className={buttonClass}>
-                    {savingChecklistItem ? <Loader2 size={14} className="animate-spin" /> : 'Agregar'}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
-                    <GraduationCap size={14} />
-                    Inscribir colaborador
-                  </h3>
-                  {selectedPhase.scope === 'INSTITUTIONAL' ? (
-                    <button
-                      type="button"
-                      onClick={() => void handleEnrollAll()}
-                      disabled={enrollingAll}
-                      className={buttonClass}
-                      title="Inscribe a todos los colaboradores activos; omite a los ya inscritos y a quienes no han aprobado la fase anterior"
-                    >
-                      {enrollingAll ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
-                      Inscribir a todos
-                    </button>
-                  ) : null}
-                </div>
-                {bulkResult ? (
-                  <div className="mb-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(248,251,253,0.96)] p-3 text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-[var(--color-brand-700)]">
-                        Inscripción masiva: {bulkResult.enrolled} de {bulkResult.total} inscritos
-                        {bulkResult.skipped.length > 0 ? ` · ${bulkResult.skipped.length} omitidos` : ''}
-                      </p>
-                      <button type="button" onClick={() => setBulkResult(null)} className="text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]">
-                        <X size={13} />
-                      </button>
-                    </div>
-                    {bulkResult.skipped.length > 0 ? (
-                      <div className="mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
-                        {bulkResult.skipped.map((item) => (
-                          <p key={item.employee_id} className="text-[var(--unilabor-neutral)]">
-                            <span className="font-semibold text-[var(--unilabor-ink)]">{item.full_name}</span> — {item.reason}
+                    {bulkResult ? (
+                      <div className="mb-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(248,251,253,0.96)] p-3 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-semibold text-[var(--color-brand-700)]">
+                            Inscripción masiva: {bulkResult.enrolled} de {bulkResult.total} inscritos
+                            {bulkResult.skipped.length > 0 ? ` · ${bulkResult.skipped.length} omitidos` : ''}
                           </p>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className="space-y-2">
-                  <SearchableSelect
-                    value={enrollEmployeeId}
-                    onChange={setEnrollEmployeeId}
-                    options={employees.map((employee) => ({
-                      value: String(employee.id),
-                      label: employee.full_name,
-                      hint: employee.employee_code,
-                    }))}
-                    placeholder="Buscar colaborador..."
-                    emptyLabel="Sin seleccionar"
-                    searchPlaceholder="Buscar por nombre o código..."
-                  />
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <SearchableSelect
-                        value={enrollSupervisorId}
-                        onChange={setEnrollSupervisorId}
-                        options={employees.map((employee) => ({
-                          value: String(employee.id),
-                          label: employee.full_name,
-                          hint: employee.employee_code,
-                        }))}
-                        placeholder="Supervisor (opcional)..."
-                        emptyLabel="Sin supervisor"
-                        searchPlaceholder="Buscar por nombre o código..."
-                      />
-                    </div>
-                    <button type="button" onClick={() => void handleEnroll()} disabled={enrolling} className={buttonClass}>
-                      {enrolling ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
-                  Inscripciones ({enrollments.length})
-                </h3>
-                {loadingEnrollments ? (
-                  <p className="text-sm text-[var(--unilabor-neutral)]">Cargando...</p>
-                ) : enrollments.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] p-4 text-sm text-[var(--unilabor-neutral)]">
-                    Sin colaboradores inscritos todavía.
-                  </p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {enrollments.map((item) => (
-                      <div
-                        key={item.enrollment_id}
-                        className="rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-sm"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-bold text-[var(--color-brand-700)]">{item.employee_name}</p>
-                            <p className="text-xs text-[var(--unilabor-neutral)]">{item.employee_code}</p>
-                            {item.missing_branch || item.missing_position ? (
-                              <button
-                                type="button"
-                                onClick={() => setCertDataTarget(item)}
-                                title="Capturar los datos faltantes de la constancia sin salir de esta pantalla"
-                                className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-amber-700"
-                              >
-                                <span className="rounded-full bg-amber-50 px-2 py-0.5 ring-1 ring-amber-200">
-                                  Constancia: falta{' '}
-                                  {[item.missing_branch ? 'sucursal' : null, item.missing_position ? 'puesto' : null]
-                                    .filter(Boolean)
-                                    .join(' y ')}
-                                </span>
-                                <span className="underline underline-offset-2">Completar datos</span>
-                              </button>
-                            ) : null}
-                          </div>
-                          <div className="text-right text-xs text-[var(--unilabor-neutral)]">
-                            <p>
-                              Lectura: {item.reading_signed}/{item.reading_total}
-                            </p>
-                            {item.reading_deadline_at && !item.reading_completed_at ? (
-                              <p className={new Date(item.reading_deadline_at) < new Date() ? 'text-rose-500' : ''}>
-                                {new Date(item.reading_deadline_at) < new Date() ? 'Lectura vencida: ' : 'Lectura vence: '}
-                                {new Date(item.reading_deadline_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}
+                          <button type="button" onClick={() => setBulkResult(null)} className="text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]">
+                            <X size={13} />
+                          </button>
+                        </div>
+                        {bulkResult.skipped.length > 0 ? (
+                          <div className="mt-1.5 max-h-40 space-y-0.5 overflow-y-auto">
+                            {bulkResult.skipped.map((item) => (
+                              <p key={item.employee_id} className="text-[var(--unilabor-neutral)]">
+                                <span className="font-semibold text-[var(--unilabor-ink)]">{item.full_name}</span> — {item.reason}
                               </p>
-                            ) : null}
-                            <p>
-                              Evaluación: {item.evaluation_status ?? 'Pendiente'} ({formatPercentage(item)})
-                              {item.evaluation_attempt_no && item.evaluation_attempt_no > 1
-                                ? ` · intento #${item.evaluation_attempt_no}`
-                                : ''}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[rgba(0,65,106,0.08)] pt-2 text-xs">
-                          {editingSupervisorId === item.enrollment_id ? (
-                            <div className="flex flex-1 items-center gap-2">
-                              <div className="flex-1">
-                                <SearchableSelect
-                                  value={supervisorSelection}
-                                  onChange={setSupervisorSelection}
-                                  options={employees.map((employee) => ({
-                                    value: String(employee.id),
-                                    label: employee.full_name,
-                                    hint: employee.employee_code,
-                                  }))}
-                                  placeholder="Supervisor..."
-                                  emptyLabel="Sin supervisor"
-                                  searchPlaceholder="Buscar por nombre o código..."
-                                />
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => void handleSaveSupervisor(item.enrollment_id)}
-                                className="font-semibold text-[var(--color-brand-700)] underline"
-                              >
-                                Guardar
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingSupervisorId(item.enrollment_id);
-                                setSupervisorSelection(item.supervisor_employee_id ? String(item.supervisor_employee_id) : '');
-                              }}
-                              className="text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]"
-                            >
-                              Supervisor: <span className="font-semibold">{item.supervisor_name ?? 'No asignado'}</span>
-                            </button>
-                          )}
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => void handleToggleExpandEnrollment(item.enrollment_id)}
-                              className="inline-flex items-center gap-1 text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]"
-                            >
-                              <ListChecks size={12} />
-                              Checklist: {item.checklist_completed}/{item.checklist_total}
-                            </button>
-                            {canReopenReading(item) ? (
-                              <button
-                                type="button"
-                                onClick={() => setReopenEnrollment(item)}
-                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ring-1 transition ${
-                                  isReadingExpired(item)
-                                    ? 'bg-rose-50 text-rose-700 ring-rose-200 hover:bg-rose-100'
-                                    : 'bg-sky-50 text-sky-800 ring-sky-200 hover:bg-sky-100'
-                                }`}
-                                title={
-                                  isReadingExpired(item)
-                                    ? 'El plazo de lectura venció: dar horas adicionales para terminar de leer antes del cuestionario'
-                                    : 'Ampliar el plazo de lectura de este colaborador'
-                                }
-                              >
-                                <BookOpen size={12} />
-                                {isReadingExpired(item) ? 'Reabrir lectura' : 'Ampliar lectura'}
-                              </button>
-                            ) : null}
-                            {canAuthorizeRetry(item) ? (
-                              <button
-                                type="button"
-                                onClick={() => setRetryEnrollment(item)}
-                                className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-100"
-                                title="Abrir un nuevo intento del cuestionario tras la retroalimentación"
-                              >
-                                <RotateCcw size={12} />
-                                Autorizar nuevo intento
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => void handleRemoveEnrollment(item)}
-                              className="text-rose-500 transition hover:text-rose-700"
-                              title="Eliminar inscripción (solo si la fase no está aprobada)"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {expandedEnrollmentId === item.enrollment_id ? (
-                          <div className="mt-2 space-y-1 rounded-lg bg-white/80 p-2">
-                            {loadingChecklistProgress ? (
-                              <p className="text-xs text-[var(--unilabor-neutral)]">Cargando...</p>
-                            ) : (
-                              checklistProgress.map((progressItem) => (
-                                <button
-                                  type="button"
-                                  key={progressItem.checklist_item_id}
-                                  onClick={() =>
-                                    void handleToggleChecklistProgressItem(
-                                      item.enrollment_id,
-                                      progressItem.checklist_item_id,
-                                      !progressItem.completed_at,
-                                    )
-                                  }
-                                  className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left text-xs text-[var(--unilabor-ink)] hover:bg-[rgba(191,212,230,0.2)]"
-                                >
-                                  {progressItem.completed_at ? (
-                                    <CheckSquare size={13} className="text-emerald-600" />
-                                  ) : (
-                                    <Square size={13} className="text-[var(--unilabor-neutral)]" />
-                                  )}
-                                  {progressItem.item_text}
-                                </button>
-                              ))
-                            )}
+                            ))}
                           </div>
                         ) : null}
                       </div>
-                    ))}
+                    ) : null}
+                    <div className="space-y-2">
+                      <SearchableSelect
+                        value={enrollEmployeeId}
+                        onChange={setEnrollEmployeeId}
+                        options={employeeOptions}
+                        placeholder="Buscar colaborador..."
+                        emptyLabel="Sin seleccionar"
+                        searchPlaceholder="Buscar por nombre o código..."
+                      />
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <SearchableSelect
+                            value={enrollSupervisorId}
+                            onChange={setEnrollSupervisorId}
+                            options={employeeOptions}
+                            placeholder="Supervisor (opcional)..."
+                            emptyLabel="Sin supervisor"
+                            searchPlaceholder="Buscar por nombre o código..."
+                          />
+                        </div>
+                        <button type="button" onClick={() => void handleEnroll()} disabled={enrolling} className={buttonClass}>
+                          {enrolling ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  <div>
+                    <h3 className={sectionTitleClass}>
+                      <Users size={14} />
+                      Inscripciones ({enrollments.length})
+                    </h3>
+                    {loadingEnrollments ? (
+                      <p className="text-sm text-[var(--unilabor-neutral)]">Cargando...</p>
+                    ) : enrollments.length === 0 ? (
+                      <p className="rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] p-4 text-sm text-[var(--unilabor-neutral)]">
+                        Sin colaboradores inscritos todavía.
+                      </p>
+                    ) : (
+                      <div className="overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)]">
+                        <div className="space-y-1.5 p-2">
+                          {pagedEnrollments.map((item) => (
+                            <InductionEnrollmentCard
+                              key={item.enrollment_id}
+                              item={item}
+                              employeeOptions={employeeOptions}
+                              editingSupervisor={editingSupervisorId === item.enrollment_id}
+                              supervisorSelection={supervisorSelection}
+                              expanded={expandedEnrollmentId === item.enrollment_id}
+                              loadingChecklist={loadingChecklistProgress}
+                              checklistProgress={checklistProgress}
+                              onSupervisorSelectionChange={setSupervisorSelection}
+                              onStartEditSupervisor={() => {
+                                setEditingSupervisorId(item.enrollment_id);
+                                setSupervisorSelection(item.supervisor_employee_id ? String(item.supervisor_employee_id) : '');
+                              }}
+                              onSaveSupervisor={() => void handleSaveSupervisor(item.enrollment_id)}
+                              onToggleExpand={() => void handleToggleExpandEnrollment(item.enrollment_id)}
+                              onToggleChecklistItem={(checklistItemId, completed) =>
+                                void handleToggleChecklistProgressItem(item.enrollment_id, checklistItemId, completed)
+                              }
+                              onCompleteData={() => setCertDataTarget(item)}
+                              onReopenReading={() => setReopenEnrollment(item)}
+                              onAuthorizeRetry={() => setRetryEnrollment(item)}
+                              onRemove={() => void handleRemoveEnrollment(item)}
+                            />
+                          ))}
+                        </div>
+                        <CompactListPager
+                          page={currentEnrollPage}
+                          pageSize={enrollPageSize}
+                          total={enrollments.length}
+                          pageSizeOptions={ENROLLMENT_PAGE_SIZES}
+                          onPageChange={setEnrollPage}
+                          sizeLabel="Inscritos por página"
+                          onPageSizeChange={(size) => {
+                            setEnrollPageSize(size);
+                            setEnrollPage(1);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
         </section>

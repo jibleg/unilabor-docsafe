@@ -30,6 +30,7 @@ import {
   listProviderNotificationRecipientsController,
   removeProviderNotificationRecipientController,
 } from '../controllers/provider-config.controller';
+import { getAgreementDashboardController } from '../controllers/agreement-dashboard.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { uploadProviderDocument } from '../middlewares/upload.middleware';
 import { validate } from '../middlewares/validate.middleware';
@@ -54,6 +55,13 @@ const documentsWrite = requirePermission('PROVIDERS.DOCUMENTS.WRITE');
 const configManage = requirePermission('PROVIDERS.CONFIG.MANAGE');
 
 // --- Catalogo: proveedores (mismo helpdesk_suppliers que usa Activos) ------
+// --- Panorama ejecutivo de contratos (proveedores y/o clientes segun permisos) ---
+router.get(
+  '/dashboard/contracts',
+  requirePermission(['PROVIDERS.DOCUMENTS.READ', 'PROVIDERS.CLIENTS.DOCUMENTS.READ']),
+  getAgreementDashboardController,
+);
+
 router.get('/catalog/providers', catalogRead, listProvidersController);
 router.post('/catalog/providers', catalogManage, validate(providerSchema), createProviderController);
 router.patch('/catalog/providers/:id', catalogManage, validate(providerSchema), updateProviderController);
