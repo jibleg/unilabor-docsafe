@@ -68,8 +68,12 @@ const loadSignatureRow = async (evaluationId: number): Promise<SignatureRow> => 
   };
 };
 
+// La constancia nace al AUTORIZAR (paso de RH / Direccion General), no al cerrar.
 export const isCertificateEligible = (record: CompetencyEvaluationRecord): boolean =>
-  record.status === 'CLOSED' && record.results.dictamen !== null && record.results.dictamen !== 'NO_COMPETENTE';
+  record.status === 'CLOSED' &&
+  record.results.dictamen !== null &&
+  record.results.dictamen !== 'NO_COMPETENTE' &&
+  ['AUTORIZADO', 'AUTORIZADO_CON_SEGUIMIENTO'].includes(record.results.authorization_result ?? '');
 
 export interface IssueCompetencyCertificateInput {
   evaluationId: number;

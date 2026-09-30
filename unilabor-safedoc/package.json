@@ -4,7 +4,7 @@
   "main": "/src/index.ts",
   "scripts": {
     "dev": "nodemon src/index.ts",
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/assets && cp -R src/assets/. dist/assets/",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",

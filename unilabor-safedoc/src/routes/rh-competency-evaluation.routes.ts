@@ -14,6 +14,7 @@ import {
   replaceCompetencyActionsController,
   replaceCompetencySectionItemsController,
   updateCompetencyEvaluationController,
+  authorizeCompetencyEvaluationController,
 } from '../controllers/rh-competency-evaluation.controller';
 import {
   deleteQuestionBankItemController,
@@ -33,6 +34,7 @@ import {
   replaceActionsSchema,
   replaceSectionItemsSchema,
   updateCompetencyEvaluationSchema,
+  authorizeCompetencyEvaluationSchema,
 } from '../schemas/rh-competency-evaluation.schema';
 
 /**
@@ -67,6 +69,13 @@ router.delete('/:id/knowledge-quiz', cancelKnowledgeQuizController);
 router.get('/:id/knowledge-courses', listKnowledgeCourseOptionsController);
 router.post('/:id/knowledge-course', validate(assignCourseKnowledgeSchema), assignCourseKnowledgeController);
 router.post('/:id/certificate', issueCompetencyCertificateController);
+// Autorizar: solo RH o Direccion General (permiso propio, ademas del MANAGE del router).
+router.post(
+  '/:id/authorize',
+  requirePermission('RH.COMPETENCY.AUTHORIZE'),
+  validate(authorizeCompetencyEvaluationSchema),
+  authorizeCompetencyEvaluationController,
+);
 router.delete('/:id', deleteCompetencyEvaluationController);
 
 export default router;

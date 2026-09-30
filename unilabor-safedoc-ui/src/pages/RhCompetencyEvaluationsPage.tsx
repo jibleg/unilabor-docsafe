@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ClipboardCheck, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Loader2, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { listEmployees } from '../api/service';
 import { listPositions } from '../api/service.api-rh-position';
@@ -12,7 +13,8 @@ import {
 import { getApiErrorMessage } from '../api/service.parsers';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { CompetencyEvaluationEditor } from '../components/rh/CompetencyEvaluationEditor';
-import { DICTAMEN_UI, formatDateOnly } from '../utils/competency';
+import { AUTHORIZATION_UI, DICTAMEN_UI, formatDateOnly } from '../utils/competency';
+import { useHasPermission } from '../utils/permissions';
 import type { Employee, RhCompetencyEvaluation, RhCompetencyEvaluationType, RhPosition } from '../types/models';
 
 const cardClass = 'rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-5 shadow-xl shadow-[rgba(0,65,106,0.08)]';
@@ -39,6 +41,12 @@ export const RhCompetencyEvaluationsPage = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [selected, setSelected] = useState<RhCompetencyEvaluation | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  // Acceso directo a la autorizacion (RH / Direccion General): panel de pendientes,
+  // boton por fila, filtro dedicado y enlace ?evaluation=ID&authorize=1.
+  const canAuthorize = useHasPermission('RH.COMPETENCY.AUTHORIZE');
+  const [pendingAuthorization, setPendingAuthorization] = useState<RhCompetencyEvaluation[]>([]);
+  const [autoAuthorize, setAutoAuthorize] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [positions, setPositions] = useState<RhPosition[]>([]);
@@ -54,11 +62,13 @@ export const RhCompetencyEvaluationsPage = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const pendingOnly = statusFilter === 'PENDING_AUTH';
       const result = await listCompetencyEvaluations({
         search: search.trim() || undefined,
-        status: statusFilter || undefined,
+        status: pendingOnly ? 'CLOSED' : statusFilter || undefined,
+        ...(pendingOnly ? { limit: 100 } : {}),
       });
-      setEvaluations(result.data);
+      setEvaluations(pendingOnly ? result.data.filter((item) => item.results.authorization_result === 'PENDIENTE') : result.data);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudieron cargar las evaluaciones.'));
     } finally {
@@ -70,6 +80,19 @@ export const RhCompetencyEvaluationsPage = () => {
     void load();
   }, [load]);
 
+  const loadPendingAuthorization = useCallback(async () => {
+    try {
+      const result = await listCompetencyEvaluations({ status: 'CLOSED', limit: 100 });
+      setPendingAuthorization(result.data.filter((item) => item.results.authorization_result === 'PENDIENTE'));
+    } catch {
+      // Panel informativo: si falla, simplemente no se muestra.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPendingAuthorization();
+  }, [loadPendingAuthorization]);
+
   useEffect(() => {
     Promise.all([listEmployees(), listPositions()])
       .then(([employeeData, positionData]) => {
@@ -79,16 +102,33 @@ export const RhCompetencyEvaluationsPage = () => {
       .catch((error) => toast.error(getApiErrorMessage(error, 'No se pudieron cargar colaboradores/puestos.')));
   }, []);
 
-  const openDetail = async (evaluationId: number) => {
+  const openDetail = async (evaluationId: number, options: { authorize?: boolean } = {}) => {
     setLoadingDetail(true);
     try {
       const detail = await getCompetencyEvaluation(evaluationId);
+      setAutoAuthorize(Boolean(options.authorize));
       setSelected(detail);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo abrir la evaluación.'));
     } finally {
       setLoadingDetail(false);
     }
+  };
+
+  // Enlace directo: /rh/competency-evaluations?evaluation=ID[&authorize=1]
+  const linkedEvaluationId = Number(searchParams.get('evaluation')) || null;
+  const linkedAuthorize = searchParams.get('authorize') === '1';
+  useEffect(() => {
+    if (!linkedEvaluationId) return;
+    void openDetail(linkedEvaluationId, { authorize: linkedAuthorize });
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedEvaluationId, linkedAuthorize]);
+
+  const handleChanged = (updated: RhCompetencyEvaluation) => {
+    setSelected(updated);
+    void loadPendingAuthorization();
+    void load();
   };
 
   const handleCreate = async () => {
@@ -173,7 +213,7 @@ export const RhCompetencyEvaluationsPage = () => {
             </span>
           </div>
         </div>
-        <CompetencyEvaluationEditor evaluation={selected} onChanged={setSelected} />
+        <CompetencyEvaluationEditor key={`${selected.id}-${autoAuthorize ? 'auth' : 'view'}`} evaluation={selected} onChanged={handleChanged} autoOpenAuthorize={autoAuthorize} />
       </div>
     );
   }
@@ -196,6 +236,77 @@ export const RhCompetencyEvaluationsPage = () => {
           </button>
         </div>
 
+        {pendingAuthorization.length > 0 ? (
+          <div className="relative mt-4 overflow-hidden rounded-2xl bg-gradient-to-r from-[var(--color-brand-700)] to-[var(--color-brand-500)] p-5 text-white shadow-xl shadow-[rgba(0,65,106,0.25)]">
+            <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute -bottom-20 right-28 h-40 w-40 rounded-full bg-white/5" />
+            <div className="relative flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--color-brand-700)] shadow-lg">
+                  <ShieldCheck size={28} />
+                  <span className="absolute -right-2 -top-2 inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-amber-400 px-1.5 text-xs font-black text-[var(--color-brand-900)] ring-4 ring-[var(--color-brand-700)]">
+                    {pendingAuthorization.length}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--color-brand-100)]">Autorización pendiente</p>
+                  <p className="text-lg font-bold leading-tight">
+                    {pendingAuthorization.length === 1
+                      ? '1 evaluación de competencia espera tu autorización'
+                      : `${pendingAuthorization.length} evaluaciones de competencia esperan autorización`}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--color-brand-100)]">
+                    El dictamen ya está sellado.{' '}
+                    {canAuthorize
+                      ? 'Registra aquí la decisión de RH o Dirección General: vigencia y constancia nacen al autorizar.'
+                      : 'La decisión la registra RH o Dirección General (tu cuenta no tiene ese permiso).'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'PENDING_AUTH' ? '' : 'PENDING_AUTH')}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/40 bg-white/15 px-4 py-2 text-sm font-bold text-white backdrop-blur transition hover:bg-white/25"
+              >
+                <ClipboardCheck size={15} />
+                {statusFilter === 'PENDING_AUTH' ? 'Ver todas las evaluaciones' : 'Ver solo pendientes'}
+              </button>
+            </div>
+            <div className="relative mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {pendingAuthorization.slice(0, 6).map((item) => {
+                const dictamenUi = item.results.dictamen ? DICTAMEN_UI[item.results.dictamen] : null;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => void openDetail(item.id, { authorize: canAuthorize })}
+                    className="group flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-left shadow-md transition hover:-translate-y-0.5 hover:shadow-xl"
+                    title={canAuthorize ? 'Abrir y autorizar' : 'Abrir la evaluación'}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-[var(--color-brand-700)]">{item.employee_name}</span>
+                      <span className="block truncate text-xs text-[var(--unilabor-neutral)]">{item.position_name}</span>
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="font-bold text-[var(--color-brand-700)]">{item.results.final_pct ?? '—'}%</span>
+                        {dictamenUi ? <span className={`rounded-full px-2 py-0.5 font-semibold ${dictamenUi.className}`}>{dictamenUi.label}</span> : null}
+                      </span>
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-[var(--color-brand-900)] shadow transition group-hover:bg-amber-300">
+                      <ShieldCheck size={14} />
+                      {canAuthorize ? 'Autorizar' : 'Abrir'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {pendingAuthorization.length > 6 ? (
+              <p className="relative mt-2 text-xs text-[var(--color-brand-100)]">
+                y {pendingAuthorization.length - 6} más: usa "Ver solo pendientes" para verlas todas.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
         <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_200px]">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" />
@@ -210,6 +321,7 @@ export const RhCompetencyEvaluationsPage = () => {
             <option value="">Todos los estados</option>
             <option value="DRAFT">Borradores</option>
             <option value="CLOSED">Cerradas</option>
+            <option value="PENDING_AUTH">Pendientes de autorización</option>
           </select>
         </div>
 
@@ -262,6 +374,11 @@ export const RhCompetencyEvaluationsPage = () => {
                                 {dictamenUi.label}
                               </span>
                             )}
+                            {evaluation.status === 'CLOSED' && evaluation.results.authorization_result && AUTHORIZATION_UI[evaluation.results.authorization_result] ? (
+                              <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${AUTHORIZATION_UI[evaluation.results.authorization_result]?.className ?? ''}`}>
+                                {AUTHORIZATION_UI[evaluation.results.authorization_result]?.label}
+                              </span>
+                            ) : null}
                           </>
                         ) : (
                           <span className="text-[var(--unilabor-neutral)]">—</span>
@@ -279,6 +396,19 @@ export const RhCompetencyEvaluationsPage = () => {
                           >
                             {evaluation.status === 'CLOSED' ? 'Cerrada' : 'Borrador'}
                           </span>
+                          {evaluation.status === 'CLOSED' && evaluation.results.authorization_result === 'PENDIENTE' && canAuthorize ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void openDetail(evaluation.id, { authorize: true });
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg bg-[var(--color-brand-700)] px-2 py-1 text-[11px] font-bold text-white transition hover:opacity-90"
+                              title="Registrar la autorización de RH / Dirección General"
+                            >
+                              <ShieldCheck size={12} /> Autorizar
+                            </button>
+                          ) : null}
                           {evaluation.status === 'DRAFT' && (
                             <button
                               type="button"

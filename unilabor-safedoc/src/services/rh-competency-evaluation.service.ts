@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import pool from '../config/db';
 import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image';
 import { archiveGeneratedPdfToExpedient } from './employee-document-archive.service';
@@ -55,6 +56,7 @@ export const DICTAMEN_LABELS: Record<CompetencyDictamen, string> = {
 };
 
 export const AUTHORIZATION_LABELS: Record<string, string> = {
+  PENDIENTE: 'PENDIENTE DE AUTORIZACIÓN',
   AUTORIZADO: 'AUTORIZADO',
   AUTORIZADO_CON_SEGUIMIENTO: 'AUTORIZADO CON SEGUIMIENTO',
   NO_AUTORIZADO: 'NO AUTORIZADO',
@@ -192,6 +194,9 @@ export interface CompetencyEvaluationRecord {
   results: CompetencyEvaluationResults;
   authorized_at: string | null;
   valid_until: string | null;
+  /** Quien ejecuto la autorizacion (RH o Direccion General) y su nota. */
+  authorized_by_name: string | null;
+  authorization_note: string | null;
   area_signatory_name: string | null;
   rh_signatory_name: string | null;
   director_signatory_name: string | null;
@@ -208,7 +213,7 @@ export interface CompetencyEvaluationRecord {
 const BASE_QUERY = `
   SELECT
     ev.*, e.full_name AS employee_name, e.employee_code, p.name AS position_name,
-    tc.title AS reference_course_title,
+    tc.title AS reference_course_title, au.full_name AS authorized_by_name,
     ka.status AS knowledge_status, ka.deadline_at AS knowledge_deadline_at, ka.started_at AS knowledge_started_at,
     ka.submitted_at AS knowledge_submitted_at, ka.percentage AS knowledge_percentage,
     (SELECT COUNT(*)::int FROM public.evaluation_assignment_questions aq WHERE aq.assignment_id = ka.id) AS knowledge_question_count
@@ -217,6 +222,7 @@ const BASE_QUERY = `
   JOIN public.rh_positions p ON p.id = ev.position_id
   LEFT JOIN public.training_courses tc ON tc.id = ev.reference_course_id
   LEFT JOIN public.evaluation_assignments ka ON ka.id = ev.knowledge_assignment_id
+  LEFT JOIN public.users au ON au.id = ev.authorized_by_user_id
 `;
 
 const toIso = (value: unknown): string | null => {
@@ -256,6 +262,8 @@ const mapRow = (row: any): CompetencyEvaluationRecord => ({
   },
   authorized_at: toDateString(row.authorized_at),
   valid_until: toDateString(row.valid_until),
+  authorized_by_name: row.authorized_by_name ? String(row.authorized_by_name) : null,
+  authorization_note: row.authorization_note ? String(row.authorization_note) : null,
   area_signatory_name: row.area_signatory_name ? String(row.area_signatory_name) : null,
   rh_signatory_name: row.rh_signatory_name ? String(row.rh_signatory_name) : null,
   director_signatory_name: row.director_signatory_name ? String(row.director_signatory_name) : null,
@@ -767,12 +775,20 @@ export const closeEvaluation = async (input: CloseEvaluationInput): Promise<Comp
   }
 
   const closedAt = new Date();
-  const authorized = results.dictamen !== 'NO_COMPETENTE';
-  const authorizedAt = authorized ? closedAt : null;
-  const validUntil = authorized ? addMonths(closedAt, 12) : null;
+  // La autorizacion NO se da por hecha con el dictamen: la evaluacion competente
+  // queda PENDIENTE y la ejecuta RH o Direccion General (authorizeEvaluation),
+  // momento en el que nacen la vigencia de 12 meses y la constancia. Solo
+  // "No competente" se resuelve de inmediato como NO AUTORIZADO.
+  const pendingAuthorization = results.dictamen !== 'NO_COMPETENTE';
+  const sealedResults: CompetencyEvaluationResults = {
+    ...results,
+    authorization_result: pendingAuthorization ? 'PENDIENTE' : 'NO_AUTORIZADO',
+  };
+  const authorizedAt = pendingAuthorization ? null : closedAt;
+  const validUntil = null as Date | null;
 
   const pdf = await buildCompetencyEvaluationPdf({
-    record: { ...record, results },
+    record: { ...record, results: sealedResults },
     items,
     actions: record.actions ?? [],
     closedAt,
@@ -839,7 +855,7 @@ export const closeEvaluation = async (input: CloseEvaluationInput): Promise<Comp
         results.final_pct,
         results.veto_applied,
         results.dictamen,
-        results.authorization_result,
+        sealedResults.authorization_result,
         authorizedAt,
         validUntil,
         paths.collaborator,
@@ -865,6 +881,105 @@ export const closeEvaluation = async (input: CloseEvaluationInput): Promise<Comp
     }
     throw error;
   }
+
+  return (await getEvaluationById(record.id)) as CompetencyEvaluationRecord;
+};
+
+// --- Autorizacion (paso propio de RH / Direccion General) -----------------------
+
+export type CompetencyAuthorizationDecision = 'AUTORIZADO' | 'AUTORIZADO_CON_SEGUIMIENTO' | 'NO_AUTORIZADO';
+
+export interface AuthorizeEvaluationInput {
+  evaluationId: number;
+  decision: CompetencyAuthorizationDecision;
+  note: string | null;
+  decidedByUserId: string;
+}
+
+const readSignatureFile = (storedPath: string | null): Buffer => {
+  if (!storedPath) return throwCoded('RH_COMP_EVAL_SIGNATURE_FILE_MISSING', 'No se encontro una firma del cierre para regenerar el registro.');
+  const absolute = path.isAbsolute(storedPath) ? storedPath : path.resolve(process.cwd(), storedPath);
+  if (!fs.existsSync(absolute)) return throwCoded('RH_COMP_EVAL_SIGNATURE_FILE_MISSING', 'No se encontro una firma del cierre para regenerar el registro.');
+  return fs.readFileSync(absolute);
+};
+
+/**
+ * Ejecuta la autorizacion de una evaluacion cerrada con dictamen competente
+ * (authorization_result = PENDIENTE). Sella decision, quien y cuando, fija la
+ * vigencia de 12 meses (si se autoriza), regenera el PDF oficial como nueva
+ * version en el expediente (la version del cierre queda en historial) y deja
+ * la evaluacion lista para emitir la constancia.
+ */
+export const authorizeEvaluation = async (input: AuthorizeEvaluationInput): Promise<CompetencyEvaluationRecord> => {
+  const record = await getEvaluationById(input.evaluationId);
+  if (!record) return throwCoded('RH_COMP_EVAL_NOT_FOUND', 'La evaluacion indicada no existe.');
+  if (record.status !== 'CLOSED') return throwCoded('RH_COMP_EVAL_NOT_CLOSED', 'La autorizacion se ejecuta sobre una evaluacion cerrada.');
+  if (record.results.authorization_result !== 'PENDIENTE') {
+    return throwCoded('RH_COMP_EVAL_AUTH_NOT_PENDING', 'Esta evaluacion no esta pendiente de autorizacion.');
+  }
+
+  const paths = await pool.query(
+    `SELECT collaborator_signature_path, evaluator_signature_path, area_signature_path, rh_signature_path, director_signature_path
+       FROM public.rh_competency_evaluations WHERE id = $1;`,
+    [record.id],
+  );
+  const row = paths.rows[0] ?? {};
+  const decidedAt = new Date();
+  const authorized = input.decision !== 'NO_AUTORIZADO';
+  const validUntil = authorized ? addMonths(decidedAt, 12) : null;
+  const decidedBy = await pool.query(`SELECT full_name FROM public.users WHERE id = $1;`, [input.decidedByUserId]);
+  const decidedByName = decidedBy.rows[0]?.full_name ? String(decidedBy.rows[0].full_name) : null;
+
+  const sealedResults: CompetencyEvaluationResults = { ...record.results, authorization_result: input.decision };
+  const items = record.items ?? (await listEvaluationItems(record.id));
+  const pdf = await buildCompetencyEvaluationPdf({
+    record: {
+      ...record,
+      results: sealedResults,
+      authorized_at: decidedAt.toISOString().slice(0, 10),
+      valid_until: validUntil ? validUntil.toISOString().slice(0, 10) : null,
+      authorized_by_name: decidedByName,
+      authorization_note: input.note,
+    },
+    items,
+    actions: record.actions ?? [],
+    closedAt: record.closed_at ? new Date(record.closed_at) : decidedAt,
+    authorizedAt: decidedAt,
+    validUntil,
+    signatories: {
+      collaboratorName: record.employee_name,
+      evaluatorName: record.evaluator_name,
+      areaName: record.area_signatory_name ?? '',
+      rhName: record.rh_signatory_name ?? '',
+      directorName: record.director_signatory_name ?? '',
+    },
+    signaturePngs: {
+      collaborator: readSignatureFile(row.collaborator_signature_path ?? null),
+      evaluator: readSignatureFile(row.evaluator_signature_path ?? null),
+      area: readSignatureFile(row.area_signature_path ?? null),
+      rh: readSignatureFile(row.rh_signature_path ?? null),
+      director: readSignatureFile(row.director_signature_path ?? null),
+    },
+  });
+
+  const documentId = await archiveGeneratedPdfToExpedient({
+    employeeId: record.employee_id,
+    documentTypeCode: 'COMPETENCY_EVALUATION',
+    referenceKey: `competency_evaluation:${record.id}`,
+    title: `REH-REG-003 Evaluación de competencia - ${record.results.dictamen ? DICTAMEN_LABELS[record.results.dictamen] : ''} · ${AUTHORIZATION_LABELS[input.decision]}`,
+    description: `Puesto: ${record.position_name}. Resultado final: ${record.results.final_pct}%. ${AUTHORIZATION_LABELS[input.decision]} por ${decidedByName ?? 'RH'} el ${decidedAt.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' })}.${input.note ? ` Nota: ${input.note}` : ''}`,
+    pdf,
+    uploadedByUserId: input.decidedByUserId,
+    expiryDate: validUntil ? validUntil.toISOString().slice(0, 10) : null,
+  });
+
+  await pool.query(
+    `UPDATE public.rh_competency_evaluations
+        SET authorization_result = $2, authorized_at = $3, valid_until = $4,
+            authorized_by_user_id = $5, authorization_note = $6, document_id = $7, updated_at = NOW()
+      WHERE id = $1 AND status = 'CLOSED' AND authorization_result = 'PENDIENTE';`,
+    [record.id, input.decision, decidedAt, validUntil, input.decidedByUserId, input.note, documentId],
+  );
 
   return (await getEvaluationById(record.id)) as CompetencyEvaluationRecord;
 };

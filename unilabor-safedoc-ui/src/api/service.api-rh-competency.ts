@@ -124,6 +124,18 @@ export interface CloseCompetencyEvaluationPayload {
   director_signatory_name: string;
 }
 
+export type CompetencyAuthorizationDecision = 'AUTORIZADO' | 'AUTORIZADO_CON_SEGUIMIENTO' | 'NO_AUTORIZADO';
+
+/** Autorización del REH-REG-003 (RH o Dirección General; permiso RH.COMPETENCY.AUTHORIZE). */
+export const authorizeCompetencyEvaluation = async (
+  id: number,
+  payload: { decision: CompetencyAuthorizationDecision; note?: string | null },
+): Promise<{ message: string; evaluation: RhCompetencyEvaluation }> => {
+  const response = await api.post(`/rh/competency-evaluations/${id}/authorize`, payload);
+  const data = asRecord(unwrapPayload(response.data));
+  return { message: String(data?.message ?? 'Autorización registrada.'), evaluation: data?.evaluation as RhCompetencyEvaluation };
+};
+
 export const closeCompetencyEvaluation = async (
   id: number,
   payload: CloseCompetencyEvaluationPayload,

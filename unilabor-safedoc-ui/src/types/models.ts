@@ -1902,6 +1902,9 @@ export interface RhCompetencyEvaluation {
   results: RhCompetencyEvaluationResults;
   authorized_at: string | null;
   valid_until: string | null;
+  /** Quién ejecutó la autorización (RH o Dirección General) y su nota. */
+  authorized_by_name?: string | null;
+  authorization_note?: string | null;
   area_signatory_name: string | null;
   rh_signatory_name: string | null;
   director_signatory_name: string | null;

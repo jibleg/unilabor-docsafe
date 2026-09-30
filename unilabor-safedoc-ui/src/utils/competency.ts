@@ -9,6 +9,13 @@ export const formatDateOnly = (value: string | null): string => {
   }
   return new Date(value).toLocaleDateString('es-MX');
 };
+export const AUTHORIZATION_UI: Record<string, { label: string; className: string }> = {
+  PENDIENTE: { label: 'Pendiente de autorización', className: 'bg-amber-50 text-amber-800 ring-1 ring-amber-200' },
+  AUTORIZADO: { label: 'Autorizado', className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+  AUTORIZADO_CON_SEGUIMIENTO: { label: 'Autorizado con seguimiento', className: 'bg-sky-50 text-sky-800 ring-1 ring-sky-200' },
+  NO_AUTORIZADO: { label: 'No autorizado', className: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200' },
+};
+
 export const DICTAMEN_UI: Record<string, { label: string; className: string }> = {
   COMPETENTE_Y_AUTORIZADO: { label: 'Competente y autorizado', className: 'bg-emerald-50 text-emerald-700' },
   COMPETENTE_CON_OBSERVACIONES: { label: 'Competente con observaciones', className: 'bg-emerald-50 text-emerald-700' },

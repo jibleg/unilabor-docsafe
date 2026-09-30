@@ -12,6 +12,7 @@ import {
   replaceActions,
   replaceSectionItems,
   updateEvaluation,
+  authorizeEvaluation,
 } from '../services/rh-competency-evaluation.service';
 import {
   assignKnowledgeQuiz,
@@ -32,6 +33,8 @@ const parseId = (value: unknown): number | null => {
 };
 
 const ERROR_STATUS: Record<string, number> = {
+  RH_COMP_EVAL_AUTH_NOT_PENDING: 409,
+  RH_COMP_EVAL_SIGNATURE_FILE_MISSING: 409,
   RH_COMP_EVAL_EMPLOYEE_NOT_FOUND: 404,
   RH_COMP_EVAL_POSITION_NOT_FOUND: 404,
   RH_COMP_EVAL_NOT_FOUND: 404,
@@ -222,6 +225,42 @@ export const closeCompetencyEvaluationController = async (req: AuthRequest, res:
     if (mapped) return mapped;
     console.error('Error cerrando evaluacion de competencia:', error);
     return res.status(500).json({ message: 'No se pudo cerrar la evaluacion.' });
+  }
+};
+
+export const authorizeCompetencyEvaluationController = async (req: AuthRequest, res: Response) => {
+  const evaluationId = parseId(req.params.id);
+  if (!evaluationId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  if (!req.user?.id) {
+    return res.status(401).json({ message: 'Sesion invalida.' });
+  }
+  const decision = req.body.decision as 'AUTORIZADO' | 'AUTORIZADO_CON_SEGUIMIENTO' | 'NO_AUTORIZADO';
+  const note = typeof req.body.note === 'string' && req.body.note.trim() ? String(req.body.note).trim() : null;
+  try {
+    const evaluation = await authorizeEvaluation({ evaluationId, decision, note, decidedByUserId: req.user.id });
+    await logAudit(req.user.id, `RH_COMP_EVAL_AUTHORIZE:${evaluationId}:${decision}`, evaluationId, req.ip);
+    // Constancia de competencia: nace al autorizar (best-effort, no deshace la autorizacion).
+    const certificateDocumentId = decision === 'NO_AUTORIZADO' ? null : await tryIssueCompetencyCertificate(evaluationId, req.user.id);
+    if (certificateDocumentId) {
+      await logAudit(req.user.id, `RH_COMP_EVAL_CERTIFICATE_ISSUED:${evaluationId}:${certificateDocumentId}`, evaluationId, req.ip);
+    }
+    const finalEvaluation = certificateDocumentId ? (await getEvaluationById(evaluationId)) ?? evaluation : evaluation;
+    return res.json({
+      message:
+        decision === 'NO_AUTORIZADO'
+          ? 'Decision registrada: NO AUTORIZADO. El registro actualizado quedo en el expediente.'
+          : certificateDocumentId
+            ? 'Evaluacion autorizada; registro actualizado y constancia de competencia archivados en el expediente.'
+            : 'Evaluacion autorizada; registro actualizado en el expediente.',
+      evaluation: finalEvaluation,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error autorizando evaluacion de competencia:', error);
+    return res.status(500).json({ message: 'No se pudo registrar la autorizacion.' });
   }
 };
 

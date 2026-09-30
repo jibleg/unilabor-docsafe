@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Award, Check, Eye, FileCheck2, FileText, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Award, Check, Eye, FileCheck2, FileText, Loader2, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react';
 import { KnowledgeQuizPanel } from './KnowledgeQuizPanel';
 import { toast } from 'react-toastify';
 import {
@@ -13,7 +13,9 @@ import {
 import { getEmployeeDocumentUrl } from '../../api/service.api-training';
 import { getApiErrorMessage } from '../../api/service.parsers';
 import { PdfSafeViewer } from '../PdfSafeViewerSafe';
-import { DICTAMEN_UI, formatDateOnly } from '../../utils/competency';
+import { AUTHORIZATION_UI, DICTAMEN_UI, formatDateOnly } from '../../utils/competency';
+import { useHasPermission } from '../../utils/permissions';
+import { CompetencyAuthorizeModal } from './CompetencyAuthorizeModal';
 import { SignaturePad } from '../helpdesk/SignaturePad';
 import type {
   RhCompetencyCriticality,
@@ -23,6 +25,8 @@ import type {
 } from '../../types/models';
 
 interface CompetencyEvaluationEditorProps {
+  /** Abrir de inmediato el cuadro de autorización (acceso directo desde el listado). */
+  autoOpenAuthorize?: boolean;
   evaluation: RhCompetencyEvaluation;
   onChanged: (updated: RhCompetencyEvaluation) => void;
 }
@@ -505,8 +509,12 @@ const CloseModal = ({
 };
 
 /** Editor completo de una evaluación REH-REG-003 (3 secciones + plan + resultados + cierre). */
-export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: CompetencyEvaluationEditorProps) => {
+export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuthorize = false }: CompetencyEvaluationEditorProps) => {
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const canAuthorize = useHasPermission('RH.COMPETENCY.AUTHORIZE');
+  const [showAuthorizeModal, setShowAuthorizeModal] = useState(
+    () => autoOpenAuthorize && canAuthorize && evaluation.status === 'CLOSED' && evaluation.results.authorization_result === 'PENDIENTE',
+  );
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
   const [issuingCertificate, setIssuingCertificate] = useState(false);
   // Secciones 1-3 en pestañas para acortar el scroll. Todas se mantienen montadas
@@ -516,7 +524,14 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: Competency
   const results = evaluation.results;
   const dictamenUi = results.dictamen ? DICTAMEN_UI[results.dictamen] : null;
   // Constancia: solo con dictamen competente (cualquiera de los tres grados).
-  const certificateEligible = readOnly && results.dictamen !== null && results.dictamen !== 'NO_COMPETENTE';
+  // La constancia nace al AUTORIZAR (paso de RH / Dirección General), no al cerrar.
+  const authorizationPending = readOnly && results.authorization_result === 'PENDIENTE';
+  const authorizationUi = results.authorization_result ? AUTHORIZATION_UI[results.authorization_result] : null;
+  const certificateEligible =
+    readOnly &&
+    results.dictamen !== null &&
+    results.dictamen !== 'NO_COMPETENTE' &&
+    ['AUTORIZADO', 'AUTORIZADO_CON_SEGUIMIENTO'].includes(results.authorization_result ?? '');
 
   const openDocument = async (documentId: number, title: string) => {
     try {
@@ -574,6 +589,22 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: Competency
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
                   <Check size={13} /> Cerrada {evaluation.valid_until ? `· vigente hasta ${formatDateOnly(evaluation.valid_until)}` : ''}
                 </span>
+                {authorizationUi ? (
+                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${authorizationUi.className}`} title={evaluation.authorization_note ?? undefined}>
+                    <ShieldCheck size={13} /> {authorizationUi.label}
+                    {!authorizationPending && evaluation.authorized_at ? ` · ${formatDateOnly(evaluation.authorized_at)}` : ''}
+                    {!authorizationPending && evaluation.authorized_by_name ? ` · ${evaluation.authorized_by_name}` : ''}
+                  </span>
+                ) : null}
+                {authorizationPending ? (
+                  canAuthorize ? (
+                    <button type="button" onClick={() => setShowAuthorizeModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-3 py-2 text-xs font-bold text-white shadow-md transition hover:opacity-90">
+                      <ShieldCheck size={14} /> Autorizar
+                    </button>
+                  ) : (
+                    <p className="text-right text-[11px] text-amber-800">La autorización la ejecuta RH o Dirección General.</p>
+                  )
+                ) : null}
                 <div className="flex flex-wrap justify-end gap-2">
                   {evaluation.document_id ? (
                     <button
@@ -664,6 +695,12 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged }: Competency
         <SectionEditor evaluation={evaluation} section="CONOCIMIENTO" readOnly={readOnly} onChanged={onChanged} />
       </div>
       <ActionsEditor evaluation={evaluation} readOnly={readOnly} onChanged={onChanged} />
+
+      {showAuthorizeModal ? (
+
+        <CompetencyAuthorizeModal evaluation={evaluation} onClose={() => setShowAuthorizeModal(false)} onAuthorized={onChanged} />
+
+      ) : null}
 
       {showCloseModal && (
         <CloseModal evaluation={evaluation} onClose={() => setShowCloseModal(false)} onClosed={onChanged} />

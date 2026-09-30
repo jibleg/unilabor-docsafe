@@ -127,3 +127,13 @@ export const linkPositionTrainingCourseSchema = z.object({
   course_id: z.coerce.number({ message: 'Elige la capacitacion' }).int().positive('Elige la capacitacion'),
 });
 export type LinkPositionTrainingCourseInput = z.infer<typeof linkPositionTrainingCourseSchema>;
+
+/** Autorizacion del REH-REG-003 (paso propio de RH / Direccion General, sin firma). */
+export const authorizeCompetencyEvaluationSchema = z.object({
+  decision: z.enum(['AUTORIZADO', 'AUTORIZADO_CON_SEGUIMIENTO', 'NO_AUTORIZADO'], {
+    error: 'Indica la decision: AUTORIZADO, AUTORIZADO_CON_SEGUIMIENTO o NO_AUTORIZADO.',
+  }),
+  note: z.string().trim().max(1000, 'La nota es demasiado larga').nullable().optional(),
+});
+
+export type AuthorizeCompetencyEvaluationInput = z.infer<typeof authorizeCompetencyEvaluationSchema>;
