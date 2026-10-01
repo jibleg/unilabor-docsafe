@@ -28,7 +28,7 @@ const inputClass =
 const buttonClass =
   'inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-50';
 
-/** Tamaños de página del listado de puestos. */
+/** Tamaños de página del listado de puestos y de sus documentos obligatorios. */
 const POSITION_PAGE_SIZES = [10, 20, 30];
 
 type PositionTabKey = 'competencies' | 'documents' | 'courses';
@@ -97,6 +97,19 @@ export const RhPositionsPage = () => {
   const currentListPage = Math.min(listPage ?? autoListPage, listTotalPages);
   const pagedPositions = visiblePositions.slice((currentListPage - 1) * listPageSize, currentListPage * listPageSize);
 
+  // Documentos obligatorios paginados (hay puestos con más de 200).
+  const [docPage, setDocPage] = useState(1);
+  const [docPageSize, setDocPageSize] = useState(POSITION_PAGE_SIZES[0]);
+  const positionDocuments = selectedPosition?.documents ?? [];
+  const docTotalPages = Math.max(1, Math.ceil(positionDocuments.length / docPageSize));
+  const currentDocPage = Math.min(docPage, docTotalPages);
+  const pagedDocuments = positionDocuments.slice((currentDocPage - 1) * docPageSize, currentDocPage * docPageSize);
+
+  const selectPosition = (positionId: number) => {
+    setSelectedId(positionId);
+    setDocPage(1);
+  };
+
   // Competencias del puesto seleccionado en orden A-Z (pedido del usuario;
   // el orden del manual sigue guardado en sort_order por si se quiere volver).
   const sortedCompetencies = useMemo(
@@ -140,7 +153,7 @@ export const RhPositionsPage = () => {
       setNewName('');
       toast.success('Puesto creado correctamente.');
       await load();
-      setSelectedId(created.id);
+      selectPosition(created.id);
       setListPage(null);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo crear el puesto.'));
@@ -215,6 +228,8 @@ export const RhPositionsPage = () => {
       await addPositionDocument(selectedPosition.id, document.id);
       toast.success('Documento agregado al puesto correctamente.');
       await load();
+      // El nuevo queda al final: ir a la última página para verlo (se ajusta al total).
+      setDocPage(Number.MAX_SAFE_INTEGER);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo agregar el documento.'));
     }
@@ -289,7 +304,7 @@ export const RhPositionsPage = () => {
                       : 'border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] hover:bg-[rgba(191,212,230,0.2)]'
                   }`}
                 >
-                  <button type="button" onClick={() => setSelectedId(position.id)} className="flex-1 text-left">
+                  <button type="button" onClick={() => selectPosition(position.id)} className="flex-1 text-left">
                     <p className="text-sm font-bold text-[var(--color-brand-700)]">{position.name}</p>
                     <p className="text-xs text-[var(--unilabor-neutral)]">{position.code}</p>
                   </button>
@@ -409,7 +424,7 @@ export const RhPositionsPage = () => {
                     Documentos obligatorios ({selectedPosition.documents.length})
                   </h3>
                   <div className="space-y-1.5">
-                    {selectedPosition.documents.map((document) => (
+                    {pagedDocuments.map((document) => (
                       <div
                         key={document.id}
                         className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
@@ -425,6 +440,22 @@ export const RhPositionsPage = () => {
                       </div>
                     ))}
                   </div>
+                  {positionDocuments.length > 0 ? (
+                    <div className="mt-2 overflow-hidden rounded-xl border border-[rgba(0,65,106,0.08)]">
+                      <CompactListPager
+                        page={currentDocPage}
+                        pageSize={docPageSize}
+                        total={positionDocuments.length}
+                        pageSizeOptions={POSITION_PAGE_SIZES}
+                        onPageChange={setDocPage}
+                        sizeLabel="Documentos por página"
+                        onPageSizeChange={(size) => {
+                          setDocPageSize(size);
+                          setDocPage(1);
+                        }}
+                      />
+                    </div>
+                  ) : null}
                   <div className="mt-2">
                     <DocumentSearchPicker
                       excludeIds={selectedPosition.documents.map((document) => document.document_id)}
