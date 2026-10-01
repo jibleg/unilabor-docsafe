@@ -61,11 +61,13 @@ export type InductionAlert =
   | 'SIN_CUESTIONARIO'
   | 'AVANCE_PENDIENTE'
   | 'SIN_CONSTANCIA'
-  | 'DATOS_CONSTANCIA';
+  | 'DATOS_CONSTANCIA'
+  | 'FIRMAS_PENDIENTES';
 
 export type InductionAction =
   | 'REOPEN_READING'
   | 'EXTEND_READING'
+  | 'REOPEN_SIGNATURES'
   | 'RESEND_NOTICE'
   | 'RESET_ATTEMPT'
   | 'AUTHORIZE_RETRY'
@@ -236,6 +238,14 @@ export const deriveInductionStage = (row: StageInput, now: Date = new Date()): I
   return 'SIN_INICIAR';
 };
 
+/**
+ * Fase aprobada con documentos sin firmar: el examen se abrio por vencimiento
+ * del plazo de lectura y el colaborador lo acredito sin terminar de leer. La
+ * firma de esos acuses sigue siendo evidencia pendiente para la acreditacion.
+ */
+const hasPendingSignatures = (row: Pick<InductionRosterRow, 'stage' | 'reading_total' | 'reading_signed'>): boolean =>
+  row.stage === 'APROBADA' && row.reading_total > row.reading_signed;
+
 const deriveAlerts = (row: Omit<InductionRosterRow, 'alerts' | 'actions' | 'elapsed_hours'>, now: Date): InductionAlert[] => {
   const alerts: InductionAlert[] = [];
   const soonMs = SOON_HOURS * 3_600_000;
@@ -262,6 +272,7 @@ const deriveAlerts = (row: Omit<InductionRosterRow, 'alerts' | 'actions' | 'elap
   if (row.stage === 'APROBADA' && row.next_phase_id && !row.next_phase_enrolled) alerts.push('AVANCE_PENDIENTE');
   if (row.stage === 'APROBADA' && !row.certificate_document_id) alerts.push('SIN_CONSTANCIA');
   if (row.stage !== 'APROBADA' && (row.missing_branch || row.missing_position)) alerts.push('DATOS_CONSTANCIA');
+  if (hasPendingSignatures(row)) alerts.push('FIRMAS_PENDIENTES');
   return alerts;
 };
 
@@ -276,6 +287,9 @@ const deriveActions = (row: Omit<InductionRosterRow, 'alerts' | 'actions' | 'ela
   }
   if (row.phase_published && readingIncomplete && row.evaluation_status === null) {
     actions.push('RESEND_NOTICE');
+  }
+  if (hasPendingSignatures(row)) {
+    actions.push('REOPEN_SIGNATURES');
   }
   if (row.stage === 'EVALUACION_TRUNCADA' || row.stage === 'EVALUACION_EN_CURSO') {
     actions.push('RESET_ATTEMPT');

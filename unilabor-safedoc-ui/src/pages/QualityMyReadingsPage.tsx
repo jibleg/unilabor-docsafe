@@ -220,6 +220,14 @@ export const QualityMyReadingsPage = () => {
                   >
                     {READER_STATUS_LABEL[item.status]}
                   </span>
+                  {item.induction_phase_concluded && item.status !== 'signed' && (
+                    <span
+                      className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-200"
+                      title="Ya aprobaste esta fase de Inducción; falta tu firma de lectura como evidencia para la acreditación"
+                    >
+                      Fase concluida · pendiente de firma
+                    </span>
+                  )}
                 </div>
                 <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--unilabor-neutral)]">
                   {overdue ? (

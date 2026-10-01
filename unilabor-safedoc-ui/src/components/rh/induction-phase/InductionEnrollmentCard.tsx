@@ -21,6 +21,11 @@ const REOPENABLE_EVALUATION_STATUSES: Array<string | null> = [null, 'pending', '
 const canReopenReading = (item: RhInductionPhaseEnrollmentSummary): boolean =>
   item.reading_total > 0 && !item.reading_completed_at && REOPENABLE_EVALUATION_STATUSES.includes(item.evaluation_status);
 
+// "Reabrir firmas pendientes": aprobo la fase sin terminar de firmar (el examen
+// se abrio por vencimiento). Solo se reactivan los acuses sin firmar.
+const hasPendingSignatures = (item: RhInductionPhaseEnrollmentSummary): boolean =>
+  item.evaluation_status === 'passed' && item.reading_total > item.reading_signed;
+
 const isReadingExpired = (item: RhInductionPhaseEnrollmentSummary): boolean =>
   Boolean(item.reading_deadline_at) && new Date(item.reading_deadline_at as string) < new Date();
 
@@ -132,6 +137,17 @@ export const InductionEnrollmentCard = ({
             <ListChecks size={12} />
             Checklist: {item.checklist_completed}/{item.checklist_total}
           </button>
+          {hasPendingSignatures(item) ? (
+            <button
+              type="button"
+              onClick={onReopenReading}
+              className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800 ring-1 ring-amber-200 transition hover:bg-amber-100"
+              title="Aprobó la fase con documentos sin firmar: reabrirlos para que los lea y firme (evidencia para la acreditación)"
+            >
+              <BookOpen size={12} />
+              Reabrir firmas pendientes ({item.reading_total - item.reading_signed})
+            </button>
+          ) : null}
           {canReopenReading(item) ? (
             <button
               type="button"

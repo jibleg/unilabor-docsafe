@@ -107,6 +107,16 @@ describe('mapRosterRow acciones y alertas', () => {
     expect(row.actions).not.toContain('UNENROLL');
     expect(row.elapsed_hours).toBe(80);
   });
+  it('aprobada con documentos sin firmar -> alerta y reabrir firmas pendientes (no reabrir lectura)', () => {
+    const passed = { ...dbRow, assignment_id: 9, evaluation_status: 'passed', attempt_no: 1, submitted_at: hoursAgo(10), percentage: 95, question_count: 20, response_count: 20 };
+    const row = mapRosterRow(passed, NOW);
+    expect(row.alerts).toContain('FIRMAS_PENDIENTES');
+    expect(row.actions).toContain('REOPEN_SIGNATURES');
+    expect(row.actions).not.toContain('REOPEN_READING');
+    const allSigned = mapRosterRow({ ...passed, reading_signed: 4, reading_completed_at: hoursAgo(20) }, NOW);
+    expect(allSigned.alerts).not.toContain('FIRMAS_PENDIENTES');
+    expect(allSigned.actions).not.toContain('REOPEN_SIGNATURES');
+  });
 });
 
 describe('rosterQuerySchema', () => {

@@ -51,6 +51,8 @@ export interface MyReadingRecord {
   active_seconds: number;
   current_page: number | null;
   has_signed_copy: boolean;
+  /** Acuse de una fase de Induccion ya aprobada (firma pendiente reabierta por RH). */
+  induction_phase_concluded: boolean;
 }
 
 export interface SignReadingPayload {
@@ -73,7 +75,14 @@ const SELECT_MY_READING = `
     a.*,
     p.document_id,
     p.title_snapshot AS document_title,
-    p.instructions
+    p.instructions,
+    EXISTS (
+      SELECT 1
+        FROM public.rh_induction_reading_items ri
+        INNER JOIN public.rh_induction_enrollments e ON e.id = ri.enrollment_id
+        INNER JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
+       WHERE ri.acknowledgement_id = a.id AND ea.status = 'passed'
+    ) AS induction_phase_concluded
   FROM public.quality_reading_acknowledgements a
   INNER JOIN public.quality_reading_publications p ON p.id = a.publication_id
 `;
@@ -98,14 +107,17 @@ const mapRow = (row: any): MyReadingRecord => {
     active_seconds: Number(row.active_seconds),
     current_page: row.current_page === null ? null : Number(row.current_page),
     has_signed_copy: Boolean(row.signed_file_path),
+    induction_phase_concluded: Boolean(row.induction_phase_concluded),
   };
 };
 
 /**
  * Lecturas de Induccion que NO se muestran al colaborador: las de una fase que
- * sigue en borrador (RH aun no la publica) y las de una fase que ya aprobo
- * (la evidencia se conserva integra en Calidad/RH y en su expediente; solo
- * deja de estorbar en "Mis lecturas").
+ * sigue en borrador (RH aun no la publica) y, de una fase que ya aprobo, las
+ * firmadas o vencidas (la evidencia se conserva integra en Calidad/RH y en su
+ * expediente; solo deja de estorbar en "Mis lecturas"). Un acuse sin firmar de
+ * una fase aprobada vuelve a verse cuando RH lo reabre ("Reabrir firmas
+ * pendientes"): la firma sigue siendo evidencia para la acreditacion.
  */
 const HIDDEN_INDUCTION_READING = `
   EXISTS (
@@ -115,7 +127,7 @@ const HIDDEN_INDUCTION_READING = `
       INNER JOIN public.rh_induction_phases ph ON ph.id = e.phase_id
       LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
      WHERE ri.acknowledgement_id = a.id
-       AND (ph.published_at IS NULL OR ea.status = 'passed')
+       AND (ph.published_at IS NULL OR (ea.status = 'passed' AND a.status IN ('signed', 'expired')))
   )`;
 
 export const listMyReadings = async (userId: string): Promise<MyReadingRecord[]> => {

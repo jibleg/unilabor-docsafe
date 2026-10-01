@@ -64,6 +64,7 @@ export const ALERT_META: Record<InductionAlert, { label: string; severity: 'crit
   AVANCE_PENDIENTE: { label: 'Aprobó y no ha avanzado', severity: 'warning' },
   SIN_CONSTANCIA: { label: 'Sin constancia emitida', severity: 'warning' },
   DATOS_CONSTANCIA: { label: 'Faltan datos para la constancia', severity: 'info' },
+  FIRMAS_PENDIENTES: { label: 'Aprobó con documentos sin firmar', severity: 'warning' },
 };
 
 export const ALERT_ORDER: InductionAlert[] = [
@@ -77,6 +78,7 @@ export const ALERT_ORDER: InductionAlert[] = [
   'LECTURA_POR_VENCER',
   'EVALUACION_POR_VENCER',
   'SIN_CONSTANCIA',
+  'FIRMAS_PENDIENTES',
   'DATOS_CONSTANCIA',
 ];
 
@@ -89,6 +91,7 @@ export const ALERT_SEVERITY_CLASS: Record<'critical' | 'warning' | 'info', strin
 export const ACTION_META: Record<InductionAction, { label: string; tone: 'primary' | 'warning' | 'danger' | 'neutral' | 'success' }> = {
   REOPEN_READING: { label: 'Reabrir lectura', tone: 'danger' },
   EXTEND_READING: { label: 'Ampliar lectura', tone: 'primary' },
+  REOPEN_SIGNATURES: { label: 'Reabrir firmas pendientes', tone: 'warning' },
   RESEND_NOTICE: { label: 'Reenviar aviso SMS', tone: 'neutral' },
   RESET_ATTEMPT: { label: 'Reabrir intento truncado', tone: 'danger' },
   AUTHORIZE_RETRY: { label: 'Autorizar nuevo intento', tone: 'warning' },
@@ -141,3 +144,9 @@ export const formatRelative = (iso: string | null): string => {
 
 export const percent = (value: number | null | undefined, digits = 0): string =>
   value === null || value === undefined ? '—' : `${value.toFixed(digits)} %`;
+
+/** Acciones que se atienden con "Reabrir lectura" (individual o "Mandar a lectura" en lote). */
+export const READING_REOPEN_ACTIONS: InductionAction[] = ['REOPEN_READING', 'EXTEND_READING', 'REOPEN_SIGNATURES'];
+
+export const canReopenReading = (row: { actions: InductionAction[] }): boolean =>
+  row.actions.some((action) => READING_REOPEN_ACTIONS.includes(action));

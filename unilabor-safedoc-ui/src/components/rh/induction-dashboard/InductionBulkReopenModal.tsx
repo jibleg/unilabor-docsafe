@@ -68,7 +68,9 @@ export const InductionBulkReopenModal = ({ rows, onClose, onDone }: InductionBul
         <div className="space-y-3 px-5 py-4 text-sm text-[var(--unilabor-ink)]">
           <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">
             Se reabre (o amplía) el plazo de lectura de cada inscrito seleccionado. Si su cuestionario se había abierto por vencimiento y
-            nadie lo inició, se retira y volverá a abrirse al terminar de leer o al vencer el nuevo plazo. Sin correo ni SMS.
+            nadie lo inició, se retira y volverá a abrirse al terminar de leer o al vencer el nuevo plazo. A quien ya aprobó la fase con
+            documentos sin firmar solo se le reabren esos documentos para leerlos y firmarlos (su evaluación y constancia no cambian). Sin
+            correo ni SMS.
           </p>
           <div>
             <label className="text-xs font-semibold">Horas de lectura</label>

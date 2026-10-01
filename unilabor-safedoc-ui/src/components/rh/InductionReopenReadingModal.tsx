@@ -25,6 +25,10 @@ const formatDeadline = (date: Date): string =>
  * si el cuestionario ya se habia abierto por vencimiento y nadie lo inicio, se
  * retira y se abrira de nuevo al terminar de leer o al vencer el nuevo plazo.
  * No envia correo ni SMS.
+ *
+ * Fase ya APROBADA con documentos sin firmar: el backend solo reactiva esos
+ * acuses (evaluacion, constancia y plazo de la fase no se tocan) para que el
+ * colaborador los lea y firme como evidencia para la acreditacion.
  */
 export const InductionReopenReadingModal = ({
   enrollment,
@@ -40,6 +44,8 @@ export const InductionReopenReadingModal = ({
   const resultingDeadline = hoursValid ? new Date(Date.now() + parsedHours * 3_600_000) : null;
   const readingExpired = Boolean(enrollment.reading_deadline_at) && new Date(enrollment.reading_deadline_at as string) < new Date();
   const hasUnstartedExam = enrollment.evaluation_status === 'pending' || enrollment.evaluation_status === 'expired';
+  const phaseConcluded = enrollment.evaluation_status === 'passed';
+  const pendingSignatures = enrollment.reading_total - enrollment.reading_signed;
 
   const handleConfirm = async () => {
     if (!hoursValid) {
@@ -49,7 +55,9 @@ export const InductionReopenReadingModal = ({
     try {
       const result = await reopenInductionReading(enrollment.enrollment_id, parsedHours, note.trim() || undefined);
       toast.success(
-        `Lectura reabierta para ${enrollment.employee_name}: vence ${formatDeadline(new Date(result.new_deadline_at))}. Avísale en persona.`,
+        result.mode === 'PENDING_SIGNATURES'
+          ? `${result.acknowledgements_reactivated} documento(s) sin firmar reabiertos para ${enrollment.employee_name}: vence ${formatDeadline(new Date(result.new_deadline_at))}. Avísale en persona.`
+          : `Lectura reabierta para ${enrollment.employee_name}: vence ${formatDeadline(new Date(result.new_deadline_at))}. Avísale en persona.`,
       );
       onReopened();
       onClose();
@@ -66,7 +74,7 @@ export const InductionReopenReadingModal = ({
         <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-              Reabrir lectura
+              {phaseConcluded ? 'Reabrir firmas pendientes' : 'Reabrir lectura'}
             </p>
             <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{enrollment.employee_name}</h2>
           </div>
@@ -81,6 +89,18 @@ export const InductionReopenReadingModal = ({
 
         <div className="space-y-4 overflow-y-auto px-5 py-4">
           <div className="rounded-xl bg-[rgba(191,212,230,0.22)] px-4 py-3 text-sm text-[var(--unilabor-ink)]">
+            {phaseConcluded ? (
+              <p>
+                Aprobó la fase con{' '}
+                <span className="font-semibold">
+                  {enrollment.reading_signed} de {enrollment.reading_total}
+                </span>{' '}
+                documentos firmados. Se reabren solo los{' '}
+                <span className="font-semibold">{pendingSignatures} sin firmar</span> para que los lea y firme en Mis
+                lecturas; su evaluación aprobada y su constancia no cambian. El avance de lectura que ya tenga se
+                conserva y cada firma se archiva en su expediente.
+              </p>
+            ) : (
             <p>
               Lleva{' '}
               <span className="font-semibold">
@@ -93,6 +113,7 @@ export const InductionReopenReadingModal = ({
               . Se le darán las horas indicadas a partir de ahora; el avance que ya tiene (páginas leídas y
               tiempo acumulado) se conserva.
             </p>
+            )}
             {hasUnstartedExam ? (
               <p className="mt-2">
                 El cuestionario que se abrió al vencer{enrollment.evaluation_status === 'expired' ? ' (y que también venció)' : ''}{' '}
@@ -107,7 +128,7 @@ export const InductionReopenReadingModal = ({
 
           <div>
             <label htmlFor="reopen-hours" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--color-brand-700)]">
-              Horas adicionales de lectura
+              {phaseConcluded ? 'Horas para leer y firmar' : 'Horas adicionales de lectura'}
             </label>
             <div className="flex items-center gap-3">
               <input
@@ -139,7 +160,7 @@ export const InductionReopenReadingModal = ({
             </div>
             <p className="mt-1 text-[11px] text-[var(--unilabor-neutral)]">
               {hoursValid && resultingDeadline
-                ? `Nuevo límite de lectura: ${formatDeadline(resultingDeadline)}`
+                ? `${phaseConcluded ? 'Límite para firmar' : 'Nuevo límite de lectura'}: ${formatDeadline(resultingDeadline)}`
                 : `Indica un número entero entre 1 y ${HOURS_MAX} horas.`}
             </p>
           </div>

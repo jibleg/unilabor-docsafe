@@ -25,7 +25,7 @@ import { InductionResetAttemptModal } from '../components/rh/induction-dashboard
 import { InductionRosterTable, type RosterFilters } from '../components/rh/induction-dashboard/InductionRosterTable';
 import type { InductionAction, InductionProgramOverview, InductionRosterPage, InductionRosterRow } from '../types/models';
 import { confirmAction } from '../utils/confirm';
-import { formatDateTime } from '../utils/inductionDashboard';
+import { canReopenReading, formatDateTime } from '../utils/inductionDashboard';
 import { notifyError, notifySuccess } from '../utils/notify';
 
 const cardClass = 'rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-5 shadow-xl shadow-[rgba(0,65,106,0.08)]';
@@ -137,6 +137,7 @@ export const RhInductionDashboardPage = () => {
     switch (action) {
       case 'REOPEN_READING':
       case 'EXTEND_READING':
+      case 'REOPEN_SIGNATURES':
         setModal({ kind: 'reopen', row });
         return;
       case 'AUTHORIZE_RETRY':
@@ -348,7 +349,7 @@ export const RhInductionDashboardPage = () => {
               onAction={handleAction}
               onBulkReopen={() => {
                 const rows = (roster?.rows ?? []).filter(
-                  (row) => selected.has(row.enrollment_id) && (row.actions.includes('REOPEN_READING') || row.actions.includes('EXTEND_READING')),
+                  (row) => selected.has(row.enrollment_id) && canReopenReading(row),
                 );
                 if (rows.length > 0) setModal({ kind: 'bulk-reopen', rows });
               }}

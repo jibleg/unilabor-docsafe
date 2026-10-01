@@ -1,5 +1,6 @@
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
+import type { PoolClient } from 'pg';
 import { withTransaction } from '../utils/transaction';
 
 // -----------------------------------------------------------------------------
@@ -29,6 +30,13 @@ import { withTransaction } from '../utils/transaction';
 // calificados o reprobados (para reprobados/vencidos con intento real existe
 // "Autorizar nuevo intento"). Sin correo ni SMS (politica: 1 SMS por fase; RH
 // avisa en persona).
+//
+// Modo FIRMAS PENDIENTES (fase ya aprobada): el examen se abrio por vencimiento
+// del plazo y el colaborador lo acredito sin terminar de leer; los acuses sin
+// firmar son evidencia faltante para la acreditacion. Solo se reactivan esos
+// acuses con un plazo propio (NOW() + N h). La evaluacion aprobada, la
+// constancia y el plazo de la inscripcion quedan intactos; al firmar, la copia
+// se archiva en el expediente como cualquier otra lectura de la fase.
 // -----------------------------------------------------------------------------
 
 export interface ReopenInductionReadingInput {
@@ -38,7 +46,10 @@ export interface ReopenInductionReadingInput {
   note?: string | undefined;
 }
 
+export type ReopenInductionReadingMode = 'READING' | 'PENDING_SIGNATURES';
+
 export interface ReopenInductionReadingResult {
+  mode: ReopenInductionReadingMode;
   enrollment_id: number;
   employee_id: number;
   phase_number: number;
@@ -127,6 +138,9 @@ export const reopenInductionReading = async (
         [assignmentId],
       );
       const assignment = assignmentResult.rows[0];
+      if (assignment && String(assignment.status) === 'passed') {
+        return reopenPendingSignatures(client, input, ctx, readingSigned, readingTotal);
+      }
       if (assignment) {
         const status = String(assignment.status);
         const untouched =
@@ -183,6 +197,7 @@ export const reopenInductionReading = async (
     );
 
     return {
+      mode: 'READING',
       enrollment_id: Number(ctx.enrollment_id),
       employee_id: Number(ctx.employee_id),
       phase_number: Number(ctx.phase_number),
@@ -195,4 +210,55 @@ export const reopenInductionReading = async (
       reading_total: readingTotal,
     };
   });
+};
+
+/**
+ * Fase aprobada: reactiva SOLO los acuses sin firmar de la inscripcion con un
+ * plazo propio. No toca la evaluacion ni `reading_deadline_at` (el examen ya se
+ * presento; ese limite es historia de la fase).
+ */
+const reopenPendingSignatures = async (
+  client: PoolClient,
+  input: ReopenInductionReadingInput,
+  ctx: any,
+  readingSigned: number,
+  readingTotal: number,
+): Promise<ReopenInductionReadingResult> => {
+  const ackResult = await client.query(
+    `UPDATE public.quality_reading_acknowledgements q
+        SET deadline_at = NOW() + make_interval(hours => $2::int),
+            status = CASE
+                       WHEN q.status = 'expired' AND q.read_completed_at IS NOT NULL THEN 'read'
+                       WHEN q.status = 'expired' AND q.started_at IS NOT NULL THEN 'in_progress'
+                       WHEN q.status = 'expired' THEN 'pending'
+                       ELSE q.status
+                     END,
+            updated_at = NOW()
+       FROM public.rh_induction_reading_items ri
+      WHERE q.id = ri.acknowledgement_id
+        AND ri.enrollment_id = $1
+        AND q.status IN ('pending', 'in_progress', 'read', 'expired')
+      RETURNING q.deadline_at;`,
+    [input.enrollmentId, input.hours],
+  );
+  if ((ackResult.rowCount ?? 0) === 0) {
+    return throwCoded(
+      'RH_INDUCTION_REOPEN_NO_PENDING_SIGNATURES',
+      'La fase esta aprobada y no quedan documentos sin firmar que reabrir.',
+    );
+  }
+  const newDeadline = ackResult.rows[0].deadline_at;
+  return {
+    mode: 'PENDING_SIGNATURES',
+    enrollment_id: Number(ctx.enrollment_id),
+    employee_id: Number(ctx.employee_id),
+    phase_number: Number(ctx.phase_number),
+    previous_deadline_at: ctx.reading_deadline_at ? toIsoDateTime(ctx.reading_deadline_at) : null,
+    new_deadline_at: toIsoDateTime(newDeadline),
+    removed_assignment_id: null,
+    removed_assignment_status: null,
+    acknowledgements_reactivated: ackResult.rowCount ?? 0,
+    reading_signed: readingSigned,
+    reading_total: readingTotal,
+  };
 };

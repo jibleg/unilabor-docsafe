@@ -85,6 +85,7 @@ const ERROR_STATUS: Record<string, number> = {
   RH_INDUCTION_RETRY_ASSIGNMENT_FAILED: 500,
   RH_INDUCTION_REOPEN_NO_READING: 409,
   RH_INDUCTION_REOPEN_READING_COMPLETED: 409,
+  RH_INDUCTION_REOPEN_NO_PENDING_SIGNATURES: 409,
   RH_INDUCTION_REOPEN_EVALUATION_STARTED: 409,
 };
 
@@ -233,6 +234,7 @@ export const reopenInductionReadingController = async (req: AuthRequest, res: Re
       entity_id: enrollmentId,
       employee_id: result.employee_id,
       metadata: {
+        mode: result.mode,
         phase_number: result.phase_number,
         hours,
         previous_deadline_at: result.previous_deadline_at,
@@ -246,7 +248,10 @@ export const reopenInductionReadingController = async (req: AuthRequest, res: Re
       },
     });
     return res.status(200).json({
-      message: `Lectura reabierta por ${hours} h (vence ${formatInductionDeadline(result.new_deadline_at)}).`,
+      message:
+        result.mode === 'PENDING_SIGNATURES'
+          ? `${result.acknowledgements_reactivated} documento(s) sin firmar reabiertos por ${hours} h (vence ${formatInductionDeadline(result.new_deadline_at)}).`
+          : `Lectura reabierta por ${hours} h (vence ${formatInductionDeadline(result.new_deadline_at)}).`,
       reopen: result,
     });
   } catch (error: any) {

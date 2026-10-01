@@ -24,6 +24,7 @@ import {
   ALERT_META,
   ALERT_ORDER,
   ALERT_SEVERITY_CLASS,
+  canReopenReading,
   ORIGIN_META,
   STAGE_META,
   STAGE_ORDER,
@@ -56,6 +57,7 @@ interface InductionRosterTableProps {
 const ACTION_ICON: Record<InductionAction, React.ReactNode> = {
   REOPEN_READING: <BookOpen size={14} />,
   EXTEND_READING: <BookOpen size={14} />,
+  REOPEN_SIGNATURES: <BookOpen size={14} />,
   RESEND_NOTICE: <MessageSquare size={14} />,
   RESET_ATTEMPT: <RotateCcw size={14} />,
   AUTHORIZE_RETRY: <RotateCcw size={14} />,
@@ -154,7 +156,7 @@ export const InductionRosterTable = ({
   const alertOptions = useMemo(() => ALERT_ORDER.map((alert) => ({ value: alert, label: ALERT_META[alert].label })), []);
   const rows = roster?.rows ?? [];
   const allSelected = rows.length > 0 && rows.every((row) => selected.has(row.enrollment_id));
-  const selectableForReopen = rows.filter((row) => row.actions.includes('REOPEN_READING') || row.actions.includes('EXTEND_READING'));
+  const selectableForReopen = rows.filter(canReopenReading);
   const selectedReopenable = selectableForReopen.filter((row) => selected.has(row.enrollment_id)).length;
 
   const chip = (stage: InductionStage) => {
@@ -255,7 +257,7 @@ export const InductionRosterTable = ({
               </tr>
             ) : (
               rows.map((row) => {
-                const canSelect = row.actions.includes('REOPEN_READING') || row.actions.includes('EXTEND_READING');
+                const canSelect = canReopenReading(row);
                 const items: ActionMenuItem[] = row.actions.map((action) => ({
                   key: action,
                   label: ACTION_META[action].label,

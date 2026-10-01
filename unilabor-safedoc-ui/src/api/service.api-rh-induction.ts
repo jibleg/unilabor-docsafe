@@ -209,6 +209,8 @@ export const authorizeInductionRetry = async (
 };
 
 export interface InductionReopenReadingResult {
+  /** READING = reabrir la lectura de la fase; PENDING_SIGNATURES = fase aprobada, solo acuses sin firmar. */
+  mode?: 'READING' | 'PENDING_SIGNATURES';
   enrollment_id: number;
   employee_id: number;
   phase_number: number;

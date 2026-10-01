@@ -34,6 +34,7 @@ const ALERTS = [
   'AVANCE_PENDIENTE',
   'SIN_CONSTANCIA',
   'DATOS_CONSTANCIA',
+  'FIRMAS_PENDIENTES',
 ] as const;
 
 /** "a,b,c" o array -> array de valores validos (los desconocidos se descartan). */

@@ -1501,11 +1501,13 @@ export type InductionAlert =
   | 'SIN_CUESTIONARIO'
   | 'AVANCE_PENDIENTE'
   | 'SIN_CONSTANCIA'
-  | 'DATOS_CONSTANCIA';
+  | 'DATOS_CONSTANCIA'
+  | 'FIRMAS_PENDIENTES';
 
 export type InductionAction =
   | 'REOPEN_READING'
   | 'EXTEND_READING'
+  | 'REOPEN_SIGNATURES'
   | 'RESEND_NOTICE'
   | 'RESET_ATTEMPT'
   | 'AUTHORIZE_RETRY'
@@ -2054,6 +2056,8 @@ export interface MyReading {
   active_seconds: number;
   current_page: number | null;
   has_signed_copy: boolean;
+  /** Acuse de una fase de Inducción ya aprobada: firma pendiente reabierta por RH. */
+  induction_phase_concluded?: boolean;
 }
 
 /** Publicación cuyo documento del SGC ya tiene una versión nueva vigente. */
