@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Briefcase, FileText, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { Briefcase, FileText, GraduationCap, ListChecks, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -15,10 +15,12 @@ import {
 } from '../api/service.api-rh-position';
 import { CompactListPager } from '../components/CompactListPager';
 import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
+import { ExpedientTabs } from '../components/rh/ExpedientTabs';
 import { PositionTrainingCoursesPanel } from '../components/rh/PositionTrainingCoursesPanel';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { confirmAction } from '../utils/confirm';
 import type { RhPosition } from '../types/models';
+import type { ExpedientTab } from '../utils/expedientTabs';
 
 const cardClass = 'rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-5 shadow-xl shadow-[rgba(0,65,106,0.08)]';
 const inputClass =
@@ -29,12 +31,19 @@ const buttonClass =
 /** Tamaños de página del listado de puestos. */
 const POSITION_PAGE_SIZES = [10, 20, 30];
 
+type PositionTabKey = 'competencies' | 'documents' | 'courses';
+
 export const RhPositionsPage = () => {
   const [positions, setPositions] = useState<RhPosition[]>([]);
   const [loading, setLoading] = useState(true);
   // ?position=ID abre directamente ese puesto (p. ej. desde el aviso de la evaluación de competencia).
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(() => Number(searchParams.get('position')) || null);
+  // Pestaña activa del puesto; se conserva al cambiar de puesto para comparar la misma sección.
+  // ?focus=courses (aviso de la evaluación de competencia) abre directo la de capacitaciones.
+  const [activeTab, setActiveTab] = useState<PositionTabKey>(() =>
+    searchParams.get('focus') === 'courses' ? 'courses' : 'competencies',
+  );
 
   const [newCode, setNewCode] = useState('');
   const [newName, setNewName] = useState('');
@@ -99,6 +108,25 @@ export const RhPositionsPage = () => {
         : [],
     [selectedPosition],
   );
+
+  const positionTabs = useMemo<ExpedientTab[]>(() => {
+    if (!selectedPosition) return [];
+    return [
+      {
+        key: 'competencies',
+        label: 'Competencias técnicas',
+        icon: <ListChecks size={14} />,
+        badge: String(selectedPosition.competencies.length),
+      },
+      {
+        key: 'documents',
+        label: 'Documentos obligatorios',
+        icon: <FileText size={14} />,
+        badge: String(selectedPosition.documents.length),
+      },
+      { key: 'courses', label: 'Capacitaciones del puesto', icon: <GraduationCap size={14} /> },
+    ];
+  }, [selectedPosition]);
 
   const handleCreatePosition = async () => {
     if (!newCode.trim() || !newName.trim()) {
@@ -306,101 +334,114 @@ export const RhPositionsPage = () => {
                 <p className="text-xs text-[var(--unilabor-neutral)]">{selectedPosition.code}</p>
               </div>
 
-              <div>
-                <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
-                  Competencias técnicas ({selectedPosition.competencies.length})
-                </h3>
-                <div className="space-y-1.5">
-                  {sortedCompetencies.map((competency) => (
-                    <div
-                      key={competency.id}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
+              <ExpedientTabs
+                tabs={positionTabs}
+                active={activeTab}
+                onChange={(key) => setActiveTab(key as PositionTabKey)}
+                ariaLabel="Secciones del puesto"
+              />
+
+              {activeTab === 'competencies' ? (
+                <div>
+                  <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
+                    Competencias técnicas ({selectedPosition.competencies.length})
+                  </h3>
+                  <div className="space-y-1.5">
+                    {sortedCompetencies.map((competency) => (
+                      <div
+                        key={competency.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
+                      >
+                        <span className="text-[var(--unilabor-ink)]">{competency.competency_text}</span>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={competency.criticality}
+                            onChange={(event) => void handleChangeCriticality(competency.id, event.target.value as 'A' | 'M' | 'B')}
+                            disabled={updatingCompetencyId === competency.id}
+                            className={`cursor-pointer rounded-full border-0 px-2 py-0.5 text-[10px] font-bold outline-none disabled:opacity-60 ${
+                              competency.criticality === 'A'
+                                ? 'bg-rose-50 text-rose-700'
+                                : competency.criticality === 'B'
+                                  ? 'bg-[rgba(151,163,172,0.14)] text-[var(--unilabor-neutral)]'
+                                  : 'bg-amber-50 text-amber-700'
+                            }`}
+                            title="Cambiar criticidad (pondera la Evaluación de competencia REH-REG-003)"
+                            aria-label="Criticidad de la competencia"
+                          >
+                            <option value="A">Alta (5)</option>
+                            <option value="M">Media (3)</option>
+                            <option value="B">Baja (1)</option>
+                          </select>
+                          <button type="button" onClick={() => void handleDeleteCompetency(competency.id)} className="text-rose-500 hover:text-rose-700">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <input
+                      value={competencyText}
+                      onChange={(event) => setCompetencyText(event.target.value)}
+                      placeholder="Ej. Manejo de espectrofotómetro"
+                      className={`${inputClass} min-w-55 flex-1`}
+                    />
+                    <select
+                      value={competencyCriticality}
+                      onChange={(event) => setCompetencyCriticality(event.target.value as 'A' | 'M' | 'B')}
+                      className={`${inputClass} w-40 shrink-0`}
+                      title="Criticidad de la competencia"
                     >
-                      <span className="text-[var(--unilabor-ink)]">{competency.competency_text}</span>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={competency.criticality}
-                          onChange={(event) => void handleChangeCriticality(competency.id, event.target.value as 'A' | 'M' | 'B')}
-                          disabled={updatingCompetencyId === competency.id}
-                          className={`cursor-pointer rounded-full border-0 px-2 py-0.5 text-[10px] font-bold outline-none disabled:opacity-60 ${
-                            competency.criticality === 'A'
-                              ? 'bg-rose-50 text-rose-700'
-                              : competency.criticality === 'B'
-                                ? 'bg-[rgba(151,163,172,0.14)] text-[var(--unilabor-neutral)]'
-                                : 'bg-amber-50 text-amber-700'
-                          }`}
-                          title="Cambiar criticidad (pondera la Evaluación de competencia REH-REG-003)"
-                          aria-label="Criticidad de la competencia"
-                        >
-                          <option value="A">Alta (5)</option>
-                          <option value="M">Media (3)</option>
-                          <option value="B">Baja (1)</option>
-                        </select>
-                        <button type="button" onClick={() => void handleDeleteCompetency(competency.id)} className="text-rose-500 hover:text-rose-700">
+                      <option value="A">A — Alta (5)</option>
+                      <option value="M">M — Media (3)</option>
+                      <option value="B">B — Baja (1)</option>
+                    </select>
+                    <button type="button" onClick={() => void handleAddCompetency()} disabled={savingCompetency} className={`${buttonClass} shrink-0`}>
+                      {savingCompetency ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {activeTab === 'documents' ? (
+                <div>
+                  <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
+                    Documentos obligatorios ({selectedPosition.documents.length})
+                  </h3>
+                  <div className="space-y-1.5">
+                    {selectedPosition.documents.map((document) => (
+                      <div
+                        key={document.id}
+                        className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
+                      >
+                        <span className="inline-flex items-center gap-2 text-[var(--unilabor-ink)]">
+                          <FileText size={14} className="text-[var(--color-brand-500)]" />
+                          {document.code ? `${document.code} — ` : ''}
+                          {document.title}
+                        </span>
+                        <button type="button" onClick={() => void handleRemoveDocument(document.id)} className="text-rose-500 hover:text-rose-700">
                           <Trash2 size={13} />
                         </button>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  <div className="mt-2">
+                    <DocumentSearchPicker
+                      excludeIds={selectedPosition.documents.map((document) => document.document_id)}
+                      onPick={handleAddDocument}
+                    />
+                  </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <input
-                    value={competencyText}
-                    onChange={(event) => setCompetencyText(event.target.value)}
-                    placeholder="Ej. Manejo de espectrofotómetro"
-                    className={`${inputClass} min-w-55 flex-1`}
-                  />
-                  <select
-                    value={competencyCriticality}
-                    onChange={(event) => setCompetencyCriticality(event.target.value as 'A' | 'M' | 'B')}
-                    className={`${inputClass} w-40 shrink-0`}
-                    title="Criticidad de la competencia"
-                  >
-                    <option value="A">A — Alta (5)</option>
-                    <option value="M">M — Media (3)</option>
-                    <option value="B">B — Baja (1)</option>
-                  </select>
-                  <button type="button" onClick={() => void handleAddCompetency()} disabled={savingCompetency} className={`${buttonClass} shrink-0`}>
-                    {savingCompetency ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                  </button>
-                </div>
-              </div>
+              ) : null}
 
-              <div>
-                <h3 className="mb-2 text-sm font-bold text-[var(--color-brand-700)]">
-                  Documentos obligatorios ({selectedPosition.documents.length})
-                </h3>
-                <div className="space-y-1.5">
-                  {selectedPosition.documents.map((document) => (
-                    <div
-                      key={document.id}
-                      className="flex items-center justify-between rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
-                    >
-                      <span className="inline-flex items-center gap-2 text-[var(--unilabor-ink)]">
-                        <FileText size={14} className="text-[var(--color-brand-500)]" />
-                        {document.code ? `${document.code} — ` : ''}
-                        {document.title}
-                      </span>
-                      <button type="button" onClick={() => void handleRemoveDocument(document.id)} className="text-rose-500 hover:text-rose-700">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-2">
-                  <DocumentSearchPicker
-                    excludeIds={selectedPosition.documents.map((document) => document.document_id)}
-                    onPick={handleAddDocument}
-                  />
-                </div>
-              </div>
-
-              <PositionTrainingCoursesPanel
-                key={selectedPosition.id}
-                positionId={selectedPosition.id}
-                positionName={selectedPosition.name}
-                focus={searchParams.get('focus') === 'courses' && Number(searchParams.get('position')) === selectedPosition.id}
-              />
+              {activeTab === 'courses' ? (
+                <PositionTrainingCoursesPanel
+                  key={selectedPosition.id}
+                  positionId={selectedPosition.id}
+                  positionName={selectedPosition.name}
+                  focus={searchParams.get('focus') === 'courses' && Number(searchParams.get('position')) === selectedPosition.id}
+                />
+              ) : null}
             </div>
           )}
         </section>
