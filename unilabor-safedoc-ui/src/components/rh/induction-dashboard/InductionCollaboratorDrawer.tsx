@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Award, BookOpenCheck, CheckCircle2, Circle, FileText, History, ListChecks, Loader2, Lock, User, X } from 'lucide-react';
+import { Award, BookOpenCheck, CheckCircle2, Circle, Eye, FileSignature, FileText, History, ListChecks, Loader2, Lock, User, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getInductionEmployee360 } from '../../../api/service.api-rh-induction-dashboard';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { EvaluationResponsesModal } from '../EvaluationResponsesModal';
-import type { InductionAction, InductionEmployee360, InductionRosterRow } from '../../../types/models';
+import { InductionReadingEvidenceViewer, type ReadingEvidenceTab } from './InductionReadingEvidenceViewer';
+import type { InductionAction, InductionEmployee360, InductionReadingDocumentDetail, InductionRosterRow } from '../../../types/models';
 import { EVALUATION_STATUS_META } from '../../../utils/evaluations';
 import {
   ACTION_META,
@@ -62,6 +63,8 @@ export const InductionCollaboratorDrawer = ({ employeeId, focusPhaseNumber, refr
   const [openPhase, setOpenPhase] = useState<number | null>(focusPhaseNumber ?? null);
   /** Intento cuyas preguntas y respuestas se muestran en el modal de revisión. */
   const [responsesAssignmentId, setResponsesAssignmentId] = useState<number | null>(null);
+  /** Documento leído (y su hoja de firma) abierto en el visor protegido. */
+  const [evidence, setEvidence] = useState<{ doc: InductionReadingDocumentDetail; tab: ReadingEvidenceTab } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -254,6 +257,26 @@ export const InductionCollaboratorDrawer = ({ employeeId, focusPhaseNumber, refr
                                 {doc.pages_seen}/{doc.pages_total} páginas · {formatDuration(doc.active_seconds)} de lectura
                                 {doc.signed_at ? ` · firmado ${formatDateTime(doc.signed_at)}` : doc.deadline_at ? ` · vence ${formatDateTime(doc.deadline_at)}` : ''}
                               </p>
+                              {doc.acknowledgement_id ? (
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEvidence({ doc, tab: 'document' })}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-white px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]"
+                                  >
+                                    <Eye size={12} /> Ver documento
+                                  </button>
+                                  {signed ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setEvidence({ doc, tab: 'signature' })}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                                    >
+                                      <FileSignature size={12} /> Ver firma
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ) : null}
                             </li>
                           );
                         })}
@@ -343,6 +366,17 @@ export const InductionCollaboratorDrawer = ({ employeeId, focusPhaseNumber, refr
           </div>
         ) : null}
       </motion.aside>
+      {evidence && evidence.doc.acknowledgement_id ? (
+        <InductionReadingEvidenceViewer
+          acknowledgementId={evidence.doc.acknowledgement_id}
+          title={evidence.doc.title}
+          documentCode={evidence.doc.document_code}
+          signedAt={evidence.doc.signed_at}
+          employeeName={detail?.employee.full_name ?? ''}
+          initialTab={evidence.tab}
+          onClose={() => setEvidence(null)}
+        />
+      ) : null}
       {responsesAssignmentId !== null ? (
         <div className="relative z-[70]">
           <EvaluationResponsesModal assignmentId={responsesAssignmentId} onClose={() => setResponsesAssignmentId(null)} />

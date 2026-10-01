@@ -64,6 +64,10 @@ import {
   updatePhaseEvaluationRulesController,
 } from '../controllers/rh-induction-dashboard.controller';
 import {
+  viewInductionReadingDocumentController,
+  viewInductionSignatureSheetController,
+} from '../controllers/rh-induction-reading-evidence.controller';
+import {
   resetTruncatedAttemptSchema,
   updatePhaseAdvanceGraceSchema,
   updatePhaseAutoAdvanceSchema,
@@ -135,6 +139,16 @@ router.get('/induction/dashboard/overview', requirePermission('RH.INDUCTION.MANA
 router.get('/induction/dashboard/phases/:phaseId/roster', requirePermission('RH.INDUCTION.MANAGE'), getInductionPhaseRosterController);
 router.get('/induction/dashboard/employees/:employeeId', requirePermission('RH.INDUCTION.MANAGE'), getInductionEmployee360Controller);
 router.get('/induction/dashboard/enrollments/:enrollmentId', requirePermission('RH.INDUCTION.MANAGE'), getInductionEnrollmentRowController);
+router.get(
+  '/induction/dashboard/acknowledgements/:acknowledgementId/document',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  viewInductionReadingDocumentController,
+);
+router.get(
+  '/induction/dashboard/acknowledgements/:acknowledgementId/signature-sheet',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  viewInductionSignatureSheetController,
+);
 router.patch(
   '/induction/phases/:phaseId/auto-advance',
   requirePermission('RH.INDUCTION.MANAGE'),

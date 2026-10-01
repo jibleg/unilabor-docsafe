@@ -139,3 +139,17 @@ export const startDeferredEnrollmentNow = async (enrollmentId: number): Promise<
   const response = await api.post(`/rh/induction/enrollments/${enrollmentId}/start-now`);
   return String(asRecord(unwrapPayload(response.data))?.message ?? '');
 };
+
+/**
+ * Documento que leyó un inscrito (solo para el visor protegido) y su hoja de
+ * firma (una página). Devuelven un object URL que el llamador revoca al cerrar.
+ */
+export const getInductionReadingDocumentUrl = async (acknowledgementId: number): Promise<string> => {
+  const response = await api.get(`/rh/induction/dashboard/acknowledgements/${acknowledgementId}/document`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
+};
+
+export const getInductionSignatureSheetUrl = async (acknowledgementId: number): Promise<string> => {
+  const response = await api.get(`/rh/induction/dashboard/acknowledgements/${acknowledgementId}/signature-sheet`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
+};
