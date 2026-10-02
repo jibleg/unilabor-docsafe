@@ -182,6 +182,9 @@ const RhNotificationsPage = lazy(() =>
 const RhLateRequestsPage = lazy(() =>
   import('./pages/RhLateRequestsPage').then((module) => ({ default: module.RhLateRequestsPage })),
 );
+const RhCompetencyDashboardPage = lazy(() =>
+  import('./pages/RhCompetencyDashboardPage').then((module) => ({ default: module.RhCompetencyDashboardPage })),
+);
 const RhTrainingDashboardPage = lazy(() =>
   import('./pages/RhTrainingDashboardPage').then((module) => ({ default: module.RhTrainingDashboardPage })),
 );
@@ -476,6 +479,14 @@ function App() {
           element={
             <PermissionGate permission="RH.INDUCTION.MANAGE" redirectTo="/rh">
               <RhInductionDashboardPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="competency-dashboard"
+          element={
+            <PermissionGate permission="RH.COMPETENCY.MANAGE" redirectTo="/rh">
+              <RhCompetencyDashboardPage />
             </PermissionGate>
           }
         />

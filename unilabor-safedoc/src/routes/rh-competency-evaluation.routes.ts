@@ -17,6 +17,10 @@ import {
   authorizeCompetencyEvaluationController,
 } from '../controllers/rh-competency-evaluation.controller';
 import {
+  getCompetencyDashboardController,
+  getCompetencyEmployeeDetailController,
+} from '../controllers/rh-competency-dashboard.controller';
+import {
   deleteQuestionBankItemController,
   generateQuestionBankController,
   listQuestionBankBatchesController,
@@ -56,6 +60,10 @@ router.get('/positions/:positionId/question-bank/approved', listApprovedPosition
 router.get('/positions/:positionId/question-bank/batches', listQuestionBankBatchesController);
 router.patch('/question-bank/:itemId', validate(reviewQuestionBankItemSchema), reviewQuestionBankItemController);
 router.delete('/question-bank/:itemId', deleteQuestionBankItemController);
+
+// Panel (panorama + detalle por colaborador). Va ANTES de /:id.
+router.get('/dashboard', getCompetencyDashboardController);
+router.get('/dashboard/employees/:employeeId', getCompetencyEmployeeDetailController);
 
 router.get('/', listCompetencyEvaluationsController);
 router.post('/', validate(createCompetencyEvaluationSchema), createCompetencyEvaluationController);

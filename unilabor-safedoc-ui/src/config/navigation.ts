@@ -1,4 +1,5 @@
 import {
+  Gauge,
   AlertTriangle,
   BarChart3,
   Bell,
@@ -103,6 +104,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: LayoutDashboard, label: 'Tablero de inducción', path: '/rh/induction/dashboard', permission: 'RH.INDUCTION.MANAGE' },
         { icon: GraduationCap, label: 'Fases de inducción', path: '/rh/induction', permission: 'RH.INDUCTION.MANAGE' },
         { icon: ClipboardCheck, label: 'Evaluación de competencia', path: '/rh/competency-evaluations', permission: 'RH.COMPETENCY.MANAGE' },
+        { icon: Gauge, label: 'Tablero de competencia', path: '/rh/competency-dashboard', permission: 'RH.COMPETENCY.MANAGE' },
       ],
     },
     {
