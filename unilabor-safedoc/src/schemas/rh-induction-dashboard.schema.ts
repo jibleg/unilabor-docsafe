@@ -64,6 +64,21 @@ export const rosterQuerySchema = z.object({
 
 export type RosterQueryInput = z.infer<typeof rosterQuerySchema>;
 
+/** Directorio "Por colaborador": busqueda + estado global de su inducción. */
+export const directoryQuerySchema = z.object({
+  q: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
+  status: z.enum(['ALL', 'IN_PROGRESS', 'STALLED', 'COMPLETED', 'ATTENTION']).default('ALL'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(5).max(100).default(20),
+});
+
+export type DirectoryQueryInput = z.infer<typeof directoryQuerySchema>;
+
 const optionalNote = z
   .string()
   .trim()
@@ -100,3 +115,52 @@ export const updatePhaseAdvanceGraceSchema = z.object({
   hours: z.union([z.coerce.number().int().min(0, 'Minimo 0').max(720, 'Maximo 720 horas (30 dias)'), z.null()]),
 });
 export type UpdatePhaseAdvanceGraceInput = z.infer<typeof updatePhaseAdvanceGraceSchema>;
+
+/** Bandeja de avance de las fases por puesto (4->5, 5->6, 6->7). */
+export const transitionQuerySchema = z.object({
+  target: z.coerce.number().int().refine((value) => value === 5 || value === 6 || value === 7, 'La fase destino debe ser 5, 6 o 7'),
+  state: z.enum(['READY', 'BLOCKED', 'STARTED']).optional(),
+  reason: z
+    .enum(['SIN_USUARIO', 'SIN_PUESTO', 'FASE_EN_BORRADOR', 'PUESTO_NO_HABILITADO', 'PUESTO_SIN_DOCUMENTOS', 'EVALUACION_NO_LISTA', 'PUESTO_SIN_COMPETENCIAS'])
+    .optional(),
+  q: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(5).max(200).default(30),
+});
+export type TransitionQueryInput = z.infer<typeof transitionQuerySchema>;
+
+/** Mover colaboradores a la fase destino (solo se procesan los LISTOS). */
+export const executeTransitionSchema = z
+  .object({
+    target: z.union([z.literal(5), z.literal(6), z.literal(7)], { error: 'La fase destino debe ser 5, 6 o 7.' }),
+    employee_ids: z
+      .array(z.coerce.number().int().positive())
+      .min(1, 'Selecciona al menos un colaborador.')
+      .max(200, 'Maximo 200 colaboradores por operacion.')
+      .transform((ids) => [...new Set(ids)]),
+    evaluator_name: z.string().trim().max(160).optional(),
+    evaluation_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha invalida (AAAA-MM-DD).')
+      .optional(),
+  })
+  .refine((value) => value.target !== 7 || (value.evaluator_name ?? '').length >= 3, {
+    message: 'Indica quien aplicara la evaluacion de competencia (minimo 3 caracteres).',
+    path: ['evaluator_name'],
+  });
+export type ExecuteTransitionInputBody = z.infer<typeof executeTransitionSchema>;
+
+/** Captura (o correccion) de la evaluacion practica de la Fase 6 desde el tablero. */
+export const capturePracticalScoreSchema = z.object({
+  score: z.coerce.number().min(0, 'La calificacion minima es 0').max(10, 'La calificacion maxima es 10'),
+  captured_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha invalida (AAAA-MM-DD).')
+    .optional(),
+});
+export type CapturePracticalScoreInput = z.infer<typeof capturePracticalScoreSchema>;

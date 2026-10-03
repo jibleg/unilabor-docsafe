@@ -7,6 +7,8 @@ interface PaginationProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   loading?: boolean;
+  /** Para contenedores angostos (columnas laterales): apila el resumen sobre los botones y acorta la etiqueta de página. */
+  compact?: boolean;
 }
 
 const buttonClass =
@@ -19,6 +21,7 @@ export const Pagination = ({
   pageSize,
   onPageChange,
   loading = false,
+  compact = false,
 }: PaginationProps) => {
   if (total === 0) {
     return null;
@@ -30,11 +33,15 @@ export const Pagination = ({
   const canNext = page < totalPages && !loading;
 
   return (
-    <div className="flex flex-col items-center justify-between gap-3 px-4 py-3 text-xs text-[var(--color-brand-700)] sm:flex-row">
+    <div
+      className={`flex flex-col items-center justify-between gap-3 py-3 text-xs text-[var(--color-brand-700)] ${
+        compact ? 'px-0' : 'px-4 sm:flex-row'
+      }`}
+    >
       <span>
         Mostrando <strong>{from}</strong>–<strong>{to}</strong> de <strong>{total}</strong>
       </span>
-      <div className="flex items-center gap-2">
+      <div className={`flex items-center ${compact ? 'w-full justify-between gap-1' : 'gap-2'}`}>
         <button
           type="button"
           className={buttonClass}
@@ -44,8 +51,8 @@ export const Pagination = ({
           <ChevronLeft size={14} />
           Anterior
         </button>
-        <span className="px-2 font-semibold">
-          Página {page} de {totalPages}
+        <span className={`whitespace-nowrap font-semibold ${compact ? '' : 'px-2'}`}>
+          {compact ? `${page} / ${totalPages}` : `Página ${page} de ${totalPages}`}
         </span>
         <button
           type="button"

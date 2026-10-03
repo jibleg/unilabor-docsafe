@@ -1,9 +1,11 @@
-import { AlertTriangle, BookOpenCheck, CheckCircle2, GraduationCap, Trophy, Users } from 'lucide-react';
+import { AlertTriangle, Award, BookOpenCheck, CheckCircle2, GraduationCap, Hourglass, Trophy, Users } from 'lucide-react';
 import type { InductionProgramOverview } from '../../../types/models';
 
 interface InductionProgramKpisProps {
   overview: InductionProgramOverview;
   onFocusAttention?: () => void;
+  /** Abre la bandeja de avance de las fases por puesto. */
+  onOpenTransitions?: () => void;
 }
 
 const Tile = ({
@@ -44,14 +46,16 @@ const Tile = ({
   );
 };
 
-/** Fila de KPIs del programa (Fases 1-4). */
-export const InductionProgramKpis = ({ overview, onFocusAttention }: InductionProgramKpisProps) => {
+/** KPIs del programa (Fases 1-7). */
+export const InductionProgramKpis = ({ overview, onFocusAttention, onOpenTransitions }: InductionProgramKpisProps) => {
+  const waiting = overview.transitions.reduce((acc, item) => acc + item.READY + item.BLOCKED, 0);
+  const blocked = overview.transitions.reduce((acc, item) => acc + item.BLOCKED, 0);
   const { totals } = overview;
   const coverage = overview.employees_active > 0 ? Math.round((overview.employees_in_program / overview.employees_active) * 100) : 0;
   const completionPct =
     overview.employees_in_program > 0 ? Math.round((overview.employees_completed_1_4 / overview.employees_in_program) * 100) : 0;
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Tile
         label="Colaboradores en el programa"
         value={overview.employees_in_program}
@@ -64,6 +68,21 @@ export const InductionProgramKpis = ({ overview, onFocusAttention }: InductionPr
         value={overview.employees_completed_1_4}
         hint={`${completionPct} % de los inscritos`}
         icon={Trophy}
+        accent="bg-emerald-50 text-emerald-700"
+      />
+      <Tile
+        label="Esperan la siguiente fase"
+        value={waiting}
+        hint={waiting > 0 ? `Fases 5-7 por puesto · ${blocked} bloqueados` : 'Nadie detenido entre fases'}
+        icon={Hourglass}
+        accent={blocked > 0 ? 'bg-rose-50 text-rose-700' : 'bg-[rgba(191,212,230,0.5)] text-[var(--color-brand-700)]'}
+        onClick={onOpenTransitions}
+      />
+      <Tile
+        label="Concluyeron Fases 1-7"
+        value={overview.employees_completed_1_7}
+        hint={`${overview.phase7.pending_authorization} por autorizar · ${overview.phase7.in_process} en evaluación`}
+        icon={Award}
         accent="bg-emerald-50 text-emerald-700"
       />
       <Tile label="En lectura" value={totals.in_reading} hint="Inscripciones leyendo documentos" icon={BookOpenCheck} accent="bg-sky-50 text-sky-700" />

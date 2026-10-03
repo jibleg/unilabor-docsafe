@@ -4,12 +4,19 @@ import {
   DASHBOARD_LAST_PHASE,
   emptyStageCounts,
   loadPhaseRosterRows,
+  ROSTER_LAST_PHASE,
 } from './rh-induction-dashboard.service';
 import type { InductionAlert, InductionRosterRow, InductionStage } from './rh-induction-dashboard.service';
+import { competencyStage, loadInitialCompetencies } from './rh-induction-phase7';
+import { getPositionReadiness } from './rh-induction-position-readiness.service';
+import type { PositionReadinessRow } from './rh-induction-position-readiness.service';
+import { summarizeTransitions } from './rh-induction-transition.service';
+import type { TransitionState, TransitionTarget } from './rh-induction-transition.service';
 
 // -----------------------------------------------------------------------------
-// Panorama del tablero de Induccion (Fases 1-4): configuracion/reglas de cada
-// fase, embudo de inscritos por etapa, alertas y KPIs globales del programa.
+// Panorama del tablero de Induccion: configuracion/reglas de cada fase (1-4
+// institucionales, 5-6 por puesto), embudo de inscritos por etapa, alertas,
+// bandeja de avance entre fases por puesto, Fase 7 (REH-REG-003) y KPIs.
 // -----------------------------------------------------------------------------
 
 export interface InductionPhaseRules {
@@ -42,9 +49,19 @@ export interface InductionPhaseReadiness {
   ready: boolean;
 }
 
+/** Fases por puesto: cuantos puestos estan habilitados y listos para recibir colaboradores. */
+export interface InductionPositionPhaseSummary {
+  positions_enabled: number;
+  positions_ready: number;
+  /** Aprobaron la fase anterior y esperan entrar (listos + bloqueados). */
+  waiting: number;
+  waiting_ready: number;
+}
+
 export interface InductionPhaseOverview {
   phase_id: number;
   phase_number: number;
+  scope: 'INSTITUTIONAL' | 'POSITION';
   name: string;
   published_at: string | null;
   documents_total: number;
@@ -60,6 +77,17 @@ export interface InductionPhaseOverview {
   reading_progress_pct: number;
   pending_advance: number;
   origin_counts: Record<string, number>;
+  position_summary: InductionPositionPhaseSummary | null;
+}
+
+export interface InductionPhase7Overview {
+  /** Aprobaron la Fase 6 y aun no tienen evaluacion de competencia inicial. */
+  waiting: number;
+  waiting_ready: number;
+  in_process: number;
+  pending_authorization: number;
+  approved: number;
+  not_approved: number;
 }
 
 export interface InductionProgramOverview {
@@ -67,6 +95,7 @@ export interface InductionProgramOverview {
   employees_active: number;
   employees_in_program: number;
   employees_completed_1_4: number;
+  employees_completed_1_7: number;
   employees_by_current_phase: Record<string, number>;
   totals: {
     enrollments: number;
@@ -76,6 +105,8 @@ export interface InductionProgramOverview {
     needs_attention: number;
   };
   phases: InductionPhaseOverview[];
+  phase7: InductionPhase7Overview;
+  transitions: Array<{ target: TransitionTarget } & Record<TransitionState, number>>;
 }
 
 const ALERT_KEYS: InductionAlert[] = [
@@ -90,6 +121,7 @@ const ALERT_KEYS: InductionAlert[] = [
   'AVANCE_PENDIENTE',
   'SIN_CONSTANCIA',
   'DATOS_CONSTANCIA',
+  'FIRMAS_PENDIENTES',
 ];
 
 const emptyAlertCounts = (): Record<InductionAlert, number> =>
@@ -103,6 +135,7 @@ const emptyAlertCounts = (): Record<InductionAlert, number> =>
 
 const READING_STAGES: InductionStage[] = ['SIN_INICIAR', 'LEYENDO', 'LECTURA_VENCIDA', 'LECTURA_COMPLETA'];
 const EVALUATION_STAGES: InductionStage[] = [
+  'PRACTICA_PENDIENTE',
   'EVALUACION_DISPONIBLE',
   'EVALUACION_EN_CURSO',
   'EVALUACION_TRUNCADA',
@@ -120,6 +153,7 @@ const ATTENTION_ALERTS: InductionAlert[] = [
 interface PhaseConfigRow {
   phase_id: number;
   phase_number: number;
+  scope: 'INSTITUTIONAL' | 'POSITION';
   name: string;
   published_at: string | null;
   documents_total: number;
@@ -129,7 +163,7 @@ interface PhaseConfigRow {
 
 const loadPhaseConfigs = async (): Promise<PhaseConfigRow[]> => {
   const result = await pool.query(
-    `SELECT p.id, p.phase_number, p.name, p.published_at, p.reading_time_limit_hours, p.duration_hours,
+    `SELECT p.id, p.phase_number, p.scope, p.name, p.published_at, p.reading_time_limit_hours, p.duration_hours,
             p.auto_complete_checklist_on_pass, p.auto_advance_on_pass, p.advance_grace_hours,
             p.responsible_label, p.responsible_name, p.responsible_phone, p.training_course_id,
             (SELECT COUNT(*)::int FROM public.rh_induction_phase_documents d WHERE d.phase_id = p.id) AS documents_total,
@@ -148,12 +182,13 @@ const loadPhaseConfigs = async (): Promise<PhaseConfigRow[]> => {
             AND evaluation_type = 'quiz'
           ORDER BY created_at DESC LIMIT 1
        ) t ON TRUE
-      WHERE p.scope = 'INSTITUTIONAL' AND p.phase_number BETWEEN 1 AND ${DASHBOARD_LAST_PHASE}
+      WHERE p.phase_number BETWEEN 1 AND ${ROSTER_LAST_PHASE}
       ORDER BY p.phase_number ASC;`,
   );
   return result.rows.map((row) => ({
     phase_id: Number(row.id),
     phase_number: Number(row.phase_number),
+    scope: String(row.scope) === 'POSITION' ? 'POSITION' : 'INSTITUTIONAL',
     name: String(row.name),
     published_at: row.published_at ? toIsoDateTime(row.published_at) : null,
     documents_total: Number(row.documents_total ?? 0),
@@ -184,7 +219,26 @@ const loadPhaseConfigs = async (): Promise<PhaseConfigRow[]> => {
 const average = (values: number[]): number | null =>
   values.length === 0 ? null : Math.round((values.reduce((acc, value) => acc + value, 0) / values.length) * 10) / 10;
 
-export const buildPhaseOverview = (config: PhaseConfigRow, rows: InductionRosterRow[]): InductionPhaseOverview => {
+const positionSummary = (phaseNumber: number, positions: PositionReadinessRow[]): InductionPositionPhaseSummary => {
+  const key = phaseNumber === 5 ? 'phase5' : 'phase6';
+  return positions.reduce(
+    (acc, position) => {
+      const phase = position[key];
+      if (phase.enabled) acc.positions_enabled += 1;
+      if (phase.ok) acc.positions_ready += 1;
+      acc.waiting += phase.waiting;
+      acc.waiting_ready += phase.ready;
+      return acc;
+    },
+    { positions_enabled: 0, positions_ready: 0, waiting: 0, waiting_ready: 0 },
+  );
+};
+
+export const buildPhaseOverview = (
+  config: PhaseConfigRow,
+  rows: InductionRosterRow[],
+  positions: PositionReadinessRow[] = [],
+): InductionPhaseOverview => {
   const stageCounts = emptyStageCounts();
   const alertCounts = emptyAlertCounts();
   const originCounts: Record<string, number> = {};
@@ -214,14 +268,26 @@ export const buildPhaseOverview = (config: PhaseConfigRow, rows: InductionRoster
       if (row.evaluation_percentage !== null) percentages.push(row.evaluation_percentage);
     }
   }
-  const readiness: InductionPhaseReadiness = {
-    documents_ok: config.documents_total > 0,
-    quiz_ok: config.rules.quiz_published,
-    duration_ok: config.rules.duration_hours !== null && config.rules.duration_hours > 0,
-    signatures_ok: config.rules.certificate_signatures >= 3,
-    published: Boolean(config.published_at),
-    ready: false,
-  };
+  const byPosition = config.scope === 'POSITION' ? positionSummary(config.phase_number, positions) : null;
+  // En las fases por puesto los documentos, la evaluacion y las firmas son de
+  // cada puesto: la fase esta lista cuando al menos un puesto lo esta.
+  const readiness: InductionPhaseReadiness = byPosition
+    ? {
+        documents_ok: byPosition.positions_ready > 0,
+        quiz_ok: byPosition.positions_ready > 0,
+        duration_ok: config.rules.duration_hours !== null && config.rules.duration_hours > 0,
+        signatures_ok: byPosition.positions_ready > 0,
+        published: Boolean(config.published_at),
+        ready: false,
+      }
+    : {
+        documents_ok: config.documents_total > 0,
+        quiz_ok: config.rules.quiz_published,
+        duration_ok: config.rules.duration_hours !== null && config.rules.duration_hours > 0,
+        signatures_ok: config.rules.certificate_signatures >= 3,
+        published: Boolean(config.published_at),
+        ready: false,
+      };
   readiness.ready = readiness.documents_ok && readiness.quiz_ok && readiness.duration_ok && readiness.signatures_ok;
   return {
     ...config,
@@ -235,11 +301,17 @@ export const buildPhaseOverview = (config: PhaseConfigRow, rows: InductionRoster
     reading_progress_pct: pagesTotal > 0 ? Math.round((pagesSeen / pagesTotal) * 1000) / 10 : 0,
     pending_advance: pendingAdvance,
     origin_counts: originCounts,
+    position_summary: byPosition,
   };
 };
 
 export const getInductionProgramOverview = async (): Promise<InductionProgramOverview> => {
-  const configs = await loadPhaseConfigs();
+  const [configs, positions, transitions, competencies] = await Promise.all([
+    loadPhaseConfigs(),
+    getPositionReadiness(),
+    summarizeTransitions(),
+    loadInitialCompetencies(),
+  ]);
   const phases: InductionPhaseOverview[] = [];
   const employeesInProgram = new Set<number>();
   const currentPhaseByEmployee = new Map<number, number>();
@@ -248,7 +320,7 @@ export const getInductionProgramOverview = async (): Promise<InductionProgramOve
 
   for (const config of configs) {
     const rows = await loadPhaseRosterRows(config.phase_id);
-    phases.push(buildPhaseOverview(config, rows));
+    phases.push(buildPhaseOverview(config, rows, positions));
     for (const row of rows) {
       totals.enrollments += 1;
       employeesInProgram.add(row.employee_id);
@@ -273,7 +345,23 @@ export const getInductionProgramOverview = async (): Promise<InductionProgramOve
   }
   let completed = 0;
   for (const set of passedPhasesByEmployee.values()) {
-    if (set.size >= DASHBOARD_LAST_PHASE) completed += 1;
+    if ([1, 2, 3, DASHBOARD_LAST_PHASE].every((phase) => set.has(phase))) completed += 1;
+  }
+  const phase7Waiting = transitions.find((item) => item.target === 7);
+  const phase7: InductionPhase7Overview = {
+    waiting: (phase7Waiting?.READY ?? 0) + (phase7Waiting?.BLOCKED ?? 0),
+    waiting_ready: phase7Waiting?.READY ?? 0,
+    in_process: 0,
+    pending_authorization: 0,
+    approved: 0,
+    not_approved: 0,
+  };
+  for (const competency of competencies.values()) {
+    const stage = competencyStage(competency);
+    if (stage === 'COMPETENCIA_EN_PROCESO') phase7.in_process += 1;
+    else if (stage === 'COMPETENCIA_POR_AUTORIZAR') phase7.pending_authorization += 1;
+    else if (stage === 'APROBADA') phase7.approved += 1;
+    else phase7.not_approved += 1;
   }
   const activeEmployees = await pool.query(`SELECT COUNT(*)::int AS total FROM public.employees WHERE is_active = TRUE;`);
 
@@ -282,8 +370,11 @@ export const getInductionProgramOverview = async (): Promise<InductionProgramOve
     employees_active: Number(activeEmployees.rows[0]?.total ?? 0),
     employees_in_program: employeesInProgram.size,
     employees_completed_1_4: completed,
+    employees_completed_1_7: phase7.approved,
     employees_by_current_phase: employeesByCurrentPhase,
     totals,
     phases,
+    phase7,
+    transitions,
   };
 };

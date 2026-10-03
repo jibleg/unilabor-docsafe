@@ -5,17 +5,20 @@ import { tryActivateDeferredEnrollments } from './rh-induction-grace.service';
 import { refreshEnrollmentReadingStatus } from './rh-induction.service';
 
 // -----------------------------------------------------------------------------
-// Tablero de gestion integral de la Induccion, Fases 1-4 (institucionales).
+// Tablero de gestion integral de la Induccion: Fases 1-4 (institucionales) y
+// Fases 5-6 (por puesto, con el curso del puesto del colaborador). La Fase 7
+// no tiene inscripciones: se resuelve con la evaluacion de competencia.
 //
 // Modelo de lectura unico ("fila de inscrito") que deriva, para cada
 // colaborador inscrito, su ETAPA en el proceso, sus ALERTAS y las ACCIONES que
 // RH puede ejecutar sobre el. El panorama por fase agrega esas filas. Todo se
 // deriva de tablas existentes: no hay estado nuevo que mantener.
-//
-// Las Fases 5-7 (por puesto) quedan fuera del tablero a proposito.
 // -----------------------------------------------------------------------------
 
+/** Ultima fase institucional (ruta comun 1-4 con avance automatico). */
 export const DASHBOARD_LAST_PHASE = 4;
+/** Ultima fase con inscripciones (la 6); la 7 vive en el REH-REG-003. */
+export const ROSTER_LAST_PHASE = 6;
 
 export type InductionStage =
   | 'EN_ESPERA_PUBLICACION'
@@ -28,8 +31,11 @@ export type InductionStage =
   | 'EVALUACION_DISPONIBLE'
   | 'EVALUACION_EN_CURSO'
   | 'EVALUACION_TRUNCADA'
+  | 'PRACTICA_PENDIENTE'
   | 'EN_CALIFICACION'
   | 'EVALUACION_VENCIDA'
+  | 'COMPETENCIA_EN_PROCESO'
+  | 'COMPETENCIA_POR_AUTORIZAR'
   | 'NO_ACREDITADA'
   | 'APROBADA';
 
@@ -44,8 +50,11 @@ export const INDUCTION_STAGES: InductionStage[] = [
   'EVALUACION_DISPONIBLE',
   'EVALUACION_EN_CURSO',
   'EVALUACION_TRUNCADA',
+  'PRACTICA_PENDIENTE',
   'EN_CALIFICACION',
   'EVALUACION_VENCIDA',
+  'COMPETENCIA_EN_PROCESO',
+  'COMPETENCIA_POR_AUTORIZAR',
   'NO_ACREDITADA',
   'APROBADA',
 ];
@@ -76,12 +85,15 @@ export type InductionAction =
   | 'ISSUE_CERTIFICATE'
   | 'COMPLETE_DATA'
   | 'START_NOW'
+  | 'CAPTURE_PRACTICAL'
   | 'UNENROLL';
 
 export interface InductionRosterRow {
   enrollment_id: number;
   phase_id: number;
   phase_number: number;
+  /** Fase 6 = evaluacion practica capturada por RH; el resto, cuestionario. */
+  evaluation_mode: 'quiz' | 'practical';
   employee_id: number;
   employee_name: string;
   employee_code: string;
@@ -150,16 +162,20 @@ const ROSTER_SELECT = `
     (SELECT COUNT(*)::int FROM public.evaluation_responses r WHERE r.assignment_id = ea.id) AS response_count,
     (SELECT COUNT(*)::int FROM public.evaluation_assignments x
        JOIN public.evaluation_templates xt ON xt.id = x.template_id
-      WHERE x.employee_id = emp.id AND xt.training_course_id = p.training_course_id) AS attempts_total,
+      WHERE x.employee_id = emp.id AND xt.training_course_id = COALESCE(e.training_course_id, p.training_course_id)) AS attempts_total,
     rd.reading_total, rd.reading_signed, rd.pages_total, rd.pages_seen, rd.active_seconds, rd.reading_started_at,
     (SELECT COUNT(*)::int FROM public.rh_induction_phase_checklist_items ci WHERE ci.phase_id = e.phase_id) AS checklist_total,
     (SELECT COUNT(*)::int FROM public.rh_induction_checklist_progress cp WHERE cp.enrollment_id = e.id) AS checklist_completed,
     np.id AS next_phase_id, np.published_at IS NOT NULL AS next_phase_published,
-    EXISTS (SELECT 1 FROM public.rh_induction_enrollments ne WHERE ne.employee_id = emp.id AND ne.phase_id = np.id) AS next_phase_enrolled,
+    CASE WHEN p.phase_number = ${ROSTER_LAST_PHASE}
+      -- De la Fase 6 se "avanza" abriendo la evaluacion de competencia inicial (Fase 7).
+      THEN EXISTS (SELECT 1 FROM public.rh_competency_evaluations ce WHERE ce.employee_id = emp.id AND ce.evaluation_type = 'INICIAL')
+      ELSE EXISTS (SELECT 1 FROM public.rh_induction_enrollments ne WHERE ne.employee_id = emp.id AND ne.phase_id = np.id)
+    END AS next_phase_enrolled,
     EXISTS (
       SELECT 1 FROM public.evaluation_templates qt
-       WHERE qt.training_course_id = p.training_course_id AND qt.status = 'published' AND qt.is_active = TRUE
-         AND qt.evaluation_type = 'quiz'
+       WHERE qt.training_course_id = COALESCE(e.training_course_id, p.training_course_id) AND qt.status = 'published' AND qt.is_active = TRUE
+         AND qt.evaluation_type = CASE WHEN p.phase_number = ${ROSTER_LAST_PHASE} THEN 'practical' ELSE 'quiz' END
     ) AS quiz_published
   FROM public.rh_induction_enrollments e
   JOIN public.rh_induction_phases p ON p.id = e.phase_id
@@ -174,8 +190,8 @@ const ROSTER_SELECT = `
   LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
   LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
   LEFT JOIN public.evaluation_templates t ON t.id = ea.template_id
-  LEFT JOIN public.rh_induction_phases np ON np.scope = 'INSTITUTIONAL' AND np.phase_number = p.phase_number + 1
-    AND p.phase_number < ${DASHBOARD_LAST_PHASE}
+  LEFT JOIN public.rh_induction_phases np ON np.phase_number = p.phase_number + 1
+    AND p.phase_number <= ${ROSTER_LAST_PHASE}
   LEFT JOIN LATERAL (
     SELECT COUNT(ri.id)::int AS reading_total,
            COUNT(ri.id) FILTER (WHERE a.status = 'signed')::int AS reading_signed,
@@ -194,6 +210,7 @@ const iso = (value: unknown): string | null => (value ? toIsoDateTime(value) : n
 const hoursBetween = (from: Date, to: Date): number => Math.max(0, (to.getTime() - from.getTime()) / 3_600_000);
 
 interface StageInput {
+  evaluation_mode?: 'quiz' | 'practical';
   phase_published: boolean;
   readings_start_at: string | null;
   reading_total: number;
@@ -230,6 +247,8 @@ export const deriveInductionStage = (row: StageInput, now: Date = new Date()): I
     return row.evaluation_started_at ? 'EVALUACION_EN_CURSO' : 'EVALUACION_DISPONIBLE';
   }
   if (!row.phase_published) return 'EN_ESPERA_PUBLICACION';
+  // Fase 6: sin lectura; espera a que RH capture la evaluacion practica.
+  if (row.evaluation_mode === 'practical') return 'PRACTICA_PENDIENTE';
   if (row.reading_completed_at) return 'LECTURA_COMPLETA';
   if (row.reading_total === 0 && row.readings_start_at && new Date(row.readings_start_at).getTime() > now.getTime()) return 'EN_DESCANSO';
   if (row.reading_total === 0) return 'SIN_LECTURAS';
@@ -268,7 +287,7 @@ const deriveAlerts = (row: Omit<InductionRosterRow, 'alerts' | 'actions' | 'elap
   }
   if (row.stage === 'NO_ACREDITADA') alerts.push('NO_ACREDITADA');
   if (row.stage === 'EN_CALIFICACION') alerts.push('EN_CALIFICACION');
-  if (row.stage === 'LECTURA_COMPLETA' && !row.quiz_published) alerts.push('SIN_CUESTIONARIO');
+  if ((row.stage === 'LECTURA_COMPLETA' || row.stage === 'PRACTICA_PENDIENTE') && !row.quiz_published) alerts.push('SIN_CUESTIONARIO');
   if (row.stage === 'APROBADA' && row.next_phase_id && !row.next_phase_enrolled) alerts.push('AVANCE_PENDIENTE');
   if (row.stage === 'APROBADA' && !row.certificate_document_id) alerts.push('SIN_CONSTANCIA');
   if (row.stage !== 'APROBADA' && (row.missing_branch || row.missing_position)) alerts.push('DATOS_CONSTANCIA');
@@ -294,7 +313,10 @@ const deriveActions = (row: Omit<InductionRosterRow, 'alerts' | 'actions' | 'ela
   if (row.stage === 'EVALUACION_TRUNCADA' || row.stage === 'EVALUACION_EN_CURSO') {
     actions.push('RESET_ATTEMPT');
   }
-  if (row.stage === 'NO_ACREDITADA' || row.stage === 'EVALUACION_VENCIDA') {
+  if (row.evaluation_mode === 'practical') {
+    // La practica no tiene intentos: RH captura (o corrige) la calificacion.
+    if (row.stage === 'PRACTICA_PENDIENTE' || row.stage === 'NO_ACREDITADA') actions.push('CAPTURE_PRACTICAL');
+  } else if (row.stage === 'NO_ACREDITADA' || row.stage === 'EVALUACION_VENCIDA') {
     actions.push('AUTHORIZE_RETRY');
   }
   if (row.stage === 'EN_CALIFICACION') {
@@ -323,6 +345,7 @@ export const mapRosterRow = (row: any, now: Date = new Date()): InductionRosterR
     enrollment_id: Number(row.enrollment_id),
     phase_id: Number(row.phase_id),
     phase_number: Number(row.phase_number),
+    evaluation_mode: (Number(row.phase_number) === ROSTER_LAST_PHASE ? 'practical' : 'quiz') as 'quiz' | 'practical',
     employee_id: Number(row.employee_id),
     employee_name: String(row.employee_name),
     employee_code: String(row.employee_code ?? ''),
@@ -402,9 +425,19 @@ export const loadPhaseRosterRows = async (phaseId: number): Promise<InductionRos
 
 export const loadEmployeeRosterRows = async (employeeId: number): Promise<InductionRosterRow[]> => {
   const result = await pool.query(
-    `${ROSTER_SELECT} WHERE e.employee_id = $1 AND p.scope = 'INSTITUTIONAL' AND p.phase_number <= ${DASHBOARD_LAST_PHASE}
+    `${ROSTER_SELECT} WHERE e.employee_id = $1 AND p.phase_number <= ${ROSTER_LAST_PHASE}
       ORDER BY p.phase_number ASC;`,
     [employeeId],
+  );
+  const now = new Date();
+  return result.rows.map((row) => mapRosterRow(row, now));
+};
+
+/** Todas las inscripciones del programa (Fases 1-6) para el directorio por colaborador. */
+export const loadProgramRosterRows = async (): Promise<InductionRosterRow[]> => {
+  const result = await pool.query(
+    `${ROSTER_SELECT} WHERE p.phase_number <= ${ROSTER_LAST_PHASE}
+      ORDER BY emp.full_name ASC, p.phase_number ASC;`,
   );
   const now = new Date();
   return result.rows.map((row) => mapRosterRow(row, now));
@@ -438,7 +471,7 @@ export interface RosterPage {
   stage_counts: Record<InductionStage, number>;
 }
 
-const normalize = (value: string): string =>
+export const normalizeSearchText = (value: string): string =>
   value
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -459,14 +492,14 @@ export const queryPhaseRoster = async (query: RosterQuery): Promise<RosterPage> 
   for (const row of all) {
     stageCounts[row.stage] += 1;
   }
-  const search = query.search ? normalize(query.search) : '';
+  const search = query.search ? normalizeSearchText(query.search) : '';
   const stages = query.stages && query.stages.length > 0 ? new Set(query.stages) : null;
   const alerts = query.alerts && query.alerts.length > 0 ? new Set(query.alerts) : null;
   const filtered = all.filter((row) => {
     if (stages && !stages.has(row.stage)) return false;
     if (alerts && !row.alerts.some((alert) => alerts.has(alert))) return false;
     if (search) {
-      const haystack = normalize(
+      const haystack = normalizeSearchText(
         [row.employee_name, row.employee_code, row.employee_email ?? '', row.area ?? '', row.branch_name ?? '', row.position_name ?? ''].join(' '),
       );
       if (!haystack.includes(search)) return false;

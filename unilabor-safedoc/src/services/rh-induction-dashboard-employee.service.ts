@@ -5,9 +5,14 @@ import type { InductionRosterRow } from './rh-induction-dashboard.service';
 import { tryActivateDeferredEnrollments } from './rh-induction-grace.service';
 import { getInstitutionalTrack, tryAdvanceEmployeeIfEligible } from './rh-induction-progression.service';
 import type { InductionTrackPhase } from './rh-induction-progression.service';
+import { loadInitialCompetencies, PHASE7_NUMBER } from './rh-induction-phase7';
+import type { CompetencySnapshot } from './rh-induction-phase7';
+import { loadTransitionRows } from './rh-induction-transition.service';
+import type { TransitionBlock, TransitionState, TransitionTarget } from './rh-induction-transition.service';
 
 // -----------------------------------------------------------------------------
-// Vista 360 de un colaborador en la Induccion (Fases 1-4): ruta institucional,
+// Vista 360 de un colaborador en la Induccion (Fases 1-7): ruta institucional,
+// ruta por puesto (5-6 por inscripcion, 7 por su REH-REG-003 inicial),
 // detalle de cada inscripcion, lectura documento por documento (paginas,
 // tiempo activo, firma), historial de TODOS los intentos de evaluacion de cada
 // fase (no solo el vigente), constancia y bitacora de acciones de RH.
@@ -62,6 +67,19 @@ export interface InductionAuditEntry {
   metadata: Record<string, unknown> | null;
 }
 
+/** Fase por puesto (5-7) en la ruta del colaborador, con su estado de avance. */
+export interface InductionPositionTrackPhase {
+  phase_id: number;
+  phase_number: number;
+  phase_name: string;
+  published: boolean;
+  enrollment_id: number | null;
+  /** Si aun no entra: LISTO / BLOQUEADO (con motivos) segun la bandeja de avance. */
+  transition: { state: TransitionState; blocks: TransitionBlock[] } | null;
+  /** Solo Fase 7: evaluacion de competencia inicial. */
+  competency: CompetencySnapshot | null;
+}
+
 export interface InductionEmployee360 {
   employee: {
     id: number;
@@ -71,11 +89,13 @@ export interface InductionEmployee360 {
     phone: string | null;
     area: string | null;
     branch_name: string | null;
+    position_id: number | null;
     position_name: string | null;
     is_active: boolean;
     user_linked: boolean;
   };
   track: InductionTrackPhase[];
+  position_track: InductionPositionTrackPhase[];
   enrollments: InductionRosterRow[];
   documents: InductionReadingDocumentDetail[];
   attempts: InductionAttemptDetail[];
@@ -91,7 +111,10 @@ const loadEmployee = async (employeeId: number): Promise<InductionEmployee360['e
             (SELECT rp.name FROM public.rh_employee_positions rep
                JOIN public.rh_positions rp ON rp.id = rep.position_id
               WHERE rep.employee_id = emp.id AND rep.is_active = TRUE
-              ORDER BY rep.assigned_at DESC LIMIT 1) AS position_name
+              ORDER BY rep.assigned_at DESC LIMIT 1) AS position_name,
+            (SELECT rep.position_id FROM public.rh_employee_positions rep
+              WHERE rep.employee_id = emp.id AND rep.is_active = TRUE
+              ORDER BY rep.assigned_at DESC LIMIT 1) AS position_id
        FROM public.employees emp
        LEFT JOIN public.helpdesk_asset_units bu ON bu.id = emp.branch_id
       WHERE emp.id = $1 LIMIT 1;`,
@@ -109,6 +132,7 @@ const loadEmployee = async (employeeId: number): Promise<InductionEmployee360['e
     phone: row.phone ? String(row.phone) : null,
     area: row.area ? String(row.area) : null,
     branch_name: row.branch_name ? String(row.branch_name) : null,
+    position_id: row.position_id ? Number(row.position_id) : null,
     position_name: row.position_name ? String(row.position_name) : null,
     is_active: Boolean(row.is_active),
     user_linked: Boolean(row.user_linked),
@@ -160,8 +184,9 @@ const loadAttempts = async (employeeId: number, currentAssignmentIds: Set<number
             (SELECT COUNT(*)::int FROM public.evaluation_responses r WHERE r.assignment_id = a.id) AS response_count
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
-       JOIN public.rh_induction_phases p ON p.training_course_id = t.training_course_id
-        AND p.scope = 'INSTITUTIONAL' AND p.phase_number BETWEEN 1 AND 4
+       JOIN public.rh_induction_enrollments e ON e.employee_id = a.employee_id
+       JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number BETWEEN 1 AND 6
+        AND t.training_course_id = COALESCE(e.training_course_id, p.training_course_id)
       WHERE a.employee_id = $1
       ORDER BY p.phase_number ASC, a.created_at ASC;`,
     [employeeId],
@@ -214,6 +239,35 @@ const loadAudit = async (employeeId: number, enrollmentIds: number[], assignment
   }));
 };
 
+const loadPositionTrack = async (employeeId: number, enrollments: InductionRosterRow[]): Promise<InductionPositionTrackPhase[]> => {
+  const phases = await pool.query(
+    `SELECT id, phase_number, name, published_at FROM public.rh_induction_phases
+      WHERE scope = 'POSITION' AND phase_number BETWEEN 5 AND ${PHASE7_NUMBER} ORDER BY phase_number ASC;`,
+  );
+  const competency = (await loadInitialCompetencies([employeeId])).get(employeeId) ?? null;
+  const track: InductionPositionTrackPhase[] = [];
+  for (const row of phases.rows) {
+    const phaseNumber = Number(row.phase_number);
+    const enrollment = enrollments.find((item) => item.phase_number === phaseNumber) ?? null;
+    const isPhase7 = phaseNumber === PHASE7_NUMBER;
+    let transition: InductionPositionTrackPhase['transition'] = null;
+    if (!enrollment && !(isPhase7 && competency)) {
+      const [candidate] = await loadTransitionRows(phaseNumber as TransitionTarget, [employeeId]);
+      if (candidate) transition = { state: candidate.state, blocks: candidate.blocks };
+    }
+    track.push({
+      phase_id: Number(row.id),
+      phase_number: phaseNumber,
+      phase_name: String(row.name),
+      published: Boolean(row.published_at),
+      enrollment_id: enrollment?.enrollment_id ?? null,
+      transition,
+      competency: isPhase7 ? competency : null,
+    });
+  }
+  return track;
+};
+
 export const getInductionEmployee360 = async (employeeId: number): Promise<InductionEmployee360 | null> => {
   const employee = await loadEmployee(employeeId);
   if (!employee) {
@@ -227,8 +281,9 @@ export const getInductionEmployee360 = async (employeeId: number): Promise<Induc
   const currentAssignmentIds = new Set(
     enrollments.map((row) => row.evaluation_assignment_id).filter((id): id is number => id !== null),
   );
-  const [track, documents, attempts] = await Promise.all([
+  const [track, positionTrack, documents, attempts] = await Promise.all([
     getInstitutionalTrack(employeeId),
+    loadPositionTrack(employeeId, enrollments),
     loadDocuments(enrollmentIds),
     loadAttempts(employeeId, currentAssignmentIds),
   ]);
@@ -237,5 +292,5 @@ export const getInductionEmployee360 = async (employeeId: number): Promise<Induc
     enrollmentIds,
     attempts.map((attempt) => attempt.assignment_id),
   );
-  return { employee, track, enrollments, documents, attempts, audit };
+  return { employee, track, position_track: positionTrack, enrollments, documents, attempts, audit };
 };

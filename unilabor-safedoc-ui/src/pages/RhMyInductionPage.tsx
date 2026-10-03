@@ -151,6 +151,15 @@ export const RhMyInductionPage = () => {
                   ) : null}
                 </p>
               ) : null}
+              {track.length > 0 && passedCount === track.length && !progress.some((item) => item.phase_number > track.length) ? (
+                <p className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+                  <span>
+                    <strong>Concluiste la ruta institucional.</strong> Sigue tu Fase 5: la inducción técnica de tu puesto. Recursos Humanos te
+                    inscribirá en cuanto tu puesto la tenga lista; recibirás un SMS con tus lecturas.
+                  </span>
+                </p>
+              ) : null}
             </section>
           ) : null}
 

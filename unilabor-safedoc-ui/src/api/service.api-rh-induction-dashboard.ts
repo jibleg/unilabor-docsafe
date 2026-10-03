@@ -3,6 +3,14 @@ import { asRecord, unwrapPayload } from './service.shared';
 import type {
   EvaluationTemplate,
   InductionAlert,
+  InductionDirectoryPage,
+  InductionDirectoryStatus,
+  InductionPositionReadinessRow,
+  InductionTransitionBlockReason,
+  InductionTransitionQueue,
+  InductionTransitionResult,
+  InductionTransitionState,
+  InductionTransitionTarget,
   InductionEmployee360,
   InductionProgramOverview,
   InductionRosterPage,
@@ -34,6 +42,24 @@ export const getInductionPhaseRoster = async (phaseId: number, query: InductionR
   if (query.limit) params.limit = query.limit;
   const response = await api.get(`/rh/induction/dashboard/phases/${phaseId}/roster`, { params });
   return asRecord(unwrapPayload(response.data))?.roster as InductionRosterPage;
+};
+
+export interface InductionDirectoryQuery {
+  q?: string;
+  status?: InductionDirectoryStatus;
+  page?: number;
+  limit?: number;
+}
+
+/** Directorio "Por colaborador": inscritos en Fases 1-4 con el estado de cada fase. */
+export const getInductionDirectory = async (query: InductionDirectoryQuery = {}): Promise<InductionDirectoryPage> => {
+  const params: Record<string, string | number> = {};
+  if (query.q) params.q = query.q;
+  if (query.status && query.status !== 'ALL') params.status = query.status;
+  if (query.page) params.page = query.page;
+  if (query.limit) params.limit = query.limit;
+  const response = await api.get('/rh/induction/dashboard/employees', { params });
+  return asRecord(unwrapPayload(response.data))?.directory as InductionDirectoryPage;
 };
 
 export const getInductionEmployee360 = async (employeeId: number): Promise<InductionEmployee360> => {
@@ -152,4 +178,55 @@ export const getInductionReadingDocumentUrl = async (acknowledgementId: number):
 export const getInductionSignatureSheetUrl = async (acknowledgementId: number): Promise<string> => {
   const response = await api.get(`/rh/induction/dashboard/acknowledgements/${acknowledgementId}/signature-sheet`, { responseType: 'blob' });
   return URL.createObjectURL(response.data as Blob);
+};
+
+// --- Fases por puesto (5-7): bandeja de avance, preparación y práctica -------
+
+export interface InductionTransitionQueueQuery {
+  target: InductionTransitionTarget;
+  state?: InductionTransitionState | undefined;
+  reason?: InductionTransitionBlockReason | undefined;
+  q?: string | undefined;
+  page?: number;
+  limit?: number;
+}
+
+export const getInductionTransitionQueue = async (query: InductionTransitionQueueQuery): Promise<InductionTransitionQueue> => {
+  const params: Record<string, string | number> = { target: query.target };
+  if (query.state) params.state = query.state;
+  if (query.reason) params.reason = query.reason;
+  if (query.q) params.q = query.q;
+  if (query.page) params.page = query.page;
+  if (query.limit) params.limit = query.limit;
+  const response = await api.get('/rh/induction/dashboard/transitions', { params });
+  return asRecord(unwrapPayload(response.data))?.queue as InductionTransitionQueue;
+};
+
+export interface ExecuteInductionTransitionPayload {
+  target: InductionTransitionTarget;
+  employee_ids: number[];
+  evaluator_name?: string;
+  evaluation_date?: string;
+}
+
+/** Mueve a la fase destino a los colaboradores LISTOS; los demás regresan con su motivo. */
+export const executeInductionTransition = async (
+  payload: ExecuteInductionTransitionPayload,
+): Promise<{ message: string; results: InductionTransitionResult[] }> => {
+  const response = await api.post('/rh/induction/dashboard/transitions', payload);
+  const data = asRecord(unwrapPayload(response.data));
+  return { message: String(data?.message ?? ''), results: (data?.results as InductionTransitionResult[]) ?? [] };
+};
+
+export const getInductionPositionReadiness = async (): Promise<InductionPositionReadinessRow[]> => {
+  const response = await api.get('/rh/induction/dashboard/positions/readiness');
+  return (asRecord(unwrapPayload(response.data))?.positions as InductionPositionReadinessRow[]) ?? [];
+};
+
+export const captureEnrollmentPractical = async (enrollmentId: number, score: number, capturedAt?: string): Promise<string> => {
+  const response = await api.post(`/rh/induction/dashboard/enrollments/${enrollmentId}/practical`, {
+    score,
+    ...(capturedAt ? { captured_at: capturedAt } : {}),
+  });
+  return String(asRecord(unwrapPayload(response.data))?.message ?? '');
 };

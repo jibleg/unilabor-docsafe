@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { LayoutDashboard, Loader2, RefreshCw, Settings2 } from 'lucide-react';
+import { Award, LayoutDashboard, Loader2, RefreshCw, Settings2, StepForward, Users } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { removeEnrollment } from '../api/service.api-rh-induction';
 import {
@@ -16,14 +16,28 @@ import { EnrollmentCertificateDataModal } from '../components/rh/EnrollmentCerti
 import { InductionReopenReadingModal } from '../components/rh/InductionReopenReadingModal';
 import { InductionRetryModal } from '../components/rh/InductionRetryModal';
 import { InductionBulkReopenModal } from '../components/rh/induction-dashboard/InductionBulkReopenModal';
+import { InductionCollaboratorDirectory } from '../components/rh/induction-dashboard/InductionCollaboratorDirectory';
 import { InductionCollaboratorDrawer } from '../components/rh/induction-dashboard/InductionCollaboratorDrawer';
+import { InductionCollaboratorSummary } from '../components/rh/induction-dashboard/InductionCollaboratorSummary';
 import { InductionPhaseCard } from '../components/rh/induction-dashboard/InductionPhaseCard';
 import { InductionPhaseFunnelChart } from '../components/rh/induction-dashboard/InductionPhaseFunnelChart';
+import { InductionPhase7Card } from '../components/rh/induction-dashboard/InductionPhase7Card';
 import { InductionPhaseRulesPanel } from '../components/rh/induction-dashboard/InductionPhaseRulesPanel';
+import { InductionPositionPhasePanel } from '../components/rh/induction-dashboard/InductionPositionPhasePanel';
+import { InductionPracticalCaptureModal } from '../components/rh/induction-dashboard/InductionPracticalCaptureModal';
+import { InductionTransitionModal, type TransitionCandidateRef } from '../components/rh/induction-dashboard/InductionTransitionModal';
+import { InductionTransitionsView, type TransitionsTab } from '../components/rh/induction-dashboard/InductionTransitionsView';
 import { InductionProgramKpis } from '../components/rh/induction-dashboard/InductionProgramKpis';
 import { InductionResetAttemptModal } from '../components/rh/induction-dashboard/InductionResetAttemptModal';
 import { InductionRosterTable, type RosterFilters } from '../components/rh/induction-dashboard/InductionRosterTable';
-import type { InductionAction, InductionProgramOverview, InductionRosterPage, InductionRosterRow } from '../types/models';
+import type {
+  InductionAction,
+  InductionEmployee360,
+  InductionProgramOverview,
+  InductionRosterPage,
+  InductionRosterRow,
+  InductionTransitionTarget,
+} from '../types/models';
 import { confirmAction } from '../utils/confirm';
 import { canReopenReading, formatDateTime } from '../utils/inductionDashboard';
 import { notifyError, notifySuccess } from '../utils/notify';
@@ -38,12 +52,18 @@ type Modal =
   | { kind: 'reset'; row: InductionRosterRow }
   | { kind: 'data'; row: InductionRosterRow }
   | { kind: 'bulk-reopen'; rows: InductionRosterRow[] }
+  | { kind: 'practical'; row: InductionRosterRow }
+  | { kind: 'transition'; target: InductionTransitionTarget; candidates: TransitionCandidateRef[] }
   | null;
 
+const parseTransitionsTab = (value: string | null): TransitionsTab =>
+  value === 'positions' ? 'positions' : value === '6' ? 6 : value === '7' ? 7 : 5;
+
 /**
- * Tablero de gestión integral de la Inducción (Fases 1-4): panorama del
- * programa, gestión por fase (reglas + roster con acciones) y expediente 360
- * por colaborador. Las Fases 5-7 (por puesto) siguen en /rh/induction.
+ * Tablero de gestión integral de la Inducción (Fases 1-7): panorama del
+ * programa, gestión por fase (reglas o configuración por puesto + roster con
+ * acciones), bandeja de avance de las fases por puesto (4→5→6→7, para que
+ * nadie quede detenido) y expediente 360 por colaborador.
  */
 export const RhInductionDashboardPage = () => {
   const navigate = useNavigate();
@@ -60,6 +80,10 @@ export const RhInductionDashboardPage = () => {
   const [modal, setModal] = useState<Modal>(null);
 
   const selectedPhaseId = Number(searchParams.get('phase')) || null;
+  const collaboratorsView = !selectedPhaseId && searchParams.get('view') === 'collaborators';
+  const transitionsView = !selectedPhaseId && searchParams.get('view') === 'transitions';
+  const transitionsTab = parseTransitionsTab(searchParams.get('tab'));
+  const selectedEmployeeId = Number(searchParams.get('employee')) || null;
   const selectedPhase = useMemo(() => overview?.phases.find((phase) => phase.phase_id === selectedPhaseId) ?? null, [overview, selectedPhaseId]);
 
   const loadOverview = useCallback(async () => {
@@ -123,6 +147,18 @@ export const RhInductionDashboardPage = () => {
     setSearchParams(phaseId ? { phase: String(phaseId) } : {});
   };
 
+  const openCollaborators = (employeeId?: number) =>
+    setSearchParams(employeeId ? { view: 'collaborators', employee: String(employeeId) } : { view: 'collaborators' });
+
+  const openTransitions = (tab: TransitionsTab = 5) => setSearchParams({ view: 'transitions', tab: String(tab) });
+
+  const openTransitionFor = (target: InductionTransitionTarget, employee: InductionEmployee360['employee']) =>
+    setModal({
+      kind: 'transition',
+      target,
+      candidates: [{ employee_id: employee.id, employee_name: employee.full_name, position_code: employee.position_name }],
+    });
+
   const runAction = async (label: string, fn: () => Promise<string>, fallback: string) => {
     try {
       const message = await fn();
@@ -152,6 +188,9 @@ export const RhInductionDashboardPage = () => {
       case 'GRADE':
         navigate('/rh/grading');
         return;
+      case 'CAPTURE_PRACTICAL':
+        setModal({ kind: 'practical', row });
+        return;
       case 'START_NOW': {
         const ok = await confirmAction(
           'Terminar el descanso ahora',
@@ -177,6 +216,16 @@ export const RhInductionDashboardPage = () => {
         return;
       }
       case 'ADVANCE': {
+        // De la Fase 4 en adelante el avance depende del puesto: pasa por la
+        // misma validación de la bandeja (listo / bloqueado con su motivo).
+        if (row.phase_number >= 4) {
+          setModal({
+            kind: 'transition',
+            target: (row.phase_number + 1) as InductionTransitionTarget,
+            candidates: [{ employee_id: row.employee_id, employee_name: row.employee_name, position_code: row.position_name }],
+          });
+          return;
+        }
         const ok = await confirmAction(
           `Avanzar a la Fase ${row.phase_number + 1}`,
           `${row.employee_name} aprobó la Fase ${row.phase_number}. ${
@@ -237,6 +286,8 @@ export const RhInductionDashboardPage = () => {
       return all ? new Set() : new Set(rows.map((row) => row.enrollment_id));
     });
 
+  const waitingTransitions = overview ? overview.transitions.reduce((acc, item) => acc + item.READY + item.BLOCKED, 0) : 0;
+
   const pendingReaders = roster ? Object.entries(roster.stage_counts).reduce((acc, [stage, count]) => (['SIN_INICIAR', 'LEYENDO', 'LECTURA_VENCIDA'].includes(stage) ? acc + count : acc), 0) : 0;
 
   return (
@@ -246,9 +297,9 @@ export const RhInductionDashboardPage = () => {
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--color-brand-500)]">Programa de Inducción</p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--color-brand-700)]">Tablero de Inducción</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--unilabor-neutral)]">
-            Gestión integral de las Fases 1-4: cada colaborador avanza a su ritmo (al aprobar una fase entra solo a la siguiente) y desde
-            aquí RH ve el panorama, ajusta las reglas de cada fase y resuelve lecturas vencidas, intentos truncados, reevaluaciones,
-            avances y constancias sin salir de la pantalla.
+            Gestión integral de las 7 fases. En las Fases 1-4 cada colaborador avanza a su ritmo; en las Fases 5-7 (por puesto) RH lo mueve
+            desde la bandeja de avance, que muestra a cada quien listo o bloqueado con su motivo para que nadie se quede detenido. Desde
+            aquí se resuelven lecturas vencidas, intentos truncados, reevaluaciones, prácticas, avances y constancias.
           </p>
         </div>
         <div className="flex gap-2">
@@ -274,10 +325,29 @@ export const RhInductionDashboardPage = () => {
           type="button"
           onClick={() => selectPhase(null)}
           className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-            !selectedPhaseId ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'
+            !selectedPhaseId && !collaboratorsView && !transitionsView ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'
           }`}
         >
           <LayoutDashboard size={14} /> Panorama
+        </button>
+        <button
+          type="button"
+          onClick={() => openCollaborators(selectedEmployeeId ?? undefined)}
+          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+            collaboratorsView ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'
+          }`}
+        >
+          <Users size={14} /> Por colaborador
+        </button>
+        <button
+          type="button"
+          onClick={() => openTransitions(transitionsView ? transitionsTab : 5)}
+          className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+            transitionsView ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'
+          }`}
+        >
+          <StepForward size={14} /> Bandeja de avance
+          {waitingTransitions > 0 ? <span className="rounded-full bg-rose-500 px-1.5 text-[10px] text-white">{waitingTransitions}</span> : null}
         </button>
         {overview?.phases.map((phase) => (
           <button
@@ -292,9 +362,59 @@ export const RhInductionDashboardPage = () => {
             <span className="ml-1.5 rounded-full bg-white/70 px-1.5 text-[10px] text-[var(--color-brand-700)]">{phase.enrolled}</span>
           </button>
         ))}
+        {overview ? (
+          <button
+            type="button"
+            onClick={() => openTransitions(7)}
+            className={`inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+              transitionsView && transitionsTab === 7 ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'
+            }`}
+          >
+            <Award size={13} /> Fase 7
+            <span className="ml-1 rounded-full bg-white/70 px-1.5 text-[10px] text-[var(--color-brand-700)]">
+              {overview.phase7.in_process + overview.phase7.pending_authorization + overview.phase7.approved + overview.phase7.not_approved}
+            </span>
+          </button>
+        ) : null}
       </div>
 
-      {loadingOverview && !overview ? (
+      {transitionsView ? (
+        <InductionTransitionsView
+          tab={transitionsTab}
+          overview={overview}
+          refreshKey={refreshKey}
+          onTabChange={(tab) => openTransitions(tab)}
+          onChanged={() => void refreshAll()}
+          onOpenEmployee={(employeeId) => setDrawer({ employeeId })}
+        />
+      ) : collaboratorsView ? (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(320px,0.34fr)_minmax(0,1fr)]">
+          <aside className={`${cardClass} self-start`}>
+            <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Colaboradores</h2>
+            <p className="mb-3 text-xs text-[var(--unilabor-neutral)]">Inscritos en el programa (Fases 1-7). Elige uno para ver su resumen y el detalle de cada fase.</p>
+            <InductionCollaboratorDirectory selectedEmployeeId={selectedEmployeeId} refreshKey={refreshKey} onSelect={(employeeId) => openCollaborators(employeeId)} />
+          </aside>
+          <section className={cardClass}>
+            {selectedEmployeeId ? (
+              <InductionCollaboratorSummary
+                key={selectedEmployeeId}
+                employeeId={selectedEmployeeId}
+                refreshKey={refreshKey}
+                onAction={handleAction}
+                onTransition={openTransitionFor}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2 py-20 text-center">
+                <Users size={28} className="text-[var(--color-brand-300)]" />
+                <p className="text-sm font-semibold text-[var(--color-brand-700)]">Selecciona un colaborador</p>
+                <p className="max-w-sm text-xs text-[var(--unilabor-neutral)]">
+                  Verás su avance en las 7 fases, documentos firmados, intentos de evaluación, constancias y la bitácora de gestión de RH.
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
+      ) : loadingOverview && !overview ? (
         <div className={`${cardClass} flex items-center justify-center py-12`}>
           <Loader2 size={22} className="animate-spin text-[var(--unilabor-neutral)]" />
         </div>
@@ -305,6 +425,10 @@ export const RhInductionDashboardPage = () => {
             onFocusAttention={() => {
               const first = overview.phases.find((phase) => ATTENTION_ALERTS.some((alert) => (phase.alert_counts[alert] ?? 0) > 0));
               if (first) selectPhase(first.phase_id, { alerts: ATTENTION_ALERTS });
+            }}
+            onOpenTransitions={() => {
+              const first = overview.transitions.find((item) => item.READY + item.BLOCKED > 0);
+              openTransitions(first?.target ?? 5);
             }}
           />
           <section className={cardClass}>
@@ -321,6 +445,7 @@ export const RhInductionDashboardPage = () => {
             {overview.phases.map((phase) => (
               <InductionPhaseCard key={phase.phase_id} phase={phase} onOpen={(phaseId) => selectPhase(phaseId)} />
             ))}
+            <InductionPhase7Card phase7={overview.phase7} onOpen={() => openTransitions(7)} />
           </div>
         </>
       ) : overview && selectedPhase ? (
@@ -334,7 +459,15 @@ export const RhInductionDashboardPage = () => {
                 {selectedPhase.pending_advance > 0 ? ` · ${selectedPhase.pending_advance} por avanzar` : ''}
               </p>
             </div>
-            <InductionPhaseRulesPanel phase={selectedPhase} pendingReaders={pendingReaders} onChanged={refreshAll} />
+            {selectedPhase.scope === 'POSITION' ? (
+              <InductionPositionPhasePanel
+                phase={selectedPhase}
+                onOpenTransitions={() => openTransitions(selectedPhase.phase_number as InductionTransitionTarget)}
+                onOpenPositions={() => openTransitions('positions')}
+              />
+            ) : (
+              <InductionPhaseRulesPanel phase={selectedPhase} pendingReaders={pendingReaders} onChanged={refreshAll} />
+            )}
           </aside>
           <section className={cardClass}>
             <InductionRosterTable
@@ -367,6 +500,7 @@ export const RhInductionDashboardPage = () => {
             refreshKey={refreshKey}
             onClose={() => setDrawer(null)}
             onAction={handleAction}
+            onTransition={openTransitionFor}
           />
         ) : null}
       </AnimatePresence>
@@ -374,6 +508,10 @@ export const RhInductionDashboardPage = () => {
       {modal?.kind === 'reopen' ? <InductionReopenReadingModal enrollment={modal.row} onClose={() => setModal(null)} onReopened={() => void refreshAll()} /> : null}
       {modal?.kind === 'retry' ? <InductionRetryModal enrollment={modal.row} onClose={() => setModal(null)} onAuthorized={() => void refreshAll()} /> : null}
       {modal?.kind === 'reset' ? <InductionResetAttemptModal row={modal.row} onClose={() => setModal(null)} onDone={() => void refreshAll()} /> : null}
+      {modal?.kind === 'practical' ? <InductionPracticalCaptureModal row={modal.row} onClose={() => setModal(null)} onDone={() => void refreshAll()} /> : null}
+      {modal?.kind === 'transition' ? (
+        <InductionTransitionModal target={modal.target} candidates={modal.candidates} onClose={() => setModal(null)} onDone={() => void refreshAll()} />
+      ) : null}
       {modal?.kind === 'bulk-reopen' ? <InductionBulkReopenModal rows={modal.rows} onClose={() => setModal(null)} onDone={() => void refreshAll()} /> : null}
       {modal?.kind === 'data' ? (
         <EnrollmentCertificateDataModal

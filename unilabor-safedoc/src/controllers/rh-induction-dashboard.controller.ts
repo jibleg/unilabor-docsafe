@@ -6,6 +6,7 @@ import {
   resendReadingNotice,
   resetTruncatedAttempt,
 } from '../services/rh-induction-attempt-repair.service';
+import { queryInductionDirectory } from '../services/rh-induction-dashboard-directory.service';
 import { getInductionEmployee360 } from '../services/rh-induction-dashboard-employee.service';
 import { getInductionProgramOverview } from '../services/rh-induction-dashboard-overview.service';
 import { loadEnrollmentRosterRow, queryPhaseRoster } from '../services/rh-induction-dashboard.service';
@@ -18,6 +19,7 @@ import { updateEvaluationTemplate } from '../services/evaluation-template.servic
 import type { EvaluationTemplatePayload } from '../services/evaluation-template.service';
 import pool from '../config/db';
 import {
+  directoryQuerySchema,
   rosterQuerySchema,
   type ResetTruncatedAttemptInput,
   type UpdatePhaseAdvanceGraceInput,
@@ -43,6 +45,7 @@ const ERROR_STATUS: Record<string, number> = {
   RH_INDUCTION_PREVIOUS_PHASE_NOT_APPROVED: 409,
   RH_INDUCTION_EMPLOYEE_WITHOUT_USER: 409,
   RH_INDUCTION_PHASE_WITHOUT_DOCUMENTS: 409,
+  RH_INDUCTION_POSITION_EVALUATION_NOT_READY: 409,
   RH_INDUCTION_PHASE_WITHOUT_PUBLISHED_EVALUATION: 409,
   RH_INDUCTION_AUTO_ADVANCE_NOT_APPLICABLE: 409,
   RH_INDUCTION_GRACE_NOT_APPLICABLE: 409,
@@ -110,6 +113,28 @@ export const getInductionPhaseRosterController = async (req: AuthRequest, res: R
     return res.json({ roster });
   } catch (error: any) {
     return fail(res, error, 'Error cargando el roster de la fase', 'No se pudo cargar el roster de la fase.');
+  }
+};
+
+/** GET /rh/induction/dashboard/employees?q=&status=&page=&limit= (directorio por colaborador) */
+export const getInductionDirectoryController = async (req: AuthRequest, res: Response) => {
+  const parsed = directoryQuerySchema.safeParse(req.query ?? {});
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: 'Filtros invalidos',
+      errors: parsed.error.issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message })),
+    });
+  }
+  try {
+    const directory = await queryInductionDirectory({
+      search: parsed.data.q,
+      status: parsed.data.status,
+      page: parsed.data.page,
+      limit: parsed.data.limit,
+    });
+    return res.json({ directory });
+  } catch (error: any) {
+    return fail(res, error, 'Error cargando el directorio de induccion', 'No se pudo cargar el listado de colaboradores.');
   }
 };
 

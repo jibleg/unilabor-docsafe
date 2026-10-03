@@ -66,6 +66,7 @@ const ACTION_ICON: Record<InductionAction, React.ReactNode> = {
   ISSUE_CERTIFICATE: <Award size={14} />,
   COMPLETE_DATA: <UserPen size={14} />,
   START_NOW: <Coffee size={14} />,
+  CAPTURE_PRACTICAL: <ClipboardCheck size={14} />,
   UNENROLL: <Trash2 size={14} />,
 };
 

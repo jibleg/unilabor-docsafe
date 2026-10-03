@@ -1485,8 +1485,11 @@ export type InductionStage =
   | 'EVALUACION_DISPONIBLE'
   | 'EVALUACION_EN_CURSO'
   | 'EVALUACION_TRUNCADA'
+  | 'PRACTICA_PENDIENTE'
   | 'EN_CALIFICACION'
   | 'EVALUACION_VENCIDA'
+  | 'COMPETENCIA_EN_PROCESO'
+  | 'COMPETENCIA_POR_AUTORIZAR'
   | 'NO_ACREDITADA'
   | 'APROBADA';
 
@@ -1516,6 +1519,7 @@ export type InductionAction =
   | 'ISSUE_CERTIFICATE'
   | 'COMPLETE_DATA'
   | 'START_NOW'
+  | 'CAPTURE_PRACTICAL'
   | 'UNENROLL';
 
 export type InductionEnrollmentOrigin = 'MANUAL' | 'BULK' | 'AUTO_ADVANCE' | 'RECONCILE' | 'ADVANCE';
@@ -1524,6 +1528,8 @@ export type InductionEnrollmentOrigin = 'MANUAL' | 'BULK' | 'AUTO_ADVANCE' | 'RE
 export interface InductionRosterRow extends RhInductionPhaseEnrollmentSummary {
   phase_id: number;
   phase_number: number;
+  /** Fase 6 = evaluación práctica capturada por RH; el resto, cuestionario. */
+  evaluation_mode: 'quiz' | 'practical';
   employee_email: string | null;
   area: string | null;
   branch_name: string | null;
@@ -1596,9 +1602,17 @@ export interface InductionPhaseReadiness {
   ready: boolean;
 }
 
+export interface InductionPositionPhaseSummary {
+  positions_enabled: number;
+  positions_ready: number;
+  waiting: number;
+  waiting_ready: number;
+}
+
 export interface InductionPhaseOverview {
   phase_id: number;
   phase_number: number;
+  scope: 'INSTITUTIONAL' | 'POSITION';
   name: string;
   published_at: string | null;
   documents_total: number;
@@ -1614,6 +1628,125 @@ export interface InductionPhaseOverview {
   reading_progress_pct: number;
   pending_advance: number;
   origin_counts: Record<string, number>;
+  /** Solo fases por puesto (5-6): puestos habilitados/listos y quién espera entrar. */
+  position_summary: InductionPositionPhaseSummary | null;
+}
+
+export interface InductionPhase7Overview {
+  waiting: number;
+  waiting_ready: number;
+  in_process: number;
+  pending_authorization: number;
+  approved: number;
+  not_approved: number;
+}
+
+export type InductionTransitionTarget = 5 | 6 | 7;
+export type InductionTransitionState = 'READY' | 'BLOCKED' | 'STARTED';
+export type InductionTransitionBlockReason =
+  | 'SIN_USUARIO'
+  | 'SIN_PUESTO'
+  | 'FASE_EN_BORRADOR'
+  | 'PUESTO_NO_HABILITADO'
+  | 'PUESTO_SIN_DOCUMENTOS'
+  | 'EVALUACION_NO_LISTA'
+  | 'PUESTO_SIN_COMPETENCIAS';
+
+export interface InductionTransitionBlock {
+  reason: InductionTransitionBlockReason;
+  detail: string;
+}
+
+export interface InductionCompetencySnapshot {
+  evaluation_id: number;
+  status: 'DRAFT' | 'CLOSED';
+  evaluation_date: string | null;
+  evaluator_name: string;
+  final_pct: number | null;
+  dictamen: string | null;
+  authorization_result: string | null;
+  closed_at: string | null;
+}
+
+export type InductionPositionEvaluationState = 'MISSING' | 'DRAFT' | 'NO_QUESTIONS' | 'READY';
+
+/** Renglón de la bandeja de avance (aprobó la fase anterior y no está en la destino). */
+export interface InductionTransitionRow {
+  target: InductionTransitionTarget;
+  state: InductionTransitionState;
+  blocks: InductionTransitionBlock[];
+  waiting_hours: number | null;
+  employee_id: number;
+  employee_name: string;
+  employee_code: string;
+  user_linked: boolean;
+  area: string | null;
+  branch_name: string | null;
+  position_id: number | null;
+  position_code: string | null;
+  position_name: string | null;
+  previous_enrollment_id: number;
+  previous_passed_at: string | null;
+  previous_percentage: number | null;
+  previous_certificate_document_id: number | null;
+  target_course_id: number | null;
+  documents_total: number;
+  competencies_total: number;
+  evaluation_state: InductionPositionEvaluationState;
+  competency: InductionCompetencySnapshot | null;
+}
+
+export interface InductionTransitionPhase {
+  phase_id: number;
+  phase_number: number;
+  name: string;
+  published: boolean;
+  advance_grace_hours: number | null;
+}
+
+export interface InductionTransitionQueue {
+  phase: InductionTransitionPhase;
+  rows: InductionTransitionRow[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  state_counts: Record<InductionTransitionState, number>;
+  reason_counts: Record<InductionTransitionBlockReason, number>;
+}
+
+export interface InductionTransitionResult {
+  employee_id: number;
+  employee_name: string;
+  ok: boolean;
+  message: string;
+  created_id: number | null;
+  previous_enrollment_id: number | null;
+}
+
+export interface InductionPositionPhaseReadiness {
+  enabled: boolean;
+  course_id: number | null;
+  evaluation_state: InductionPositionEvaluationState | null;
+  question_count: number;
+  certificate_signatures: number;
+  waiting: number;
+  ready: number;
+  enrolled: number;
+  ok: boolean;
+}
+
+/** Preparación de un puesto para recibir colaboradores en las Fases 5-7. */
+export interface InductionPositionReadinessRow {
+  position_id: number;
+  position_code: string;
+  position_name: string;
+  employees_active: number;
+  documents_total: number;
+  competencies_total: number;
+  phase5: InductionPositionPhaseReadiness;
+  phase6: InductionPositionPhaseReadiness;
+  phase7: { waiting: number; ready: number; started: number; ok: boolean };
 }
 
 export interface InductionProgramOverview {
@@ -1621,6 +1754,7 @@ export interface InductionProgramOverview {
   employees_active: number;
   employees_in_program: number;
   employees_completed_1_4: number;
+  employees_completed_1_7: number;
   employees_by_current_phase: Record<string, number>;
   totals: {
     enrollments: number;
@@ -1630,6 +1764,8 @@ export interface InductionProgramOverview {
     needs_attention: number;
   };
   phases: InductionPhaseOverview[];
+  phase7: InductionPhase7Overview;
+  transitions: Array<{ target: InductionTransitionTarget } & Record<InductionTransitionState, number>>;
 }
 
 export type InductionTrackAccess = 'ENROLLED' | 'AVAILABLE' | 'LOCKED';
@@ -1702,6 +1838,57 @@ export interface InductionAuditEntry {
   metadata: Record<string, unknown> | null;
 }
 
+export type InductionDirectoryStatus = 'ALL' | 'IN_PROGRESS' | 'STALLED' | 'COMPLETED' | 'ATTENTION';
+
+export interface InductionDirectoryPhase {
+  phase_number: number;
+  /** null en la Fase 7 (evaluación de competencia, sin inscripción). */
+  enrollment_id: number | null;
+  stage: InductionStage;
+  reading_signed: number;
+  reading_total: number;
+  evaluation_percentage: number | null;
+  attempts_total: number;
+  has_certificate: boolean;
+  alerts: InductionAlert[];
+}
+
+/** Renglón del directorio "Por colaborador" del Tablero de Inducción. */
+export interface InductionDirectoryRow {
+  employee_id: number;
+  employee_name: string;
+  employee_code: string;
+  position_name: string | null;
+  branch_name: string | null;
+  area: string | null;
+  phases: InductionDirectoryPhase[];
+  approved_count: number;
+  current_phase_number: number;
+  current_stage: InductionStage;
+  attention_count: number;
+  last_enrolled_at: string;
+}
+
+export interface InductionDirectoryPage {
+  rows: InductionDirectoryRow[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  status_counts: Record<InductionDirectoryStatus, number>;
+}
+
+/** Fase por puesto (5-7) en la ruta del colaborador con su estado de avance. */
+export interface InductionPositionTrackPhase {
+  phase_id: number;
+  phase_number: number;
+  phase_name: string;
+  published: boolean;
+  enrollment_id: number | null;
+  transition: { state: InductionTransitionState; blocks: InductionTransitionBlock[] } | null;
+  competency: InductionCompetencySnapshot | null;
+}
+
 export interface InductionEmployee360 {
   employee: {
     id: number;
@@ -1711,11 +1898,13 @@ export interface InductionEmployee360 {
     phone: string | null;
     area: string | null;
     branch_name: string | null;
+    position_id: number | null;
     position_name: string | null;
     is_active: boolean;
     user_linked: boolean;
   };
   track: InductionTrackPhase[];
+  position_track: InductionPositionTrackPhase[];
   enrollments: InductionRosterRow[];
   documents: InductionReadingDocumentDetail[];
   attempts: InductionAttemptDetail[];

@@ -7,6 +7,11 @@ import {
   tryNotifyInductionPhaseReady,
 } from './rh-induction-notification.service';
 import { syncInductionReadingDeadlines } from './rh-induction-reading-deadline.service';
+import {
+  evaluationModeForPhase,
+  loadCourseEvaluationState,
+  POSITION_EVALUATION_STATE_LABEL,
+} from './rh-induction-position-evaluation';
 
 /**
  * Orquestacion de las Fases 1-4 de induccion (institucionales, iguales para
@@ -766,6 +771,18 @@ export const enrollEmployeeInPhase = async (
       );
     }
     positionCourseId = Number(bridgeResult.rows[0].training_course_id);
+
+    // Candado anti-limbo: no se entra a la fase si la evaluacion del puesto no
+    // esta lista para presentarse (Fase 5 cuestionario con preguntas, Fase 6
+    // practica publicada); de lo contrario el colaborador leeria sin examen.
+    const mode = evaluationModeForPhase(phaseNumber);
+    const evaluationState = await loadCourseEvaluationState(positionCourseId, mode);
+    if (evaluationState !== 'READY') {
+      throwCoded(
+        'RH_INDUCTION_POSITION_EVALUATION_NOT_READY',
+        `La ${mode === 'quiz' ? 'evaluacion (cuestionario)' : 'evaluacion practica'} de la Fase ${phaseNumber} para el puesto "${positionName}" esta ${POSITION_EVALUATION_STATE_LABEL[evaluationState]}; publicala antes de inscribir.`,
+      );
+    }
 
     if (phaseNumber === 5) {
       const docsResult = await pool.query(

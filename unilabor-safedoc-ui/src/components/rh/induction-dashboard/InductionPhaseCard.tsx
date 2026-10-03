@@ -23,7 +23,10 @@ export const InductionPhaseCard = ({ phase, onOpen }: InductionPhaseCardProps) =
     <div className="flex flex-col rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/90 p-4 shadow-sm shadow-[rgba(0,65,106,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-500)]">Fase {phase.phase_number}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-500)]">
+            Fase {phase.phase_number}
+            {phase.scope === 'POSITION' ? ' · por puesto' : ''}
+          </p>
           <h3 className="mt-0.5 text-base font-bold leading-tight text-[var(--color-brand-700)]">{phase.name}</h3>
         </div>
         <span
@@ -64,12 +67,29 @@ export const InductionPhaseCard = ({ phase, onOpen }: InductionPhaseCardProps) =
         </div>
       </dl>
 
-      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
-        <ReadinessDot ok={phase.readiness.documents_ok} label={`${phase.documents_total} documentos`} />
-        <ReadinessDot ok={phase.readiness.quiz_ok} label="Cuestionario" />
-        <ReadinessDot ok={phase.readiness.signatures_ok} label="Firmas" />
-        <ReadinessDot ok={phase.readiness.duration_ok} label="Duración" />
-      </div>
+      {phase.position_summary ? (
+        <div className="mt-3 space-y-1">
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <ReadinessDot
+              ok={phase.position_summary.positions_ready > 0}
+              label={`${phase.position_summary.positions_ready}/${phase.position_summary.positions_enabled} puestos listos`}
+            />
+            <ReadinessDot ok={phase.readiness.duration_ok} label="Duración" />
+          </div>
+          {phase.position_summary.waiting > 0 ? (
+            <p className="text-[11px] font-semibold text-[var(--color-brand-700)]">
+              {phase.position_summary.waiting} esperan entrar · {phase.position_summary.waiting_ready} listos
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
+          <ReadinessDot ok={phase.readiness.documents_ok} label={`${phase.documents_total} documentos`} />
+          <ReadinessDot ok={phase.readiness.quiz_ok} label="Cuestionario" />
+          <ReadinessDot ok={phase.readiness.signatures_ok} label="Firmas" />
+          <ReadinessDot ok={phase.readiness.duration_ok} label="Duración" />
+        </div>
+      )}
 
       {alerts.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">

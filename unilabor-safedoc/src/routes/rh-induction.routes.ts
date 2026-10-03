@@ -52,6 +52,7 @@ import {
   advanceEnrollmentController,
   getInductionDashboardOverviewController,
   getInductionEmployee360Controller,
+  getInductionDirectoryController,
   getInductionEnrollmentRowController,
   getInductionPhaseRosterController,
   issueEnrollmentCertificateController,
@@ -64,10 +65,18 @@ import {
   updatePhaseEvaluationRulesController,
 } from '../controllers/rh-induction-dashboard.controller';
 import {
+  captureEnrollmentPracticalController,
+  executeTransitionController,
+  getPositionReadinessController,
+  getTransitionQueueController,
+} from '../controllers/rh-induction-transition.controller';
+import {
   viewInductionReadingDocumentController,
   viewInductionSignatureSheetController,
 } from '../controllers/rh-induction-reading-evidence.controller';
 import {
+  capturePracticalScoreSchema,
+  executeTransitionSchema,
   resetTruncatedAttemptSchema,
   updatePhaseAdvanceGraceSchema,
   updatePhaseAutoAdvanceSchema,
@@ -137,6 +146,21 @@ router.post(
 // Tablero de gestion integral (Fases 1-4): panorama, roster por fase, vista 360 y acciones.
 router.get('/induction/dashboard/overview', requirePermission('RH.INDUCTION.MANAGE'), getInductionDashboardOverviewController);
 router.get('/induction/dashboard/phases/:phaseId/roster', requirePermission('RH.INDUCTION.MANAGE'), getInductionPhaseRosterController);
+router.get('/induction/dashboard/transitions', requirePermission('RH.INDUCTION.MANAGE'), getTransitionQueueController);
+router.post(
+  '/induction/dashboard/transitions',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(executeTransitionSchema),
+  executeTransitionController,
+);
+router.get('/induction/dashboard/positions/readiness', requirePermission('RH.INDUCTION.MANAGE'), getPositionReadinessController);
+router.post(
+  '/induction/dashboard/enrollments/:enrollmentId/practical',
+  requirePermission('RH.INDUCTION.MANAGE'),
+  validate(capturePracticalScoreSchema),
+  captureEnrollmentPracticalController,
+);
+router.get('/induction/dashboard/employees', requirePermission('RH.INDUCTION.MANAGE'), getInductionDirectoryController);
 router.get('/induction/dashboard/employees/:employeeId', requirePermission('RH.INDUCTION.MANAGE'), getInductionEmployee360Controller);
 router.get('/induction/dashboard/enrollments/:enrollmentId', requirePermission('RH.INDUCTION.MANAGE'), getInductionEnrollmentRowController);
 router.get(
