@@ -36,6 +36,8 @@ import type {
   TraceabilityEmployee,
   TraceabilityRow,
   TrainingCourse,
+  TrainingCourseKind,
+  TrainingCourseSummary,
 } from '../types/models';
 
 /**
@@ -89,6 +91,7 @@ const normalizeCourse = (input: unknown): TrainingCourse | null => {
     certificate_validity_months: getNumber(source, ['certificate_validity_months']) ?? 12,
     is_active: getBoolean(source, ['is_active'], true),
     template_count: getNumber(source, ['template_count']) ?? 0,
+    published_template_count: getNumber(source, ['published_template_count']) ?? 0,
     created_at: getString(source, ['created_at']),
     updated_at: getString(source, ['updated_at']),
   };
@@ -174,14 +177,46 @@ const normalizeTemplate = (input: unknown): EvaluationTemplate | null => {
 
 // --- Capacitaciones ---
 
+export interface TrainingCourseListQuery extends PageQuery {
+  kind?: TrainingCourseKind | undefined;
+  /** Fase del Programa de Induccion (1-7). */
+  phase?: number | undefined;
+}
+
+const EMPTY_COURSE_SUMMARY: TrainingCourseSummary = { total: 0, induction: 0, general: 0, draft: 0 };
+
+const normalizeCourseSummary = (input: unknown): TrainingCourseSummary => {
+  const source = asRecord(input);
+  if (!source) {
+    return EMPTY_COURSE_SUMMARY;
+  }
+  return {
+    total: getNumber(source, ['total']) ?? 0,
+    induction: getNumber(source, ['induction']) ?? 0,
+    general: getNumber(source, ['general']) ?? 0,
+    draft: getNumber(source, ['draft']) ?? 0,
+  };
+};
+
 export const listTrainingCoursesPaginated = async (
-  query: PageQuery = {},
-): Promise<PageResult<TrainingCourse>> => {
-  const response = await api.get('/rh/trainings', { params: buildPageParams(query) });
+  query: TrainingCourseListQuery = {},
+): Promise<PageResult<TrainingCourse> & { summary: TrainingCourseSummary }> => {
+  const params: Record<string, string | number> = buildPageParams(query);
+  if (query.kind) {
+    params.kind = query.kind;
+  }
+  if (query.phase) {
+    params.phase = query.phase;
+  }
+  const response = await api.get('/rh/trainings', { params });
   const data = getArrayFromPayload(response.data, ['data', 'courses', 'items'])
     .map(normalizeCourse)
     .filter((course): course is TrainingCourse => course !== null);
-  return { data, pagination: extractPagination(response.data, data.length) };
+  return {
+    data,
+    pagination: extractPagination(response.data, data.length),
+    summary: normalizeCourseSummary(asRecord(response.data)?.summary),
+  };
 };
 
 export const getTrainingCourse = async (courseId: number): Promise<TemplateDetail | null> => {

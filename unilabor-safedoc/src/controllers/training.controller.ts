@@ -7,6 +7,7 @@ import {
   getTrainingCourseById,
   listTrainingCourses,
   updateTrainingCourse,
+  type TrainingCourseKind,
   type TrainingCoursePayload,
 } from '../services/training.service';
 import {
@@ -28,6 +29,10 @@ const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
+
+const COURSE_KINDS: readonly TrainingCourseKind[] = ['induction', 'general', 'draft'];
+const parseCourseKind = (value: unknown): TrainingCourseKind | undefined =>
+  COURSE_KINDS.find((kind) => kind === value);
 
 const mapTrainingError = (res: Response, error: any): Response | null => {
   switch (error?.code) {
@@ -89,6 +94,8 @@ export const listTrainingCoursesController = async (req: AuthRequest, res: Respo
       limit: req.query.limit,
       search: typeof req.query.search === 'string' ? req.query.search : undefined,
       includeInactive: req.query.include_inactive === 'true',
+      kind: parseCourseKind(req.query.kind),
+      inductionPhase: parseId(req.query.phase) ?? undefined,
     });
     return res.json(result);
   } catch (error: any) {

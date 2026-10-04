@@ -59,6 +59,9 @@ const mapCourseRow = (row: any): TrainingCourseRecord => {
   if (row.template_count !== undefined) {
     course.template_count = Number(row.template_count);
   }
+  if (row.published_template_count !== undefined) {
+    course.published_template_count = Number(row.published_template_count);
+  }
   if (row.created_at) {
     course.created_at = String(row.created_at);
   }
@@ -94,16 +97,41 @@ const generateCourseCode = async (client: PoolClient): Promise<string> => {
 
 const COURSE_SEARCH_COLUMNS = ['c.code', 'c.title', 'c.description'];
 
+/** Filtro rapido del catalogo: cursos del Programa de Induccion, el resto, o con evaluaciones en borrador. */
+export type TrainingCourseKind = 'induction' | 'general' | 'draft';
+
 export interface TrainingCourseListOptions extends PaginationInput {
   search?: string | undefined;
   includeInactive?: boolean;
+  kind?: TrainingCourseKind | undefined;
+  /** Fase del Programa de Induccion (1-7): cursos INDUCCION-FASE-N e INDUCCION-FASE-N-PUESTO. */
+  inductionPhase?: number | undefined;
 }
+
+/** Contadores por filtro (con la busqueda aplicada) para las pestanas del catalogo. */
+export interface TrainingCourseSummary {
+  total: number;
+  induction: number;
+  general: number;
+  draft: number;
+}
+
+const INDUCTION_CODE_CLAUSE = `UPPER(c.code) LIKE 'INDUCCION-FASE-%'`;
+const DRAFT_TEMPLATES_EXISTS = `EXISTS (SELECT 1 FROM public.evaluation_templates et
+   WHERE et.training_course_id = c.id AND et.is_active = TRUE AND et.status = 'draft')`;
+
+const KIND_CLAUSES: Record<TrainingCourseKind, string> = {
+  induction: INDUCTION_CODE_CLAUSE,
+  general: `NOT ${INDUCTION_CODE_CLAUSE}`,
+  draft: DRAFT_TEMPLATES_EXISTS,
+};
 
 const buildCourseBaseQuery = () => `
   SELECT
     c.id, c.code, c.title, c.description, c.certificate_validity_months,
     c.is_active, c.created_at, c.updated_at,
-    COUNT(t.id)::int AS template_count
+    COUNT(t.id)::int AS template_count,
+    COUNT(t.id) FILTER (WHERE t.status = 'published')::int AS published_template_count
   FROM public.training_courses c
   LEFT JOIN public.evaluation_templates t
     ON t.training_course_id = c.id AND t.is_active = TRUE
@@ -111,14 +139,40 @@ const buildCourseBaseQuery = () => `
 
 export const listTrainingCourses = async (
   options: TrainingCourseListOptions = {},
-): Promise<PaginatedResult<TrainingCourseRecord>> => {
+): Promise<PaginatedResult<TrainingCourseRecord> & { summary: TrainingCourseSummary }> => {
   await assertTable();
 
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
   const search = buildIlikeSearch(COURSE_SEARCH_COLUMNS, options.search, 0);
-  const conditions = [options.includeInactive ? '' : 'c.is_active = TRUE', search.clause].filter(Boolean);
+  const baseConditions = [options.includeInactive ? '' : 'c.is_active = TRUE', search.clause].filter(Boolean);
+  // La fase es un entero 1-7 validado: se interpola sin riesgo y no desplaza los placeholders de la busqueda.
+  const phase = options.inductionPhase;
+  const phaseClause =
+    phase && Number.isInteger(phase) && phase >= 1 && phase <= 7
+      ? `(UPPER(c.code) = 'INDUCCION-FASE-${phase}' OR UPPER(c.code) LIKE 'INDUCCION-FASE-${phase}-%')`
+      : '';
+  const conditions = [...baseConditions, options.kind ? KIND_CLAUSES[options.kind] : '', phaseClause].filter(
+    Boolean,
+  );
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const baseWhereClause = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+
+  const summaryResult = await pool.query(
+    `SELECT COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE ${KIND_CLAUSES.induction})::int AS induction,
+            COUNT(*) FILTER (WHERE ${KIND_CLAUSES.general})::int AS general,
+            COUNT(*) FILTER (WHERE ${KIND_CLAUSES.draft})::int AS draft
+       FROM public.training_courses c ${baseWhereClause};`,
+    search.values,
+  );
+  const summaryRow = summaryResult.rows[0] ?? {};
+  const summary: TrainingCourseSummary = {
+    total: Number(summaryRow.total ?? 0),
+    induction: Number(summaryRow.induction ?? 0),
+    general: Number(summaryRow.general ?? 0),
+    draft: Number(summaryRow.draft ?? 0),
+  };
 
   const limitSql = paginate
     ? `LIMIT $${search.values.length + 1} OFFSET $${search.values.length + 2}`
@@ -134,14 +188,14 @@ export const listTrainingCourses = async (
   const data = dataResult.rows.map(mapCourseRow);
 
   if (!paginate) {
-    return buildPaginatedResult(data, data.length, 1, data.length || 1);
+    return { ...buildPaginatedResult(data, data.length, 1, data.length || 1), summary };
   }
 
   const countResult = await pool.query(
     `SELECT COUNT(*)::int AS total FROM public.training_courses c ${whereClause};`,
     search.values,
   );
-  return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
+  return { ...buildPaginatedResult(data, countResult.rows[0]?.total, page, limit), summary };
 };
 
 export const getTrainingCourseById = async (courseId: number): Promise<TrainingCourseRecord | null> => {

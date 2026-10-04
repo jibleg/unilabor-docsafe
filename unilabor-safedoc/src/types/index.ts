@@ -56,6 +56,7 @@ export interface TrainingCourseRecord {
   certificate_validity_months: number;
   is_active: boolean;
   template_count?: number;
+  published_template_count?: number;
   created_at?: string;
   updated_at?: string;
 }

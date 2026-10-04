@@ -1,32 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useState } from 'react';
+import { Briefcase, FilePen, GraduationCap, LayoutGrid, Loader2, Plus, Search, SearchX, X } from 'lucide-react';
 import {
-  Award,
-  BookOpen,
-  Briefcase,
-  ChevronDown,
-  ChevronRight,
-  ClipboardCheck,
-  GraduationCap,
-  Loader2,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  UserPlus,
-} from 'lucide-react';
-import {
-  createEvaluationTemplate,
   createTrainingCourse,
-  deleteEvaluationTemplate,
   deleteTrainingCourse,
   getApiErrorMessage,
-  getTrainingCourse,
   listTrainingCoursesPaginated,
   updateTrainingCourse,
   type TrainingCoursePayload,
 } from '../api/service';
-import type { EvaluationTemplate, EvaluationType, TrainingCourse } from '../types/models';
+import type { EvaluationTemplate, TrainingCourse, TrainingCourseKind, TrainingCourseSummary } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { confirmAction } from '../utils/confirm';
 import { usePaginatedList } from '../hooks/usePaginatedList';
@@ -34,6 +16,9 @@ import { Pagination } from '../components/Pagination';
 import { EvaluationTemplateEditorModal } from '../components/rh/EvaluationTemplateEditorModal';
 import { AssignEvaluationModal } from '../components/rh/AssignEvaluationModal';
 import { CertificateDesignerModal } from '../components/rh/CertificateDesignerModal';
+import { TrainingCourseCard, TrainingCourseCardSkeleton } from '../components/rh/trainings/TrainingCourseCard';
+import { TrainingCourseDrawer } from '../components/rh/trainings/TrainingCourseDrawer';
+import { INDUCTION_PHASES } from '../utils/trainingCatalog';
 
 interface CourseFormState {
   title: string;
@@ -51,13 +36,38 @@ const inputClass =
   'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]';
 const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]';
 
-/** Cursos del Programa de Induccion (INDUCCION-FASE-N y INDUCCION-FASE-N-PUESTO): sus
- *  evaluaciones NO se asignan a mano, las abre el programa al inscribir en /rh/induction
- *  (el backend tambien lo rechaza con 409). */
-const isInductionCourse = (course: TrainingCourse): boolean => course.code.toUpperCase().startsWith('INDUCCION-FASE-');
+type KindTab = 'all' | TrainingCourseKind;
+
+const KIND_TABS: { key: KindTab; label: string; icon: typeof LayoutGrid; count: (s: TrainingCourseSummary) => number }[] = [
+  { key: 'all', label: 'Todas', icon: LayoutGrid, count: (s) => s.total },
+  { key: 'induction', label: 'Inducción', icon: Briefcase, count: (s) => s.induction },
+  { key: 'general', label: 'Generales', icon: GraduationCap, count: (s) => s.general },
+  { key: 'draft', label: 'Borrador', icon: FilePen, count: (s) => s.draft },
+];
+
+const EMPTY_SUMMARY: TrainingCourseSummary = { total: 0, induction: 0, general: 0, draft: 0 };
+const PAGE_SIZE = 24;
 
 export const RhTrainingsPage = () => {
-  const navigate = useNavigate();
+  const [kind, setKind] = useState<KindTab>('all');
+  const [phase, setPhase] = useState<number | null>(null);
+  const [summary, setSummary] = useState<TrainingCourseSummary>(EMPTY_SUMMARY);
+
+  const fetchCourses = useCallback(
+    async (query: { page: number; limit: number; search: string; filters: Record<string, string> }) => {
+      const result = await listTrainingCoursesPaginated({
+        page: query.page,
+        limit: query.limit,
+        search: query.search,
+        kind: (query.filters.kind || undefined) as TrainingCourseKind | undefined,
+        phase: query.filters.phase ? Number(query.filters.phase) : undefined,
+      });
+      setSummary(result.summary);
+      return result;
+    },
+    [],
+  );
+
   const {
     items: courses,
     pagination,
@@ -67,46 +77,41 @@ export const RhTrainingsPage = () => {
     setSearch,
     loading,
     reload,
-  } = usePaginatedList<TrainingCourse>(
-    (query) => listTrainingCoursesPaginated(query),
-    {
-      onError: (error) =>
-        notifyError(getApiErrorMessage(error, 'No se pudieron cargar las capacitaciones.')),
-    },
-  );
+  } = usePaginatedList<TrainingCourse>(fetchCourses, {
+    pageSize: PAGE_SIZE,
+    filters: { kind: kind === 'all' ? '' : kind, phase: kind === 'induction' && phase ? String(phase) : '' },
+    onError: (error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar las capacitaciones.')),
+  });
 
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<TrainingCourse | null>(null);
   const [courseForm, setCourseForm] = useState<CourseFormState>(EMPTY_COURSE_FORM);
   const [savingCourse, setSavingCourse] = useState(false);
 
-  const [expandedCourseId, setExpandedCourseId] = useState<number | null>(null);
-  const [templates, setTemplates] = useState<EvaluationTemplate[]>([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [openCourse, setOpenCourse] = useState<TrainingCourse | null>(null);
+  const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
   const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
   const [assigningTemplate, setAssigningTemplate] = useState<EvaluationTemplate | null>(null);
   const [certificateCourse, setCertificateCourse] = useState<TrainingCourse | null>(null);
 
-  const loadTemplates = useCallback(async (courseId: number) => {
-    setLoadingTemplates(true);
-    try {
-      const detail = await getTrainingCourse(courseId);
-      setTemplates(detail?.templates ?? []);
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudieron cargar las evaluaciones.'));
-    } finally {
-      setLoadingTemplates(false);
+  // El drawer queda debajo de los modales: Esc/clic fuera no debe cerrarlo mientras uno esta abierto.
+  const modalOpen = isCourseModalOpen || editingTemplateId !== null || assigningTemplate !== null || certificateCourse !== null;
+  const closeDrawer = useCallback(() => {
+    if (!modalOpen) {
+      setOpenCourse(null);
     }
-  }, []);
+  }, [modalOpen]);
 
-  useEffect(() => {
-    if (expandedCourseId !== null) {
-      void loadTemplates(expandedCourseId);
+  const refreshAfterTemplateChange = () => {
+    setDrawerRefreshKey((current) => current + 1);
+    reload();
+  };
+
+  const selectKind = (next: KindTab) => {
+    setKind(next);
+    if (next !== 'induction') {
+      setPhase(null);
     }
-  }, [expandedCourseId, loadTemplates]);
-
-  const toggleExpand = (courseId: number) => {
-    setExpandedCourseId((current) => (current === courseId ? null : courseId));
   };
 
   const openCreateCourse = () => {
@@ -138,8 +143,18 @@ export const RhTrainingsPage = () => {
     setSavingCourse(true);
     try {
       if (editingCourse) {
-        await updateTrainingCourse(editingCourse.id, payload);
+        const updated = await updateTrainingCourse(editingCourse.id, payload);
         notifySuccess('Capacitación actualizada correctamente.');
+        if (openCourse?.id === editingCourse.id) {
+          setOpenCourse(
+            updated ?? {
+              ...openCourse,
+              title: payload.title,
+              description: payload.description ?? null,
+              certificate_validity_months: courseForm.certificate_validity_months,
+            },
+          );
+        }
       } else {
         await createTrainingCourse(payload);
         notifySuccess('Capacitación creada correctamente.');
@@ -165,304 +180,147 @@ export const RhTrainingsPage = () => {
     try {
       await deleteTrainingCourse(course.id);
       notifySuccess('Capacitación inactivada correctamente.');
+      if (openCourse?.id === course.id) {
+        setOpenCourse(null);
+      }
       reload();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo inactivar la capacitación.'));
     }
   };
 
-  const handleCreateTemplate = async (courseId: number, evaluationType: EvaluationType = 'quiz') => {
-    try {
-      const created = await createEvaluationTemplate(courseId, {
-        title: evaluationType === 'practical' ? 'Nueva práctica' : 'Nueva evaluación',
-        evaluation_type: evaluationType,
-      });
-      notifySuccess(
-        evaluationType === 'practical'
-          ? 'Evaluación práctica creada. Confirma su título a continuación.'
-          : 'Evaluación creada. Diséñala a continuación.',
-      );
-      await loadTemplates(courseId);
-      if (created) {
-        setEditingTemplateId(created.id);
-      }
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo crear la evaluación.'));
-    }
-  };
-
-  const handleDeleteTemplate = async (templateId: number, courseId: number) => {
-    const confirmed = await confirmAction('Inactivar evaluación', 'Inactivar esta evaluación?', 'Inactivar');
-    if (!confirmed) {
-      return;
-    }
-    try {
-      await deleteEvaluationTemplate(templateId);
-      notifySuccess('Evaluación inactivada correctamente.');
-      await loadTemplates(courseId);
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo inactivar la evaluación.'));
-    }
-  };
+  const filtersActive = kind !== 'all' || search.trim() !== '';
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-            Capacitación y competencia
-          </p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-[var(--color-brand-700)]">
-            <GraduationCap size={24} /> Capacitaciones
-          </h1>
-          <p className="mt-1 text-sm text-[var(--unilabor-neutral)]">
-            Diseña las capacitaciones, sus evaluaciones y el banco de preguntas (ISO 15189).
-          </p>
-        </div>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="flex items-center gap-3 text-2xl font-black text-[var(--color-brand-700)]">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--color-brand-500),var(--color-brand-700))] text-white shadow-[0_8px_18px_rgba(0,65,106,0.25)]">
+            <GraduationCap size={22} />
+          </span>
+          Capacitaciones
+        </h1>
         <button
           type="button"
           onClick={openCreateCourse}
-          className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_18px_rgba(0,65,106,0.25)] transition hover:brightness-110"
         >
-          <Plus size={16} /> Nueva capacitación
+          <Plus size={16} /> <span className="hidden sm:inline">Nueva capacitación</span>
         </button>
       </div>
 
-      <div className="relative">
-        <Search
-          size={16}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]"
-        />
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Buscar por código, título o descripción..."
-          className={`${inputClass} pl-9`}
-        />
-      </div>
-
-      <div className="space-y-3">
-        {loading ? (
-          <div className="flex items-center justify-center py-16 text-sm text-[var(--unilabor-neutral)]">
-            <Loader2 className="mr-2 animate-spin" size={18} /> Cargando capacitaciones...
-          </div>
-        ) : courses.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[rgba(0,65,106,0.18)] bg-[rgba(248,251,253,0.7)] py-16 text-center text-sm text-[var(--unilabor-neutral)]">
-            Aun no hay capacitaciones. Crea la primera para empezar a diseñar evaluaciones.
-          </div>
-        ) : (
-          courses.map((course) => {
-            const expanded = expandedCourseId === course.id;
-            return (
-              <div
-                key={course.id}
-                className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/90"
+      <div className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/70 p-3 shadow-[0_1px_2px_rgba(0,65,106,0.05)] backdrop-blur">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por código o título"
+              className={`${inputClass} pl-9 pr-9`}
+            />
+            {search ? (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-[var(--unilabor-neutral)] transition hover:bg-[rgba(0,65,106,0.08)]"
+                aria-label="Limpiar búsqueda"
               >
-                <div className="flex items-center justify-between gap-3 px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(course.id)}
-                    className="flex flex-1 items-center gap-3 text-left"
+                <X size={14} />
+              </button>
+            ) : null}
+          </div>
+          <div className="flex gap-1 overflow-x-auto rounded-xl bg-[rgba(0,65,106,0.05)] p-1" role="tablist">
+            {KIND_TABS.map(({ key, label, icon: Icon, count }) => {
+              const active = kind === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => selectKind(key)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${
+                    active
+                      ? 'bg-white text-[var(--color-brand-700)] shadow-[0_2px_8px_rgba(0,65,106,0.14)]'
+                      : 'text-[var(--unilabor-neutral)] hover:text-[var(--color-brand-700)]'
+                  }`}
+                >
+                  <Icon size={14} />
+                  {label}
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] ${
+                      active ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(0,65,106,0.08)]'
+                    }`}
                   >
-                    {expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                    <div>
-                      <p className="flex flex-wrap items-center gap-2 font-semibold text-[var(--color-brand-700)]">
-                        {course.title}
-                        {isInductionCourse(course) ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full bg-[rgba(191,212,230,0.35)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]"
-                            title="Las inscripciones y la apertura de la evaluación se manejan desde Inducción."
-                          >
-                            <Briefcase size={10} />
-                            Programa de Inducción
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="text-xs text-[var(--unilabor-neutral)]">
-                        {course.code} | Vigencia constancia:{' '}
-                        {course.certificate_validity_months === 0
-                          ? 'sin vencimiento'
-                          : `${course.certificate_validity_months} meses`}{' '}
-                        | {course.template_count ?? 0} evaluación(es)
-                      </p>
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setCertificateCourse(course)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                      aria-label="Diseñar constancia"
-                      title="Diseñar constancia"
-                    >
-                      <Award size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openEditCourse(course)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                      aria-label="Editar capacitación"
-                      title="Editar capacitación"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteCourse(course)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(220,38,38,0.2)] text-red-600 transition hover:bg-red-50"
-                      aria-label="Inactivar capacitación"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </div>
+                    {count(summary)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-                {expanded && (
-                  <div className="border-t border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.6)] px-4 py-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--color-brand-500)]">
-                        Evaluaciones
-                      </h3>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => void handleCreateTemplate(course.id, 'quiz')}
-                          className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                        >
-                          <Plus size={13} /> Nueva evaluación
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleCreateTemplate(course.id, 'practical')}
-                          className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-white/80 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                        >
-                          <ClipboardCheck size={13} /> Nueva práctica
-                        </button>
-                      </div>
-                    </div>
-                    {loadingTemplates ? (
-                      <div className="flex items-center py-4 text-xs text-[var(--unilabor-neutral)]">
-                        <Loader2 className="mr-2 animate-spin" size={14} /> Cargando evaluaciones...
-                      </div>
-                    ) : templates.length === 0 ? (
-                      <p className="py-3 text-xs text-[var(--unilabor-neutral)]">
-                        Esta capacitación aun no tiene evaluaciones.
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {templates.map((template) => {
-                          const isPractical = template.evaluation_type === 'practical';
-                          return (
-                          <li
-                            key={template.id}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-[rgba(0,65,106,0.1)] bg-white/90 px-3 py-2"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => setEditingTemplateId(template.id)}
-                              className="flex flex-1 items-center gap-2 text-left"
-                            >
-                              {isPractical ? (
-                                <ClipboardCheck size={15} className="text-[var(--color-brand-500)]" />
-                              ) : (
-                                <BookOpen size={15} className="text-[var(--color-brand-500)]" />
-                              )}
-                              <span className="text-sm font-medium text-[var(--unilabor-ink)]">
-                                {template.title}
-                              </span>
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                                  isPractical ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'
-                                }`}
-                              >
-                                {isPractical ? 'Práctica' : 'Cuestionario'}
-                              </span>
-                              {!isPractical && (
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                                    template.status === 'published'
-                                      ? 'bg-emerald-100 text-emerald-700'
-                                      : 'bg-amber-100 text-amber-700'
-                                  }`}
-                                >
-                                  {template.status === 'published' ? 'Publicada' : 'Borrador'}
-                                </span>
-                              )}
-                              <span className="text-xs text-[var(--unilabor-neutral)]">
-                                {isPractical ? (
-                                  'RH captura la calificación · acredita ≥ 8'
-                                ) : (
-                                  <>
-                                    {template.question_count ?? 0} pregunta(s) | min {template.passing_score}% |{' '}
-                                    {template.window_hours}h
-                                    {template.requires_manual_grading ? ' | revision RH' : ''}
-                                  </>
-                                )}
-                              </span>
-                            </button>
-                            <div className="flex items-center gap-1">
-                              {isPractical ? (
-                                <button
-                                  type="button"
-                                  onClick={() => navigate(`/rh/practical-capture?template=${template.id}`)}
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                                  aria-label="Capturar calificaciones"
-                                  title="Capturar calificaciones"
-                                >
-                                  <ClipboardCheck size={14} />
-                                </button>
-                              ) : isInductionCourse(course) ? (
-                                <button
-                                  type="button"
-                                  onClick={() => navigate('/rh/induction')}
-                                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[rgba(0,65,106,0.1)] px-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                                  aria-label="Inscribir en Inducción"
-                                  title="Los cursos de Inducción no se asignan a mano: la evaluación se abre sola al completar la lectura de la fase. Inscribe a los colaboradores en Inducción."
-                                >
-                                  <Briefcase size={14} />
-                                  Inscribir en Inducción
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setAssigningTemplate(template)}
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                                  aria-label="Asignar evaluación"
-                                  title="Asignar a colaboradores"
-                                >
-                                  <UserPlus size={14} />
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => setEditingTemplateId(template.id)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                                aria-label="Diseñar evaluación"
-                                title="Diseñar evaluación"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteTemplate(template.id, course.id)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(220,38,38,0.2)] text-red-600 transition hover:bg-red-50"
-                                aria-label="Inactivar evaluación"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })
+        {kind === 'induction' && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[null, ...INDUCTION_PHASES].map((value) => {
+              const active = phase === value;
+              return (
+                <button
+                  key={value ?? 'all'}
+                  type="button"
+                  onClick={() => setPhase(value)}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                    active
+                      ? 'bg-[var(--color-brand-700)] text-white shadow-sm'
+                      : 'bg-[rgba(191,212,230,0.35)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.35)]'
+                  }`}
+                >
+                  {value === null ? 'Todas' : `Fase ${value}`}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
+
+      {loading && courses.length === 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {Array.from({ length: 8 }, (_, index) => (
+            <TrainingCourseCardSkeleton key={index} />
+          ))}
+        </div>
+      ) : courses.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[rgba(0,65,106,0.18)] bg-[rgba(248,251,253,0.7)] py-16 text-sm text-[var(--unilabor-neutral)]">
+          {filtersActive ? <SearchX size={32} className="text-[var(--color-brand-300)]" /> : <GraduationCap size={32} className="text-[var(--color-brand-300)]" />}
+          {filtersActive ? 'Sin resultados' : 'Sin capacitaciones'}
+          {filtersActive ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                selectKind('all');
+              }}
+              className="rounded-lg border border-[rgba(0,65,106,0.14)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.3)]"
+            >
+              Limpiar filtros
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className={`grid gap-4 transition-opacity sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 ${loading ? 'opacity-60' : ''}`}>
+          {courses.map((course) => (
+            <TrainingCourseCard
+              key={course.id}
+              course={course}
+              onOpen={setOpenCourse}
+              onDesignCertificate={setCertificateCourse}
+              onEdit={openEditCourse}
+              onDelete={(target) => void handleDeleteCourse(target)}
+            />
+          ))}
+        </div>
+      )}
 
       <Pagination
         page={page}
@@ -472,6 +330,20 @@ export const RhTrainingsPage = () => {
         onPageChange={setPage}
         loading={loading}
       />
+
+      {openCourse !== null && (
+        <TrainingCourseDrawer
+          course={openCourse}
+          refreshKey={drawerRefreshKey}
+          onClose={closeDrawer}
+          onEditCourse={openEditCourse}
+          onDesignCertificate={setCertificateCourse}
+          onDeleteCourse={(target) => void handleDeleteCourse(target)}
+          onEditTemplate={setEditingTemplateId}
+          onAssignTemplate={setAssigningTemplate}
+          onTemplatesChanged={reload}
+        />
+      )}
 
       {/* Modal capacitación */}
       {isCourseModalOpen && (
@@ -545,12 +417,7 @@ export const RhTrainingsPage = () => {
         <EvaluationTemplateEditorModal
           templateId={editingTemplateId}
           onClose={() => setEditingTemplateId(null)}
-          onSaved={() => {
-            if (expandedCourseId !== null) {
-              void loadTemplates(expandedCourseId);
-            }
-            reload();
-          }}
+          onSaved={refreshAfterTemplateChange}
         />
       )}
 
@@ -558,11 +425,7 @@ export const RhTrainingsPage = () => {
         <AssignEvaluationModal
           template={assigningTemplate}
           onClose={() => setAssigningTemplate(null)}
-          onAssigned={() => {
-            if (expandedCourseId !== null) {
-              void loadTemplates(expandedCourseId);
-            }
-          }}
+          onAssigned={() => setDrawerRefreshKey((current) => current + 1)}
         />
       )}
 

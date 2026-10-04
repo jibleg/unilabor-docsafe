@@ -1010,8 +1010,20 @@ export interface TrainingCourse {
   certificate_validity_months: number;
   is_active: boolean;
   template_count?: number;
+  published_template_count?: number;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Filtro rapido del catalogo de capacitaciones (GET /rh/trainings?kind=). */
+export type TrainingCourseKind = 'induction' | 'general' | 'draft';
+
+/** Contadores por filtro del catalogo, con la busqueda aplicada. */
+export interface TrainingCourseSummary {
+  total: number;
+  induction: number;
+  general: number;
+  draft: number;
 }
 
 export interface EvaluationQuestionOption {
