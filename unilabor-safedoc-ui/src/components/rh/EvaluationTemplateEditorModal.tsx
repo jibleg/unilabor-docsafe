@@ -6,17 +6,51 @@ import {
   replaceTemplateQuestions,
   updateEvaluationTemplate,
 } from '../../api/service';
-import { listInductionPhases } from '../../api/service.api-rh-induction';
-import { QuestionBankPanel } from './QuestionBankPanel';
+import { listInductionPhases, listPhasePositions } from '../../api/service.api-rh-induction';
+import { getPositionById } from '../../api/service.api-rh-position';
+import { QuestionBankPanel, type QuestionBankSourceDocument } from './QuestionBankPanel';
 import type {
   EvaluationQuestion,
   EvaluationQuestionType,
   EvaluationSelectionMode,
   EvaluationTemplate,
   EvaluationType,
-  RhInductionPhase,
+  QuestionBankScope,
 } from '../../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
+
+/** Fuente del banco IA: la fase (Fases 1-4) o el puesto (Fases 5-6, cuestionario por puesto). */
+interface QuestionBankSource {
+  scope: QuestionBankScope;
+  documents: QuestionBankSourceDocument[];
+  label: string;
+}
+
+/**
+ * Resuelve de donde genera preguntas la IA para el curso de esta plantilla:
+ * curso institucional ligado directo a la fase, o curso por puesto ligado via
+ * rh_induction_phase_positions (Fases 5-6), cuyos documentos son los
+ * obligatorios del puesto. null si el curso no es de Induccion.
+ */
+const resolveQuestionBankSource = async (courseId: number): Promise<QuestionBankSource | null> => {
+  const phases = await listInductionPhases();
+  const phase = phases.find((entry) => entry.training_course_id === courseId);
+  if (phase) {
+    return { scope: { phaseId: phase.id }, documents: phase.documents, label: 'los documentos de esta fase' };
+  }
+  const positionPhases = phases.filter((entry) => entry.scope === 'POSITION');
+  const enabledByPhase = await Promise.all(positionPhases.map((entry) => listPhasePositions(entry.id)));
+  const enabled = enabledByPhase.flat().find((entry) => entry.training_course_id === courseId);
+  if (!enabled) {
+    return null;
+  }
+  const position = await getPositionById(enabled.position_id);
+  return {
+    scope: { positionId: enabled.position_id },
+    documents: (position?.documents ?? []).map((doc) => ({ document_id: doc.document_id, code: doc.code, title: doc.title })),
+    label: `los documentos obligatorios del puesto ${enabled.position_name}`,
+  };
+};
 
 interface EvaluationTemplateEditorModalProps {
   templateId: number;
@@ -92,10 +126,9 @@ export const EvaluationTemplateEditorModal = ({
   const [saving, setSaving] = useState(false);
   const [template, setTemplate] = useState<EvaluationTemplate | null>(null);
   const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
-  // Fase de induccion cuya training_course_id coincide con esta plantilla (si
-  // aplica): solo entonces se ofrece el banco de preguntas con IA, ya que
-  // necesita los documentos obligatorios de la fase como fuente.
-  const [inductionPhase, setInductionPhase] = useState<RhInductionPhase | null>(null);
+  // Fuente del banco IA (fase o puesto de Induccion) si el curso de esta
+  // plantilla es de Induccion: solo entonces se ofrece el banco de preguntas.
+  const [bankSource, setBankSource] = useState<QuestionBankSource | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -110,11 +143,9 @@ export const EvaluationTemplateEditorModal = ({
         setQuestions(detail?.questions ?? []);
         if (detail?.training_course_id) {
           try {
-            const phases = await listInductionPhases();
+            const source = await resolveQuestionBankSource(detail.training_course_id);
             if (active) {
-              setInductionPhase(
-                phases.find((phase) => phase.training_course_id === detail.training_course_id) ?? null,
-              );
+              setBankSource(source);
             }
           } catch {
             // El banco IA es una mejora opcional: si no se puede resolver la fase, se omite en silencio.
@@ -163,7 +194,7 @@ export const EvaluationTemplateEditorModal = ({
   // que no esta en esa lista (p. ej. se quito de la fase) se conserva visible.
   const sourceDocumentChoices = useMemo(() => {
     const byId = new Map<string, { id: string; label: string }>();
-    for (const doc of inductionPhase?.documents ?? []) {
+    for (const doc of bankSource?.documents ?? []) {
       byId.set(doc.document_id, { id: doc.document_id, label: doc.code ? `${doc.code} · ${doc.title}` : doc.title });
     }
     for (const question of questions) {
@@ -177,11 +208,11 @@ export const EvaluationTemplateEditorModal = ({
       }
     }
     return [...byId.values()];
-  }, [inductionPhase, questions]);
+  }, [bankSource, questions]);
 
   const setSourceDocument = (index: number, documentId: string) => {
     const choice = sourceDocumentChoices.find((entry) => entry.id === documentId) ?? null;
-    const phaseDoc = inductionPhase?.documents.find((doc) => doc.document_id === documentId) ?? null;
+    const phaseDoc = bankSource?.documents.find((doc) => doc.document_id === documentId) ?? null;
     updateQuestion(index, {
       source_document_id: choice ? choice.id : null,
       source_document_code: phaseDoc?.code ?? null,
@@ -497,10 +528,11 @@ export const EvaluationTemplateEditorModal = ({
               </div>
             )}
 
-            {!isPractical && inductionPhase && (
+            {!isPractical && bankSource && (
               <QuestionBankPanel
-                scope={{ phaseId: inductionPhase.id }}
-                documents={inductionPhase.documents}
+                scope={bankSource.scope}
+                documents={bankSource.documents}
+                sourceLabel={bankSource.label}
                 onUseQuestion={useGeneratedQuestion}
               />
             )}

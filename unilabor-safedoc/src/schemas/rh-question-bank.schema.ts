@@ -7,6 +7,8 @@ import { z } from 'zod';
  */
 
 export const QUESTION_BANK_MAX_PER_TYPE = 15;
+/** Cada documento aporta hasta 12k caracteres al prompt; los puestos con 200+ documentos se generan por tandas. */
+export const QUESTION_BANK_MAX_DOCUMENTS = 10;
 
 const questionCount = z.coerce
   .number({ message: 'La cantidad debe ser un numero' })
@@ -15,7 +17,10 @@ const questionCount = z.coerce
   .max(QUESTION_BANK_MAX_PER_TYPE, `Maximo ${QUESTION_BANK_MAX_PER_TYPE} preguntas por tipo en cada generacion`);
 
 export const generateQuestionBankSchema = z.object({
-  document_ids: z.array(z.string().uuid('ID de documento invalido')).min(1, 'Selecciona al menos un documento'),
+  document_ids: z
+    .array(z.string().uuid('ID de documento invalido'))
+    .min(1, 'Selecciona al menos un documento')
+    .max(QUESTION_BANK_MAX_DOCUMENTS, `Maximo ${QUESTION_BANK_MAX_DOCUMENTS} documentos en cada generacion`),
   counts: z
     .object({
       single: questionCount,

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, ChevronDown, Loader2, Pencil, Sparkles, X } from 'lucide-react';
+import { Check, ChevronDown, Loader2, Pencil, Search, Sparkles, X } from 'lucide-react';
 import {
   deleteQuestionBankItem,
   generateQuestionBank,
@@ -65,6 +65,17 @@ const clampCount = (raw: string): number => {
   return Math.min(MAX_PER_TYPE, Math.max(0, Math.floor(value)));
 };
 
+/**
+ * Tope de documentos por generacion (rh-question-bank.schema): cada documento
+ * aporta hasta 12k caracteres al prompt. Los puestos con 200+ documentos se
+ * generan por tandas eligiendo los documentos con el buscador.
+ */
+const MAX_DOCUMENTS = 10;
+
+/** Normaliza para buscar sin distinguir mayusculas ni acentos. */
+const normalizeSearch = (value: string): string =>
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 const DEFAULT_COUNTS: QuestionBankCounts = { boolean: 5, multiple: 5, single: 3, open: 2 };
 // Competencia: solo tipos autocalificables (el colaborador contesta en el sistema).
 const DEFAULT_COUNTS_COMPETENCY: QuestionBankCounts = { boolean: 5, multiple: 5, single: 5, open: 0 };
@@ -84,9 +95,12 @@ export const QuestionBankPanel = ({
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [items, setItems] = useState<QuestionBankItem[]>([]);
+  // Con pocos documentos (fases institucionales) se preseleccionan todos; con
+  // muchos (puestos) RH elige con el buscador para no rebasar el tope.
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(
-    new Set(phaseDocuments.map((doc) => doc.document_id)),
+    phaseDocuments.length <= MAX_DOCUMENTS ? new Set(phaseDocuments.map((doc) => doc.document_id)) : new Set(),
   );
+  const [docSearch, setDocSearch] = useState('');
   const [counts, setCounts] = useState<QuestionBankCounts>(competencyMode ? DEFAULT_COUNTS_COMPETENCY : DEFAULT_COUNTS);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [usedIds, setUsedIds] = useState<Set<number>>(new Set());
@@ -110,7 +124,19 @@ export const QuestionBankPanel = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded, scopeKey]);
 
-  const toggleDocument = (documentId: string) =>
+  const visibleDocuments = useMemo(() => {
+    const term = normalizeSearch(docSearch.trim());
+    if (!term) {
+      return phaseDocuments;
+    }
+    return phaseDocuments.filter((doc) => normalizeSearch(`${doc.code ?? ''} ${doc.title}`).includes(term));
+  }, [phaseDocuments, docSearch]);
+
+  const toggleDocument = (documentId: string) => {
+    if (!selectedDocIds.has(documentId) && selectedDocIds.size >= MAX_DOCUMENTS) {
+      notifyWarning(`Máximo ${MAX_DOCUMENTS} documentos por generación; puedes generar varias veces.`);
+      return;
+    }
     setSelectedDocIds((current) => {
       const next = new Set(current);
       if (next.has(documentId)) {
@@ -120,10 +146,15 @@ export const QuestionBankPanel = ({
       }
       return next;
     });
+  };
 
   const handleGenerate = async () => {
     if (selectedDocIds.size === 0) {
       notifyWarning('Selecciona al menos un documento.');
+      return;
+    }
+    if (selectedDocIds.size > MAX_DOCUMENTS) {
+      notifyWarning(`Máximo ${MAX_DOCUMENTS} documentos por generación; puedes generar varias veces.`);
       return;
     }
     const total = counts.boolean + counts.multiple + counts.single + counts.open;
@@ -303,9 +334,38 @@ export const QuestionBankPanel = ({
                     className="space-y-3 rounded-xl border border-[rgba(0,65,106,0.1)] bg-white p-3"
                   >
                     <div>
-                      <label className={labelClass}>Documentos a usar</label>
-                      <div className="space-y-1.5">
-                        {phaseDocuments.map((doc) => (
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Documentos a usar</label>
+                        <span className="text-[11px] font-semibold text-[#5b3fa6]">
+                          {selectedDocIds.size}/{Math.min(MAX_DOCUMENTS, phaseDocuments.length)} seleccionados
+                          {selectedDocIds.size > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDocIds(new Set())}
+                              className="ml-2 font-semibold text-[var(--color-brand-700)] underline-offset-2 hover:underline"
+                            >
+                              Limpiar
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      {phaseDocuments.length > 5 && (
+                        <div className="relative mb-2">
+                          <Search
+                            size={14}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]"
+                          />
+                          <input
+                            type="search"
+                            value={docSearch}
+                            onChange={(event) => setDocSearch(event.target.value)}
+                            placeholder={`Buscar por código o título entre ${phaseDocuments.length} documentos...`}
+                            className={`${inputClass} pl-9`}
+                          />
+                        </div>
+                      )}
+                      <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+                        {visibleDocuments.map((doc) => (
                           <label
                             key={doc.document_id}
                             className="flex items-center gap-2 text-sm text-[var(--unilabor-ink)]"
@@ -314,12 +374,24 @@ export const QuestionBankPanel = ({
                               type="checkbox"
                               checked={selectedDocIds.has(doc.document_id)}
                               onChange={() => toggleDocument(doc.document_id)}
-                              className="h-4 w-4 accent-[#5b3fa6]"
+                              className="h-4 w-4 shrink-0 accent-[#5b3fa6]"
                             />
                             {doc.code ? `${doc.code} — ${doc.title}` : doc.title}
                           </label>
                         ))}
+                        {visibleDocuments.length === 0 && (
+                          <p className="text-xs text-[var(--unilabor-neutral)]">
+                            {phaseDocuments.length === 0
+                              ? 'No hay documentos obligatorios configurados.'
+                              : 'Ningún documento coincide con la búsqueda.'}
+                          </p>
+                        )}
                       </div>
+                      {phaseDocuments.length > MAX_DOCUMENTS && (
+                        <p className="mt-1 text-[11px] text-[var(--unilabor-neutral)]">
+                          Máximo {MAX_DOCUMENTS} documentos por generación; para cubrir más, genera por tandas.
+                        </p>
+                      )}
                     </div>
 
                     <p className="mb-2 text-[11px] text-[var(--unilabor-neutral)]">Máximo {MAX_PER_TYPE} preguntas por tipo en cada generación; puedes generar varias veces.</p>
