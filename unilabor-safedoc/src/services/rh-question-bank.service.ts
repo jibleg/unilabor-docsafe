@@ -4,6 +4,7 @@ import pool from '../config/db';
 import { getAnthropicConfig } from '../config/env';
 import type { EvaluationQuestionType } from '../types';
 import { resolveStoredDocumentPath } from './document.service';
+import { mapAiApiError } from './rh-question-bank-ai-errors';
 
 /**
  * Banco de preguntas generado por IA (RH). Genera preguntas candidatas con la
@@ -364,11 +365,19 @@ export const generateQuestions = async (input: GenerateQuestionBankInput): Promi
 
     return { batchId, questionCount: questions.length };
   } catch (error: any) {
-    const errorMessage = error?.publicMessage || error?.message || 'Error desconocido al generar preguntas.';
+    // Falla de la API de Claude: se guarda el detalle tecnico en el lote y se
+    // relanza con codigo + mensaje claro para RH.
+    const aiError = mapAiApiError(error);
+    const errorMessage =
+      aiError?.detail || error?.publicMessage || error?.message || 'Error desconocido al generar preguntas.';
     await pool.query(`UPDATE public.rh_question_bank_batches SET status = 'failed', error_message = $2 WHERE id = $1;`, [
       batchId,
       errorMessage,
     ]);
+    if (aiError) {
+      console.error(`Banco de preguntas: lote ${batchId} fallo en la API de IA -> ${aiError.detail}`);
+      throwCoded(aiError.code, aiError.publicMessage);
+    }
     throw error;
   }
 };
