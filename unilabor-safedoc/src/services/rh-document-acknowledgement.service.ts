@@ -227,7 +227,11 @@ export const registerReadingProgress = async (
   return withTransaction(async (client) => {
     // FOR UPDATE: latidos concurrentes (dos pestanias) no se pisan al acumular.
     const current = await client.query(
-      `SELECT * FROM public.rh_document_acknowledgements WHERE id = $1 FOR UPDATE;`,
+      // `db_now_ms`: el credito se mide con el reloj de la BD, el mismo que escribe
+      // `last_progress_at = NOW()`. La BD de prod vive en otro host con ~2 s de
+      // desfase; mezclarlo con Date.now() anulaba el credito de cada latido.
+      `SELECT *, (EXTRACT(EPOCH FROM NOW()) * 1000)::FLOAT8 AS db_now_ms
+         FROM public.rh_document_acknowledgements WHERE id = $1 FOR UPDATE;`,
       [acknowledgementId],
     );
     if (current.rows.length === 0) {
@@ -244,7 +248,8 @@ export const registerReadingProgress = async (
         'Este acuse ya no admite avance de lectura.',
       );
     }
-    if (new Date(row.deadline_at).getTime() < Date.now()) {
+    const dbNowMs = Number(row.db_now_ms);
+    if (new Date(row.deadline_at).getTime() < dbNowMs) {
       return fail('RH_ACK_EXPIRED', 'El plazo para este acuse ya vencio.');
     }
 
@@ -266,7 +271,7 @@ export const registerReadingProgress = async (
         last_progress_at: row.last_progress_at ?? null,
       },
       page,
-      { maxCreditSeconds: MAX_HEARTBEAT_CREDIT_SECONDS },
+      { nowMs: dbNowMs, maxCreditSeconds: MAX_HEARTBEAT_CREDIT_SECONDS },
     );
 
     const { current_page_seconds: currentPageSeconds, active_seconds: activeSeconds } = progress;

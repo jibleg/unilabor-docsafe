@@ -216,7 +216,11 @@ export const registerReadingProgress = async (
   withTransaction(async (client) => {
     // FOR UPDATE: dos pestanias abiertas no se pisan al acumular.
     const current = await client.query(
-      `SELECT * FROM public.quality_reading_acknowledgements WHERE id = $1 FOR UPDATE;`,
+      // `db_now_ms`: el credito se mide con el reloj de la BD, el mismo que escribe
+      // `last_progress_at = NOW()`. La BD de prod vive en otro host con ~2 s de
+      // desfase; mezclarlo con Date.now() anulaba el credito de cada latido.
+      `SELECT *, (EXTRACT(EPOCH FROM NOW()) * 1000)::FLOAT8 AS db_now_ms
+         FROM public.quality_reading_acknowledgements WHERE id = $1 FOR UPDATE;`,
       [readingId],
     );
     if (current.rows.length === 0) {
@@ -230,7 +234,8 @@ export const registerReadingProgress = async (
     if (!['pending', 'in_progress'].includes(String(row.status))) {
       return fail('QUALITY_READING_NOT_TRACKABLE', 'Esta lectura ya no admite avance.');
     }
-    if (new Date(row.deadline_at).getTime() < Date.now()) {
+    const dbNowMs = Number(row.db_now_ms);
+    if (new Date(row.deadline_at).getTime() < dbNowMs) {
       return fail('QUALITY_READING_EXPIRED', 'El plazo para esta lectura ya vencio.');
     }
 
@@ -250,7 +255,7 @@ export const registerReadingProgress = async (
         last_progress_at: row.last_progress_at ?? null,
       },
       page,
-      { maxCreditSeconds: DEFAULT_MAX_HEARTBEAT_CREDIT_SECONDS },
+      { nowMs: dbNowMs, maxCreditSeconds: DEFAULT_MAX_HEARTBEAT_CREDIT_SECONDS },
     );
 
     await client.query(
