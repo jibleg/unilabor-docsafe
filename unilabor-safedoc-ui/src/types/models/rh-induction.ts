@@ -96,6 +96,9 @@ export interface RhInductionProgressItem {
   responsible_label: string;
   reading_total: number;
   reading_signed: number;
+  /** Acuses vigentes sin firmar; en una fase aprobada = firmas reabiertas por RH. */
+  reading_to_sign?: number;
+  reading_to_sign_deadline_at?: string | null;
   reading_completed_at: string | null;
   reading_deadline_at: string | null;
   evaluation_assignment_id: number | null;

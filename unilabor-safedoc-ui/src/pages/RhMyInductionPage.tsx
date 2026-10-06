@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpenCheck, CheckCircle2, ClipboardList, GraduationCap, Loader2, Lock, Sparkles } from 'lucide-react';
+import { BookOpenCheck, CheckCircle2, ClipboardList, GraduationCap, Loader2, Lock, PenLine, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { getMyInductionOverview } from '../api/service.api-rh-induction';
@@ -10,12 +10,22 @@ const cardClass = 'rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p
 const buttonClass =
   'rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]';
 
+const pendingSignButtonClass =
+  'rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100';
+
 const formatDateTime = (iso: string | null): string =>
   iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'long', timeStyle: 'short' }) : '';
 
+/** Firmas que RH reabrio en una fase ya aprobada (acuses vigentes sin firmar). */
+const pendingSignatures = (item: RhInductionProgressItem): number =>
+  item.evaluation_status === 'passed' ? (item.reading_to_sign ?? 0) : 0;
+
 const stepStatus = (item: RhInductionProgressItem): { label: string; icon: typeof BookOpenCheck; done: boolean } => {
   if (item.evaluation_status === 'passed') {
-    return { label: 'Fase aprobada', icon: CheckCircle2, done: true };
+    const toSign = pendingSignatures(item);
+    return toSign > 0
+      ? { label: `Fase aprobada · ${toSign} ${toSign === 1 ? 'documento' : 'documentos'} por leer y firmar`, icon: PenLine, done: false }
+      : { label: 'Fase aprobada', icon: CheckCircle2, done: true };
   }
   if (item.evaluation_status === 'failed') {
     return { label: 'Evaluación no acreditada: RH te indicará cuándo puedes presentar de nuevo.', icon: ClipboardList, done: false };
@@ -189,6 +199,9 @@ export const RhMyInductionPage = () => {
                           {item.reading_deadline_at && !item.reading_completed_at && !item.evaluation_assignment_id ? (
                             <p className="text-xs font-semibold text-amber-600">Fecha límite de lectura: {formatDateTime(item.reading_deadline_at)}</p>
                           ) : null}
+                          {pendingSignatures(item) > 0 && item.reading_to_sign_deadline_at ? (
+                            <p className="text-xs font-semibold text-amber-600">Firma antes del {formatDateTime(item.reading_to_sign_deadline_at)}</p>
+                          ) : null}
                         </div>
                       </div>
 
@@ -199,6 +212,10 @@ export const RhMyInductionPage = () => {
                       ) : !item.reading_completed_at && !item.evaluation_assignment_id && item.phase_published !== false && !(item.readings_start_at && item.reading_total === 0) ? (
                         <button type="button" onClick={() => navigate('/quality/my-readings')} className={buttonClass}>
                           Ir a leer
+                        </button>
+                      ) : pendingSignatures(item) > 0 ? (
+                        <button type="button" onClick={() => navigate('/quality/my-readings')} className={pendingSignButtonClass}>
+                          Leer y firmar ({pendingSignatures(item)})
                         </button>
                       ) : item.evaluation_status === 'passed' ? (
                         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-700">

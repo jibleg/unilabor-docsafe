@@ -1209,6 +1209,13 @@ export interface RhInductionProgressItem {
   responsible_label: string;
   reading_total: number;
   reading_signed: number;
+  /**
+   * Acuses vigentes sin firmar (pending/in_progress/read con plazo abierto). En
+   * una fase aprobada solo existen si RH uso "Reabrir firmas pendientes": es lo
+   * que permite llevar al colaborador a firmarlos desde "Mi induccion".
+   */
+  reading_to_sign: number;
+  reading_to_sign_deadline_at: string | null;
   reading_completed_at: string | null;
   reading_deadline_at: string | null;
   evaluation_assignment_id: number | null;
@@ -1250,12 +1257,21 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
         (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri
            INNER JOIN public.quality_reading_acknowledgements a ON a.id = ri.acknowledgement_id
           WHERE ri.enrollment_id = e.id AND a.status = 'signed') AS reading_signed,
+        to_sign.total AS reading_to_sign, to_sign.deadline_at AS reading_to_sign_deadline_at,
         (SELECT COUNT(*)::int FROM public.rh_induction_phase_checklist_items ci WHERE ci.phase_id = p.id) AS checklist_total,
         (SELECT COUNT(*)::int FROM public.rh_induction_checklist_progress cp WHERE cp.enrollment_id = e.id) AS checklist_completed
       FROM public.rh_induction_enrollments e
       INNER JOIN public.rh_induction_phases p ON p.id = e.phase_id
       LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
       LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
+      CROSS JOIN LATERAL (
+        SELECT COUNT(*)::int AS total, MIN(a.deadline_at) AS deadline_at
+          FROM public.rh_induction_reading_items ri
+          INNER JOIN public.quality_reading_acknowledgements a ON a.id = ri.acknowledgement_id
+         WHERE ri.enrollment_id = e.id
+           AND a.status IN ('pending', 'in_progress', 'read')
+           AND a.deadline_at > NOW()
+      ) to_sign
      WHERE e.employee_id = $1
      ORDER BY p.phase_number ASC;`,
     [employeeId],
@@ -1268,6 +1284,10 @@ export const getEmployeeInductionProgress = async (employeeId: number): Promise<
     responsible_label: String(row.responsible_label),
     reading_total: Number(row.reading_total ?? 0),
     reading_signed: Number(row.reading_signed ?? 0),
+    reading_to_sign: Number(row.reading_to_sign ?? 0),
+    reading_to_sign_deadline_at: row.reading_to_sign_deadline_at
+      ? new Date(row.reading_to_sign_deadline_at).toISOString()
+      : null,
     reading_completed_at: row.reading_completed_at ? String(row.reading_completed_at) : null,
     reading_deadline_at: row.reading_deadline_at ? String(row.reading_deadline_at) : null,
     evaluation_assignment_id: row.evaluation_assignment_id ? Number(row.evaluation_assignment_id) : null,
