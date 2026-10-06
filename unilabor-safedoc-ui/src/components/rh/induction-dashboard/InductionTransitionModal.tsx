@@ -36,25 +36,46 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
   const [evaluationDate, setEvaluationDate] = useState(todayIsoDate());
   const [saving, setSaving] = useState(false);
   const [results, setResults] = useState<InductionTransitionResult[] | null>(null);
+  const [progress, setProgress] = useState<{ done: number; current: string } | null>(null);
   const meta = TRANSITION_TARGET_META[target];
   const needsEvaluator = target === 7;
   const canConfirm = !needsEvaluator || evaluatorName.trim().length >= 3;
 
+  // Uno por uno: cada inscripcion de Fase 5 asigna todos los documentos del
+  // puesto (hasta ~250) y puede tardar minutos; en un solo request el proxy
+  // cortaba la peticion (504) a mitad del lote.
   const handleConfirm = async () => {
     setSaving(true);
+    const collected: InductionTransitionResult[] = [];
     try {
-      const response = await executeInductionTransition({
-        target,
-        employee_ids: candidates.map((candidate) => candidate.employee_id),
-        ...(needsEvaluator ? { evaluator_name: evaluatorName.trim(), evaluation_date: evaluationDate } : {}),
-      });
-      setResults(response.results);
-      if (response.results.some((result) => result.ok)) notifySuccess(response.message);
-      else notifyError(response.message);
+      for (const [index, candidate] of candidates.entries()) {
+        setProgress({ done: index, current: candidate.employee_name });
+        try {
+          const response = await executeInductionTransition({
+            target,
+            employee_ids: [candidate.employee_id],
+            ...(needsEvaluator ? { evaluator_name: evaluatorName.trim(), evaluation_date: evaluationDate } : {}),
+          });
+          collected.push(...response.results);
+        } catch (error) {
+          collected.push({
+            employee_id: candidate.employee_id,
+            employee_name: candidate.employee_name,
+            ok: false,
+            created_id: null,
+            previous_enrollment_id: null,
+            message: getApiErrorMessage(error, 'No se pudo completar el avance.'),
+          });
+        }
+        setResults([...collected]);
+      }
+      const okCount = collected.filter((result) => result.ok).length;
+      const summary = `${okCount} de ${candidates.length} colaborador(es) avanzados.`;
+      if (okCount > 0) notifySuccess(summary);
+      else notifyError(summary);
       onDone();
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo completar el avance.'));
     } finally {
+      setProgress(null);
       setSaving(false);
     }
   };
@@ -68,12 +89,18 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
             <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{meta.action}</h2>
             <p className="text-sm text-[var(--unilabor-ink)]">{candidates.length} colaborador(es)</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:bg-slate-100" aria-label="Cerrar">
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:bg-slate-100 disabled:opacity-40" aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm text-[var(--unilabor-ink)]">
+          {progress ? (
+            <p className="flex items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
+              <Loader2 size={14} className="animate-spin" />
+              Procesando {progress.done + 1} de {candidates.length}: {progress.current}. No cierres esta ventana.
+            </p>
+          ) : null}
           {results ? (
             <ul className="space-y-1.5">
               {results.map((result) => (
@@ -128,7 +155,7 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-5 py-3">
-          {results ? (
+          {results && !saving ? (
             <button type="button" onClick={onClose} className="rounded-xl bg-[var(--color-brand-700)] px-4 py-2 text-sm font-bold text-white hover:opacity-90">
               Cerrar
             </button>

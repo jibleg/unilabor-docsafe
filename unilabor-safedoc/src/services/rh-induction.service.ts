@@ -386,7 +386,16 @@ export const assignEnrollmentReadings = async (
   documents: PhaseDocumentRow[],
   actorUserId: string,
 ): Promise<void> => {
+  // Idempotente: si una asignacion previa se corto a la mitad, solo completa lo que falta.
+  const existing = await pool.query(
+    `SELECT document_id FROM public.rh_induction_reading_items WHERE enrollment_id = $1;`,
+    [enrollmentId],
+  );
+  const alreadyAssigned = new Set(existing.rows.map((row) => String(row.document_id)));
   for (const document of documents) {
+    if (alreadyAssigned.has(document.document_id)) {
+      continue;
+    }
     const publicationId = await getOrOpenPublication(document.document_id, actorUserId);
     const { created, skipped_user_ids: skipped } = await assignReaders(
       publicationId,
@@ -424,7 +433,7 @@ const getEmployeePositionDocuments = async (employeeId: number): Promise<PhaseDo
        FROM public.rh_employee_positions rep
        INNER JOIN public.rh_position_documents pd ON pd.position_id = rep.position_id
        INNER JOIN public.documents d ON d.id = pd.document_id
-      WHERE rep.employee_id = $1 AND rep.is_active = TRUE
+      WHERE rep.employee_id = $1 AND rep.is_active = TRUE AND d.status = 'active'
       ORDER BY rep.assigned_at DESC, pd.sort_order ASC, pd.id ASC;`,
     [employeeId],
   );
@@ -675,8 +684,20 @@ const getOrOpenPublication = async (documentId: string, userId: string): Promise
   if (existing.rows.length > 0) {
     return Number(existing.rows[0].id);
   }
-  const publication = await publishReading({ document_id: documentId }, userId);
-  return publication.id;
+  try {
+    const publication = await publishReading({ document_id: documentId }, userId);
+    return publication.id;
+  } catch (error) {
+    // Otra inscripcion en paralelo pudo abrirla primero: se reusa esa.
+    const raced = await pool.query(
+      `SELECT id FROM public.quality_reading_publications WHERE document_id = $1 AND status = 'open' LIMIT 1;`,
+      [documentId],
+    );
+    if (raced.rows.length > 0) {
+      return Number(raced.rows[0].id);
+    }
+    throw error;
+  }
 };
 
 export interface RhInductionEnrollment {
@@ -790,6 +811,7 @@ export const enrollEmployeeInPhase = async (
            FROM public.rh_position_documents pd
            INNER JOIN public.documents d ON d.id = pd.document_id
           WHERE pd.position_id = $1
+            AND d.status = 'active' -- un documento reemplazado no se puede publicar para lectura
           ORDER BY pd.sort_order ASC, pd.id ASC;`,
         [positionId],
       );

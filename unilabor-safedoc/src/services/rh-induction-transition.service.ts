@@ -399,6 +399,7 @@ const runOne = async (row: TransitionRow, phase: TransitionPhaseInfo, input: Exe
           : 'Inscrito en la Fase 6; queda pendiente la captura de su evaluacion practica.',
     };
   } catch (error: any) {
+    console.error(`Induccion: fallo el avance a la Fase ${input.target} de ${row.employee_name} (#${row.employee_id}):`, error);
     return { ...base, ok: false, created_id: null, message: error?.publicMessage || 'No se pudo completar el avance.' };
   }
 };
