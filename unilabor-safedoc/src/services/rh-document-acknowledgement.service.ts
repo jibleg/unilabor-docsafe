@@ -22,11 +22,11 @@ import { buildSignedAcknowledgementPdf } from './rh-acknowledgement-pdf.service'
 // -----------------------------------------------------------------------------
 
 export const DEFAULT_DEADLINE_HOURS = 72;
-export const DEFAULT_MIN_SECONDS_PER_PAGE = 7;
+export const DEFAULT_MIN_SECONDS_PER_PAGE = 1;
 
 // Cadencia con la que el visor emite latidos. El cliente solo dice "sigo en la
 // pagina N"; el servidor decide cuanto tiempo acreditar.
-export const HEARTBEAT_INTERVAL_SECONDS = 4;
+export const HEARTBEAT_INTERVAL_SECONDS = 2;
 
 // Techo de credito por latido. Si entre dos latidos pasa mas que esto (pestania
 // en segundo plano, equipo suspendido, red caida), se acredita solo este maximo:

@@ -9,7 +9,7 @@
 // -----------------------------------------------------------------------------
 
 /** Cadencia con la que el visor emite latidos. */
-export const DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 4;
+export const DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 2;
 
 /**
  * Techo de credito por latido: si entre dos latidos pasa mas que esto (pestania

@@ -9,7 +9,7 @@ import type { Employee } from '../../types/models';
 // Valores por defecto acordados: 72h de plazo y 7s de permanencia por pagina.
 // El segundo es un piso anti-atajo, no una estimacion de lectura real.
 const DEFAULT_DEADLINE_HOURS = 72;
-const DEFAULT_MIN_SECONDS_PER_PAGE = 7;
+const DEFAULT_MIN_SECONDS_PER_PAGE = 1;
 
 interface Props {
   documentId: number;

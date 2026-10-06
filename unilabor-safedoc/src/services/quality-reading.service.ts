@@ -11,7 +11,7 @@ import { resolveStoredDocumentPath } from './document.service';
 // el repositorio documental ya controla.
 
 const DEFAULT_DEADLINE_HOURS = 72;
-const DEFAULT_MIN_SECONDS_PER_PAGE = 7;
+const DEFAULT_MIN_SECONDS_PER_PAGE = 1;
 
 export type PublicationStatus = 'open' | 'closed';
 export type ReadingStatus =

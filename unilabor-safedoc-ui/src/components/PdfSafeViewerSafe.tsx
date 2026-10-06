@@ -237,7 +237,7 @@ export const PdfSafeViewer = ({
   pageNumberRef.current = pageNumber;
 
   const trackingEnabled = Boolean(tracking);
-  const heartbeatMs = (tracking?.intervalSeconds ?? 4) * 1000;
+  const heartbeatMs = (tracking?.intervalSeconds ?? 2) * 1000;
 
   // Criterio de scroll completo: la pagina actual queda "recorrida" cuando el
   // area de lectura llego a su fondo (o cuando la pagina cabe entera sin
