@@ -37,6 +37,8 @@ export type InductionStage =
   | 'COMPETENCIA_EN_PROCESO'
   | 'COMPETENCIA_POR_AUTORIZAR'
   | 'NO_ACREDITADA'
+  /** Ruta por puesto: acredito un puesto y el siguiente de la cola aun no puede activarse. */
+  | 'SIGUIENTE_PUESTO'
   | 'APROBADA';
 
 export const INDUCTION_STAGES: InductionStage[] = [
@@ -56,6 +58,7 @@ export const INDUCTION_STAGES: InductionStage[] = [
   'COMPETENCIA_EN_PROCESO',
   'COMPETENCIA_POR_AUTORIZAR',
   'NO_ACREDITADA',
+  'SIGUIENTE_PUESTO',
   'APROBADA',
 ];
 
@@ -101,6 +104,12 @@ export interface InductionRosterRow {
   area: string | null;
   branch_name: string | null;
   position_name: string | null;
+  /** Fases por puesto: codigo del puesto de la inscripcion y su lugar en la ruta. */
+  position_code: string | null;
+  position_sequence: number | null;
+  /** Solo en vistas agregadas (directorio/panorama): avance de la ruta por puesto. */
+  positions_total?: number;
+  positions_passed?: number;
   origin: string;
   enrolled_at: string;
   phase_published: boolean;
@@ -149,10 +158,12 @@ const SOON_HOURS = 24;
 const ROSTER_SELECT = `
   SELECT
     e.id AS enrollment_id, e.phase_id, p.phase_number, p.published_at, p.training_course_id,
-    e.origin, e.created_at AS enrolled_at, e.readings_start_at,
+    -- Ruta por puesto: un puesto en cola "entra" a la fase cuando se activa.
+    e.origin, COALESCE(e.activated_at, e.created_at) AS enrolled_at, e.readings_start_at,
     emp.id AS employee_id, emp.full_name AS employee_name, emp.employee_code, emp.email AS employee_email,
     emp.area, bu.name AS branch_name, emp.branch_id IS NULL AS missing_branch,
-    pos.name AS position_name,
+    -- Fases por puesto: el puesto de ESTA inscripcion; institucionales: el puesto vigente.
+    COALESCE(epos.name, pos.name) AS position_name, epos.code AS position_code, e.position_sequence, e.queue_status,
     e.reading_completed_at, e.reading_deadline_at,
     e.supervisor_employee_id, sup.full_name AS supervisor_name,
     ea.id AS assignment_id, ea.status AS evaluation_status, ea.attempt_no, ea.available_at, ea.deadline_at AS evaluation_deadline_at,
@@ -168,10 +179,20 @@ const ROSTER_SELECT = `
     (SELECT COUNT(*)::int FROM public.rh_induction_checklist_progress cp WHERE cp.enrollment_id = e.id) AS checklist_completed,
     np.id AS next_phase_id, np.published_at IS NOT NULL AS next_phase_published,
     CASE WHEN p.phase_number = ${ROSTER_LAST_PHASE}
-      -- De la Fase 6 se "avanza" abriendo la evaluacion de competencia inicial (Fase 7).
-      THEN EXISTS (SELECT 1 FROM public.rh_competency_evaluations ce WHERE ce.employee_id = emp.id AND ce.evaluation_type = 'INICIAL')
-      ELSE EXISTS (SELECT 1 FROM public.rh_induction_enrollments ne WHERE ne.employee_id = emp.id AND ne.phase_id = np.id)
-    END AS next_phase_enrolled,
+      -- De la Fase 6 se "avanza" abriendo la evaluacion de competencia inicial (Fase 7) DE ESTE PUESTO.
+      THEN EXISTS (SELECT 1 FROM public.rh_competency_evaluations ce
+                    WHERE ce.employee_id = emp.id AND ce.evaluation_type = 'INICIAL'
+                      AND (e.position_id IS NULL OR ce.position_id = e.position_id))
+      ELSE EXISTS (SELECT 1 FROM public.rh_induction_enrollments ne
+                    WHERE ne.employee_id = emp.id AND ne.phase_id = np.id AND ne.queue_status <> 'CANCELLED')
+    END
+    -- Ruta por puesto: mientras queden puestos de esta fase por acreditar no hay "avance pendiente".
+    OR (e.position_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM public.rh_induction_enrollments sib
+            LEFT JOIN public.evaluation_assignments sea ON sea.id = sib.evaluation_assignment_id
+           WHERE sib.employee_id = emp.id AND sib.phase_id = e.phase_id AND sib.id <> e.id
+             AND sib.queue_status <> 'CANCELLED' AND sea.status IS DISTINCT FROM 'passed'))
+    AS next_phase_enrolled,
     EXISTS (
       SELECT 1 FROM public.evaluation_templates qt
        WHERE qt.training_course_id = COALESCE(e.training_course_id, p.training_course_id) AND qt.status = 'published' AND qt.is_active = TRUE
@@ -187,6 +208,7 @@ const ROSTER_SELECT = `
      WHERE rep.employee_id = emp.id AND rep.is_active = TRUE
      ORDER BY rep.assigned_at DESC LIMIT 1
   ) pos ON TRUE
+  LEFT JOIN public.rh_positions epos ON epos.id = e.position_id
   LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
   LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
   LEFT JOIN public.evaluation_templates t ON t.id = ea.template_id
@@ -334,7 +356,8 @@ const deriveActions = (row: Omit<InductionRosterRow, 'alerts' | 'actions' | 'ela
   if (row.missing_branch || row.missing_position) {
     actions.push('COMPLETE_DATA');
   }
-  if (row.stage !== 'APROBADA' && row.stage !== 'EN_CALIFICACION') {
+  // Ruta por puesto: la inscripcion no se elimina (se retira dando de baja el puesto).
+  if (row.stage !== 'APROBADA' && row.stage !== 'EN_CALIFICACION' && !row.position_sequence) {
     actions.push('UNENROLL');
   }
   return actions;
@@ -353,6 +376,8 @@ export const mapRosterRow = (row: any, now: Date = new Date()): InductionRosterR
     area: row.area ? String(row.area) : null,
     branch_name: row.branch_name ? String(row.branch_name) : null,
     position_name: row.position_name ? String(row.position_name) : null,
+    position_code: row.position_code ? String(row.position_code) : null,
+    position_sequence: row.position_sequence ? Number(row.position_sequence) : null,
     origin: String(row.origin ?? 'MANUAL'),
     enrolled_at: toIsoDateTime(row.enrolled_at),
     phase_published: Boolean(row.published_at),
@@ -418,15 +443,15 @@ const healPhaseEnrollments = async (phaseId: number): Promise<void> => {
 
 export const loadPhaseRosterRows = async (phaseId: number): Promise<InductionRosterRow[]> => {
   await healPhaseEnrollments(phaseId);
-  const result = await pool.query(`${ROSTER_SELECT} WHERE e.phase_id = $1 ORDER BY emp.full_name ASC;`, [phaseId]);
+  const result = await pool.query(`${ROSTER_SELECT} WHERE e.phase_id = $1 AND e.queue_status = 'ACTIVE' ORDER BY emp.full_name ASC, e.position_sequence ASC NULLS FIRST;`, [phaseId]);
   const now = new Date();
   return result.rows.map((row) => mapRosterRow(row, now));
 };
 
 export const loadEmployeeRosterRows = async (employeeId: number): Promise<InductionRosterRow[]> => {
   const result = await pool.query(
-    `${ROSTER_SELECT} WHERE e.employee_id = $1 AND p.phase_number <= ${ROSTER_LAST_PHASE}
-      ORDER BY p.phase_number ASC;`,
+    `${ROSTER_SELECT} WHERE e.employee_id = $1 AND p.phase_number <= ${ROSTER_LAST_PHASE} AND e.queue_status = 'ACTIVE'
+      ORDER BY p.phase_number ASC, e.position_sequence ASC NULLS FIRST;`,
     [employeeId],
   );
   const now = new Date();
@@ -436,8 +461,8 @@ export const loadEmployeeRosterRows = async (employeeId: number): Promise<Induct
 /** Todas las inscripciones del programa (Fases 1-6) para el directorio por colaborador. */
 export const loadProgramRosterRows = async (): Promise<InductionRosterRow[]> => {
   const result = await pool.query(
-    `${ROSTER_SELECT} WHERE p.phase_number <= ${ROSTER_LAST_PHASE}
-      ORDER BY emp.full_name ASC, p.phase_number ASC;`,
+    `${ROSTER_SELECT} WHERE p.phase_number <= ${ROSTER_LAST_PHASE} AND e.queue_status = 'ACTIVE'
+      ORDER BY emp.full_name ASC, p.phase_number ASC, e.position_sequence ASC NULLS FIRST;`,
   );
   const now = new Date();
   return result.rows.map((row) => mapRosterRow(row, now));

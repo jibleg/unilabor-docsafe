@@ -7,7 +7,8 @@ import {
   ROSTER_LAST_PHASE,
 } from './rh-induction-dashboard.service';
 import type { InductionAlert, InductionRosterRow, InductionStage } from './rh-induction-dashboard.service';
-import { competencyStage, loadInitialCompetencies } from './rh-induction-phase7';
+import { competencyStage } from './rh-induction-phase7';
+import { competencyRouteStage, loadInitialCompetencyRoutes, loadPositionPhaseCounts } from './rh-induction-position-summary';
 import { getPositionReadiness } from './rh-induction-position-readiness.service';
 import type { PositionReadinessRow } from './rh-induction-position-readiness.service';
 import { summarizeTransitions } from './rh-induction-transition.service';
@@ -310,8 +311,9 @@ export const getInductionProgramOverview = async (): Promise<InductionProgramOve
     loadPhaseConfigs(),
     getPositionReadiness(),
     summarizeTransitions(),
-    loadInitialCompetencies(),
+    loadInitialCompetencyRoutes(),
   ]);
+  const positionCounts = await loadPositionPhaseCounts();
   const phases: InductionPhaseOverview[] = [];
   const employeesInProgram = new Set<number>();
   const currentPhaseByEmployee = new Map<number, number>();
@@ -356,7 +358,14 @@ export const getInductionProgramOverview = async (): Promise<InductionProgramOve
     approved: 0,
     not_approved: 0,
   };
-  for (const competency of competencies.values()) {
+  // Fase 7 por puesto: cada REH-REG-003 INICIAL cuenta por su puesto; un colaborador
+  // concluye 1-7 cuando tiene autorizada la competencia de TODOS sus puestos de la Fase 6.
+  let completedAllPositions = 0;
+  for (const [employeeId, entries] of competencies) {
+    const required = positionCounts.get(`${employeeId}:6`)?.passed ?? entries.length;
+    if (competencyRouteStage(entries, required) === 'APROBADA') completedAllPositions += 1;
+  }
+  for (const competency of [...competencies.values()].flat()) {
     const stage = competencyStage(competency);
     if (stage === 'COMPETENCIA_EN_PROCESO') phase7.in_process += 1;
     else if (stage === 'COMPETENCIA_POR_AUTORIZAR') phase7.pending_authorization += 1;
@@ -370,7 +379,7 @@ export const getInductionProgramOverview = async (): Promise<InductionProgramOve
     employees_active: Number(activeEmployees.rows[0]?.total ?? 0),
     employees_in_program: employeesInProgram.size,
     employees_completed_1_4: completed,
-    employees_completed_1_7: phase7.approved,
+    employees_completed_1_7: completedAllPositions,
     employees_by_current_phase: employeesByCurrentPhase,
     totals,
     phases,

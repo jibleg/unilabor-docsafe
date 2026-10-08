@@ -49,6 +49,10 @@ import { setPhaseDocumentExpedientTypeSchema, updatePhaseAutoChecklistSchema } f
 import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../schemas/rh-question-bank.schema';
 import { closeInductionRecordSchema } from '../schemas/rh-induction-closure.schema';
 import {
+  getPositionQuizRegenerationController,
+  startPositionQuizRegenerationController,
+} from '../controllers/rh-position-quiz-regeneration.controller';
+import {
   advanceEnrollmentController,
   getInductionDashboardOverviewController,
   getInductionEmployee360Controller,
@@ -99,6 +103,9 @@ router.get('/induction/phases/:phaseId/certificate-readiness', requirePermission
 // Fases POSITION (5-6): habilitacion por puesto (crea la training_course propia).
 router.get('/induction/phases/:phaseId/positions', requirePermission('RH.INDUCTION.MANAGE'), listPhasePositionsController);
 router.post('/induction/phases/:phaseId/positions/:positionId/enable', requirePermission('RH.INDUCTION.MANAGE'), enablePhaseForPositionController);
+// Fase 5: preguntas propias del puesto (generacion en segundo plano).
+router.get('/induction/positions/:positionId/phase5-quiz/regeneration', requirePermission('RH.INDUCTION.MANAGE'), getPositionQuizRegenerationController);
+router.post('/induction/positions/:positionId/phase5-quiz/regenerate', requirePermission('RH.INDUCTION.MANAGE'), startPositionQuizRegenerationController);
 router.post('/induction/phases/:phaseId/documents', requirePermission('RH.INDUCTION.MANAGE'), addPhaseDocumentController);
 router.delete('/induction/phase-documents/:phaseDocumentId', requirePermission('RH.INDUCTION.MANAGE'), removePhaseDocumentController);
 router.patch(

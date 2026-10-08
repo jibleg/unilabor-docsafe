@@ -73,7 +73,19 @@ export const InductionEnrollmentCard = ({
       <div className="flex items-center justify-between">
         <div>
           <p className="font-bold text-[var(--color-brand-700)]">{item.employee_name}</p>
-          <p className="text-xs text-[var(--unilabor-neutral)]">{item.employee_code}</p>
+          <p className="text-xs text-[var(--unilabor-neutral)]">
+            {item.employee_code}
+            {item.position_code ? (
+              <>
+                {' · '}
+                <span className="rounded bg-slate-100 px-1 font-mono text-[10px]">
+                  {item.position_sequence ? `${item.position_sequence}. ` : ''}
+                  {item.position_code}
+                </span>
+                {item.queue_status === 'QUEUED' ? <span className="ml-1 font-semibold text-slate-500">· en cola</span> : null}
+              </>
+            ) : null}
+          </p>
           {item.missing_branch || item.missing_position ? (
             <button
               type="button"
@@ -176,14 +188,17 @@ export const InductionEnrollmentCard = ({
               Autorizar nuevo intento
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-rose-500 transition hover:text-rose-700"
-            title="Eliminar inscripción (solo si la fase no está aprobada)"
-          >
-            <Trash2 size={12} />
-          </button>
+          {/* Ruta por puesto: la inscripción no se elimina; se retira dando de baja el puesto. */}
+          {item.position_code ? null : (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="text-rose-500 transition hover:text-rose-700"
+              title="Eliminar inscripción (solo si la fase no está aprobada)"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
         </div>
       </div>
 

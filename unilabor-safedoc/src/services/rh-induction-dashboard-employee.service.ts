@@ -5,7 +5,9 @@ import type { InductionRosterRow } from './rh-induction-dashboard.service';
 import { tryActivateDeferredEnrollments } from './rh-induction-grace.service';
 import { getInstitutionalTrack, tryAdvanceEmployeeIfEligible } from './rh-induction-progression.service';
 import type { InductionTrackPhase } from './rh-induction-progression.service';
-import { loadInitialCompetencies, PHASE7_NUMBER } from './rh-induction-phase7';
+import { competencyStage, PHASE7_NUMBER } from './rh-induction-phase7';
+import { loadInitialCompetencyRoutes } from './rh-induction-position-summary';
+import { loadTrackEntries } from './rh-induction-position-track.service';
 import type { CompetencySnapshot } from './rh-induction-phase7';
 import { loadTransitionRows } from './rh-induction-transition.service';
 import type { TransitionBlock, TransitionState, TransitionTarget } from './rh-induction-transition.service';
@@ -76,7 +78,24 @@ export interface InductionPositionTrackPhase {
   enrollment_id: number | null;
   /** Si aun no entra: LISTO / BLOQUEADO (con motivos) segun la bandeja de avance. */
   transition: { state: TransitionState; blocks: TransitionBlock[] } | null;
-  /** Solo Fase 7: evaluacion de competencia inicial. */
+  /** Solo Fase 7: evaluacion de competencia inicial (la del puesto en curso). */
+  competency: CompetencySnapshot | null;
+  /** Ruta por puesto: cada puesto con su lugar, estado y evaluacion (Fases 5-7). */
+  positions: InductionPositionTrackEntry[];
+}
+
+export interface InductionPositionTrackEntry {
+  position_id: number;
+  position_code: string;
+  position_name: string;
+  sequence: number;
+  /** Fases 5-6: QUEUED / ACTIVE / CANCELLED; Fase 7: null (no hay inscripcion). */
+  queue_status: 'QUEUED' | 'ACTIVE' | 'CANCELLED' | null;
+  enrollment_id: number | null;
+  evaluation_status: string | null;
+  passed: boolean;
+  cancelled_reason: string | null;
+  /** Solo Fase 7: REH-REG-003 INICIAL del puesto. */
   competency: CompetencySnapshot | null;
 }
 
@@ -239,30 +258,62 @@ const loadAudit = async (employeeId: number, enrollmentIds: number[], assignment
   }));
 };
 
-const loadPositionTrack = async (employeeId: number, enrollments: InductionRosterRow[]): Promise<InductionPositionTrackPhase[]> => {
+const loadPositionTrack = async (employeeId: number): Promise<InductionPositionTrackPhase[]> => {
   const phases = await pool.query(
     `SELECT id, phase_number, name, published_at FROM public.rh_induction_phases
       WHERE scope = 'POSITION' AND phase_number BETWEEN 5 AND ${PHASE7_NUMBER} ORDER BY phase_number ASC;`,
   );
-  const competency = (await loadInitialCompetencies([employeeId])).get(employeeId) ?? null;
+  const competencies = (await loadInitialCompetencyRoutes([employeeId])).get(employeeId) ?? [];
   const track: InductionPositionTrackPhase[] = [];
+  let phase6Passed: InductionPositionTrackEntry[] = [];
   for (const row of phases.rows) {
     const phaseNumber = Number(row.phase_number);
-    const enrollment = enrollments.find((item) => item.phase_number === phaseNumber) ?? null;
     const isPhase7 = phaseNumber === PHASE7_NUMBER;
-    let transition: InductionPositionTrackPhase['transition'] = null;
-    if (!enrollment && !(isPhase7 && competency)) {
-      const [candidate] = await loadTransitionRows(phaseNumber as TransitionTarget, [employeeId]);
-      if (candidate) transition = { state: candidate.state, blocks: candidate.blocks };
+    let positions: InductionPositionTrackEntry[];
+    if (isPhase7) {
+      // Un REH-REG-003 INICIAL por cada puesto que acredito la Fase 6 (en ese orden).
+      positions = phase6Passed.map((entry) => {
+        const competency = competencies.find((item) => item.position_id === entry.position_id) ?? null;
+        return {
+          ...entry,
+          queue_status: null,
+          enrollment_id: null,
+          evaluation_status: competency?.status ?? null,
+          passed: Boolean(competency && competencyStage(competency) === 'APROBADA'),
+          cancelled_reason: null,
+          competency,
+        };
+      });
+    } else {
+      const entries = await loadTrackEntries(employeeId, Number(row.id));
+      positions = entries.map((entry) => ({
+        position_id: entry.position_id,
+        position_code: entry.position_code,
+        position_name: entry.position_name,
+        sequence: entry.sequence,
+        queue_status: entry.queue_status,
+        enrollment_id: entry.enrollment_id,
+        evaluation_status: entry.evaluation_status,
+        passed: entry.passed,
+        cancelled_reason: entry.cancelled_reason,
+        competency: null,
+      }));
+      if (phaseNumber === 6) phase6Passed = positions.filter((entry) => entry.passed && entry.queue_status !== 'CANCELLED');
     }
+    const open = positions.filter((entry) => entry.queue_status !== 'CANCELLED');
+    const current = open.find((entry) => !entry.passed) ?? open[open.length - 1] ?? null;
+    let transition: InductionPositionTrackPhase['transition'] = null;
+    const [candidate] = await loadTransitionRows(phaseNumber as TransitionTarget, [employeeId]);
+    if (candidate && (open.length === 0 || isPhase7)) transition = { state: candidate.state, blocks: candidate.blocks };
     track.push({
       phase_id: Number(row.id),
       phase_number: phaseNumber,
       phase_name: String(row.name),
       published: Boolean(row.published_at),
-      enrollment_id: enrollment?.enrollment_id ?? null,
+      enrollment_id: current?.enrollment_id ?? null,
       transition,
-      competency: isPhase7 ? competency : null,
+      competency: current?.competency ?? null,
+      positions,
     });
   }
   return track;
@@ -283,7 +334,7 @@ export const getInductionEmployee360 = async (employeeId: number): Promise<Induc
   );
   const [track, positionTrack, documents, attempts] = await Promise.all([
     getInstitutionalTrack(employeeId),
-    loadPositionTrack(employeeId, enrollments),
+    loadPositionTrack(employeeId),
     loadDocuments(enrollmentIds),
     loadAttempts(employeeId, currentAssignmentIds),
   ]);

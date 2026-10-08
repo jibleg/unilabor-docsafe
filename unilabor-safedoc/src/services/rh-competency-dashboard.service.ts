@@ -70,7 +70,60 @@ export interface CompetencyDashboardEmployee {
   current_evaluation_id: number | null;
   valid_until: string | null;
   days_to_expiry: number | null;
+  /** Competencia por puesto (cada puesto activo lleva su propio REH-REG-003). */
+  position_standings: CompetencyPositionStanding[];
 }
+
+export interface CompetencyPositionStanding {
+  position_id: number;
+  position_name: string;
+  standing: CompetencyStanding;
+  current_evaluation_id: number | null;
+  valid_until: string | null;
+  days_to_expiry: number | null;
+}
+
+/** Del peor al mejor: el estado general del colaborador es el de su puesto mas atrasado. */
+const STANDING_SEVERITY: CompetencyStanding[] = [
+  'NO_COMPETENTE',
+  'VENCIDA',
+  'SIN_EVALUACION',
+  'EN_CAPTURA',
+  'PENDIENTE_AUTORIZACION',
+  'POR_VENCER',
+  'VIGENTE',
+];
+
+/**
+ * Regla pura: estado por puesto activo y estado general (el peor). Sin puestos
+ * activos se conserva la regla historica (ultima evaluacion de cualquier puesto).
+ */
+export const resolvePositionStandings = (
+  positions: Array<{ id: number; name: string }>,
+  evaluations: CompetencyDashboardEvaluation[],
+  today: string,
+): { overall: ReturnType<typeof resolveStanding>; byPosition: CompetencyPositionStanding[] } => {
+  const byPosition = positions.map((position) => ({
+    position_id: position.id,
+    position_name: position.name,
+    ...resolveStanding(evaluations.filter((evaluation) => evaluation.position_id === position.id), today),
+  }));
+  if (byPosition.length === 0) {
+    return { overall: resolveStanding(evaluations, today), byPosition };
+  }
+  const worst = [...byPosition].sort(
+    (a, b) => STANDING_SEVERITY.indexOf(a.standing) - STANDING_SEVERITY.indexOf(b.standing),
+  )[0]!;
+  return {
+    overall: {
+      standing: worst.standing,
+      current_evaluation_id: worst.current_evaluation_id,
+      valid_until: worst.valid_until,
+      days_to_expiry: worst.days_to_expiry,
+    },
+    byPosition,
+  };
+};
 
 export interface CompetencyDashboard {
   today: string;
@@ -225,18 +278,21 @@ export const getCompetencyDashboard = async (): Promise<CompetencyDashboard> => 
   const employees = employeesResult.rows.map((row): CompetencyDashboardEmployee => {
     const employeeId = Number(row.id);
     const own = byEmployee.get(employeeId) ?? [];
+    const positions: Array<{ id: number; name: string }> = Array.isArray(row.positions)
+      ? row.positions.map((position: any) => ({ id: Number(position.id), name: String(position.name) }))
+      : [];
+    const standings = resolvePositionStandings(positions, own, today);
     return {
       employee_id: employeeId,
       full_name: String(row.full_name),
       employee_code: String(row.employee_code),
       area: row.area ? String(row.area) : null,
       branch_name: row.branch_name ? String(row.branch_name) : null,
-      positions: Array.isArray(row.positions)
-        ? row.positions.map((position: any) => ({ id: Number(position.id), name: String(position.name) }))
-        : [],
+      positions,
       has_draft: own.some((evaluation) => evaluation.status === 'DRAFT'),
       evaluations_count: own.length,
-      ...resolveStanding(own, today),
+      ...standings.overall,
+      position_standings: standings.byPosition,
     };
   });
 

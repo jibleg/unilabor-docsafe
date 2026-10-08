@@ -19,6 +19,7 @@ const STAGES = [
   'EN_CALIFICACION',
   'EVALUACION_VENCIDA',
   'NO_ACREDITADA',
+  'SIGUIENTE_PUESTO',
   'APROBADA',
 ] as const;
 
@@ -121,7 +122,7 @@ export const transitionQuerySchema = z.object({
   target: z.coerce.number().int().refine((value) => value === 5 || value === 6 || value === 7, 'La fase destino debe ser 5, 6 o 7'),
   state: z.enum(['READY', 'BLOCKED', 'STARTED']).optional(),
   reason: z
-    .enum(['SIN_USUARIO', 'SIN_PUESTO', 'FASE_EN_BORRADOR', 'PUESTO_NO_HABILITADO', 'PUESTO_SIN_DOCUMENTOS', 'EVALUACION_NO_LISTA', 'PUESTO_SIN_COMPETENCIAS'])
+    .enum(['SIN_USUARIO', 'SIN_PUESTO', 'FASE_EN_BORRADOR', 'PUESTO_NO_HABILITADO', 'PUESTO_SIN_DOCUMENTOS', 'EVALUACION_NO_LISTA', 'PUESTO_SIN_COMPETENCIAS', 'PUESTOS_PENDIENTES'])
     .optional(),
   q: z
     .string()

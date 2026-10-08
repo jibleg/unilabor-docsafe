@@ -11,6 +11,7 @@ import {
 } from './rh-induction.service';
 import { autoCompleteChecklistForPassedAssignment } from './rh-induction-checklist.service';
 import { tryAdvanceInductionAfterPass } from './rh-induction-progression.service';
+import { queuePositionTrackAfterPass } from './rh-induction-position-track.service';
 
 /**
  * Generacion REAL de la constancia al acreditar una evaluacion (>= passing_score)
@@ -91,6 +92,8 @@ export const issueCertificateForAssignment = async (assignmentId: number): Promi
   await tryAutoCompleteInductionChecklist(assignmentId);
   // Gancho de Induccion: progresion autonoma (Fases 1-3 -> siguiente) al acreditar.
   await tryAdvanceInductionAfterPass(assignmentId);
+  // Gancho de Induccion: ruta por puesto (Fases 5-6) -> activa el siguiente puesto.
+  queuePositionTrackAfterPass(assignmentId);
 
   // Fase de Induccion (o null si es una capacitacion normal): decide el motor de
   // render Y la seccion del expediente donde se archiva la constancia.
@@ -184,7 +187,8 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
   const pdf = inductionPhase
     ? await renderInductionCertificatePdf({
         recipientName: context.employeeName,
-        position: (await getEmployeeActivePositionName(context.employeeId)) ?? '—',
+        // Fases por puesto: el puesto de ESTA constancia (su curso), no el mas reciente del colaborador.
+        position: inductionPhase.positionName ?? (await getEmployeeActivePositionName(context.employeeId)) ?? '—',
         branch: context.branchName ?? '—',
         scoreText: `${context.percentage} / 100`,
         durationText: inductionPhase.durationHours ? `${inductionPhase.durationHours} HORAS` : '—',
@@ -221,7 +225,9 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
   const isoExpiry = expiryDate ? expiryDate.toISOString().slice(0, 10) : null;
   // Induccion: la constancia se archiva con el nombre de la fase (pedido de RH).
   const title = inductionPhase
-    ? `Constancia Fase ${inductionPhase.phaseNumber} - ${inductionPhase.phaseName}`
+    ? `Constancia Fase ${inductionPhase.phaseNumber} - ${inductionPhase.phaseName}${
+        inductionPhase.positionName ? ` - ${inductionPhase.positionName}` : ''
+      }`
     : `Constancia - ${context.courseTitle}`;
 
   const client = await pool.connect();

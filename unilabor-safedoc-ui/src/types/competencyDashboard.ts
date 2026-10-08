@@ -54,6 +54,17 @@ export interface CompetencyDashboardEmployee {
   current_evaluation_id: number | null;
   valid_until: string | null;
   days_to_expiry: number | null;
+  /** Competencia por puesto (cada puesto activo lleva su propio REH-REG-003); el estado general es el peor. */
+  position_standings?: CompetencyPositionStanding[];
+}
+
+export interface CompetencyPositionStanding {
+  position_id: number;
+  position_name: string;
+  standing: CompetencyStanding;
+  current_evaluation_id: number | null;
+  valid_until: string | null;
+  days_to_expiry: number | null;
 }
 
 export interface CompetencyDashboard {

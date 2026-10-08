@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpenCheck, CheckCircle2, ClipboardList, GraduationCap, Loader2, Lock, PenLine, Sparkles } from 'lucide-react';
+import { BookOpenCheck, CheckCircle2, ClipboardList, Clock3, GraduationCap, Loader2, Lock, PenLine, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { getMyInductionOverview } from '../api/service.api-rh-induction';
@@ -21,6 +21,10 @@ const pendingSignatures = (item: RhInductionProgressItem): number =>
   item.evaluation_status === 'passed' ? (item.reading_to_sign ?? 0) : 0;
 
 const stepStatus = (item: RhInductionProgressItem): { label: string; icon: typeof BookOpenCheck; done: boolean } => {
+  // Ruta por puesto: los puestos se cursan uno tras otro.
+  if (item.queue_status === 'QUEUED') {
+    return { label: 'En cola: inicia al acreditar tu puesto anterior', icon: Clock3, done: false };
+  }
   if (item.evaluation_status === 'passed') {
     const toSign = pendingSignatures(item);
     return toSign > 0
@@ -194,6 +198,9 @@ export const RhMyInductionPage = () => {
                         <div>
                           <p className="font-bold text-[var(--color-brand-700)]">
                             Fase {item.phase_number}: {item.phase_name}
+                            {item.position_name ? (
+                              <span className="font-semibold text-[var(--color-brand-500)]"> · {item.position_name}</span>
+                            ) : null}
                           </p>
                           <p className="text-xs text-[var(--unilabor-neutral)]">{step.label}</p>
                           {item.reading_deadline_at && !item.reading_completed_at && !item.evaluation_assignment_id ? (
@@ -209,6 +216,10 @@ export const RhMyInductionPage = () => {
                         <button type="button" onClick={() => navigate(`/rh/my-evaluations/${item.evaluation_assignment_id}`)} className={buttonClass}>
                           Realizar evaluación
                         </button>
+                      ) : item.queue_status === 'QUEUED' ? (
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                          En cola
+                        </span>
                       ) : !item.reading_completed_at && !item.evaluation_assignment_id && item.phase_published !== false && !(item.readings_start_at && item.reading_total === 0) ? (
                         <button type="button" onClick={() => navigate('/quality/my-readings')} className={buttonClass}>
                           Ir a leer

@@ -33,11 +33,22 @@ const PhaseStrip = ({ row }: { row: InductionDirectoryRow }) => (
       return (
         <span
           key={phaseNumber}
-          title={phase ? `Fase ${phaseNumber}: ${STAGE_META[phase.stage].label}` : `Fase ${phaseNumber}: sin inscribir`}
+          title={
+            phase
+              ? `Fase ${phaseNumber}: ${STAGE_META[phase.stage].label}${
+                  phase.positions_total ? ` · ${phase.positions_passed ?? 0} de ${phase.positions_total} puestos` : ''
+                }`
+              : `Fase ${phaseNumber}: sin inscribir`
+          }
           className="flex h-4 items-center justify-center rounded text-[9px] font-bold text-white"
           style={{ backgroundColor: color ?? 'rgba(0,65,106,0.1)', color: color ? '#fff' : 'var(--unilabor-neutral)' }}
         >
           F{phaseNumber}
+          {phase?.positions_total && phase.positions_total > 1 ? (
+            <span className="ml-0.5 font-normal opacity-90">
+              {phase.positions_passed ?? 0}/{phase.positions_total}
+            </span>
+          ) : null}
         </span>
       );
     })}

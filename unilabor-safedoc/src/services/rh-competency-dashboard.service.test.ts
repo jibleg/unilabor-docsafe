@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../config/db', () => ({ default: { query: vi.fn() } }));
 
-import { CompetencyDashboardEvaluation, resolveStanding } from './rh-competency-dashboard.service';
+import { CompetencyDashboardEvaluation, resolvePositionStandings, resolveStanding } from './rh-competency-dashboard.service';
 
 const TODAY = '2026-10-02';
 
@@ -69,5 +69,28 @@ describe('resolveStanding', () => {
       TODAY,
     );
     expect(result).toMatchObject({ standing: 'PENDIENTE_AUTORIZACION', current_evaluation_id: 2 });
+  });
+});
+
+describe('resolvePositionStandings (competencia por puesto)', () => {
+  const positions = [
+    { id: 1, name: 'Químico analista' },
+    { id: 2, name: 'Custodio' },
+  ];
+  it('cada puesto activo tiene su estado y el general es el peor', () => {
+    const result = resolvePositionStandings(positions, [evaluation({ id: 1, position_id: 1 })], TODAY);
+    expect(result.byPosition.map((item) => item.standing)).toEqual(['VIGENTE', 'SIN_EVALUACION']);
+    expect(result.overall.standing).toBe('SIN_EVALUACION');
+  });
+  it('con todos sus puestos vigentes el colaborador esta vigente', () => {
+    const result = resolvePositionStandings(
+      positions,
+      [evaluation({ id: 1, position_id: 1 }), evaluation({ id: 2, position_id: 2, valid_until: '2027-03-01' })],
+      TODAY,
+    );
+    expect(result.overall.standing).toBe('VIGENTE');
+  });
+  it('sin puestos activos conserva la regla historica', () => {
+    expect(resolvePositionStandings([], [evaluation({})], TODAY).overall.standing).toBe('VIGENTE');
   });
 });

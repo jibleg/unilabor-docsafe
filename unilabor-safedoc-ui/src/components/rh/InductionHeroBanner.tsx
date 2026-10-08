@@ -21,9 +21,10 @@ export const InductionHeroBanner = () => {
     getMyInductionProgress()
       .then((progress) => {
         if (!active) return;
+        // El puesto en curso (los de la cola esperan a que acredite el anterior).
         const pending = progress
-          .filter((item) => item.evaluation_status !== 'passed')
-          .sort((a, b) => a.phase_number - b.phase_number)[0];
+          .filter((item) => item.evaluation_status !== 'passed' && item.queue_status !== 'QUEUED')
+          .sort((a, b) => a.phase_number - b.phase_number || (a.position_sequence ?? 0) - (b.position_sequence ?? 0))[0];
         setCurrent(pending ?? null);
         // Fase aprobada con firmas reabiertas por RH ("Reabrir firmas pendientes").
         const reopened = progress
@@ -95,6 +96,7 @@ export const InductionHeroBanner = () => {
       </p>
       <h2 className="mt-1 text-2xl font-bold">
         Fase {current.phase_number}: {current.phase_name}
+        {current.position_name ? <span className="text-[#BFD4E6]"> · {current.position_name}</span> : null}
       </h2>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#DCE9F3]">

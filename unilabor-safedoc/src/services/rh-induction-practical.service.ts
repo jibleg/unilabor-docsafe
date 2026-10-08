@@ -3,6 +3,7 @@ import { capturePracticalResults } from './evaluation-practical.service';
 import type { PracticalCaptureRow } from './evaluation-practical.service';
 import { autoCompleteChecklistForPassedAssignment } from './rh-induction-checklist.service';
 import { refreshEnrollmentReadingStatus } from './rh-induction.service';
+import { queuePositionTrackSync } from './rh-induction-position-track.service';
 
 // -----------------------------------------------------------------------------
 // Captura de la evaluacion practica (Fase 6) desde el Tablero de Induccion:
@@ -77,6 +78,8 @@ export const captureEnrollmentPractical = async (input: CaptureEnrollmentPractic
     await autoCompleteChecklistForPassedAssignment(captured.assignment_id).catch((error) => {
       console.error(`Checklist automatico de la Fase 6 (asignacion ${captured.assignment_id}):`, error);
     });
+    // Ruta por puesto: la constancia se emitio antes del vinculo; activa aqui el siguiente puesto.
+    queuePositionTrackSync(Number(row.employee_id), input.actorUserId);
   }
   return {
     ...captured,

@@ -108,6 +108,7 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
     `SELECT
         p.phase_number, p.name, p.responsible_label, p.scope,
         e.id AS enrollment_id, e.created_at AS enrolled_at, e.supervisor_employee_id,
+        rp.name AS position_name, e.queue_status,
         sup.full_name AS supervisor_name,
         ea.status AS evaluation_status, ea.percentage AS evaluation_percentage, ea.graded_at,
         ea.certificate_document_id,
@@ -118,10 +119,11 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
         (SELECT COUNT(*)::int FROM public.rh_induction_phase_checklist_items ci WHERE ci.phase_id = p.id) AS checklist_total,
         (SELECT COUNT(*)::int FROM public.rh_induction_checklist_progress cp WHERE cp.enrollment_id = e.id) AS checklist_completed
       FROM public.rh_induction_phases p
-      LEFT JOIN public.rh_induction_enrollments e ON e.phase_id = p.id AND e.employee_id = $1
+      LEFT JOIN public.rh_induction_enrollments e ON e.phase_id = p.id AND e.employee_id = $1 AND e.queue_status <> 'CANCELLED'
+      LEFT JOIN public.rh_positions rp ON rp.id = e.position_id
       LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
       LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
-     ORDER BY p.phase_number ASC;`,
+     ORDER BY p.phase_number ASC, e.position_sequence ASC NULLS FIRST;`,
     [employeeId],
   );
 
@@ -130,9 +132,11 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
     const evaluationStatus = row.evaluation_status ? String(row.evaluation_status) : null;
     const readingTotal = Number(row.reading_total ?? 0);
     const readingSigned = Number(row.reading_signed ?? 0);
+    // Fases por puesto (5-6): una fila por puesto de la ruta; en cola = aun sin iniciar.
+    const queued = String(row.queue_status ?? '') === 'QUEUED';
     return {
       phase_number: Number(row.phase_number),
-      name: String(row.name),
+      name: row.position_name ? `${String(row.name)} — ${String(row.position_name)}` : String(row.name),
       responsible_label: String(row.responsible_label),
       supervisor_name: row.supervisor_name ? String(row.supervisor_name) : null,
       started_at: row.enrolled_at ? String(row.enrolled_at) : null,
@@ -141,7 +145,7 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
         row.evaluation_percentage !== null && row.evaluation_percentage !== undefined
           ? Number(row.evaluation_percentage)
           : null,
-      status: resolveStatus(String(row.scope), hasEnrollment, evaluationStatus),
+      status: resolveStatus(String(row.scope), hasEnrollment && !queued, evaluationStatus),
       checklist_total: Number(row.checklist_total ?? 0),
       checklist_completed: Number(row.checklist_completed ?? 0),
       collaborator_signature_note: hasEnrollment ? collaboratorSignatureNote(readingTotal, readingSigned) : 'Pendiente',
@@ -155,23 +159,35 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
   // REH-REG-003 (rh_competency_evaluations tipo INICIAL), no el motor de
   // evaluaciones de lectura. Si existe una cerrada, la fase deja de ser
   // NO_DISPONIBLE y refleja su resultado real.
-  const phase7 = phases.find((phase) => phase.phase_number === 7);
-  if (phase7) {
+  const phase7Index = phases.findIndex((phase) => phase.phase_number === 7);
+  if (phase7Index >= 0) {
+    // Un REH-REG-003 INICIAL por puesto: una fila de Fase 7 por cada puesto evaluado.
     const compEval = await pool.query(
-      `SELECT final_pct, dictamen, evaluation_date, closed_at
-         FROM public.rh_competency_evaluations
-        WHERE employee_id = $1 AND evaluation_type = 'INICIAL' AND status = 'CLOSED'
-        ORDER BY closed_at DESC LIMIT 1;`,
+      `SELECT DISTINCT ON (c.position_id) c.final_pct, c.dictamen, c.evaluation_date, c.closed_at, c.status, rp.name AS position_name
+         FROM public.rh_competency_evaluations c
+         JOIN public.rh_positions rp ON rp.id = c.position_id
+        WHERE c.employee_id = $1 AND c.evaluation_type = 'INICIAL'
+        ORDER BY c.position_id, c.created_at DESC;`,
       [employeeId],
     );
     if (compEval.rows.length > 0) {
-      const row = compEval.rows[0];
-      phase7.status = String(row.dictamen) !== 'NO_COMPETENTE' ? 'APROBADA' : 'NO_APROBADA';
-      phase7.score_percentage = row.final_pct !== null ? Number(row.final_pct) : null;
-      phase7.started_at = row.evaluation_date ? String(row.evaluation_date) : phase7.started_at;
-      phase7.finished_at = row.closed_at ? String(row.closed_at) : phase7.finished_at;
-      phase7.collaborator_signature_note = '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)';
-      phase7.responsible_signature_note = '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)';
+      const base = phases[phase7Index]!;
+      const rows = compEval.rows.map((row) => {
+        const closed = String(row.status) === 'CLOSED';
+        return {
+          ...base,
+          name: `${base.name} — ${String(row.position_name)}`,
+          status: (closed
+            ? String(row.dictamen) !== 'NO_COMPETENTE' ? 'APROBADA' : 'NO_APROBADA'
+            : 'EN_PROCESO') as RhInductionMasterRecordPhaseRow['status'],
+          score_percentage: closed && row.final_pct !== null ? Number(row.final_pct) : null,
+          started_at: row.evaluation_date ? String(row.evaluation_date) : base.started_at,
+          finished_at: row.closed_at ? String(row.closed_at) : null,
+          collaborator_signature_note: closed ? '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)' : 'Pendiente',
+          responsible_signature_note: closed ? '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)' : 'Pendiente',
+        };
+      });
+      phases.splice(phase7Index, 1, ...rows);
     }
   }
 

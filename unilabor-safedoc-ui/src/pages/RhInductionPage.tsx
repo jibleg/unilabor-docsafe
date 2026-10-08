@@ -37,6 +37,7 @@ import { CompactListPager } from '../components/CompactListPager';
 import { ExpedientTabs } from '../components/rh/ExpedientTabs';
 import { InductionCertReadinessNotice } from '../components/rh/induction-phase/InductionCertReadinessNotice';
 import { InductionEnrollmentCard } from '../components/rh/induction-phase/InductionEnrollmentCard';
+import { PositionQuizRegenerateButton } from '../components/rh/induction-phase/PositionQuizRegenerateButton';
 import { InductionPhaseChecklistTab } from '../components/rh/induction-phase/InductionPhaseChecklistTab';
 import { InductionPhaseDocumentsTab } from '../components/rh/induction-phase/InductionPhaseDocumentsTab';
 import { buttonClass, inputClass, sectionTitleClass } from '../components/rh/induction-phase/styles';
@@ -767,14 +768,17 @@ export const RhInductionPage = () => {
                               {entry.position_name}
                               <span className="ml-2 text-xs text-[var(--unilabor-neutral)]">({entry.course_code})</span>
                             </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                entry.has_published_template
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-amber-50 text-amber-700'
-                              }`}
-                            >
-                              {entry.has_published_template ? 'Evaluación publicada' : 'Falta diseñar evaluación'}
+                            <span className="flex items-center gap-2">
+                              {selectedPhase.phase_number === 5 ? (
+                                <PositionQuizRegenerateButton positionId={entry.position_id} positionName={entry.position_name} />
+                              ) : null}
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  entry.has_published_template ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                                }`}
+                              >
+                                {entry.has_published_template ? 'Evaluación publicada' : 'Falta diseñar evaluación'}
+                              </span>
                             </span>
                           </div>
                         ))}

@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import pool from '../config/db';
 import { activateDeferredEnrollments } from './rh-induction-grace.service';
+import { sweepPositionTracks } from './rh-induction-position-track.service';
 import { sweepExpiredInductionReadings } from './rh-induction.service';
 
 /**
@@ -27,6 +28,9 @@ export const runInductionReadingSweep = async (): Promise<void> => {
     if (activated > 0) {
       console.log(`Induccion: ${activated} inscripcion(es) terminaron su descanso y recibieron sus lecturas.`);
     }
+    // Ruta por puesto (Fases 5-6): activa el siguiente puesto cuando quedo listo
+    // (puesto recien habilitado, cuestionario publicado) y aplica altas/bajas de puestos.
+    await sweepPositionTracks();
     const opened = await sweepExpiredInductionReadings();
     if (opened > 0) {
       console.log(`Induccion: ${opened} inscripcion(es) con lectura vencida pasaron a evaluacion.`);

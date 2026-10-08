@@ -112,6 +112,12 @@ export interface RhInductionProgressItem {
   phase_published?: boolean;
   /** Descanso entre fases: cuándo se activan tus lecturas (null si ya arrancó o no aplica). */
   readings_start_at?: string | null;
+  /** Fases por puesto (5-6): puesto de esta inscripción, su orden en la ruta y si está en cola. */
+  position_id?: number | null;
+  position_code?: string | null;
+  position_name?: string | null;
+  position_sequence?: number | null;
+  queue_status?: InductionQueueStatus;
 }
 
 // --- Tablero de Inducción (Fases 1-4) ---------------------------------------
@@ -133,6 +139,8 @@ export type InductionStage =
   | 'COMPETENCIA_EN_PROCESO'
   | 'COMPETENCIA_POR_AUTORIZAR'
   | 'NO_ACREDITADA'
+  /** Ruta por puesto: acreditó un puesto y el siguiente de la cola aún no puede activarse. */
+  | 'SIGUIENTE_PUESTO'
   | 'APROBADA';
 
 export type InductionAlert =
@@ -176,6 +184,9 @@ export interface InductionRosterRow extends RhInductionPhaseEnrollmentSummary {
   area: string | null;
   branch_name: string | null;
   position_name: string | null;
+  /** Solo en vistas agregadas: avance de la ruta por puesto. */
+  positions_total?: number;
+  positions_passed?: number;
   origin: InductionEnrollmentOrigin | string;
   enrolled_at: string;
   phase_published: boolean;
@@ -292,7 +303,8 @@ export type InductionTransitionBlockReason =
   | 'PUESTO_NO_HABILITADO'
   | 'PUESTO_SIN_DOCUMENTOS'
   | 'EVALUACION_NO_LISTA'
-  | 'PUESTO_SIN_COMPETENCIAS';
+  | 'PUESTO_SIN_COMPETENCIAS'
+  | 'PUESTOS_PENDIENTES';
 
 export interface InductionTransitionBlock {
   reason: InductionTransitionBlockReason;
@@ -327,7 +339,7 @@ export interface InductionTransitionRow {
   position_id: number | null;
   position_code: string | null;
   position_name: string | null;
-  previous_enrollment_id: number;
+  previous_enrollment_id: number | null;
   previous_passed_at: string | null;
   previous_percentage: number | null;
   previous_certificate_document_id: number | null;
@@ -336,6 +348,20 @@ export interface InductionTransitionRow {
   competencies_total: number;
   evaluation_state: InductionPositionEvaluationState;
   competency: InductionCompetencySnapshot | null;
+  /** Ruta por puesto: estado de cada puesto del colaborador (el `position_*` de arriba es con el que inicia o sigue). */
+  positions?: InductionTransitionPosition[];
+  /** Puestos que aún no acreditan la fase anterior (bloquean el avance). */
+  pending_positions?: string[];
+}
+
+export type InductionTransitionPositionStatus = 'LISTO' | 'BLOQUEADO' | 'APROBADO' | 'EN_CURSO' | 'EN_COLA' | 'PENDIENTE' | 'EN_EVALUACION';
+
+export interface InductionTransitionPosition {
+  position_id: number;
+  position_code: string;
+  position_name: string;
+  status: InductionTransitionPositionStatus;
+  detail: string | null;
 }
 
 export interface InductionTransitionPhase {
@@ -493,6 +519,9 @@ export interface InductionDirectoryPhase {
   attempts_total: number;
   has_certificate: boolean;
   alerts: InductionAlert[];
+  /** Fases por puesto (5-7): puestos de la ruta y cuántos van acreditados. */
+  positions_total?: number;
+  positions_passed?: number;
 }
 
 /** Renglón del directorio "Por colaborador" del Tablero de Inducción. */
@@ -528,6 +557,22 @@ export interface InductionPositionTrackPhase {
   published: boolean;
   enrollment_id: number | null;
   transition: { state: InductionTransitionState; blocks: InductionTransitionBlock[] } | null;
+  competency: InductionCompetencySnapshot | null;
+  /** Ruta por puesto: cada puesto con su lugar, estado y evaluación. */
+  positions?: InductionPositionTrackEntry[];
+}
+
+export interface InductionPositionTrackEntry {
+  position_id: number;
+  position_code: string;
+  position_name: string;
+  sequence: number;
+  /** Fases 5-6: estado en la ruta; Fase 7: null (no hay inscripción). */
+  queue_status: InductionQueueStatus | null;
+  enrollment_id: number | null;
+  evaluation_status: string | null;
+  passed: boolean;
+  cancelled_reason: string | null;
   competency: InductionCompetencySnapshot | null;
 }
 
@@ -572,7 +617,15 @@ export interface RhInductionPhaseEnrollmentSummary {
   checklist_completed: number;
   missing_branch: boolean;
   missing_position: boolean;
+  /** Fases por puesto (5-6): puesto de esta inscripción, su orden en la ruta y si está en cola. */
+  position_id?: number | null;
+  position_code?: string | null;
+  position_sequence?: number | null;
+  queue_status?: InductionQueueStatus;
 }
+
+/** Ruta por puesto (Fases 5-6): QUEUED = en cola, ACTIVE = iniciada, CANCELLED = baja lógica del puesto. */
+export type InductionQueueStatus = 'QUEUED' | 'ACTIVE' | 'CANCELLED';
 
 export interface RhInductionChecklistItem {
   id: number;
@@ -659,3 +712,14 @@ export interface RhInductionMasterRecord {
 }
 
 // --- Evaluacion de competencia (REH-REG-003) --------------------------------
+
+/** Generación de "preguntas propias del puesto" (cuestionario de la Fase 5), en segundo plano. */
+export interface PositionQuizRegeneration {
+  batch_id: number;
+  position_id: number;
+  status: 'running' | 'completed' | 'failed';
+  question_count: number;
+  documents: number;
+  error_message: string | null;
+  created_at: string;
+}

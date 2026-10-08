@@ -50,6 +50,7 @@ import {
   tryReconcilePhaseAdvance,
 } from '../services/rh-induction-progression.service';
 import { tryActivateDeferredEnrollments } from '../services/rh-induction-grace.service';
+import { queuePositionTrackSync } from '../services/rh-induction-position-track.service';
 
 const parsePositiveInt = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -303,6 +304,7 @@ export const getMyInductionProgressController = async (req: AuthRequest, res: Re
     // Progresion autonoma (auto-sanado): si aprobo una fase y aun no esta en la siguiente, lo avanza.
     await tryAdvanceEmployeeIfEligible(employee.id);
     await tryActivateDeferredEnrollments({ employeeId: employee.id });
+    queuePositionTrackSync(employee.id);
     const [progress, track] = await Promise.all([
       getEmployeeInductionProgress(employee.id),
       getInstitutionalTrack(employee.id),

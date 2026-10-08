@@ -57,6 +57,24 @@ export const StandingBadge = ({ standing }: { standing: CompetencyDashboardEmplo
   );
 };
 
+/** Puestos del colaborador; con varios, cada uno con el color de su estado de competencia. */
+const PositionNames = ({ employee }: { employee: CompetencyDashboardEmployee }) => {
+  const standings = employee.position_standings ?? [];
+  if (standings.length <= 1) {
+    return <>{employee.positions.map((position) => position.name).join(' · ')}</>;
+  }
+  return (
+    <span className="inline-flex flex-wrap gap-x-2 gap-y-0.5">
+      {standings.map((item) => (
+        <span key={item.position_id} className="inline-flex items-center gap-1" title={`${item.position_name}: ${STANDING_META[item.standing].label}`}>
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STANDING_META[item.standing].color }} />
+          {item.position_name}
+        </span>
+      ))}
+    </span>
+  );
+};
+
 const expiryText = (employee: CompetencyDashboardEmployee): string | null => {
   if (employee.days_to_expiry === null || !employee.valid_until) return null;
   if (employee.days_to_expiry < 0) return `Venció hace ${Math.abs(employee.days_to_expiry)} d`;
@@ -91,7 +109,11 @@ const CollaboratorCard = ({ employee, evaluation, onOpen, delay }: { employee: C
         <ScoreRing value={evaluation?.final_pct ?? null} />
       </div>
       <p className="line-clamp-2 min-h-[2rem] text-[11px] text-[var(--unilabor-ink)]">
-        {employee.positions.length > 0 ? employee.positions.map((position) => position.name).join(' · ') : <span className="italic text-[var(--unilabor-neutral)]">Sin puesto activo</span>}
+        {employee.positions.length > 0 ? (
+          <PositionNames employee={employee} />
+        ) : (
+          <span className="italic text-[var(--unilabor-neutral)]">Sin puesto activo</span>
+        )}
       </p>
       {evaluation && evaluation.status === 'CLOSED' ? (
         <div className="grid grid-cols-3 gap-2">
@@ -249,7 +271,9 @@ export const CompetencyCollaborators = ({ employees, evaluationsById, onOpen }: 
                         ) : null}
                       </p>
                     </td>
-                    <td className="max-w-[220px] px-3 py-2 text-[var(--unilabor-ink)]">{employee.positions.map((position) => position.name).join(', ') || '—'}</td>
+                    <td className="max-w-[220px] px-3 py-2 text-[var(--unilabor-ink)]">
+                      {employee.positions.length > 0 ? <PositionNames employee={employee} /> : '—'}
+                    </td>
                     <td className="px-3 py-2"><StandingBadge standing={employee.standing} /></td>
                     {SECTION_META.map((section) => (
                       <td key={section.key} className="px-3 py-2 text-right tabular-nums">{evaluation?.[section.key] ?? '—'}</td>

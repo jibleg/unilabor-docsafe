@@ -6,6 +6,7 @@ import type {
   InductionTransitionBlockReason,
   InductionTransitionState,
   InductionTransitionTarget,
+  InductionTransitionPositionStatus,
 } from '../types/models';
 
 /**
@@ -43,6 +44,7 @@ export const STAGE_META: Record<InductionStage, { label: string; short: string; 
   COMPETENCIA_EN_PROCESO: { label: 'Evaluación de competencia en proceso', short: 'Competencia en proceso', group: 'EVALUACION', className: 'bg-amber-100 text-amber-700' },
   COMPETENCIA_POR_AUTORIZAR: { label: 'Competente, pendiente de autorización', short: 'Por autorizar', group: 'EVALUACION', className: 'bg-violet-100 text-violet-700' },
   NO_ACREDITADA: { label: 'No acreditada', short: 'No acreditada', group: 'EVALUACION', className: 'bg-rose-100 text-rose-700' },
+  SIGUIENTE_PUESTO: { label: 'Siguiente puesto en cola', short: 'Sig. puesto', group: 'ESPERA', className: 'bg-violet-100 text-violet-700' },
   APROBADA: { label: 'Fase aprobada', short: 'Aprobada', group: 'APROBADA', className: 'bg-emerald-100 text-emerald-700' },
 };
 
@@ -61,6 +63,7 @@ export const STAGE_ORDER: InductionStage[] = [
   'EN_CALIFICACION',
   'EVALUACION_VENCIDA',
   'NO_ACREDITADA',
+  'SIGUIENTE_PUESTO',
   'APROBADA',
 ];
 
@@ -189,6 +192,7 @@ export const TRANSITION_REASON_META: Record<InductionTransitionBlockReason, { la
   PUESTO_SIN_DOCUMENTOS: { label: 'Puesto sin documentos', fix: 'Cargar documentos del puesto', path: (id) => (id ? `/rh/positions?position=${id}` : '/rh/positions') },
   EVALUACION_NO_LISTA: { label: 'Evaluación del puesto no lista', fix: 'Publicar la evaluación en Capacitaciones', path: () => '/rh/trainings' },
   PUESTO_SIN_COMPETENCIAS: { label: 'Puesto sin competencias', fix: 'Capturar competencias del puesto', path: (id) => (id ? `/rh/positions?position=${id}` : '/rh/positions') },
+  PUESTOS_PENDIENTES: { label: 'Puestos por acreditar', fix: 'Esperar a que acredite todos sus puestos', path: () => '/rh/induction/dashboard' },
 };
 
 export const TRANSITION_REASON_ORDER: InductionTransitionBlockReason[] = [
@@ -199,6 +203,7 @@ export const TRANSITION_REASON_ORDER: InductionTransitionBlockReason[] = [
   'SIN_PUESTO',
   'SIN_USUARIO',
   'PUESTO_SIN_COMPETENCIAS',
+  'PUESTOS_PENDIENTES',
 ];
 
 export const EVALUATION_STATE_META: Record<InductionPositionEvaluationState, { label: string; className: string }> = {
@@ -226,3 +231,14 @@ export const competencyStage = (competency: { status: 'DRAFT' | 'CLOSED'; dictam
 export const competencyLink = (evaluationId: number): string => `/rh/competency-evaluations?evaluation=${evaluationId}`;
 
 export const todayIsoDate = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+
+/** Estado de cada puesto en la ruta por puesto (Fases 5-7): color y texto corto. */
+export const POSITION_STATUS_META: Record<InductionTransitionPositionStatus, { label: string; className: string }> = {
+  LISTO: { label: 'Listo', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+  BLOQUEADO: { label: 'Bloqueado', className: 'border-rose-200 bg-rose-50 text-rose-700' },
+  APROBADO: { label: 'Acreditado', className: 'border-emerald-300 bg-emerald-100 text-emerald-800' },
+  EN_CURSO: { label: 'En curso', className: 'border-sky-200 bg-sky-50 text-sky-800' },
+  EN_COLA: { label: 'En cola', className: 'border-slate-200 bg-slate-50 text-slate-600' },
+  PENDIENTE: { label: 'Pendiente', className: 'border-amber-200 bg-amber-50 text-amber-800' },
+  EN_EVALUACION: { label: 'En evaluación', className: 'border-violet-200 bg-violet-50 text-violet-700' },
+};

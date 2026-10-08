@@ -221,8 +221,9 @@ export const EmployeeInductionHistoryPanel = ({ employeeId }: EmployeeInductionH
               </tr>
             </thead>
             <tbody>
-              {record.phases.map((phase) => (
-                <tr key={phase.phase_number} className="border-t border-[rgba(0,65,106,0.06)] align-top">
+              {record.phases.map((phase, index) => (
+                // Fases por puesto (5-7): una fila por puesto, mismo numero de fase.
+                <tr key={`${phase.phase_number}-${index}`} className="border-t border-[rgba(0,65,106,0.06)] align-top">
                   <td className="py-2 pr-2">
                     <p className="font-bold text-[var(--color-brand-700)]">Fase {phase.phase_number}</p>
                     <p className="text-[var(--unilabor-neutral)]">{phase.name}</p>

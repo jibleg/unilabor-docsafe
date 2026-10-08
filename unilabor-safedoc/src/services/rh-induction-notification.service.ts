@@ -1,5 +1,11 @@
 import pool from '../config/db';
 import { sendSmsNotification, sendWhatsAppNotification } from './notification.service';
+import {
+  buildCompetencyOpenedSms,
+  buildPositionReadingsSms,
+  buildPracticalStartedSms,
+  type PositionStepContext,
+} from './rh-induction-position-messages';
 
 /**
  * Aviso por WhatsApp (Whapi Cloud) al responsable de una fase de induccion
@@ -96,7 +102,58 @@ export const buildInductionReadingsAssignedMessages = (
  * Un solo mensaje por persona y fase, con el total de documentos y la fecha
  * limite vigente. Sin lecturas asignadas (o sin telefono) no se avisa.
  */
+/**
+ * Lugar del puesto de una inscripcion en su ruta (Fases 5-6): "puesto N de M"
+ * sin contar puestos dados de baja. null si la inscripcion no es por puesto.
+ */
+const loadPositionStep = async (enrollmentId: number): Promise<(PositionStepContext & { phone: string | null }) | null> => {
+  const result = await pool.query(
+    `SELECT p.phase_number, rp.name AS position_name, rp.code AS position_code, emp.phone,
+            (SELECT COUNT(*)::int FROM public.rh_induction_enrollments x
+              WHERE x.employee_id = e.employee_id AND x.phase_id = e.phase_id AND x.queue_status <> 'CANCELLED'
+                AND x.position_sequence <= e.position_sequence) AS ordinal,
+            (SELECT COUNT(*)::int FROM public.rh_induction_enrollments x
+              WHERE x.employee_id = e.employee_id AND x.phase_id = e.phase_id AND x.queue_status <> 'CANCELLED') AS total
+       FROM public.rh_induction_enrollments e
+       JOIN public.rh_induction_phases p ON p.id = e.phase_id
+       JOIN public.rh_positions rp ON rp.id = e.position_id
+       JOIN public.employees emp ON emp.id = e.employee_id
+      WHERE e.id = $1 LIMIT 1;`,
+    [enrollmentId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    phaseNumber: Number(row.phase_number),
+    positionName: String(row.position_name),
+    positionCode: String(row.position_code),
+    ordinal: Number(row.ordinal),
+    total: Number(row.total),
+    phone: row.phone ? String(row.phone) : null,
+  };
+};
+
 export const notifyInductionReadingsAssigned = async (enrollmentId: number): Promise<void> => {
+  // Ruta por puesto (Fase 5): el SMS dice que puesto es y cuenta solo lo pendiente.
+  const step = await loadPositionStep(enrollmentId);
+  if (step) {
+    const pending = await pool.query(
+      `SELECT COUNT(*)::int AS pending
+         FROM public.rh_induction_enrollments e
+         JOIN public.rh_induction_reading_items ri ON ri.enrollment_id = e.id
+         LEFT JOIN public.quality_reading_acknowledgements a ON a.id = ri.acknowledgement_id
+        WHERE e.id = $1 AND (a.id IS NULL OR a.status <> 'signed');`,
+      [enrollmentId],
+    );
+    const deadline = await pool.query(`SELECT reading_deadline_at FROM public.rh_induction_enrollments WHERE id = $1;`, [enrollmentId]);
+    const sms = buildPositionReadingsSms(
+      step,
+      Number(pending.rows[0]?.pending ?? 0),
+      deadline.rows[0]?.reading_deadline_at ? new Date(deadline.rows[0].reading_deadline_at).toISOString() : null,
+    );
+    await sendSmsNotification(step.phone, sms.subject, sms.body, 'induction_readings_assigned');
+    return;
+  }
   const result = await pool.query(
     `SELECT emp.full_name AS employee_name, emp.phone,
             p.phase_number, p.name AS phase_name, e.reading_deadline_at,
@@ -137,6 +194,61 @@ export const queueNotifyInductionReadingsAssigned = (enrollmentId: number): void
       await notifyInductionReadingsAssigned(enrollmentId);
     } catch (error) {
       console.error(`No se pudo avisar al colaborador sus lecturas de induccion (enrollment ${enrollmentId}):`, error);
+    }
+  });
+};
+
+/** SMS al colaborador al iniciar la practica supervisada de un puesto (Fase 6). */
+export const queueNotifyPracticalStarted = (enrollmentId: number): void => {
+  notificationChain = notificationChain.then(async () => {
+    try {
+      const step = await loadPositionStep(enrollmentId);
+      if (!step) return;
+      const sms = buildPracticalStartedSms(step);
+      await sendSmsNotification(step.phone, sms.subject, sms.body, 'induction_practical_started');
+    } catch (error) {
+      console.error(`No se pudo avisar el inicio de la practica (enrollment ${enrollmentId}):`, error);
+    }
+  });
+};
+
+/**
+ * SMS al colaborador al abrirse su REH-REG-003 INICIAL de un puesto (Fase 7).
+ * "Puesto N de M" = lugar del puesto entre los que acredito la Fase 6.
+ */
+export const queueNotifyCompetencyOpened = (employeeId: number, positionId: number): void => {
+  notificationChain = notificationChain.then(async () => {
+    try {
+      const result = await pool.query(
+        `SELECT emp.phone, rp.name AS position_name, rp.code AS position_code, f6.ordinal, f6.total
+           FROM public.employees emp
+           JOIN public.rh_positions rp ON rp.id = $2
+           CROSS JOIN LATERAL (
+             SELECT COUNT(*) FILTER (WHERE e.position_sequence <= mine.position_sequence)::int AS ordinal, COUNT(*)::int AS total
+               FROM public.rh_induction_enrollments e
+               JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number = 6
+               LEFT JOIN LATERAL (
+                 SELECT m.position_sequence FROM public.rh_induction_enrollments m
+                   JOIN public.rh_induction_phases mp ON mp.id = m.phase_id AND mp.phase_number = 6
+                  WHERE m.employee_id = emp.id AND m.position_id = $2 AND m.queue_status <> 'CANCELLED' LIMIT 1
+               ) mine ON TRUE
+              WHERE e.employee_id = emp.id AND e.queue_status <> 'CANCELLED'
+           ) f6
+          WHERE emp.id = $1 LIMIT 1;`,
+        [employeeId, positionId],
+      );
+      const row = result.rows[0];
+      if (!row) return;
+      const sms = buildCompetencyOpenedSms({
+        phaseNumber: 7,
+        positionName: String(row.position_name),
+        positionCode: String(row.position_code),
+        ordinal: Math.max(1, Number(row.ordinal ?? 1)),
+        total: Math.max(1, Number(row.total ?? 1)),
+      });
+      await sendSmsNotification(row.phone ? String(row.phone) : null, sms.subject, sms.body, 'induction_competency_opened');
+    } catch (error) {
+      console.error(`No se pudo avisar la evaluacion de competencia (colaborador ${employeeId}):`, error);
     }
   });
 };

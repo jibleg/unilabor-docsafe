@@ -21,9 +21,9 @@ interface InductionTransitionModalProps {
 }
 
 const TARGET_EXPLANATION: Record<InductionTransitionTarget, string> = {
-  5: 'Quedan inscritos en la Fase 5 con los documentos de su puesto. Si la fase tiene periodo de descanso, sus lecturas se activan al terminar; si no, reciben de inmediato sus lecturas, su plazo y el aviso por SMS.',
-  6: 'Quedan inscritos en la Fase 6 (práctica supervisada, sin lectura). Después RH captura su evaluación práctica desde la Fase 6 del tablero.',
-  7: 'Se abre en borrador su evaluación de competencia inicial (REH-REG-003) con las competencias de su puesto precargadas. Se completa y cierra en Evaluación de competencia.',
+  5: 'Quedan inscritos en la Fase 5 con una inscripción por cada puesto, uno tras otro: inicia el primero (lecturas, plazo y SMS) y, al acreditar su cuestionario, se abre el siguiente sin descanso. Pasan a la Fase 6 solo con TODOS sus puestos acreditados.',
+  6: 'Quedan inscritos en la Fase 6 (práctica supervisada, sin lectura) por cada puesto, en el orden de la Fase 5: RH captura la práctica del puesto en curso y al acreditarla se abre la del siguiente.',
+  7: 'Se abre en borrador la evaluación de competencia inicial (REH-REG-003) del siguiente puesto de su ruta, con sus competencias precargadas. Al autorizarla, el colaborador vuelve a la bandeja con su siguiente puesto.',
 };
 
 /**

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { getInductionTransitionQueue } from '../../../api/service.api-rh-induction-dashboard';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { Pagination } from '../../Pagination';
+import { InductionPositionChips } from './InductionPositionChips';
 import { InductionTransitionModal, type TransitionCandidateRef } from './InductionTransitionModal';
 import type {
   InductionTransitionBlockReason,
@@ -273,8 +274,19 @@ export const InductionTransitionBoard = ({ target, refreshKey, onChanged, onOpen
                     </p>
                   </td>
                   <td className="px-3 py-2 text-xs">
-                    {row.position_code ? <span className="rounded bg-slate-100 px-1 font-mono text-[10px]">{row.position_code}</span> : '—'}
-                    <p className="max-w-[200px] text-[11px] text-[var(--unilabor-neutral)]">{row.position_name}</p>
+                    {row.positions && row.positions.length > 1 ? (
+                      <>
+                        <InductionPositionChips positions={row.positions} highlight={row.position_code} />
+                        <p className="mt-1 max-w-[220px] text-[11px] text-[var(--unilabor-neutral)]">
+                          {row.positions.length} puestos, uno tras otro · {row.state === 'STARTED' ? 'en evaluación' : 'inicia'}: {row.position_code ?? '—'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        {row.position_code ? <span className="rounded bg-slate-100 px-1 font-mono text-[10px]">{row.position_code}</span> : '—'}
+                        <p className="max-w-[200px] text-[11px] text-[var(--unilabor-neutral)]">{row.position_name}</p>
+                      </>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-xs">
                     <p className="text-[var(--unilabor-ink)]">{formatDate(row.previous_passed_at)}</p>

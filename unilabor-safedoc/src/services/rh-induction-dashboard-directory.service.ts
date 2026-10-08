@@ -2,6 +2,12 @@ import { loadProgramRosterRows, normalizeSearchText } from './rh-induction-dashb
 import type { InductionAlert, InductionRosterRow, InductionStage } from './rh-induction-dashboard.service';
 import { competencyStage, loadInitialCompetencies, PHASE7_NUMBER } from './rh-induction-phase7';
 import type { CompetencySnapshot } from './rh-induction-phase7';
+import {
+  collapsePositionRows,
+  competencyRouteStage,
+  loadInitialCompetencyRoutes,
+  loadPositionPhaseCounts,
+} from './rh-induction-position-summary';
 
 // -----------------------------------------------------------------------------
 // Directorio "Por colaborador" del Tablero de Induccion: un renglon por
@@ -41,6 +47,9 @@ export interface DirectoryPhaseStatus {
   attempts_total: number;
   has_certificate: boolean;
   alerts: InductionAlert[];
+  /** Fases por puesto (5-7): puestos de la ruta y cuantos van acreditados. */
+  positions_total?: number;
+  positions_passed?: number;
 }
 
 export interface DirectoryEmployeeRow {
@@ -85,11 +94,14 @@ const toPhaseStatus = (row: InductionRosterRow): DirectoryPhaseStatus => ({
   attempts_total: row.attempts_total,
   has_certificate: row.certificate_document_id !== null,
   alerts: row.alerts,
+  ...(row.positions_total !== undefined ? { positions_total: row.positions_total, positions_passed: row.positions_passed ?? 0 } : {}),
 });
 
 export const groupRosterByEmployee = (
   rows: InductionRosterRow[],
   competencies: Map<number, CompetencySnapshot> = new Map(),
+  /** Ruta de competencia por puesto: etapa agregada y avance de la Fase 7 por colaborador. */
+  phase7Routes: Map<number, { stage: InductionStage; total: number; passed: number }> = new Map(),
 ): DirectoryEmployeeRow[] => {
   const byEmployee = new Map<number, InductionRosterRow[]>();
   for (const row of rows) {
@@ -102,7 +114,14 @@ export const groupRosterByEmployee = (
     const first = sorted[0] as InductionRosterRow;
     const phases = sorted.map(toPhaseStatus);
     const competency = competencies.get(first.employee_id);
-    if (competency) phases.push(toPhase7Status(competency));
+    if (competency) {
+      const route = phase7Routes.get(first.employee_id);
+      phases.push(
+        route
+          ? { ...toPhase7Status(competency), stage: route.stage, positions_total: route.total, positions_passed: route.passed }
+          : toPhase7Status(competency),
+      );
+    }
     const current = phases[phases.length - 1] as DirectoryPhaseStatus;
     return {
       employee_id: first.employee_id,
@@ -176,6 +195,19 @@ export const filterDirectory = (all: DirectoryEmployeeRow[], query: DirectoryQue
 };
 
 export const queryInductionDirectory = async (query: DirectoryQuery): Promise<DirectoryPage> => {
-  const [rows, competencies] = await Promise.all([loadProgramRosterRows(), loadInitialCompetencies()]);
-  return filterDirectory(groupRosterByEmployee(rows, competencies), query);
+  const [rows, competencies, counts, routes] = await Promise.all([
+    loadProgramRosterRows(),
+    loadInitialCompetencies(),
+    loadPositionPhaseCounts(),
+    loadInitialCompetencyRoutes(),
+  ]);
+  // Fase 7 por puesto: se exige un REH-REG-003 autorizado por cada puesto que acredito la Fase 6.
+  const phase7Routes = new Map<number, { stage: InductionStage; total: number; passed: number }>();
+  for (const [employeeId, entries] of routes) {
+    const required = counts.get(`${employeeId}:6`)?.passed ?? entries.length;
+    const stage = competencyRouteStage(entries, required);
+    const passed = entries.filter((entry) => competencyStage(entry) === 'APROBADA').length;
+    phase7Routes.set(employeeId, { stage, total: Math.max(required, entries.length), passed });
+  }
+  return filterDirectory(groupRosterByEmployee(collapsePositionRows(rows, counts), competencies, phase7Routes), query);
 };

@@ -1,4 +1,5 @@
 import pool from '../config/db';
+import { queuePositionTrackSync } from './rh-induction-position-track.service';
 
 /**
  * Relacion M:N colaborador<->puesto (decision confirmada: multi-puesto real,
@@ -84,6 +85,8 @@ export const assignPositionToEmployee = async (
       [employeeId, positionId, assignedByUserId ?? null],
     );
     const result = await pool.query(`${SELECT_BASE} WHERE ep.id = $1;`, [Number(inserted.rows[0].id)]);
+    // Induccion por puesto: el puesto nuevo se forma en su ruta de Fase 5/6.
+    queuePositionTrackSync(employeeId, assignedByUserId ?? null);
     return mapRow(result.rows[0]);
   } catch (error: any) {
     if (error?.code === '23503') {
@@ -97,8 +100,14 @@ export const endEmployeePosition = async (employeePositionId: number): Promise<b
   const result = await pool.query(
     `UPDATE public.rh_employee_positions
         SET is_active = FALSE, ended_at = NOW(), updated_at = NOW()
-      WHERE id = $1 AND is_active = TRUE;`,
+      WHERE id = $1 AND is_active = TRUE
+      RETURNING employee_id;`,
     [employeePositionId],
   );
-  return (result.rowCount ?? 0) > 0;
+  if ((result.rowCount ?? 0) === 0) {
+    return false;
+  }
+  // Induccion por puesto: baja logica de su inscripcion no aprobada y sigue con los activos.
+  queuePositionTrackSync(Number(result.rows[0].employee_id));
+  return true;
 };
