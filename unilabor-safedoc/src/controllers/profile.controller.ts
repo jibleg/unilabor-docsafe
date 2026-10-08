@@ -8,10 +8,14 @@ import { AuthRequest } from '../types';
 const avatarUploadDirectory = process.env.DIRECTORY_UPLOAD_AVATAR || 'uploads/avatars';
 const avatarRootPath = path.resolve(process.cwd(), avatarUploadDirectory);
 
+// Rutas guardadas desde Windows ("uploads\avatars\...") se normalizan a "/" para resolverlas en Linux.
+const toPosixPath = (storedPath: string): string => storedPath.replace(/\\/g, '/');
+
 const resolveAvatarPath = (storedPath: string): string => {
-  const absolutePath = path.isAbsolute(storedPath)
-    ? path.normalize(storedPath)
-    : path.resolve(process.cwd(), storedPath);
+  const posixPath = toPosixPath(storedPath);
+  const absolutePath = path.isAbsolute(posixPath)
+    ? path.normalize(posixPath)
+    : path.resolve(process.cwd(), posixPath);
 
   const normalizedRoot = avatarRootPath.endsWith(path.sep)
     ? avatarRootPath
@@ -170,7 +174,7 @@ export const uploadMyAvatar = async (req: AuthRequest, res: Response) => {
         WHERE id = $2
         RETURNING id, email, full_name, role, avatar_path, updated_at;
       `,
-      [file.path, userId]
+      [toPosixPath(file.path), userId]
     );
 
     await removeAvatarIfExists(previousAvatarPath);
@@ -233,7 +237,7 @@ export const getMyAvatar = async (req: AuthRequest, res: Response): Promise<void
     }
 
     if (error?.message === 'INVALID_AVATAR_PATH') {
-      res.status(500).json({ message: 'Ruta de avatar invalida en base de datos' });
+      res.status(404).json({ message: 'Ruta de avatar invalida en base de datos' });
       return;
     }
 
