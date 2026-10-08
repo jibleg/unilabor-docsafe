@@ -12,6 +12,8 @@ interface InductionCollaboratorDrawerProps {
   employeeId: number;
   /** Fase que se muestra expandida al abrir (la del roster desde donde se abrió). */
   focusPhaseNumber?: number;
+  /** Fases por puesto: inscripcion (puesto) que se abrio desde la fila; si no, el puesto en curso. */
+  focusEnrollmentId?: number;
   refreshKey: number;
   onClose: () => void;
   onAction: (action: InductionAction, row: InductionRosterRow) => void;
@@ -28,6 +30,7 @@ interface InductionCollaboratorDrawerProps {
 export const InductionCollaboratorDrawer = ({
   employeeId,
   focusPhaseNumber,
+  focusEnrollmentId,
   refreshKey,
   onClose,
   onAction,
@@ -100,6 +103,7 @@ export const InductionCollaboratorDrawer = ({
             <InductionPhaseDetail
               detail={detail}
               phaseNumber={shownPhase}
+              initialEnrollmentId={shownPhase === focusPhaseNumber ? focusEnrollmentId : undefined}
               onAction={onAction}
               onTransition={(target) => onTransition(target, detail.employee)}
             />

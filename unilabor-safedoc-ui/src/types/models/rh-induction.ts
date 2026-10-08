@@ -477,6 +477,8 @@ export interface InductionReadingDocumentDetail {
 
 export interface InductionAttemptDetail {
   assignment_id: number;
+  /** Inscripción (puesto, en Fases 5-6) a la que pertenece el intento. */
+  enrollment_id?: number;
   phase_number: number;
   template_id: number;
   template_title: string;

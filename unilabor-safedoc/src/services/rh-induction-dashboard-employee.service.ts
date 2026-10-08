@@ -40,6 +40,8 @@ export interface InductionReadingDocumentDetail {
 
 export interface InductionAttemptDetail {
   assignment_id: number;
+  /** Inscripcion (puesto, en Fases 5-6) a la que pertenece el intento. */
+  enrollment_id: number;
   phase_number: number;
   template_id: number;
   template_title: string;
@@ -196,7 +198,7 @@ const loadDocuments = async (enrollmentIds: number[]): Promise<InductionReadingD
 
 const loadAttempts = async (employeeId: number, currentAssignmentIds: Set<number>): Promise<InductionAttemptDetail[]> => {
   const result = await pool.query(
-    `SELECT a.id, p.phase_number, t.id AS template_id, t.title AS template_title,
+    `SELECT a.id, e.id AS enrollment_id, p.phase_number, t.id AS template_id, t.title AS template_title,
             a.status, a.attempt_no, a.available_at, a.deadline_at, a.started_at, a.submitted_at, a.graded_at,
             a.score, a.max_score, a.percentage, a.certificate_document_id,
             (SELECT COUNT(*)::int FROM public.evaluation_assignment_questions q WHERE q.assignment_id = a.id) AS question_count,
@@ -212,6 +214,7 @@ const loadAttempts = async (employeeId: number, currentAssignmentIds: Set<number
   );
   return result.rows.map((row) => ({
     assignment_id: Number(row.id),
+    enrollment_id: Number(row.enrollment_id),
     phase_number: Number(row.phase_number),
     template_id: Number(row.template_id),
     template_title: String(row.template_title),

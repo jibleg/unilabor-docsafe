@@ -10,11 +10,13 @@ interface InductionPhaseDetailProps {
   phaseNumber: number | null;
   onAction: (action: InductionAction, row: InductionRosterRow) => void;
   onTransition: (target: InductionTransitionTarget) => void;
+  /** Puesto (inscripcion) a mostrar al abrir; por defecto, el que esta en curso. */
+  initialEnrollmentId?: number | undefined;
 }
 
 /** Detalle de la fase elegida en la ruta: la inscripción (1-6) o el estado de avance / Fase 7. */
-export const InductionPhaseDetail = ({ detail, phaseNumber, onAction, onTransition }: InductionPhaseDetailProps) => {
-  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<number | null>(null);
+export const InductionPhaseDetail = ({ detail, phaseNumber, onAction, onTransition, initialEnrollmentId }: InductionPhaseDetailProps) => {
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<number | null>(initialEnrollmentId ?? null);
   const phase = buildProgramTrack(detail).find((item) => item.phase_number === phaseNumber);
   if (!phase) return null;
   // Fases por puesto: la ruta arriba; abajo el detalle del puesto elegido (por defecto, el que esta en curso).
@@ -41,7 +43,10 @@ export const InductionPhaseDetail = ({ detail, phaseNumber, onAction, onTransiti
           row={row}
           employeeName={detail.employee.full_name}
           documents={detail.documents.filter((doc) => doc.enrollment_id === row.enrollment_id)}
-          attempts={detail.attempts.filter((attempt) => attempt.phase_number === row.phase_number)}
+          attempts={detail.attempts.filter((attempt) =>
+            // Fases por puesto: solo los intentos de ESTE puesto (no los de los otros puestos de la fase).
+            attempt.enrollment_id !== undefined ? attempt.enrollment_id === row.enrollment_id : attempt.phase_number === row.phase_number,
+          )}
           onAction={onAction}
         />
       </div>

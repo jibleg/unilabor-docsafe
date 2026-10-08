@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Award, BookOpenCheck, CheckCircle2, Eye, FileSignature, FileText, ListChecks } from 'lucide-react';
+import { Pagination } from '../../Pagination';
 import { EvaluationResponsesModal } from '../EvaluationResponsesModal';
 import { InductionReadingEvidenceViewer, type ReadingEvidenceTab } from './InductionReadingEvidenceViewer';
 import { InductionSection as Section } from './InductionSection';
@@ -30,9 +31,16 @@ interface InductionEnrollmentDetailProps {
  * acciones de RH, lectura por documento (con visor protegido y hoja de firma),
  * intentos de evaluación (con preguntas y respuestas) y constancia.
  */
+const DOCUMENTS_PAGE_SIZE = 20;
+
 export const InductionEnrollmentDetail = ({ row, employeeName, documents, attempts, onAction }: InductionEnrollmentDetailProps) => {
   /** Intento cuyas preguntas y respuestas se muestran en el modal de revisión. */
   const [responsesAssignmentId, setResponsesAssignmentId] = useState<number | null>(null);
+  // Puestos con muchos documentos (p. ej. 200+): la lista de lecturas va paginada.
+  const [docPage, setDocPage] = useState(1);
+  const docTotalPages = Math.max(1, Math.ceil(documents.length / DOCUMENTS_PAGE_SIZE));
+  const currentDocPage = Math.min(docPage, docTotalPages);
+  const visibleDocuments = documents.slice((currentDocPage - 1) * DOCUMENTS_PAGE_SIZE, currentDocPage * DOCUMENTS_PAGE_SIZE);
   /** Documento leído (y su hoja de firma) abierto en el visor protegido. */
   const [evidence, setEvidence] = useState<{
     doc: InductionReadingDocumentDetail;
@@ -99,8 +107,9 @@ export const InductionEnrollmentDetail = ({ row, employeeName, documents, attemp
                   : 'Las lecturas se asignan al publicar la fase.'}
             </p>
           ) : (
+            <div>
             <ul className="space-y-1.5">
-              {documents.map((doc) => {
+              {visibleDocuments.map((doc) => {
                 const pct = doc.pages_total > 0 ? Math.min(100, Math.round((doc.pages_seen / doc.pages_total) * 100)) : 0;
                 const signed = doc.status === 'signed';
                 return (
@@ -167,6 +176,17 @@ export const InductionEnrollmentDetail = ({ row, employeeName, documents, attemp
                 );
               })}
             </ul>
+            {documents.length > DOCUMENTS_PAGE_SIZE ? (
+              <Pagination
+                page={currentDocPage}
+                totalPages={docTotalPages}
+                total={documents.length}
+                pageSize={DOCUMENTS_PAGE_SIZE}
+                onPageChange={setDocPage}
+                compact
+              />
+            ) : null}
+            </div>
           )}
         </Section>
 

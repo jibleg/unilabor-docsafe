@@ -75,7 +75,7 @@ export const RhInductionDashboardPage = () => {
   const [filters, setFilters] = useState<RosterFilters>(DEFAULT_FILTERS);
   const [debouncedQ, setDebouncedQ] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [drawer, setDrawer] = useState<{ employeeId: number; phaseNumber?: number } | null>(null);
+  const [drawer, setDrawer] = useState<{ employeeId: number; phaseNumber?: number; enrollmentId?: number } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [modal, setModal] = useState<Modal>(null);
 
@@ -478,7 +478,7 @@ export const RhInductionDashboardPage = () => {
               selected={selected}
               onToggleSelect={toggleSelect}
               onToggleSelectAll={toggleSelectAll}
-              onOpenEmployee={(row) => setDrawer({ employeeId: row.employee_id, phaseNumber: row.phase_number })}
+              onOpenEmployee={(row) => setDrawer({ employeeId: row.employee_id, phaseNumber: row.phase_number, enrollmentId: row.enrollment_id })}
               onAction={handleAction}
               onBulkReopen={() => {
                 const rows = (roster?.rows ?? []).filter(
@@ -497,6 +497,7 @@ export const RhInductionDashboardPage = () => {
             key={drawer.employeeId}
             employeeId={drawer.employeeId}
             focusPhaseNumber={drawer.phaseNumber}
+            focusEnrollmentId={drawer.enrollmentId}
             refreshKey={refreshKey}
             onClose={() => setDrawer(null)}
             onAction={handleAction}
