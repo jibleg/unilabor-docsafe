@@ -2,7 +2,7 @@
 import { Request } from 'express';
 
 export type UserRole = 'ADMIN' | 'EDITOR' | 'VIEWER';
-export type ModuleCode = 'QUALITY' | 'RH' | 'HELPDESK' | 'PROVIDERS';
+export type ModuleCode = 'QUALITY' | 'RH' | 'HELPDESK' | 'PROVIDERS' | 'ATTENDANCE';
 
 export interface ModuleAccess {
   code: ModuleCode;

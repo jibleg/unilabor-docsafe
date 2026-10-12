@@ -1,4 +1,12 @@
 import {
+  Activity,
+  Award,
+  CalendarCheck,
+  CalendarRange,
+  Cpu,
+  Fingerprint,
+  IdCard,
+  SlidersHorizontal,
   Gauge,
   AlertTriangle,
   BarChart3,
@@ -202,6 +210,39 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       items: [
         { icon: Layers, label: 'Clasificación', path: '/providers/classifications', permission: 'PROVIDERS.CLASSIFICATIONS.MANAGE' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/providers/profile' },
+      ],
+    },
+  ],
+  ATTENDANCE: [
+    {
+      title: 'Tableros',
+      items: [
+        { icon: Activity, label: 'Hoy en vivo', path: '/attendance/dashboard', permission: 'ATTENDANCE.RECORDS.READ' },
+        { icon: Award, label: 'Compromiso', path: '/attendance/commitment', permission: 'ATTENDANCE.RECORDS.READ' },
+      ],
+    },
+    {
+      title: 'Operación',
+      items: [
+        { icon: CalendarDays, label: 'Días', path: '/attendance/days', permission: 'ATTENDANCE.RECORDS.READ' },
+        { icon: Fingerprint, label: 'Checadas', path: '/attendance/punches', permission: 'ATTENDANCE.RECORDS.READ' },
+        { icon: CalendarCheck, label: 'Incidencias', path: '/attendance/incidents', permission: 'ATTENDANCE.RECORDS.READ' },
+      ],
+    },
+    {
+      title: 'Horarios',
+      items: [
+        { icon: CalendarRange, label: 'Calendario', path: '/attendance/schedule', permission: 'ATTENDANCE.RECORDS.READ' },
+        { icon: Clock, label: 'Turnos', path: '/attendance/shifts', permission: 'ATTENDANCE.SCHEDULES.WRITE' },
+        { icon: IdCard, label: 'Colaboradores', path: '/attendance/employees', permission: 'ATTENDANCE.RECORDS.READ' },
+      ],
+    },
+    {
+      title: 'Configuración',
+      items: [
+        { icon: Cpu, label: 'Relojes', path: '/attendance/devices', permission: 'ATTENDANCE.DEVICES.MANAGE' },
+        { icon: SlidersHorizontal, label: 'Parámetros', path: '/attendance/settings', permission: 'ATTENDANCE.SETTINGS.MANAGE' },
+        { icon: UserCircle2, label: 'Mi perfil', path: '/attendance/profile' },
       ],
     },
   ],

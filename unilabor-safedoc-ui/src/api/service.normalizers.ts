@@ -122,7 +122,8 @@ export const normalizeModuleAccess = (input: unknown): ModuleAccess | null => {
       code !== 'RH' &&
       code !== 'HELPDESK' &&
       code !== 'ADMIN' &&
-      code !== 'PROVIDERS') ||
+      code !== 'PROVIDERS' &&
+      code !== 'ATTENDANCE') ||
     !name ||
     !role
   ) {

@@ -1,0 +1,290 @@
+{
+ "data": [
+  {
+   "id": 1461,
+   "work_date": "2026-10-11",
+   "employee": {
+    "id": 3,
+    "code": "AKHA",
+    "full_name": "Ana Torres Ruiz",
+    "area": "VALIDACION",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "expected_start_time": null,
+   "expected_end_time": null,
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0,
+   "early_departure_minutes": 0,
+   "worked_hours": null,
+   "overtime_hours": 0,
+   "day_result": "no_schedule",
+   "reason": "no_shift_for_day",
+   "incident": null,
+   "is_late_accumulation_absence": false,
+   "has_pending_review": false,
+   "segments": []
+  },
+  {
+   "id": 1472,
+   "work_date": "2026-10-11",
+   "employee": {
+    "id": 5,
+    "code": "DMBM",
+    "full_name": "Beto Salas Mora",
+    "area": "QUIMICA CLINICA",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "expected_start_time": null,
+   "expected_end_time": null,
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0,
+   "early_departure_minutes": 0,
+   "worked_hours": null,
+   "overtime_hours": 0,
+   "day_result": "no_schedule",
+   "reason": "no_shift_for_day",
+   "incident": null,
+   "is_late_accumulation_absence": false,
+   "has_pending_review": false,
+   "segments": []
+  },
+  {
+   "id": 1460,
+   "work_date": "2026-10-10",
+   "employee": {
+    "id": 3,
+    "code": "AKHA",
+    "full_name": "Ana Torres Ruiz",
+    "area": "VALIDACION",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "expected_start_time": null,
+   "expected_end_time": null,
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0,
+   "early_departure_minutes": 0,
+   "worked_hours": null,
+   "overtime_hours": 0,
+   "day_result": "no_schedule",
+   "reason": "no_shift_for_day",
+   "incident": null,
+   "is_late_accumulation_absence": false,
+   "has_pending_review": false,
+   "segments": []
+  },
+  {
+   "id": 1471,
+   "work_date": "2026-10-10",
+   "employee": {
+    "id": 5,
+    "code": "DMBM",
+    "full_name": "Beto Salas Mora",
+    "area": "QUIMICA CLINICA",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "expected_start_time": null,
+   "expected_end_time": null,
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0,
+   "early_departure_minutes": 0,
+   "worked_hours": null,
+   "overtime_hours": 0,
+   "day_result": "no_schedule",
+   "reason": "no_shift_for_day",
+   "incident": null,
+   "is_late_accumulation_absence": false,
+   "has_pending_review": false,
+   "segments": []
+  },
+  {
+   "id": 1459,
+   "work_date": "2026-10-09",
+   "employee": {
+    "id": 3,
+    "code": "AKHA",
+    "full_name": "Ana Torres Ruiz",
+    "area": "VALIDACION",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "expected_start_time": "07:00",
+   "expected_end_time": "15:00",
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0,
+   "early_departure_minutes": 0,
+   "worked_hours": null,
+   "overtime_hours": 0,
+   "day_result": "absent",
+   "reason": "no_punches",
+   "incident": null,
+   "is_late_accumulation_absence": false,
+   "has_pending_review": false,
+   "segments": [
+    {
+     "name": "TEST-UI Matutino",
+     "hours": null,
+     "shift_id": 116,
+     "clock_in_at": null,
+     "has_punches": false,
+     "clock_out_at": null,
+     "expected_end": "15:00",
+     "late_minutes": 0,
+     "expected_start": "07:00",
+     "clock_in_punch_id": null,
+     "clock_out_punch_id": null,
+     "early_departure_minutes": 0
+    }
+   ]
+  },
+  {
+   "id": 1470,
+   "work_date": "2026-10-09",
+   "employee": {
+    "id": 5,
+    "code": "DMBM",
+    "full_name": "Beto Salas Mora",
+    "area": "QUIMICA CLINICA",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "expected_start_time": "07:00",
+   "expected_end_time": "15:00",
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0,
+   "early_departure_minutes": 0,
+   "worked_hours": null,
+   "overtime_hours": 0,
+   "day_result": "absent",
+   "reason": "no_punches",
+   "incident": null,
+   "is_late_accumulation_absence": false,
+   "has_pending_review": false,
+   "segments": [
+    {
+     "name": "TEST-UI Matutino",
+     "hours": null,
+     "shift_id": 116,
+     "clock_in_at": null,
+     "has_punches": false,
+     "clock_out_at": null,
+     "expected_end": "15:00",
+     "late_minutes": 0,
+     "expected_start": "07:00",
+     "clock_in_punch_id": null,
+     "clock_out_punch_id": null,
+     "early_departure_minutes": 0
+    }
+   ]
+  },
+  {
+   "id": 1458,
+   "work_date": "2026-10-08",
+   "employee": {
+    "id": 3,
+    "code": "AKHA",
+    "full_name": "Ana Torres Ruiz",
+    "area": "VALIDACION",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "expected_start_time": "07:00",
+   "expected_end_time": "15:00",
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0,
+   "early_departure_minutes": 0,
+   "worked_hours": null,
+   "overtime_hours": 0,
+   "day_result": "absent",
+   "reason": "no_punches",
+   "incident": null,
+   "is_late_accumulation_absence": false,
+   "has_pending_review": false,
+   "segments": [
+    {
+     "name": "TEST-UI Matutino",
+     "hours": null,
+     "shift_id": 116,
+     "clock_in_at": null,
+     "has_punches": false,
+     "clock_out_at": null,
+     "expected_end": "15:00",
+     "late_minutes": 0,
+     "expected_start": "07:00",
+     "clock_in_punch_id": null,
+     "clock_out_punch_id": null,
+     "early_departure_minutes": 0
+    }
+   ]
+  },
+  {
+   "id": 1469,
+   "work_date": "2026-10-08",
+   "employee": {
+    "id": 5,
+    "code": "DMBM",
+    "full_name": "Beto Salas Mora",
+    "area": "QUIMICA CLINICA",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "expected_start_time": "07:00",
+   "expected_end_time": "15:00",
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0,
+   "early_departure_minutes": 0,
+   "worked_hours": null,
+   "overtime_hours": 0,
+   "day_result": "absent",
+   "reason": "no_punches",
+   "incident": null,
+   "is_late_accumulation_absence": false,
+   "has_pending_review": false,
+   "segments": [
+    {
+     "name": "TEST-UI Matutino",
+     "hours": null,
+     "shift_id": 116,
+     "clock_in_at": null,
+     "has_punches": false,
+     "clock_out_at": null,
+     "expected_end": "15:00",
+     "late_minutes": 0,
+     "expected_start": "07:00",
+     "clock_in_punch_id": null,
+     "clock_out_punch_id": null,
+     "early_departure_minutes": 0
+    }
+   ]
+  }
+ ],
+ "pagination": {
+  "page": 1,
+  "limit": 12,
+  "total": 12,
+  "totalPages": 1
+ },
+ "summary": {
+  "absent": 8,
+  "late": 0,
+  "partial_absence": 0,
+  "early_departure": 0,
+  "late_accumulation_absence": 0,
+  "pending_review": 0
+ },
+ "range": {
+  "from": "2026-10-06",
+  "to": "2026-10-12"
+ }
+}

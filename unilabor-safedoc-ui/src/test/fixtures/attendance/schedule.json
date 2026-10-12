@@ -1,0 +1,504 @@
+{
+ "data": [
+  {
+   "employee_id": 3,
+   "full_name": "Ana Torres Ruiz",
+   "employee_code": "AKHA",
+   "position": "COORDINADOR DE ANALITICOS",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "device_employee_number": "TEST-3",
+   "is_enabled": true,
+   "week_hours": 37.5,
+   "days": [
+    {
+     "date": "2026-10-11",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    },
+    {
+     "date": "2026-10-12",
+     "chips": [
+      {
+       "assignment_id": 193,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-13",
+     "chips": [
+      {
+       "assignment_id": 193,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-14",
+     "chips": [
+      {
+       "assignment_id": 193,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-15",
+     "chips": [
+      {
+       "assignment_id": 193,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-16",
+     "chips": [
+      {
+       "assignment_id": 193,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-17",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    }
+   ]
+  },
+  {
+   "employee_id": 5,
+   "full_name": "Beto Salas Mora",
+   "employee_code": "DMBM",
+   "position": "RESPONSABLE DE QUIMICA CLINICA",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "device_employee_number": "TEST-5",
+   "is_enabled": true,
+   "week_hours": 37.5,
+   "days": [
+    {
+     "date": "2026-10-11",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    },
+    {
+     "date": "2026-10-12",
+     "chips": [
+      {
+       "assignment_id": 194,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-13",
+     "chips": [
+      {
+       "assignment_id": 194,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-14",
+     "chips": [
+      {
+       "assignment_id": 194,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-15",
+     "chips": [
+      {
+       "assignment_id": 194,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-16",
+     "chips": [
+      {
+       "assignment_id": 194,
+       "shift_id": 116,
+       "name": "TEST-UI Matutino",
+       "start_time": "07:00",
+       "end_time": "15:00",
+       "hours": 7.5,
+       "color_hex": "#2563eb",
+       "is_recurring": true,
+       "duplicate_count": 1,
+       "start_date": "2026-10-05",
+       "end_date": null,
+       "repeats_weekly": true,
+       "week_interval": 1,
+       "weekdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+       ],
+       "notes": "TEST-UI"
+      }
+     ],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 7.5
+    },
+    {
+     "date": "2026-10-17",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    }
+   ]
+  },
+  {
+   "employee_id": 15,
+   "full_name": "Carla Vega Lima",
+   "employee_code": "MRR",
+   "position": "RECEPCIONISTA",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "device_employee_number": "T001",
+   "is_enabled": true,
+   "week_hours": 0,
+   "days": [
+    {
+     "date": "2026-10-11",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    },
+    {
+     "date": "2026-10-12",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    },
+    {
+     "date": "2026-10-13",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    },
+    {
+     "date": "2026-10-14",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    },
+    {
+     "date": "2026-10-15",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    },
+    {
+     "date": "2026-10-16",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    },
+    {
+     "date": "2026-10-17",
+     "chips": [],
+     "is_rest_day": false,
+     "has_conflict_limit": false,
+     "is_split": false,
+     "total_hours": 0
+    }
+   ]
+  }
+ ],
+ "pagination": {
+  "page": 1,
+  "limit": 20,
+  "total": 3,
+  "total_pages": 1
+ },
+ "shifts": [
+  {
+   "id": 116,
+   "name": "TEST-UI Matutino",
+   "start_time": "07:00",
+   "end_time": "15:00",
+   "crosses_midnight": false,
+   "break_minutes": 30,
+   "shift_type": "fixed",
+   "color_hex": "#2563eb",
+   "is_active": true
+  },
+  {
+   "id": 117,
+   "name": "TEST-UI Nocturno",
+   "start_time": "22:00",
+   "end_time": "06:00",
+   "crosses_midnight": true,
+   "break_minutes": 30,
+   "shift_type": "fixed",
+   "color_hex": "#7c3aed",
+   "is_active": true
+  },
+  {
+   "id": 118,
+   "name": "TEST-UI Vespertino",
+   "start_time": "14:00",
+   "end_time": "22:00",
+   "crosses_midnight": false,
+   "break_minutes": 0,
+   "shift_type": "fixed",
+   "color_hex": "#d97706",
+   "is_active": true
+  }
+ ],
+ "max_shifts_per_day": 3,
+ "week_start": "sunday",
+ "week_start_date": "2026-10-11",
+ "days": [
+  "2026-10-11",
+  "2026-10-12",
+  "2026-10-13",
+  "2026-10-14",
+  "2026-10-15",
+  "2026-10-16",
+  "2026-10-17"
+ ]
+}

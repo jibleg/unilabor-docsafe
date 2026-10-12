@@ -1,0 +1,89 @@
+{
+ "agent_offline_min": 15,
+ "branches": [
+  {
+   "branch_id": 1,
+   "branch_code": "A",
+   "branch_name": "UNILABOR CENTRO",
+   "agent": {
+    "id": 3,
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO",
+    "name": "Agente QA Centro",
+    "api_key_prefix": "ad2c0000",
+    "software_version": "1.0.0",
+    "host_name": "MacBook-Pro-Israel.local",
+    "operating_system": "darwin 25.5.0",
+    "local_ip": "192.168.1.186",
+    "last_heartbeat_at": "2026-10-12T18:02:38.702Z",
+    "is_online": false,
+    "is_active": false,
+    "created_at": "2026-10-12T18:01:00.821Z"
+   },
+   "terminals": [
+    {
+     "id": 2,
+     "agent_id": 3,
+     "serial_number": "SIM320MFWX0001",
+     "name": "Reloj Recepcion",
+     "model": "DS-K1T320MFWX-B",
+     "firmware_version": "V3.5.2",
+     "local_ip": "127.0.0.1",
+     "is_active": true,
+     "is_online": false,
+     "clock_drift_seconds": -1,
+     "enrolled_people_count": 5,
+     "last_event_at": "2026-10-12T18:31:42.000Z",
+     "last_heartbeat_at": "2026-10-12T18:02:38.706Z"
+    }
+   ],
+   "pending_sync_count": 2,
+   "open_orders_count": 0
+  },
+  {
+   "branch_id": 2,
+   "branch_code": "B",
+   "branch_name": "UNILABOR CIDE",
+   "agent": null,
+   "terminals": [],
+   "pending_sync_count": 0,
+   "open_orders_count": 0
+  },
+  {
+   "branch_id": 3,
+   "branch_code": "D",
+   "branch_name": "UNILABOR LOMAS",
+   "agent": null,
+   "terminals": [],
+   "pending_sync_count": 0,
+   "open_orders_count": 0
+  },
+  {
+   "branch_id": 4,
+   "branch_code": "E",
+   "branch_name": "UNILABOR SAN JOSE",
+   "agent": null,
+   "terminals": [],
+   "pending_sync_count": 0,
+   "open_orders_count": 0
+  },
+  {
+   "branch_id": 5,
+   "branch_code": "F",
+   "branch_name": "UNILABOR SALTO DE AGUA",
+   "agent": null,
+   "terminals": [],
+   "pending_sync_count": 0,
+   "open_orders_count": 0
+  },
+  {
+   "branch_id": 6,
+   "branch_code": "G",
+   "branch_name": "UNILABOR INTERMEDICA",
+   "agent": null,
+   "terminals": [],
+   "pending_sync_count": 0,
+   "open_orders_count": 0
+  }
+ ]
+}

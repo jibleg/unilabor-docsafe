@@ -1,0 +1,16 @@
+{
+ "employee": {
+  "id": 3,
+  "full_name": "Ana Torres Ruiz",
+  "employee_code": "AKHA"
+ },
+ "hire_date": null,
+ "periods": [],
+ "balance": {
+  "entitled": 0,
+  "adjustment": 0,
+  "taken": 0,
+  "balance": 0,
+  "expiring": null
+ }
+}

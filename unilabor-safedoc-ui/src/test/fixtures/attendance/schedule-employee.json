@@ -1,0 +1,391 @@
+{
+ "employee": {
+  "id": 3,
+  "full_name": "Ana Torres Ruiz",
+  "employee_code": "AKHA"
+ },
+ "from": "2026-10-05",
+ "to": "2026-10-18",
+ "days": [
+  {
+   "date": "2026-10-05",
+   "weekday": 1,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-06",
+   "weekday": 2,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-07",
+   "weekday": 3,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-08",
+   "weekday": 4,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-09",
+   "weekday": 5,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-10",
+   "weekday": 6,
+   "chips": [],
+   "is_rest_day": false,
+   "has_schedule": false,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 0
+  },
+  {
+   "date": "2026-10-11",
+   "weekday": 7,
+   "chips": [],
+   "is_rest_day": false,
+   "has_schedule": false,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 0
+  },
+  {
+   "date": "2026-10-12",
+   "weekday": 1,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-13",
+   "weekday": 2,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-14",
+   "weekday": 3,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-15",
+   "weekday": 4,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-16",
+   "weekday": 5,
+   "chips": [
+    {
+     "assignment_id": 193,
+     "shift_id": 116,
+     "name": "TEST-UI Matutino",
+     "start_time": "07:00",
+     "end_time": "15:00",
+     "hours": 7.5,
+     "color_hex": "#2563eb",
+     "is_recurring": true,
+     "duplicate_count": 1,
+     "start_date": "2026-10-05",
+     "end_date": null,
+     "repeats_weekly": true,
+     "week_interval": 1,
+     "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "notes": "TEST-UI"
+    }
+   ],
+   "is_rest_day": false,
+   "has_schedule": true,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 7.5
+  },
+  {
+   "date": "2026-10-17",
+   "weekday": 6,
+   "chips": [],
+   "is_rest_day": false,
+   "has_schedule": false,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 0
+  },
+  {
+   "date": "2026-10-18",
+   "weekday": 7,
+   "chips": [],
+   "is_rest_day": false,
+   "has_schedule": false,
+   "has_conflict_limit": false,
+   "is_split": false,
+   "total_hours": 0
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+{
+  "docsafeUrl": "https://sgc.unilabor-app.com",
+  "agentKey": "PEGAR_AQUI_LA_CLAVE_QUE_MUESTRA_DOCSAFE_AL_CREAR_EL_AGENTE",
+  "listenPort": 8085,
+  "terminals": [
+    { "name": "Recepcion", "ip": "192.168.1.50", "port": 80, "username": "admin", "password": "CONTRASENA_DEL_RELOJ" }
+  ],
+  "intervals": { "heartbeat": 60, "orders": 15, "recovery": 600 },
+  "recoveryHours": 24,
+  "queuePath": "./queue.sqlite"
+}

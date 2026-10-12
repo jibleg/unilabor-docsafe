@@ -1,0 +1,58 @@
+{
+ "changes": [
+  {
+   "id": "7",
+   "setting_key": "tolerance_min",
+   "previous_value": 11,
+   "new_value": 10,
+   "change_reason": "TEST restaurar",
+   "changed_at": "2026-10-12T19:22:37.735Z",
+   "changed_by_name": "Usuario de Prueba"
+  },
+  {
+   "id": "6",
+   "setting_key": "tolerance_min",
+   "previous_value": 10,
+   "new_value": 11,
+   "change_reason": "TEST prueba UI",
+   "changed_at": "2026-10-12T19:22:37.722Z",
+   "changed_by_name": "Usuario de Prueba"
+  },
+  {
+   "id": "5",
+   "setting_key": "tolerance_min",
+   "previous_value": 11,
+   "new_value": 10,
+   "change_reason": "TEST restaurar",
+   "changed_at": "2026-10-12T19:22:31.275Z",
+   "changed_by_name": "Usuario de Prueba"
+  },
+  {
+   "id": "4",
+   "setting_key": "tolerance_min",
+   "previous_value": 10,
+   "new_value": 11,
+   "change_reason": "TEST prueba UI",
+   "changed_at": "2026-10-12T19:22:31.266Z",
+   "changed_by_name": "Usuario de Prueba"
+  },
+  {
+   "id": "3",
+   "setting_key": "tolerance_min",
+   "previous_value": 12,
+   "new_value": 10,
+   "change_reason": "TEST restaurar",
+   "changed_at": "2026-10-12T17:59:16.303Z",
+   "changed_by_name": "Usuario de Prueba"
+  },
+  {
+   "id": "2",
+   "setting_key": "tolerance_min",
+   "previous_value": 10,
+   "new_value": 12,
+   "change_reason": "TEST prueba",
+   "changed_at": "2026-10-12T17:59:16.235Z",
+   "changed_by_name": "Usuario de Prueba"
+  }
+ ]
+}

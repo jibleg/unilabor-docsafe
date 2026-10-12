@@ -1,0 +1,126 @@
+{
+ "settings": [
+  {
+   "key": "tolerance_min",
+   "label": "Tolerancia de entrada",
+   "description": "Minutos de gracia despues de la hora de entrada antes de contar un retardo.",
+   "group": "punctuality",
+   "type": "integer",
+   "unit": "min",
+   "options": null,
+   "min": 0,
+   "max": 120,
+   "default_value": 10,
+   "value": 10,
+   "is_modified": false
+  },
+  {
+   "key": "late_until_min",
+   "label": "Retardo maximo",
+   "description": "Si la entrada llega mas tarde que esto, el dia cuenta como falta.",
+   "group": "punctuality",
+   "type": "integer",
+   "unit": "min",
+   "options": null,
+   "min": 1,
+   "max": 480,
+   "default_value": 30,
+   "value": 30,
+   "is_modified": false
+  },
+  {
+   "key": "late_per_absence",
+   "label": "Retardos por falta",
+   "description": "Cada N retardos dentro del periodo se cuenta una falta (0 = desactivado).",
+   "group": "punctuality",
+   "type": "integer",
+   "unit": null,
+   "options": null,
+   "min": 0,
+   "max": 30,
+   "default_value": 3,
+   "value": 3,
+   "is_modified": false
+  },
+  {
+   "key": "late_period",
+   "label": "Periodo de retardos",
+   "description": "Ventana en la que se acumulan los retardos: mes, quincena o semana.",
+   "group": "punctuality",
+   "type": "enum",
+   "unit": null,
+   "options": [
+    "month",
+    "fortnight",
+    "week"
+   ],
+   "min": null,
+   "max": null,
+   "default_value": "month",
+   "value": "month",
+   "is_modified": false
+  },
+  {
+   "key": "early_exit_min",
+   "label": "Salida anticipada",
+   "description": "Minutos antes de la hora de salida a partir de los cuales se registra salida anticipada.",
+   "group": "punctuality",
+   "type": "integer",
+   "unit": "min",
+   "options": null,
+   "min": 0,
+   "max": 480,
+   "default_value": 15,
+   "value": 15,
+   "is_modified": false
+  },
+  {
+   "key": "min_workday_hours",
+   "label": "Jornada minima",
+   "description": "Si el dia suma menos horas que esto, cuenta como falta.",
+   "group": "punctuality",
+   "type": "integer",
+   "unit": "h",
+   "options": null,
+   "min": 1,
+   "max": 12,
+   "default_value": 4,
+   "value": 4,
+   "is_modified": false
+  },
+  {
+   "key": "missing_segment_result",
+   "label": "Tramo sin checar",
+   "description": "Resultado cuando falta un tramo de un horario partido: falta parcial o falta completa.",
+   "group": "punctuality",
+   "type": "enum",
+   "unit": null,
+   "options": [
+    "partial_absence",
+    "absent"
+   ],
+   "min": null,
+   "max": null,
+   "default_value": "partial_absence",
+   "value": "partial_absence",
+   "is_modified": false
+  },
+  {
+   "key": "missing_exit_result",
+   "label": "Entrada sin salida",
+   "description": "Resultado cuando hay entrada pero no salida: falta, o asistencia (queda marcada para revision).",
+   "group": "punctuality",
+   "type": "enum",
+   "unit": null,
+   "options": [
+    "absent",
+    "present"
+   ],
+   "min": null,
+   "max": null,
+   "default_value": "absent",
+   "value": "absent",
+   "is_modified": false
+  }
+ ]
+}

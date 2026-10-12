@@ -1,0 +1,213 @@
+{
+ "date": "2026-10-12",
+ "is_today": true,
+ "kpis": {
+  "expected": 2,
+  "present": 0,
+  "late": 0,
+  "missing": 2,
+  "incident": 0,
+  "pending_review": 1
+ },
+ "progress_percent": 0,
+ "by_status": [
+  {
+   "status": "missing",
+   "count": 2
+  },
+  {
+   "status": "no_schedule",
+   "count": 1
+  }
+ ],
+ "people": [
+  {
+   "employee_id": 3,
+   "code": "AKHA",
+   "full_name": "Ana Torres Ruiz",
+   "area": "VALIDACION",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "status": "missing",
+   "expected_start": "07:00",
+   "expected_end": "15:00",
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0
+  },
+  {
+   "employee_id": 5,
+   "code": "DMBM",
+   "full_name": "Beto Salas Mora",
+   "area": "QUIMICA CLINICA",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "status": "missing",
+   "expected_start": "07:00",
+   "expected_end": "15:00",
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0
+  },
+  {
+   "employee_id": 15,
+   "code": "MRR",
+   "full_name": "Carla Vega Lima",
+   "area": "PREANALITICOS",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "status": "no_schedule",
+   "expected_start": null,
+   "expected_end": null,
+   "clock_in_at": null,
+   "clock_out_at": null,
+   "late_minutes": 0
+  }
+ ],
+ "absences_next_7_days": {
+  "total": 0,
+  "items": []
+ },
+ "devices": [
+  {
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "agent": {
+    "id": 3,
+    "name": "Agente QA Centro",
+    "online": false,
+    "last_heartbeat_at": "2026-10-12T18:02:38.702Z"
+   },
+   "terminals_total": 1,
+   "terminals_online": 0,
+   "last_event_at": "2026-10-12T18:31:42.000Z"
+  }
+ ],
+ "trend_14_days": [
+  {
+   "date": "2026-09-28",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  },
+  {
+   "date": "2026-09-29",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  },
+  {
+   "date": "2026-09-30",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  },
+  {
+   "date": "2026-10-01",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  },
+  {
+   "date": "2026-10-02",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  },
+  {
+   "date": "2026-10-03",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  },
+  {
+   "date": "2026-10-04",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  },
+  {
+   "date": "2026-10-05",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 2
+  },
+  {
+   "date": "2026-10-06",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 2
+  },
+  {
+   "date": "2026-10-07",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 2
+  },
+  {
+   "date": "2026-10-08",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 2
+  },
+  {
+   "date": "2026-10-09",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 2
+  },
+  {
+   "date": "2026-10-10",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  },
+  {
+   "date": "2026-10-11",
+   "attendances": 0,
+   "incidents": 0,
+   "lates": 0,
+   "absences": 0
+  }
+ ],
+ "month_ranking": [
+  {
+   "employee_id": 3,
+   "code": "AKHA",
+   "full_name": "Ana Torres Ruiz",
+   "branch_name": "UNILABOR CENTRO",
+   "index": 0,
+   "lates": 0,
+   "absences": 5,
+   "streak": 0
+  },
+  {
+   "employee_id": 5,
+   "code": "DMBM",
+   "full_name": "Beto Salas Mora",
+   "branch_name": "UNILABOR CENTRO",
+   "index": 0,
+   "lates": 0,
+   "absences": 5,
+   "streak": 0
+  }
+ ],
+ "alerts": {
+  "without_schedule": 1,
+  "without_device_number": 0,
+  "pending_sync": 2
+ }
+}

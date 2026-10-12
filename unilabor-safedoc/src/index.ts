@@ -23,6 +23,7 @@ import adminRoutes from './routes/admin.routes';
 import providerRoutes from './routes/provider.routes';
 import classificationRoutes from './routes/classification.routes';
 import clientRoutes from './routes/client.routes';
+import attendanceRoutes, { attendanceAgentRoutes } from './routes/attendance';
 import { assertRequiredEnv, isOutboundNotifyEnabled } from './config/env';
 import { startEvaluationScheduler } from './services/evaluation-scheduler.service';
 import { startServiceReminderScheduler } from './services/helpdesk-service-scheduler.service';
@@ -31,6 +32,7 @@ import { startQualityReadingScheduler } from './services/quality-reading-schedul
 import { startInductionScheduler } from './services/rh-induction-scheduler.service';
 import { startProviderDocumentReminderScheduler } from './services/provider-document-scheduler.service';
 import { startClientDocumentReminderScheduler } from './services/client-document-scheduler.service';
+import { startAttendanceScheduler } from './services/attendance/attendance-scheduler.service';
 import { resolveUploadLimitMb } from './middlewares/upload.middleware';
 
 dotenv.config();
@@ -80,6 +82,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/providers/classifications', classificationRoutes);
 app.use('/api/providers/clients', clientRoutes);
+// Agente HikVision (auth propia por clave; antes del router con JWT de usuario).
+app.use('/api/attendance/agent', attendanceAgentRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
 // Global error handler
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -128,6 +133,8 @@ const server = app.listen(PORT, () => {
   startProviderDocumentReminderScheduler();
   // Scheduler de alertas de vencimiento de documentos de cliente. Guardado por env.
   startClientDocumentReminderScheduler();
+  // Proceso nocturno de asistencias (recalculo de ultimos dias + vacaciones). Guardado por env.
+  startAttendanceScheduler();
 });
 
 // Si no se pudo tomar el puerto (p. ej. otra instancia ya corre), el proceso

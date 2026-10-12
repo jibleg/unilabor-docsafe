@@ -1,0 +1,74 @@
+{
+ "data": [
+  {
+   "id": 64,
+   "employee": {
+    "id": 3,
+    "full_name": "Ana Torres Ruiz",
+    "employee_code": "AKHA",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "type": {
+    "id": 3,
+    "code": "paid_permission",
+    "name": "Permiso con goce",
+    "is_hourly": false,
+    "requires_attachment": true,
+    "deducts_vacation": false
+   },
+   "start_date": "2026-10-14",
+   "end_date": "2026-10-14",
+   "days": 1,
+   "hours": null,
+   "status": "captured",
+   "reason": "TEST-UI permiso de prueba",
+   "imss_folio": null,
+   "captured_by_name": "Admin Prueba",
+   "authorized_by_name": null,
+   "authorized_at": null,
+   "authorization_notes": null,
+   "notified_at": null,
+   "attachments_count": 1,
+   "created_at": "2026-10-12T19:58:21.341Z"
+  },
+  {
+   "id": 65,
+   "employee": {
+    "id": 5,
+    "full_name": "Beto Salas Mora",
+    "employee_code": "DMBM",
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO"
+   },
+   "type": {
+    "id": 7,
+    "code": "holiday_worked",
+    "name": "Festivo trabajado",
+    "is_hourly": false,
+    "requires_attachment": false,
+    "deducts_vacation": false
+   },
+   "start_date": "2026-10-13",
+   "end_date": "2026-10-13",
+   "days": 1,
+   "hours": null,
+   "status": "captured",
+   "reason": "TEST-UI festivo trabajado",
+   "imss_folio": null,
+   "captured_by_name": "Admin Prueba",
+   "authorized_by_name": null,
+   "authorized_at": null,
+   "authorization_notes": null,
+   "notified_at": null,
+   "attachments_count": 0,
+   "created_at": "2026-10-12T19:58:21.371Z"
+  }
+ ],
+ "pagination": {
+  "page": 1,
+  "limit": 30,
+  "total": 2,
+  "pages": 1
+ }
+}

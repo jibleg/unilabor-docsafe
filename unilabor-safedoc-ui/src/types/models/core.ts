@@ -1,4 +1,4 @@
-export type ModuleCode = 'QUALITY' | 'RH' | 'HELPDESK' | 'ADMIN' | 'PROVIDERS';
+export type ModuleCode = 'QUALITY' | 'RH' | 'HELPDESK' | 'ADMIN' | 'PROVIDERS' | 'ATTENDANCE';
 
 export interface ModuleAccess {
   code: ModuleCode;

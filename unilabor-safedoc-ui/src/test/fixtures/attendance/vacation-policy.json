@@ -1,0 +1,52 @@
+{
+ "policy": [
+  {
+   "from_seniority_year": 1,
+   "vacation_days": 12,
+   "law_days": 12,
+   "differs_from_law": false
+  },
+  {
+   "from_seniority_year": 2,
+   "vacation_days": 14,
+   "law_days": 14,
+   "differs_from_law": false
+  },
+  {
+   "from_seniority_year": 3,
+   "vacation_days": 16,
+   "law_days": 16,
+   "differs_from_law": false
+  },
+  {
+   "from_seniority_year": 4,
+   "vacation_days": 18,
+   "law_days": 18,
+   "differs_from_law": false
+  },
+  {
+   "from_seniority_year": 5,
+   "vacation_days": 20,
+   "law_days": 20,
+   "differs_from_law": false
+  },
+  {
+   "from_seniority_year": 6,
+   "vacation_days": 22,
+   "law_days": 22,
+   "differs_from_law": false
+  },
+  {
+   "from_seniority_year": 11,
+   "vacation_days": 24,
+   "law_days": 24,
+   "differs_from_law": false
+  },
+  {
+   "from_seniority_year": 16,
+   "vacation_days": 26,
+   "law_days": 26,
+   "differs_from_law": false
+  }
+ ]
+}

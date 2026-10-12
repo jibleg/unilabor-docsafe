@@ -1,0 +1,70 @@
+{
+ "data": [
+  {
+   "id": 213,
+   "employee": {
+    "id": 15,
+    "code": "MRR",
+    "full_name": "Carla Vega Lima"
+   },
+   "device_employee_number": "T001",
+   "source": "terminal",
+   "terminal": {
+    "id": 2,
+    "name": "Reloj Recepcion",
+    "serial_number": "SIM320MFWX0001"
+   },
+   "branch": {
+    "id": 1,
+    "name": "UNILABOR CENTRO"
+   },
+   "punch_type": "in",
+   "punched_at": "2026-10-12T18:31:42.000Z",
+   "device_reported_at": "2026-10-12T18:31:42.000Z",
+   "verification_method": "face",
+   "review_status": "pending",
+   "review_reason": "Desfase de hora del reloj: 30 min (maximo 10 min)",
+   "reviewed_at": null,
+   "reviewed_by_name": null,
+   "manual_justification": null,
+   "registered_by_name": null,
+   "has_photo": true
+  },
+  {
+   "id": 212,
+   "employee": null,
+   "device_employee_number": "9999",
+   "source": "terminal",
+   "terminal": {
+    "id": 2,
+    "name": "Reloj Recepcion",
+    "serial_number": "SIM320MFWX0001"
+   },
+   "branch": {
+    "id": 1,
+    "name": "UNILABOR CENTRO"
+   },
+   "punch_type": "in",
+   "punched_at": "2026-10-12T18:01:42.000Z",
+   "device_reported_at": "2026-10-12T18:01:42.000Z",
+   "verification_method": "face",
+   "review_status": "pending",
+   "review_reason": "Numero de empleado sin colaborador",
+   "reviewed_at": null,
+   "reviewed_by_name": null,
+   "manual_justification": null,
+   "registered_by_name": null,
+   "has_photo": true
+  }
+ ],
+ "pagination": {
+  "page": 1,
+  "limit": 12,
+  "total": 2,
+  "totalPages": 1
+ },
+ "range": {
+  "from": "2026-10-06",
+  "to": "2026-10-12"
+ }
+}

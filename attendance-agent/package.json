@@ -1,0 +1,14 @@
+{
+  "name": "docsafe-attendance-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agente de asistencias DocSafe: pasarela entre el reloj HikVision (ISAPI) y DocSafe. Se instala en una PC de la sucursal.",
+  "type": "module",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node src/agent.js",
+    "simulador": "node simulator/terminal-simulada.js",
+    "generar-checadas": "node simulator/generar-checadas.js",
+    "test": "node --test test/*.test.js"
+  }
+}

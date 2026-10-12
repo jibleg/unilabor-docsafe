@@ -13,8 +13,42 @@ import { RhLayout } from './layouts/RhLayout';
 import { HelpdeskLayout } from './layouts/HelpdeskLayout';
 import { AdminLayout } from './layouts/AdminLayout';
 import { ProvidersLayout } from './layouts/ProvidersLayout';
+import { AttendanceLayout } from './layouts/AttendanceLayout';
 import 'react-toastify/dist/ReactToastify.css';
 
+const AttendanceDashboardPage = lazy(() =>
+  import('./pages/attendance/AttendanceDashboardPage').then((module) => ({ default: module.AttendanceDashboardPage })),
+);
+const AttendanceCommitmentPage = lazy(() =>
+  import('./pages/attendance/AttendanceCommitmentPage').then((module) => ({ default: module.AttendanceCommitmentPage })),
+);
+const AttendanceSchedulePage = lazy(() =>
+  import('./pages/attendance/AttendanceSchedulePage').then((module) => ({ default: module.AttendanceSchedulePage })),
+);
+const AttendanceShiftsPage = lazy(() =>
+  import('./pages/attendance/AttendanceShiftsPage').then((module) => ({ default: module.AttendanceShiftsPage })),
+);
+const AttendanceDaysPage = lazy(() =>
+  import('./pages/attendance/AttendanceDaysPage').then((module) => ({ default: module.AttendanceDaysPage })),
+);
+const AttendancePunchesPage = lazy(() =>
+  import('./pages/attendance/AttendancePunchesPage').then((module) => ({ default: module.AttendancePunchesPage })),
+);
+const AttendanceIncidentsPage = lazy(() =>
+  import('./pages/attendance/AttendanceIncidentsPage').then((module) => ({ default: module.AttendanceIncidentsPage })),
+);
+const AttendanceEmployeesPage = lazy(() =>
+  import('./pages/attendance/AttendanceEmployeesPage').then((module) => ({ default: module.AttendanceEmployeesPage })),
+);
+const AttendanceEmployeeDetailPage = lazy(() =>
+  import('./pages/attendance/AttendanceEmployeeDetailPage').then((module) => ({ default: module.AttendanceEmployeeDetailPage })),
+);
+const AttendanceDevicesPage = lazy(() =>
+  import('./pages/attendance/AttendanceDevicesPage').then((module) => ({ default: module.AttendanceDevicesPage })),
+);
+const AttendanceSettingsPage = lazy(() =>
+  import('./pages/attendance/AttendanceSettingsPage').then((module) => ({ default: module.AttendanceSettingsPage })),
+);
 const AuditPage = lazy(() => import('./pages/AuditPage').then((module) => ({ default: module.AuditPage })));
 const RolesPage = lazy(() => import('./pages/RolesPage').then((module) => ({ default: module.RolesPage })));
 const CategoriesPage = lazy(() =>
@@ -688,6 +722,29 @@ function App() {
             </RoleGate>
           }
         />
+        <Route path="profile" element={<ProfilePage />} />
+      </Route>
+
+      <Route
+        path="/attendance"
+        element={
+          <ModuleGuard moduleCode="ATTENDANCE">
+            <AttendanceLayout />
+          </ModuleGuard>
+        }
+      >
+        <Route index element={<Navigate to="/attendance/dashboard" replace />} />
+        <Route path="dashboard" element={<PermissionGate permission="ATTENDANCE.RECORDS.READ" redirectTo="/attendance/profile"><AttendanceDashboardPage /></PermissionGate>} />
+        <Route path="commitment" element={<PermissionGate permission="ATTENDANCE.RECORDS.READ" redirectTo="/attendance/profile"><AttendanceCommitmentPage /></PermissionGate>} />
+        <Route path="days" element={<PermissionGate permission="ATTENDANCE.RECORDS.READ" redirectTo="/attendance/profile"><AttendanceDaysPage /></PermissionGate>} />
+        <Route path="punches" element={<PermissionGate permission="ATTENDANCE.RECORDS.READ" redirectTo="/attendance/profile"><AttendancePunchesPage /></PermissionGate>} />
+        <Route path="incidents" element={<PermissionGate permission="ATTENDANCE.RECORDS.READ" redirectTo="/attendance/profile"><AttendanceIncidentsPage /></PermissionGate>} />
+        <Route path="schedule" element={<PermissionGate permission="ATTENDANCE.RECORDS.READ" redirectTo="/attendance/profile"><AttendanceSchedulePage /></PermissionGate>} />
+        <Route path="shifts" element={<PermissionGate permission="ATTENDANCE.SCHEDULES.WRITE" redirectTo="/attendance/dashboard"><AttendanceShiftsPage /></PermissionGate>} />
+        <Route path="employees" element={<PermissionGate permission="ATTENDANCE.RECORDS.READ" redirectTo="/attendance/profile"><AttendanceEmployeesPage /></PermissionGate>} />
+        <Route path="employees/:id" element={<PermissionGate permission="ATTENDANCE.RECORDS.READ" redirectTo="/attendance/profile"><AttendanceEmployeeDetailPage /></PermissionGate>} />
+        <Route path="devices" element={<PermissionGate permission="ATTENDANCE.DEVICES.MANAGE" redirectTo="/attendance/dashboard"><AttendanceDevicesPage /></PermissionGate>} />
+        <Route path="settings" element={<PermissionGate permission="ATTENDANCE.SETTINGS.MANAGE" redirectTo="/attendance/dashboard"><AttendanceSettingsPage /></PermissionGate>} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 

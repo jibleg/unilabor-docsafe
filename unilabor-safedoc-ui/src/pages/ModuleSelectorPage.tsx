@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, FlaskConical, LifeBuoy, ShieldCheck, Truck } from 'lucide-react';
+import { ArrowRight, Building2, Clock, FlaskConical, LifeBuoy, ShieldCheck, Truck } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import type { ModuleAccess, ModuleCode } from '../types/models';
@@ -42,6 +42,12 @@ const moduleVisuals: Record<
     eyebrow: 'Módulo de Acuerdos',
     name: 'Prestación de servicios',
     description: 'Gestión documental de contratos y convenios con proveedores: vigencia, derogación y trazabilidad.',
+  },
+  ATTENDANCE: {
+    icon: Clock,
+    eyebrow: 'Módulo de Asistencias',
+    name: 'Control de Asistencias',
+    description: 'Asistencia del personal por sucursal: horarios, checadas de relojes, incidencias y vacaciones.',
   },
 };
 

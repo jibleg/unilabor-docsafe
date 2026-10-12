@@ -1,0 +1,183 @@
+{
+ "period": "week",
+ "from": "2026-10-11",
+ "to": "2026-10-17",
+ "label": "11 oct - 17 oct 2026",
+ "closed_through": "2026-10-11",
+ "previous": {
+  "from": "2026-10-04",
+  "to": "2026-10-10",
+  "label": "4 oct - 10 oct 2026"
+ },
+ "next": {
+  "from": "2026-10-18",
+  "to": "2026-10-24",
+  "label": "18 oct - 24 oct 2026"
+ },
+ "weights": {
+  "attendance": 40,
+  "punctuality": 40,
+  "exits": 20,
+  "exemplary": 95,
+  "attention": 70
+ },
+ "team": {
+  "expected": 0,
+  "attendances": 0,
+  "punctual": 0,
+  "lates": 0,
+  "late_minutes": 0,
+  "absences": 0,
+  "partial_absences": 0,
+  "early_departures": 0,
+  "missing_exit": 0,
+  "complete_exits": 0,
+  "present": 0,
+  "incidents": 0,
+  "hours": 0,
+  "overtime_hours": 0,
+  "pct_attendance": null,
+  "pct_punctuality": null,
+  "pct_exits": null,
+  "index": null,
+  "level": "no_data",
+  "employees": 3
+ },
+ "people": [
+  {
+   "place": 1,
+   "employee_id": 3,
+   "code": "AKHA",
+   "full_name": "Ana Torres Ruiz",
+   "area": "VALIDACION",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "index": null,
+   "level": "no_data",
+   "summary": {
+    "expected": 0,
+    "attendances": 0,
+    "punctual": 0,
+    "lates": 0,
+    "late_minutes": 0,
+    "absences": 0,
+    "partial_absences": 0,
+    "early_departures": 0,
+    "missing_exit": 0,
+    "complete_exits": 0,
+    "present": 0,
+    "incidents": 0,
+    "hours": 0,
+    "overtime_hours": 0,
+    "pct_attendance": null,
+    "pct_punctuality": null,
+    "pct_exits": null,
+    "index": null,
+    "level": "no_data",
+    "current_streak": 0,
+    "best_streak": 0
+   }
+  },
+  {
+   "place": 2,
+   "employee_id": 5,
+   "code": "DMBM",
+   "full_name": "Beto Salas Mora",
+   "area": "QUIMICA CLINICA",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "index": null,
+   "level": "no_data",
+   "summary": {
+    "expected": 0,
+    "attendances": 0,
+    "punctual": 0,
+    "lates": 0,
+    "late_minutes": 0,
+    "absences": 0,
+    "partial_absences": 0,
+    "early_departures": 0,
+    "missing_exit": 0,
+    "complete_exits": 0,
+    "present": 0,
+    "incidents": 0,
+    "hours": 0,
+    "overtime_hours": 0,
+    "pct_attendance": null,
+    "pct_punctuality": null,
+    "pct_exits": null,
+    "index": null,
+    "level": "no_data",
+    "current_streak": 0,
+    "best_streak": 0
+   }
+  },
+  {
+   "place": 3,
+   "employee_id": 15,
+   "code": "MRR",
+   "full_name": "Carla Vega Lima",
+   "area": "PREANALITICOS",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO",
+   "index": null,
+   "level": "no_data",
+   "summary": {
+    "expected": 0,
+    "attendances": 0,
+    "punctual": 0,
+    "lates": 0,
+    "late_minutes": 0,
+    "absences": 0,
+    "partial_absences": 0,
+    "early_departures": 0,
+    "missing_exit": 0,
+    "complete_exits": 0,
+    "present": 0,
+    "incidents": 0,
+    "hours": 0,
+    "overtime_hours": 0,
+    "pct_attendance": null,
+    "pct_punctuality": null,
+    "pct_exits": null,
+    "index": null,
+    "level": "no_data",
+    "current_streak": 0,
+    "best_streak": 0
+   }
+  }
+ ],
+ "trend": {
+  "granularity": "day",
+  "blocks": []
+ },
+ "recognitions": [],
+ "attention": [],
+ "detail": null,
+ "employees": [
+  {
+   "id": 3,
+   "code": "AKHA",
+   "full_name": "Ana Torres Ruiz",
+   "branch_id": 1
+  },
+  {
+   "id": 5,
+   "code": "DMBM",
+   "full_name": "Beto Salas Mora",
+   "branch_id": 1
+  },
+  {
+   "id": 15,
+   "code": "MRR",
+   "full_name": "Carla Vega Lima",
+   "branch_id": 1
+  }
+ ],
+ "branches": [
+  {
+   "id": 1,
+   "name": "UNILABOR CENTRO"
+  }
+ ]
+}

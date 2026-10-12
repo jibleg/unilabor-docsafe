@@ -1,0 +1,197 @@
+{
+ "orders": [
+  {
+   "id": 8,
+   "agent_id": 3,
+   "terminal_id": null,
+   "terminal_name": null,
+   "terminal_serial": null,
+   "employee_id": 8,
+   "employee_name": "Diego Rios Paz",
+   "order_type": "remove_person",
+   "payload": {
+    "name": "Diego Rios Paz",
+    "employeeNo": "T002"
+   },
+   "order_status": "done",
+   "result": {
+    "terminals": 1
+   },
+   "error_message": null,
+   "attempt_count": 1,
+   "created_at": "2026-10-12T18:02:34.704Z",
+   "picked_up_at": "2026-10-12T18:02:38.694Z",
+   "finished_at": "2026-10-12T18:02:38.715Z"
+  },
+  {
+   "id": 7,
+   "agent_id": 3,
+   "terminal_id": 2,
+   "terminal_name": "Reloj Recepcion",
+   "terminal_serial": "SIM320MFWX0001",
+   "employee_id": 8,
+   "employee_name": "Diego Rios Paz",
+   "order_type": "enroll_fingerprint",
+   "payload": {
+    "name": "Diego Rios Paz",
+    "finger": 1,
+    "employeeNo": "T002"
+   },
+   "order_status": "done",
+   "result": {
+    "terminal": "Sim"
+   },
+   "error_message": null,
+   "attempt_count": 1,
+   "created_at": "2026-10-12T18:01:28.567Z",
+   "picked_up_at": "2026-10-12T18:01:28.676Z",
+   "finished_at": "2026-10-12T18:01:28.712Z"
+  },
+  {
+   "id": 6,
+   "agent_id": 3,
+   "terminal_id": 2,
+   "terminal_name": "Reloj Recepcion",
+   "terminal_serial": "SIM320MFWX0001",
+   "employee_id": 15,
+   "employee_name": "Carla Vega Lima",
+   "order_type": "enroll_face",
+   "payload": {
+    "name": "Carla Vega Lima",
+    "employeeNo": "T001"
+   },
+   "order_status": "done",
+   "result": {
+    "terminal": "Sim"
+   },
+   "error_message": null,
+   "attempt_count": 1,
+   "created_at": "2026-10-12T18:01:28.549Z",
+   "picked_up_at": "2026-10-12T18:01:28.676Z",
+   "finished_at": "2026-10-12T18:01:28.698Z"
+  },
+  {
+   "id": 5,
+   "agent_id": 3,
+   "terminal_id": null,
+   "terminal_name": null,
+   "terminal_serial": null,
+   "employee_id": null,
+   "employee_name": null,
+   "order_type": "check_status",
+   "payload": {},
+   "order_status": "done",
+   "result": {
+    "Sim": {
+     "model": "DS-K1T320MFWX-B",
+     "online": true,
+     "people": 4,
+     "serial": "SIM320MFWX0001",
+     "firmware": "V3.5.2",
+     "driftSeconds": -1,
+     "pendingInQueue": 0
+    }
+   },
+   "error_message": null,
+   "attempt_count": 1,
+   "created_at": "2026-10-12T18:01:20.465Z",
+   "picked_up_at": "2026-10-12T18:01:23.675Z",
+   "finished_at": "2026-10-12T18:01:23.779Z"
+  },
+  {
+   "id": 4,
+   "agent_id": 3,
+   "terminal_id": null,
+   "terminal_name": null,
+   "terminal_serial": null,
+   "employee_id": 2,
+   "employee_name": "Fabian Luna Gil",
+   "order_type": "sync_person",
+   "payload": {
+    "name": "Fabian Luna Gil",
+    "employeeNo": "TEST-02"
+   },
+   "order_status": "done",
+   "result": {
+    "terminals": 1
+   },
+   "error_message": null,
+   "attempt_count": 1,
+   "created_at": "2026-10-12T18:01:20.407Z",
+   "picked_up_at": "2026-10-12T18:01:23.675Z",
+   "finished_at": "2026-10-12T18:01:23.757Z"
+  },
+  {
+   "id": 3,
+   "agent_id": 3,
+   "terminal_id": null,
+   "terminal_name": null,
+   "terminal_serial": null,
+   "employee_id": 1,
+   "employee_name": "Gloria Mena Roa",
+   "order_type": "sync_person",
+   "payload": {
+    "name": "Gloria Mena Roa",
+    "employeeNo": "TEST-01"
+   },
+   "order_status": "done",
+   "result": {
+    "terminals": 1
+   },
+   "error_message": null,
+   "attempt_count": 1,
+   "created_at": "2026-10-12T18:01:20.407Z",
+   "picked_up_at": "2026-10-12T18:01:23.675Z",
+   "finished_at": "2026-10-12T18:01:23.737Z"
+  },
+  {
+   "id": 2,
+   "agent_id": 3,
+   "terminal_id": null,
+   "terminal_name": null,
+   "terminal_serial": null,
+   "employee_id": 8,
+   "employee_name": "Diego Rios Paz",
+   "order_type": "sync_person",
+   "payload": {
+    "name": "Diego Rios Paz",
+    "employeeNo": "T002"
+   },
+   "order_status": "done",
+   "result": {
+    "terminals": 1
+   },
+   "error_message": null,
+   "attempt_count": 1,
+   "created_at": "2026-10-12T18:01:20.407Z",
+   "picked_up_at": "2026-10-12T18:01:23.675Z",
+   "finished_at": "2026-10-12T18:01:23.716Z"
+  },
+  {
+   "id": 1,
+   "agent_id": 3,
+   "terminal_id": null,
+   "terminal_name": null,
+   "terminal_serial": null,
+   "employee_id": 15,
+   "employee_name": "Carla Vega Lima",
+   "order_type": "sync_person",
+   "payload": {
+    "name": "Carla Vega Lima",
+    "employeeNo": "T001"
+   },
+   "order_status": "done",
+   "result": {
+    "terminals": 1
+   },
+   "error_message": null,
+   "attempt_count": 1,
+   "created_at": "2026-10-12T18:01:20.407Z",
+   "picked_up_at": "2026-10-12T18:01:23.675Z",
+   "finished_at": "2026-10-12T18:01:23.697Z"
+  }
+ ],
+ "total": 8,
+ "page": 1,
+ "limit": 20
+}

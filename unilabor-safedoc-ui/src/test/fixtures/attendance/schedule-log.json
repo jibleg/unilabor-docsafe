@@ -1,0 +1,52 @@
+{
+ "data": [
+  {
+   "id": 24,
+   "employee_id": 5,
+   "employee_name": "Beto Salas Mora",
+   "action": "schedule",
+   "shift_name": "TEST-UI Matutino",
+   "description": "Programo TEST-UI Matutino 07:00-15:00 (lun, mar, mie, jue, vie, cada semana) desde 2026-10-05 sin fecha fin",
+   "start_date": "2026-10-05",
+   "end_date": null,
+   "repeats_weekly": true,
+   "weekdays": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "changed_by_user_id": "eb6091bd-dfa7-4be7-948f-8ca22f016c20",
+   "changed_by_name": "Admin Prueba",
+   "changed_at": "2026-10-12T19:58:14.550Z"
+  },
+  {
+   "id": 23,
+   "employee_id": 3,
+   "employee_name": "Ana Torres Ruiz",
+   "action": "schedule",
+   "shift_name": "TEST-UI Matutino",
+   "description": "Programo TEST-UI Matutino 07:00-15:00 (lun, mar, mie, jue, vie, cada semana) desde 2026-10-05 sin fecha fin",
+   "start_date": "2026-10-05",
+   "end_date": null,
+   "repeats_weekly": true,
+   "weekdays": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "changed_by_user_id": "eb6091bd-dfa7-4be7-948f-8ca22f016c20",
+   "changed_by_name": "Admin Prueba",
+   "changed_at": "2026-10-12T19:58:14.550Z"
+  }
+ ],
+ "pagination": {
+  "page": 1,
+  "limit": 20,
+  "total": 2,
+  "total_pages": 1
+ }
+}

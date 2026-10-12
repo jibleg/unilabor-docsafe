@@ -100,7 +100,9 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
                       ? 'Unilabor Administración'
                       : moduleCode === 'PROVIDERS'
                         ? 'Unilabor Acuerdos'
-                        : 'Unilabor Calidad'}
+                        : moduleCode === 'ATTENDANCE'
+                          ? 'Unilabor Asistencias'
+                          : 'Unilabor Calidad'}
               </p>
             </div>
           </div>

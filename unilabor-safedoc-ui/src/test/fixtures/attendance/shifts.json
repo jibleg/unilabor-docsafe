@@ -1,0 +1,40 @@
+{
+ "shifts": [
+  {
+   "id": 116,
+   "name": "TEST-UI Matutino",
+   "start_time": "07:00",
+   "end_time": "15:00",
+   "crosses_midnight": false,
+   "break_minutes": 30,
+   "shift_type": "fixed",
+   "color_hex": "#2563eb",
+   "is_active": true,
+   "assignments_count": 2
+  },
+  {
+   "id": 118,
+   "name": "TEST-UI Vespertino",
+   "start_time": "14:00",
+   "end_time": "22:00",
+   "crosses_midnight": false,
+   "break_minutes": 0,
+   "shift_type": "fixed",
+   "color_hex": "#d97706",
+   "is_active": true,
+   "assignments_count": 0
+  },
+  {
+   "id": 117,
+   "name": "TEST-UI Nocturno",
+   "start_time": "22:00",
+   "end_time": "06:00",
+   "crosses_midnight": true,
+   "break_minutes": 30,
+   "shift_type": "fixed",
+   "color_hex": "#7c3aed",
+   "is_active": true,
+   "assignments_count": 0
+  }
+ ]
+}

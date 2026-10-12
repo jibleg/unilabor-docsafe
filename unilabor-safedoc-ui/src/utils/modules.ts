@@ -8,7 +8,8 @@ export const normalizeModuleCode = (value?: string | null): ModuleCode | null =>
     normalizedValue === 'RH' ||
     normalizedValue === 'HELPDESK' ||
     normalizedValue === 'ADMIN' ||
-    normalizedValue === 'PROVIDERS'
+    normalizedValue === 'PROVIDERS' ||
+    normalizedValue === 'ATTENDANCE'
   ) {
     return normalizedValue;
   }
@@ -31,6 +32,10 @@ export const getModuleHomePath = (moduleCode: ModuleCode): string => {
 
   if (moduleCode === 'PROVIDERS') {
     return '/providers';
+  }
+
+  if (moduleCode === 'ATTENDANCE') {
+    return '/attendance/dashboard';
   }
 
   return '/quality/dashboard';

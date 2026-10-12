@@ -1,0 +1,108 @@
+{
+ "incident_types": [
+  {
+   "id": 1,
+   "code": "vacation",
+   "name": "Vacaciones",
+   "requires_attachment": true,
+   "is_paid": true,
+   "deducts_vacation": true,
+   "counts_as_attendance": true,
+   "is_hourly": false,
+   "is_system": true,
+   "sort_order": 10,
+   "is_active": true
+  },
+  {
+   "id": 2,
+   "code": "medical_leave",
+   "name": "Incapacidad",
+   "requires_attachment": true,
+   "is_paid": true,
+   "deducts_vacation": false,
+   "counts_as_attendance": true,
+   "is_hourly": false,
+   "is_system": true,
+   "sort_order": 20,
+   "is_active": true
+  },
+  {
+   "id": 3,
+   "code": "paid_permission",
+   "name": "Permiso con goce",
+   "requires_attachment": true,
+   "is_paid": true,
+   "deducts_vacation": false,
+   "counts_as_attendance": true,
+   "is_hourly": false,
+   "is_system": true,
+   "sort_order": 30,
+   "is_active": true
+  },
+  {
+   "id": 4,
+   "code": "unpaid_permission",
+   "name": "Permiso sin goce",
+   "requires_attachment": true,
+   "is_paid": false,
+   "deducts_vacation": false,
+   "counts_as_attendance": false,
+   "is_hourly": false,
+   "is_system": true,
+   "sort_order": 40,
+   "is_active": true
+  },
+  {
+   "id": 5,
+   "code": "business_trip",
+   "name": "Comision",
+   "requires_attachment": true,
+   "is_paid": true,
+   "deducts_vacation": false,
+   "counts_as_attendance": true,
+   "is_hourly": false,
+   "is_system": true,
+   "sort_order": 50,
+   "is_active": true
+  },
+  {
+   "id": 6,
+   "code": "justified_absence",
+   "name": "Falta justificada",
+   "requires_attachment": true,
+   "is_paid": true,
+   "deducts_vacation": false,
+   "counts_as_attendance": true,
+   "is_hourly": false,
+   "is_system": true,
+   "sort_order": 60,
+   "is_active": true
+  },
+  {
+   "id": 7,
+   "code": "holiday_worked",
+   "name": "Festivo trabajado",
+   "requires_attachment": false,
+   "is_paid": true,
+   "deducts_vacation": false,
+   "counts_as_attendance": true,
+   "is_hourly": false,
+   "is_system": true,
+   "sort_order": 70,
+   "is_active": true
+  },
+  {
+   "id": 8,
+   "code": "overtime",
+   "name": "Horas extra",
+   "requires_attachment": false,
+   "is_paid": true,
+   "deducts_vacation": false,
+   "counts_as_attendance": true,
+   "is_hourly": true,
+   "is_system": true,
+   "sort_order": 80,
+   "is_active": true
+  }
+ ]
+}

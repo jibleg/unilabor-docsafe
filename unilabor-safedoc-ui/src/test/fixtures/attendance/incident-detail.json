@@ -1,0 +1,44 @@
+{
+ "incident": {
+  "id": 64,
+  "employee": {
+   "id": 3,
+   "full_name": "Ana Torres Ruiz",
+   "employee_code": "AKHA",
+   "branch_id": 1,
+   "branch_name": "UNILABOR CENTRO"
+  },
+  "type": {
+   "id": 3,
+   "code": "paid_permission",
+   "name": "Permiso con goce",
+   "is_hourly": false,
+   "requires_attachment": true,
+   "deducts_vacation": false
+  },
+  "start_date": "2026-10-14",
+  "end_date": "2026-10-14",
+  "days": 1,
+  "hours": null,
+  "status": "captured",
+  "reason": "TEST-UI permiso de prueba",
+  "imss_folio": null,
+  "captured_by_name": "Admin Prueba",
+  "authorized_by_name": null,
+  "authorized_at": null,
+  "authorization_notes": null,
+  "notified_at": null,
+  "attachments_count": 1,
+  "created_at": "2026-10-12T19:58:21.341Z",
+  "attachments": [
+   {
+    "id": 13,
+    "original_file_name": "comprobante.png",
+    "mime_type": "image/png",
+    "size_bytes": 70,
+    "uploaded_at": "2026-10-12T19:58:21.341Z",
+    "uploaded_by_name": "Admin Prueba"
+   }
+  ]
+ }
+}

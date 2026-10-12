@@ -1,0 +1,10 @@
+{
+ "summary": {
+  "enabled": 3,
+  "without_branch": 0,
+  "without_device_number": 0,
+  "pending_sync": 2,
+  "without_schedule": 1,
+  "sync_error": 0
+ }
+}
