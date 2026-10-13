@@ -27,6 +27,8 @@ Requisitos: Node.js 22.5 o superior (usa `node:sqlite`, sin dependencias npm), u
 }
 ```
 
+`recoveryHours` (24 por defecto) es cuantas horas hacia atras le pide el agente al reloj en cada recuperacion (al arrancar y cada 10 min): subelo (p. ej. a 48 o 72) si quieres poder recuperar checadas tras un apagado largo de la PC del agente; el JSON no admite comentarios, por eso la nota vive aqui.
+
 Las credenciales del reloj solo viven en este archivo; protegelo (acceso solo para el usuario del servicio). `pushHost` (opcional) fuerza la IP a la que el reloj enviara el push si la PC tiene varias tarjetas de red.
 
 4. Prueba a mano: `node src/agent.js`. Debe mostrar "push configurado" y en DocSafe el reloj aparece en linea. Ajusta el firewall de Windows para permitir el puerto `listenPort` (8085) entrante desde la LAN.
