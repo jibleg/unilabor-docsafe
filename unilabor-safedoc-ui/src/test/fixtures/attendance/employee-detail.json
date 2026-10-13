@@ -28,6 +28,10 @@
         "face_sync_error": null,
         "on_device": true
       }
-    ]
+    ],
+    "biometrics": {
+      "fingerprint": false,
+      "face": false
+    }
   }
 }

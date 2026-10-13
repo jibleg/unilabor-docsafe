@@ -41,6 +41,8 @@ export interface AttendanceEmployee {
   face_sync_error: string | null;
   /** Relojes (sucursales) donde se registra: la base y las adicionales, con su estado de sincronizacion. */
   device_branches: DeviceBranchView[];
+  /** Con que metodos biometricos puede checar (por lo registrado en DocSafe y las checadas que ya hizo). */
+  biometrics: { fingerprint: boolean; face: boolean };
 }
 
 export interface DeviceBranchView {
@@ -112,6 +114,16 @@ const EMPLOYEE_SELECT = `
              FROM attendance.employee_device_branches r
              JOIN public.helpdesk_asset_units rb ON rb.id = r.branch_id
             WHERE r.employee_id = e.id), '[]'::json) AS device_branches,
+         (EXISTS (SELECT 1 FROM attendance.agent_orders o
+                   WHERE o.employee_id = e.id AND o.order_type = 'enroll_fingerprint' AND o.order_status = 'done')
+          OR EXISTS (SELECT 1 FROM attendance.punches pu
+                      WHERE pu.employee_id = e.id AND pu.verification_method = 'fingerprint')) AS has_fingerprint,
+         (EXISTS (SELECT 1 FROM attendance.employee_device_branches fr
+                   WHERE fr.employee_id = e.id AND fr.face_sync_status = 'synced')
+          OR EXISTS (SELECT 1 FROM attendance.agent_orders o
+                      WHERE o.employee_id = e.id AND o.order_type = 'enroll_face' AND o.order_status = 'done')
+          OR EXISTS (SELECT 1 FROM attendance.punches pu
+                      WHERE pu.employee_id = e.id AND pu.verification_method = 'face')) AS has_face,
          ${SCHEDULE_EXISTS} AS has_schedule,
          (p.device_employee_number IS NOT NULL AND EXISTS (
            SELECT 1 FROM attendance.punches pu
@@ -121,9 +133,15 @@ const EMPLOYEE_SELECT = `
     LEFT JOIN public.helpdesk_asset_units b ON b.id = e.branch_id
     LEFT JOIN attendance.employee_profiles p ON p.employee_id = e.id`;
 
-const withSuggestion = (row: Omit<AttendanceEmployee, 'suggested_device_number'>): AttendanceEmployee => ({
+type EmployeeRow = Omit<AttendanceEmployee, 'suggested_device_number' | 'biometrics'> & {
+  has_fingerprint: boolean;
+  has_face: boolean;
+};
+
+const withSuggestion = ({ has_fingerprint, has_face, ...row }: EmployeeRow): AttendanceEmployee => ({
   ...row,
   suggested_device_number: suggestDeviceNumber(row.employee_code),
+  biometrics: { fingerprint: Boolean(has_fingerprint), face: Boolean(has_face) },
 });
 
 const buildFilters = (query: EmployeesQuery): { where: string; values: unknown[] } => {

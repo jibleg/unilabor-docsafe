@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Camera, Loader2, Send, UserRound } from 'lucide-react';
 import {
   fetchFacePhotoUrl, sendFacePhoto, type AttendanceEmployee, type DeviceSyncStatus,
@@ -28,7 +28,6 @@ export const FacePhotoSection = ({ employee, canWrite, onChanged }: Props) => {
   const [file, setFile] = useState<File | null>(null);
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!employee.has_face_photo) {
@@ -90,22 +89,7 @@ export const FacePhotoSection = ({ employee, canWrite, onChanged }: Props) => {
           ) : null}
           {canWrite ? (
             <div className="flex flex-wrap gap-2">
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="sr-only"
-                aria-label="Cargar fotografía desde archivo"
-                onChange={(event) => {
-                  const chosen = event.target.files?.[0] ?? null;
-                  event.target.value = '';
-                  if (chosen) {
-                    setFile(chosen);
-                    setOpen(true);
-                  }
-                }}
-              />
-              <button type="button" className={secondaryButtonClass} onClick={() => inputRef.current?.click()}>
+              <button type="button" className={secondaryButtonClass} onClick={() => { setFile(null); setOpen(true); }}>
                 <Camera size={15} aria-hidden="true" /> {employee.has_face_photo ? 'Cambiar foto' : 'Cargar foto'}
               </button>
               {employee.has_face_photo && onDevice ? (

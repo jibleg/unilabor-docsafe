@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifyError, notifySuccess } from '../../../utils/notify';
 import { formatDate, formatDateTime } from '../shared/format';
 import { AttendanceDataForm } from './AttendanceDataForm';
+import { CheckInMethods } from './CheckInMethods';
 import { FacePhotoSection } from './FacePhotoSection';
 import { ReadinessIcons } from './ReadinessIcons';
 import { SYNC_LABEL, syncBadgeClass } from './readiness';
@@ -79,6 +80,8 @@ export const AttendanceDataCard = ({ employee, branches, canWrite, canDevices, o
             <Row label="Ingreso">{employee.hire_date ? formatDate(employee.hire_date) : null}</Row>
           </dl>
           {employee.is_enabled ? <ReadinessIcons employee={employee} showLabel /> : null}
+
+          <CheckInMethods employee={employee} />
 
           <FacePhotoSection employee={employee} canWrite={canWrite} onChanged={onChanged} />
 

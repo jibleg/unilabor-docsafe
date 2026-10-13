@@ -31,6 +31,8 @@ export interface AttendanceEmployee {
   face_sync_error: string | null;
   /** Relojes (sucursales) donde se registra: la base y las adicionales, con su estado. */
   device_branches: DeviceBranchView[];
+  /** Metodos biometricos con los que puede checar (lo registrado en DocSafe y las checadas ya hechas). */
+  biometrics: { fingerprint: boolean; face: boolean };
 }
 
 export interface DeviceBranchView {

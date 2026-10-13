@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ImagePlus, Loader2, RotateCcw, Save, ZoomIn, ZoomOut } from 'lucide-react';
+import { Camera, ImagePlus, Loader2, RotateCcw, Save, ZoomIn, ZoomOut } from 'lucide-react';
 import { uploadFacePhoto, type AttendanceEmployee } from '../../../api/service.api-attendance-employees';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifyError, notifyWarning } from '../../../utils/notify';
 import {
   FRAME_HEIGHT, FRAME_WIDTH, MAX_ZOOM, MIN_ZOOM, clampCrop, exportFaceJpeg, imageBox, zoomTo, type CropState,
 } from './faceCrop';
+import { FaceCameraCapture } from './FaceCameraCapture';
 import { primaryButtonClass, secondaryButtonClass } from './ui';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp';
@@ -27,6 +28,7 @@ export const FacePhotoCropper = ({ initialFile, employeeId, onSaved, onCancel }:
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [crop, setCrop] = useState<CropState>({ zoom: 1, x: 0, y: 0 });
   const [saving, setSaving] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ pointerX: number; pointerY: number; startX: number; startY: number } | null>(null);
@@ -129,15 +131,33 @@ export const FacePhotoCropper = ({ initialFile, employeeId, onSaved, onCancel }:
         }}
       />
 
-      {!image ? (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[rgba(0,65,106,0.2)] bg-[rgba(248,251,253,0.9)] px-4 py-10 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.25)]"
-        >
-          <ImagePlus size={28} aria-hidden="true" /> Elegir archivo de imagen
-          <span className="text-xs font-normal text-[var(--unilabor-neutral)]">JPG, PNG o WebP · de frente y con buena luz</span>
-        </button>
+      {!image && cameraOpen ? (
+        <FaceCameraCapture
+          onCapture={(file) => {
+            setCameraOpen(false);
+            loadFile(file);
+          }}
+          onCancel={() => setCameraOpen(false)}
+        />
+      ) : !image ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setCameraOpen(true)}
+            className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[rgba(0,65,106,0.2)] bg-[rgba(248,251,253,0.9)] px-4 py-8 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.25)]"
+          >
+            <Camera size={28} aria-hidden="true" /> Tomar foto con la cámara
+            <span className="text-center text-xs font-normal text-[var(--unilabor-neutral)]">PC o celular · de frente y con buena luz</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-[rgba(0,65,106,0.2)] bg-[rgba(248,251,253,0.9)] px-4 py-8 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.25)]"
+          >
+            <ImagePlus size={28} aria-hidden="true" /> Elegir archivo de imagen
+            <span className="text-center text-xs font-normal text-[var(--unilabor-neutral)]">JPG, PNG o WebP</span>
+          </button>
+        </div>
       ) : (
         <>
           <div className="flex justify-center">
@@ -218,9 +238,14 @@ export const FacePhotoCropper = ({ initialFile, employeeId, onSaved, onCancel }:
 
       <div className="flex flex-wrap justify-end gap-2">
         {image && (
-          <button type="button" className={secondaryButtonClass} onClick={() => inputRef.current?.click()} disabled={saving}>
-            <ImagePlus size={15} /> Cambiar imagen
-          </button>
+          <>
+            <button type="button" className={secondaryButtonClass} onClick={() => { setImage(null); setCameraOpen(true); }} disabled={saving}>
+              <Camera size={15} /> Tomar otra foto
+            </button>
+            <button type="button" className={secondaryButtonClass} onClick={() => inputRef.current?.click()} disabled={saving}>
+              <ImagePlus size={15} /> Cambiar imagen
+            </button>
+          </>
         )}
         <button type="button" className={secondaryButtonClass} onClick={onCancel} disabled={saving}>Cancelar</button>
         <button type="button" className={primaryButtonClass} onClick={() => void save()} disabled={!image || saving}>

@@ -91,15 +91,49 @@ describe('Ficha de colaborador', () => {
     expect(await screen.findByText('90210')).toBeInTheDocument();
   });
 
-  it('fotografía: ofrece cargar desde archivo y abre el panel de recorte', async () => {
+  it('fotografía: abre el panel y ofrece cámara o archivo', async () => {
     await page();
     await ready();
     expect(await screen.findByText('Sin fotografía')).toBeInTheDocument();
-    const input = screen.getByLabelText('Cargar fotografía desde archivo') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [new File(['x'], 'rostro.jpg', { type: 'image/jpeg' })] } });
+    fireEvent.click(screen.getByRole('button', { name: /Cargar foto/ }));
     const drawer = await screen.findByRole('dialog', { name: 'Fotografía de rostro' });
-    expect(drawer).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Guardar fotografía/ })).toBeDisabled();
+    expect(within(drawer).getByRole('button', { name: /Tomar foto con la cámara/ })).toBeInTheDocument();
+    expect(within(drawer).getByRole('button', { name: /Elegir archivo de imagen/ })).toBeInTheDocument();
+    expect(within(drawer).getByRole('button', { name: /Guardar fotografía/ })).toBeDisabled();
+  });
+
+  it('fotografía: sin soporte de cámara (HTTP) lo explica y ofrece la cámara del celular', async () => {
+    await page();
+    await ready();
+    fireEvent.click(screen.getByRole('button', { name: /Cargar foto/ }));
+    const drawer = await screen.findByRole('dialog', { name: 'Fotografía de rostro' });
+    fireEvent.click(within(drawer).getByRole('button', { name: /Tomar foto con la cámara/ }));
+    expect(await within(drawer).findByRole('alert')).toHaveTextContent('HTTPS');
+    expect(within(drawer).getByLabelText('Tomar foto con la cámara del celular')).toHaveAttribute('capture', 'user');
+    expect(within(drawer).getByRole('button', { name: /Tomar foto$/ })).toBeDisabled();
+  });
+
+  it('fotografía: con cámara disponible habilita Tomar foto y libera la cámara al cerrarla', async () => {
+    const stop = vi.fn();
+    const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia, enumerateDevices: vi.fn().mockResolvedValue([{ kind: 'videoinput' }, { kind: 'videoinput' }]) }, configurable: true });
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    try {
+      await page();
+      await ready();
+      fireEvent.click(screen.getByRole('button', { name: /Cargar foto/ }));
+      const drawer = await screen.findByRole('dialog', { name: 'Fotografía de rostro' });
+      fireEvent.click(within(drawer).getByRole('button', { name: /Tomar foto con la cámara/ }));
+      await waitFor(() => expect(within(drawer).getByRole('button', { name: /Tomar foto$/ })).toBeEnabled());
+      expect(getUserMedia).toHaveBeenCalledWith(expect.objectContaining({ audio: false }));
+      expect(await within(drawer).findByRole('button', { name: /Cambiar cámara/ })).toBeInTheDocument();
+      fireEvent.click(within(drawer).getByRole('button', { name: /Cerrar cámara/ }));
+      expect(stop).toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(navigator, 'mediaDevices');
+      vi.restoreAllMocks();
+    }
   });
 
   it('error 409 de numero repetido se muestra', async () => {
@@ -198,5 +232,25 @@ describe('Ficha: varias sucursales', () => {
     fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
     await waitFor(() => expect(callsTo('PATCH', /employees\/3$/)).toHaveLength(1));
     expect((callsTo('PATCH', /employees\/3$/)[0].data as { extra_branch_ids: number[] }).extra_branch_ids.sort()).toEqual([2, 3]);
+  });
+});
+
+describe('Ficha: metodos para checar', () => {
+  it('sin biometria registrada lo indica', async () => {
+    await page();
+    await ready();
+    expect(await screen.findByText('Aún no tiene huella ni rostro registrados en el reloj.')).toBeInTheDocument();
+    expect(screen.getByText('Sin huella')).toBeInTheDocument();
+    expect(screen.getByText('Sin rostro')).toBeInTheDocument();
+  });
+
+  it('con huella y rostro indica que puede checar con ambos', async () => {
+    respond('GET', /\/attendance\/employees\/3$/, () => ({ employee: { ...fx<{ employee: object }>('employee-detail').employee, biometrics: { fingerprint: true, face: true } } }));
+    await page();
+    await ready();
+    expect(await screen.findByText('Puede checar con huella y con rostro.')).toBeInTheDocument();
+    const list = screen.getByLabelText('Métodos para checar');
+    expect(within(list).getByText('Huella')).toBeInTheDocument();
+    expect(within(list).getByText('Rostro')).toBeInTheDocument();
   });
 });
