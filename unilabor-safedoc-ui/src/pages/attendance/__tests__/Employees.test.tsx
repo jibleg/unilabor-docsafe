@@ -94,7 +94,7 @@ describe('Colaboradores', () => {
     const target = emps().find((e) => !e.is_enabled && (e.branch_id === null || !e.device_employee_number))!;
     fireEvent.click(screen.getByRole('button', { name: `Habilitar a ${target.full_name}` }));
     expect(await screen.findByRole('dialog', { name: 'Edición rápida' })).toBeInTheDocument();
-    expect(notify.notifyError).toHaveBeenCalledWith('Para habilitar completa la sucursal y el número de reloj.');
+    expect(notify.notifyError).toHaveBeenCalledWith('Para habilitar completa la sucursal y el número de empleado.');
   });
 
   it('deshabilitar pide confirmacion y hace PATCH', async () => {
@@ -119,31 +119,31 @@ describe('Colaboradores', () => {
       const dialog = await open();
       const first = emps()[0];
       fireEvent.click(await within(dialog).findByRole('checkbox', { name: `Elegir a ${first.full_name}` }));
-      const input = within(dialog).getByLabelText(`Número de reloj de ${first.full_name}`);
+      const input = within(dialog).getByLabelText(`Número de empleado de ${first.full_name}`);
       fireEvent.change(input, { target: { value: '' } });
       fireEvent.click(within(dialog).getByRole('button', { name: /^Habilitar$/ }));
       expect(within(dialog).getByRole('alert')).toHaveTextContent('Corrige las filas marcadas.');
-      expect(within(dialog).getByText('Falta el número de reloj.')).toBeInTheDocument();
+      expect(within(dialog).getByText('Falta el número de empleado.')).toBeInTheDocument();
       fireEvent.change(input, { target: { value: 'ab cd!' } });
       fireEvent.click(within(dialog).getByRole('button', { name: /^Habilitar$/ }));
-      expect(within(dialog).getByText('Solo letras, números y guion (hasta 20).')).toBeInTheDocument();
+      expect(within(dialog).getByText('Solo dígitos (hasta 20): el reloj no acepta letras ni guiones.')).toBeInTheDocument();
       expect(callsTo('POST', '/attendance/employees/bulk-enable')).toHaveLength(0);
     });
     it('muestra errores por fila del 400 y no cierra', async () => {
       const [a, b] = emps();
-      respond('POST', '/attendance/employees/bulk-enable', () => { throw httpError(400, { message: 'Hay filas con errores; no se habilito a nadie.', details: { rows: [{ employee_id: b.id, message: 'El numero de reloj X se repite.' }] } }); });
+      respond('POST', '/attendance/employees/bulk-enable', () => { throw httpError(400, { message: 'Hay filas con errores; no se habilito a nadie.', details: { rows: [{ employee_id: b.id, message: 'El numero de empleado X se repite.' }] } }); });
       const dialog = await open();
       fireEvent.click(await within(dialog).findByRole('checkbox', { name: `Elegir a ${a.full_name}` }));
       fireEvent.click(within(dialog).getByRole('checkbox', { name: `Elegir a ${b.full_name}` }));
-      for (const e of [a, b]) fireEvent.change(within(dialog).getByLabelText(`Número de reloj de ${e.full_name}`), { target: { value: `N-${e.id}` } });
+      for (const e of [a, b]) fireEvent.change(within(dialog).getByLabelText(`Número de empleado de ${e.full_name}`), { target: { value: `9${e.id}` } });
       fireEvent.change(within(dialog).getByLabelText('Sucursal por defecto'), { target: { value: '1' } });
       fireEvent.click(within(dialog).getByRole('button', { name: /^Habilitar$/ }));
       await waitFor(() => expect(callsTo('POST', '/attendance/employees/bulk-enable')).toHaveLength(1));
       expect(callsTo('POST', '/attendance/employees/bulk-enable')[0].data).toEqual({
-        rows: [{ employee_id: a.id, device_employee_number: `N-${a.id}` }, { employee_id: b.id, device_employee_number: `N-${b.id}` }],
+        rows: [{ employee_id: a.id, device_employee_number: `9${a.id}` }, { employee_id: b.id, device_employee_number: `9${b.id}` }],
         default_branch_id: 1,
       });
-      expect(await within(dialog).findByText('El numero de reloj X se repite.')).toBeInTheDocument();
+      expect(await within(dialog).findByText('El numero de empleado X se repite.')).toBeInTheDocument();
       expect(within(dialog).getByRole('alert')).toHaveTextContent('no se habilito a nadie');
     });
     it('exito cierra y recarga', async () => {
@@ -151,7 +151,7 @@ describe('Colaboradores', () => {
       const dialog = await open();
       const a = emps()[0];
       fireEvent.click(await within(dialog).findByRole('checkbox', { name: `Elegir a ${a.full_name}` }));
-      fireEvent.change(within(dialog).getByLabelText(`Número de reloj de ${a.full_name}`), { target: { value: 'N-1' } });
+      fireEvent.change(within(dialog).getByLabelText(`Número de empleado de ${a.full_name}`), { target: { value: '91' } });
       fireEvent.change(within(dialog).getByLabelText('Sucursal por defecto'), { target: { value: '1' } });
       const before = listCalls().length;
       fireEvent.click(within(dialog).getByRole('button', { name: /^Habilitar$/ }));

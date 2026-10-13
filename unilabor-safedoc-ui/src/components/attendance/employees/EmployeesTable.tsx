@@ -19,7 +19,7 @@ export const EmployeesTable = ({ employees, canWrite, onToggle, onEdit }: Props)
         <tr>
           <th className={thClass}>Colaborador</th>
           <th className={thClass}>Sucursal</th>
-          <th className={thClass}>N.º reloj</th>
+          <th className={thClass}>N.º empleado</th>
           <th className={thClass}>Ingreso</th>
           <th className={thClass}>Listo para checar</th>
           <th className={`${thClass} text-right`}>Acciones</th>
@@ -45,21 +45,23 @@ export const EmployeesTable = ({ employees, canWrite, onToggle, onEdit }: Props)
             </td>
             <td className="px-4 py-3">
               <div className="flex items-center justify-end gap-1">
-                <Link to={`/attendance/employees/${employee.id}`} className={iconButtonClass} aria-label={`Ficha de ${employee.full_name}`}>
+                <Link to={`/attendance/employees/${employee.id}`} className={iconButtonClass} aria-label={`Ficha de ${employee.full_name}`} title="Ver ficha del colaborador">
                   <UserRound size={15} />
                 </Link>
                 {canWrite ? (
                   <>
-                    <button type="button" className={iconButtonClass} aria-label={`Editar ${employee.full_name}`} onClick={() => onEdit(employee)}>
+                    <button type="button" className={iconButtonClass} aria-label={`Editar ${employee.full_name}`} title="Editar datos de asistencia" onClick={() => onEdit(employee)}>
                       <Pencil size={15} />
                     </button>
                     <button
                       type="button"
-                      className={iconButtonClass}
+                      className={`${iconButtonClass} ${employee.is_enabled ? 'text-emerald-700' : 'text-[var(--unilabor-neutral)]'}`}
+                      aria-pressed={employee.is_enabled}
                       aria-label={employee.is_enabled ? `Deshabilitar a ${employee.full_name}` : `Habilitar a ${employee.full_name}`}
+                      title={employee.is_enabled ? 'Habilitado para checar (clic para deshabilitar)' : 'No habilitado para checar (clic para habilitar)'}
                       onClick={() => onToggle(employee)}
                     >
-                      {employee.is_enabled ? <PowerOff size={15} /> : <Power size={15} />}
+                      {employee.is_enabled ? <Power size={15} /> : <PowerOff size={15} />}
                     </button>
                   </>
                 ) : null}

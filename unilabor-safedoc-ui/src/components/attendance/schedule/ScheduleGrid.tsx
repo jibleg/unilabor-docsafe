@@ -60,11 +60,14 @@ export const ScheduleGrid = ({ rows, dates, today, maxShiftsPerDay, canWrite, se
               {dates.map((date) => {
                 const day = row.days.find((d) => d.date === date);
                 const isToday = date === today;
+                // Un dia de descanso no admite turnos: primero se elimina el descanso (clic en su pildora).
+                const canProgram = canWrite && !day?.is_rest_day;
                 return (
                   <td
                     key={date}
-                    onClick={canWrite ? () => onCellClick(row, date) : undefined}
-                    className={`group/cell relative px-1.5 py-1.5 ${isToday ? 'bg-[rgba(249,179,24,0.08)]' : ''} ${canWrite ? 'cursor-pointer hover:bg-[rgba(191,212,230,0.18)]' : ''}`}
+                    onClick={canProgram ? () => onCellClick(row, date) : undefined}
+                    title={canWrite && day?.is_rest_day ? 'Día de descanso: elimina el descanso para programar un turno' : undefined}
+                    className={`group/cell relative px-1.5 py-1.5 ${isToday ? 'bg-[rgba(249,179,24,0.08)]' : ''} ${canProgram ? 'cursor-pointer hover:bg-[rgba(191,212,230,0.18)]' : ''}`}
                   >
                     <div className="space-y-1">
                       {day?.chips.map((chip) => (
@@ -81,7 +84,7 @@ export const ScheduleGrid = ({ rows, dates, today, maxShiftsPerDay, canWrite, se
                         </p>
                       )}
                     </div>
-                    {canWrite && (
+                    {canProgram && (
                       <button
                         type="button"
                         aria-label={`Programar a ${row.full_name} el ${date}`}

@@ -15,6 +15,7 @@ const MB = 1024 * 1024;
 export const INCIDENT_FILE_MAX_BYTES = 5 * MB;
 export const INCIDENT_FILE_MAX_COUNT = 3;
 export const IMPORT_FILE_MAX_BYTES = 2 * MB;
+export const FACE_PHOTO_MAX_BYTES = 400 * 1024;
 
 const ALLOWED_MIME_EXTENSIONS: Record<string, string> = {
   'image/jpeg': '.jpg',
@@ -58,6 +59,15 @@ const importUpload = multer({
   limits: { fileSize: IMPORT_FILE_MAX_BYTES, files: 1 },
 }).single('file');
 
+const facePhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: FACE_PHOTO_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'image/jpeg') cb(null, true);
+    else cb(new Error('La fotografía debe ser una imagen JPEG.'));
+  },
+}).single('photo');
+
 const translateUploadError = (error: unknown, fileLimit: string): string => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') return `El archivo excede el tamano maximo permitido (${fileLimit}).`;
@@ -86,6 +96,9 @@ export const uploadIncidentFiles: RequestHandler = wrap(incidentUpload, '5 MB');
 
 /** Libro de Excel de importacion: campo `file`, hasta 2 MB, en memoria. */
 export const uploadImportWorkbook: RequestHandler = wrap(importUpload, '2 MB');
+
+/** Fotografia de rostro (JPEG ya recortado en el navegador): campo `photo`, hasta 400 KB, en memoria. */
+export const uploadFacePhoto: RequestHandler = wrap(facePhotoUpload, '400 KB');
 
 /** Aplana los archivos subidos por `uploadIncidentFiles`. */
 export const collectUploadedFiles = (req: Request): Express.Multer.File[] => {

@@ -18,6 +18,7 @@ export const REASON_LABEL: Record<string, string> = {
   late_entry: 'Entrada tardía',
   early_exit: 'Salida anticipada',
   no_punches: 'Sin checadas',
+  no_entry_in_window: 'Sin checada de entrada en su ventana',
   excessive_late: 'Retardo excesivo',
   missing_exit: 'Falta checada de salida',
   workday_incomplete: 'Jornada incompleta',

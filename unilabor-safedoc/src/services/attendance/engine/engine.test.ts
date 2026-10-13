@@ -21,13 +21,16 @@ import { addDays, dateToLocalMs, isoWeekday, startOfWeek } from './time';
 const MIN = 60_000;
 const settings = DEFAULT_ATTENDANCE_SETTINGS;
 
+/** Ventanas amplias: estas pruebas ejercitan retardo/salida anticipada, no las ventanas (ver punch-windows.test.ts). */
+const WIDE = { entryBeforeMin: 60, entryAfterMin: 240, exitBeforeMin: 240, exitAfterMin: 240 };
+
 const shifts = new Map<number, EngineShift>([
-  [1, { id: 1, name: 'Matutino', startTime: '08:00', endTime: '17:00', breakMinutes: 60, flexible: false, isActive: true }],
-  [2, { id: 2, name: 'Manana', startTime: '09:00', endTime: '13:00', breakMinutes: 0, flexible: false, isActive: true }],
-  [3, { id: 3, name: 'Tarde', startTime: '16:00', endTime: '20:00', breakMinutes: 0, flexible: false, isActive: true }],
-  [4, { id: 4, name: 'Noche', startTime: '22:00', endTime: '06:00', breakMinutes: 0, flexible: false, isActive: true }],
-  [5, { id: 5, name: 'Flexible', startTime: '08:00', endTime: '16:00', breakMinutes: 0, flexible: true, isActive: true }],
-  [6, { id: 6, name: 'Inactivo', startTime: '08:00', endTime: '16:00', breakMinutes: 0, flexible: false, isActive: false }],
+  [1, { id: 1, name: 'Matutino', startTime: '08:00', endTime: '17:00', breakMinutes: 60, flexible: false, isActive: true, ...WIDE }],
+  [2, { id: 2, name: 'Manana', startTime: '09:00', endTime: '13:00', breakMinutes: 0, flexible: false, isActive: true, ...WIDE }],
+  [3, { id: 3, name: 'Tarde', startTime: '16:00', endTime: '20:00', breakMinutes: 0, flexible: false, isActive: true, ...WIDE }],
+  [4, { id: 4, name: 'Noche', startTime: '22:00', endTime: '06:00', breakMinutes: 0, flexible: false, isActive: true, ...WIDE }],
+  [5, { id: 5, name: 'Flexible', startTime: '08:00', endTime: '16:00', breakMinutes: 0, flexible: true, isActive: true, ...WIDE }],
+  [6, { id: 6, name: 'Inactivo', startTime: '08:00', endTime: '16:00', breakMinutes: 0, flexible: false, isActive: false, ...WIDE }],
 ]);
 
 const weekdayAssignment = (id: number, shiftId: number | null, extra: Partial<EngineAssignment> = {}): EngineAssignment => ({

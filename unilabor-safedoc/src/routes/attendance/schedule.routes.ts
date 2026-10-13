@@ -10,6 +10,7 @@ import {
 } from '../../controllers/attendance/schedule.controller';
 import {
   createShiftController,
+  deleteShiftController,
   listShiftsController,
   updateShiftController,
 } from '../../controllers/attendance/shifts.controller';
@@ -35,6 +36,7 @@ const canWrite = requirePermission('ATTENDANCE.SCHEDULES.WRITE');
 router.get('/shifts', canRead, listShiftsController);
 router.post('/shifts', canWrite, validate(createShiftSchema), createShiftController);
 router.patch('/shifts/:id', canWrite, validate(updateShiftSchema), updateShiftController);
+router.delete('/shifts/:id', canWrite, deleteShiftController);
 
 // Calendario y consultas
 router.get('/schedule', canRead, getScheduleController);

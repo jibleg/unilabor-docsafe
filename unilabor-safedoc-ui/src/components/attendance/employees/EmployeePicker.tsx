@@ -14,7 +14,7 @@ interface EmployeePickerProps {
   ariaLabel?: string;
 }
 
-/** Selector con busqueda en el servidor (nombre, codigo o numero de reloj). */
+/** Selector con busqueda en el servidor (nombre, codigo o numero de empleado). */
 export const EmployeePicker = ({
   value,
   onChange,

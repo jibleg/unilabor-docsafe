@@ -10,7 +10,7 @@ interface Props {
 const CHIPS: Array<{ key: SummaryChipKey; label: string; tone: 'neutral' | 'warn' | 'bad' }> = [
   { key: 'enabled', label: 'Habilitados', tone: 'neutral' },
   { key: 'without_branch', label: 'Sin sucursal', tone: 'warn' },
-  { key: 'without_device_number', label: 'Sin número de reloj', tone: 'warn' },
+  { key: 'without_device_number', label: 'Sin número de empleado', tone: 'warn' },
   { key: 'pending_sync', label: 'Por sincronizar', tone: 'warn' },
   { key: 'without_schedule', label: 'Sin horario', tone: 'warn' },
   { key: 'sync_error', label: 'Con error', tone: 'bad' },

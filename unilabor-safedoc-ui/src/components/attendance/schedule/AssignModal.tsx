@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Coffee, Plus, Save } from 'lucide-react';
+import { AlertTriangle, Plus, Save } from 'lucide-react';
 import { getApiErrorMessage } from '../../../api/service';
 import {
   createAssignments,
@@ -9,9 +9,11 @@ import {
 } from '../../../api/service.api-attendance-schedule';
 import { notifyError, notifySuccess, notifyWarning } from '../../../utils/notify';
 import { ConflictList } from './ConflictList';
+import { DrawerShell } from './DrawerShell';
 import { ModalShell } from './ModalShell';
 import { RepeatFields, type RepeatState } from './RepeatFields';
 import { ShiftForm } from './ShiftForm';
+import { REST, ShiftMultiSelect, type ShiftSelection } from './ShiftMultiSelect';
 import { describeWeekdays, findOverlaps, formatHoursValue, isoWeekday, readableTextColor, totalNetHours } from './scheduleHelpers';
 import { inputClass, labelClass, primaryButton, secondaryButton } from './ui';
 
@@ -33,10 +35,8 @@ interface AssignModalProps {
   onShiftCreated: (shift: AttendanceShift) => void;
 }
 
-const REST = 'rest';
-
 export const AssignModal = ({ employees, shifts, weekdayOrder, maxShiftsPerDay, initialDate, hasExistingOnDate, onClose, onSaved, onShiftCreated }: AssignModalProps) => {
-  const [selection, setSelection] = useState<(number | typeof REST)[]>([]);
+  const [selection, setSelection] = useState<ShiftSelection>([]);
   const [startDate, setStartDate] = useState(initialDate);
   const [endDate, setEndDate] = useState('');
   const [repeat, setRepeat] = useState<RepeatState>({ repeats: false, weekInterval: 1, weekdays: [1, 2, 3, 4, 5] });
@@ -124,34 +124,7 @@ export const AssignModal = ({ employees, shifts, weekdayOrder, maxShiftsPerDay, 
                 <Plus size={13} /> Nuevo turno
               </button>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {shifts.map((s) => {
-                const on = selection.includes(s.id);
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggleShift(s.id)}
-                    className={`flex items-center gap-2 rounded-xl border p-2 text-left text-sm transition ${on ? 'border-[var(--color-brand-500)] bg-[rgba(191,212,230,0.3)] ring-1 ring-[var(--color-brand-300)]' : 'border-[rgba(0,65,106,0.12)] bg-white hover:bg-slate-50'}`}
-                  >
-                    <span className="h-4 w-4 shrink-0 rounded-full border border-black/10" style={{ backgroundColor: s.color_hex }} />
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold text-[var(--unilabor-ink)]">{s.name}</span>
-                      <span className="block text-xs tabular-nums text-[var(--unilabor-neutral)]">{s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}</span>
-                    </span>
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                aria-pressed={isRest}
-                onClick={() => toggleShift(REST)}
-                className={`flex items-center gap-2 rounded-xl border border-dashed p-2 text-left text-sm font-semibold transition ${isRest ? 'border-slate-500 bg-slate-100' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
-              >
-                <Coffee size={16} className="text-slate-500" /> Descanso
-              </button>
-            </div>
+            <ShiftMultiSelect shifts={shifts} selection={selection} onToggle={toggleShift} />
             {shifts.length === 0 && <p className="mt-2 text-xs text-[var(--unilabor-neutral)]">No hay turnos activos; crea uno con “Nuevo turno”.</p>}
           </div>
 
@@ -211,19 +184,17 @@ export const AssignModal = ({ employees, shifts, weekdayOrder, maxShiftsPerDay, 
         </div>
       </ModalShell>
 
-      {creating && (
-        <ModalShell title="Nuevo turno" onClose={() => setCreating(false)} widthClass="max-w-xl">
-          <ShiftForm
-            shift={null}
-            onCancel={() => setCreating(false)}
-            onSaved={(shift) => {
-              setCreating(false);
-              onShiftCreated(shift);
-              setSelection((prev) => [...prev.filter((x) => x !== REST), shift.id]);
-            }}
-          />
-        </ModalShell>
-      )}
+      <DrawerShell open={creating} title="Nuevo turno" onClose={() => setCreating(false)}>
+        <ShiftForm
+          shift={null}
+          onCancel={() => setCreating(false)}
+          onSaved={(shift) => {
+            setCreating(false);
+            onShiftCreated(shift);
+            setSelection((prev) => [...prev.filter((x) => x !== REST), shift.id]);
+          }}
+        />
+      </DrawerShell>
     </>
   );
 };

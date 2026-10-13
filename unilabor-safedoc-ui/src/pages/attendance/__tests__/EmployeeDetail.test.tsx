@@ -64,35 +64,46 @@ describe('Ficha de colaborador', () => {
     expect(screen.getByText('Datos de asistencia')).toBeInTheDocument();
   });
 
-  it('editar datos valida el numero de reloj y guarda', async () => {
-    respond('PATCH', /employees\/3$/, () => ({ employee: { ...fx<{ employee: object }>('employee-detail').employee, device_employee_number: 'AKHA-2' } }));
+  it('editar datos valida el numero de empleado y guarda', async () => {
+    respond('PATCH', /employees\/3$/, () => ({ employee: { ...fx<{ employee: object }>('employee-detail').employee, device_employee_number: '90210' } }));
     await page();
     await ready();
     fireEvent.click(await screen.findByRole('button', { name: 'Editar datos de asistencia' }));
-    const num = await screen.findByLabelText('Número de reloj');
+    const num = await screen.findByLabelText('Número de empleado');
     fireEvent.change(num, { target: { value: 'ab cd!' } });
     expect(num).toHaveAttribute('aria-invalid', 'true');
     fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
-    expect(screen.getByRole('alert')).toHaveTextContent('El número de reloj admite letras, números y guion');
+    expect(screen.getByRole('alert')).toHaveTextContent('Solo dígitos');
     expect(callsTo('PATCH', /employees\/3$/)).toHaveLength(0);
     fireEvent.change(num, { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
     // habilitado + sin numero => error
-    expect(screen.getByRole('alert')).toHaveTextContent('Para habilitar necesitas sucursal y número de reloj.');
-    fireEvent.change(num, { target: { value: 'AKHA-2' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Para habilitar necesitas sucursal y número de empleado.');
+    fireEvent.change(num, { target: { value: '90210' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
     await waitFor(() => expect(callsTo('PATCH', /employees\/3$/)).toHaveLength(1));
-    expect(callsTo('PATCH', /employees\/3$/)[0].data).toMatchObject({ is_enabled: true, device_employee_number: 'AKHA-2', branch_id: 1 });
-    await waitFor(() => expect(screen.queryByLabelText('Número de reloj')).not.toBeInTheDocument());
-    expect(await screen.findByText('AKHA-2')).toBeInTheDocument();
+    expect(callsTo('PATCH', /employees\/3$/)[0].data).toMatchObject({ is_enabled: true, device_employee_number: '90210', branch_id: 1 });
+    await waitFor(() => expect(screen.queryByLabelText('Número de empleado')).not.toBeInTheDocument());
+    expect(await screen.findByText('90210')).toBeInTheDocument();
+  });
+
+  it('fotografía: ofrece cargar desde archivo y abre el panel de recorte', async () => {
+    await page();
+    await ready();
+    expect(await screen.findByText('Sin fotografía')).toBeInTheDocument();
+    const input = screen.getByLabelText('Cargar fotografía desde archivo') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['x'], 'rostro.jpg', { type: 'image/jpeg' })] } });
+    const drawer = await screen.findByRole('dialog', { name: 'Fotografía de rostro' });
+    expect(drawer).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Guardar fotografía/ })).toBeDisabled();
   });
 
   it('error 409 de numero repetido se muestra', async () => {
-    respond('PATCH', /employees\/3$/, () => { throw httpError(409, { message: 'El numero de reloj X ya lo usa Fulano.' }); });
+    respond('PATCH', /employees\/3$/, () => { throw httpError(409, { message: 'El numero de empleado X ya lo usa Fulano.' }); });
     await page();
     await ready();
     fireEvent.click(await screen.findByRole('button', { name: 'Editar datos de asistencia' }));
-    fireEvent.change(await screen.findByLabelText('Número de reloj'), { target: { value: 'X' } });
+    fireEvent.change(await screen.findByLabelText('Número de empleado'), { target: { value: '777' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('ya lo usa Fulano');
   });

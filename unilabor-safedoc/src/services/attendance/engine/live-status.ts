@@ -1,4 +1,4 @@
-import { normalizePunches, pairPunches, type DayResult, type EnginePunch } from './day-calculator';
+import { normalizePunches, pairForSegment, pairPunches, splitBySegment, type DayResult, type EnginePunch } from './day-calculator';
 import { hasScheduleOn, resolveDay, type DayPlan, type DaySegment, type EngineAssignment, type EngineShift } from './schedule';
 import type { AttendanceSettings } from './settings';
 import { MS_PER_MINUTE, dateToLocalMs, type DateString, type LocalMs } from './time';
@@ -34,9 +34,6 @@ export interface LiveState {
   lateMinutes: number;
   hasPendingReview: boolean;
 }
-
-/** Minutos antes del inicio del tramo desde los que ya se aceptan checadas. */
-export const EARLY_PUNCH_MINUTES = 60;
 
 const emptyState = (status: LiveStatus, hasPendingReview = false): LiveState => ({
   status,
@@ -84,8 +81,8 @@ export const liveStatus = (input: LiveInput): LiveState => {
   if (!segment) return emptyState('no_schedule', hasPendingReview);
 
   const expectedStart = midnight + segment.startMinute * MS_PER_MINUTE;
-  const earliest = expectedStart - EARLY_PUNCH_MINUTES * MS_PER_MINUTE;
-  const pair = pairPunches(punches.filter((punch) => punch.at >= earliest));
+  const groups = splitBySegment(punches, plan.segments, midnight);
+  const pair = pairForSegment(groups[plan.segments.indexOf(segment)] ?? [], segment, midnight);
   const base = {
     expectedStartMinute: segment.startMinute,
     expectedEndMinute: segment.endMinute,

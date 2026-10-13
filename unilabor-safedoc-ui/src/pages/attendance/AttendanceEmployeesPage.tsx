@@ -131,7 +131,7 @@ export const AttendanceEmployeesPage = () => {
     if (!employee.is_enabled) {
       if (employee.branch_id === null || !employee.device_employee_number) {
         setEditing(employee);
-        notifyError('Para habilitar completa la sucursal y el número de reloj.');
+        notifyError('Para habilitar completa la sucursal y el número de empleado.');
         return;
       }
     } else {
@@ -178,7 +178,7 @@ export const AttendanceEmployeesPage = () => {
           <label className={labelClass} htmlFor="e-search">Buscar</label>
           <div className="relative">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" />
-            <input id="e-search" className={`${inputClass} pl-9`} placeholder="Nombre, código o n.º de reloj" value={list.search} onChange={(event) => list.setSearch(event.target.value)} />
+            <input id="e-search" className={`${inputClass} pl-9`} placeholder="Nombre, código o n.º de empleado" value={list.search} onChange={(event) => list.setSearch(event.target.value)} />
           </div>
         </div>
         <div>

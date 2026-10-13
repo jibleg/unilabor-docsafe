@@ -13,6 +13,10 @@ const shiftFields = {
   shift_type: z.enum(['fixed', 'flexible']),
   color_hex: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, 'El color debe tener formato #RRGGBB'),
   is_active: z.boolean(),
+  entry_before_min: z.number().int().min(0).max(720),
+  entry_after_min: z.number().int().min(0).max(720),
+  exit_before_min: z.number().int().min(0).max(720),
+  exit_after_min: z.number().int().min(0).max(720),
 };
 
 /** Alta de turno: break_minutes, shift_type y color_hex tienen valor por defecto. */
@@ -24,6 +28,10 @@ export const createShiftSchema = z.object({
   shift_type: shiftFields.shift_type.default('fixed'),
   color_hex: shiftFields.color_hex.default('#034898'),
   is_active: shiftFields.is_active.optional(),
+  entry_before_min: shiftFields.entry_before_min.default(20),
+  entry_after_min: shiftFields.entry_after_min.default(30),
+  exit_before_min: shiftFields.exit_before_min.default(1),
+  exit_after_min: shiftFields.exit_after_min.default(20),
 });
 
 /** Edicion parcial de turno (al menos un campo). */
@@ -36,6 +44,10 @@ export const updateShiftSchema = z
     shift_type: shiftFields.shift_type.optional(),
     color_hex: shiftFields.color_hex.optional(),
     is_active: shiftFields.is_active.optional(),
+    entry_before_min: shiftFields.entry_before_min.optional(),
+    entry_after_min: shiftFields.entry_after_min.optional(),
+    exit_before_min: shiftFields.exit_before_min.optional(),
+    exit_after_min: shiftFields.exit_after_min.optional(),
   })
   .refine((value) => Object.values(value).some((field) => field !== undefined), {
     message: 'Indica al menos un campo a actualizar',

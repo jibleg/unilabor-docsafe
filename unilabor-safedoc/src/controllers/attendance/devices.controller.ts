@@ -3,7 +3,8 @@ import type { AuthRequest } from '../../middlewares/auth.middleware';
 import {
   createAgent, deleteAgent, getDevicesOverview, rotateAgentKey, updateAgent,
 } from '../../services/attendance/agents.service';
-import { listOrders, queueEnrollOrder, queueSyncOrders, queueTestOrder } from '../../services/attendance/agent-orders.service';
+import { listOrders, queueEnrollOrder, queueTestOrder } from '../../services/attendance/agent-orders.service';
+import { queueSyncOrders } from '../../services/attendance/device-reconcile.service';
 import { updateTerminal } from '../../services/attendance/terminals.service';
 import { ordersQuerySchema } from '../../schemas/attendance/devices.schema';
 import { handleAttendanceError, parsePositiveInt } from './attendance-http';

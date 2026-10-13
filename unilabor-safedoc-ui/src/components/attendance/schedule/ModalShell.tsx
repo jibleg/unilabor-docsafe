@@ -16,8 +16,9 @@ interface ModalShellProps {
 }
 
 /** Modal base con cabecera, cuerpo desplazable y pie; cierra con Escape. */
-export const ModalShell = ({ title, subtitle, onClose, children, footer, widthClass = 'max-w-2xl', busy = false }: ModalShellProps) => {
-  const [token] = useState(() => Symbol('modal'));
+/** Registra el panel en la pila de superpuestos: Escape solo cierra el de encima. */
+export const useEscapeStack = (onClose: () => void, busy: boolean) => {
+  const [token] = useState(() => Symbol('overlay'));
   useEffect(() => {
     openModals.push(token);
     return () => {
@@ -32,6 +33,11 @@ export const ModalShell = ({ title, subtitle, onClose, children, footer, widthCl
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose, busy, token]);
+};
+
+/** Modal base con cabecera, cuerpo desplazable y pie; cierra con Escape. */
+export const ModalShell = ({ title, subtitle, onClose, children, footer, widthClass = 'max-w-2xl', busy = false }: ModalShellProps) => {
+  useEscapeStack(onClose, busy);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={title}>

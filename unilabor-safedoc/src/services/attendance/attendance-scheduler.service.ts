@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import pool from '../../config/db';
 import { getAttendanceSettings } from './attendance-settings.service';
 import { recalculateRange, type RecalculationSummary } from './day-recalculation.service';
+import { runDeviceSyncReconciliation } from './device-reconcile.service';
 import { addDays } from './engine/time';
 import { todayInZone } from './timezone';
 import { openVacationPeriodsForAll } from './vacation-periods.service';
@@ -14,6 +15,7 @@ import { openVacationPeriodsForAll } from './vacation-periods.service';
 
 const RECALCULATION_DAYS = 3;
 const DEFAULT_CRON = '30 3 * * *';
+const DEFAULT_DEVICE_SYNC_CRON = '*/5 * * * *';
 
 export interface NightlyJobResult {
   skipped: boolean;
@@ -69,4 +71,17 @@ export const startAttendanceScheduler = (): void => {
     });
   });
   console.log(`Scheduler de asistencias activo (cron "${expression}").`);
+
+  // Red de seguridad: cada pocos minutos encola lo que falte entre DocSafe y los relojes (altas, bajas, fotos, reintentos).
+  const syncExpression = process.env.ATTENDANCE_DEVICE_SYNC_CRON || DEFAULT_DEVICE_SYNC_CRON;
+  if (!cron.validate(syncExpression)) {
+    console.error(`Scheduler de sincronizacion con relojes: expresion cron invalida "${syncExpression}".`);
+    return;
+  }
+  cron.schedule(syncExpression, () => {
+    runDeviceSyncReconciliation().catch((error) => {
+      console.error('Error en la sincronizacion automatica con los relojes:', error);
+    });
+  });
+  console.log(`Sincronizacion automatica con relojes activa (cron "${syncExpression}").`);
 };

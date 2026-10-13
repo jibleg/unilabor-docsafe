@@ -2,7 +2,9 @@ import type { AttendanceEmployee, DeviceSyncStatus } from '../../../api/service.
 
 /** Helpers puros de Colaboradores: "listo para checar", validaciones y filtros de resumen. */
 
-export const DEVICE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,20}$/;
+/** El reloj (HikVision) solo acepta numeros de empleado con digitos; maximo 20. */
+export const DEVICE_NUMBER_PATTERN = /^[0-9]{1,20}$/;
+export const DEVICE_NUMBER_HELP = 'Solo dígitos (hasta 20): el reloj no acepta letras ni guiones.';
 
 export const isValidDeviceNumber = (value: string): boolean => DEVICE_NUMBER_PATTERN.test(value.trim());
 
@@ -31,11 +33,13 @@ export const computeReadiness = (employee: AttendanceEmployee): ReadinessItem[] 
   },
   {
     key: 'number',
-    label: 'Número de reloj',
-    ok: !!employee.device_employee_number,
-    detail: employee.device_employee_number
-      ? `Número de reloj: ${employee.device_employee_number}`
-      : 'Falta el número de reloj',
+    label: 'Número de empleado',
+    ok: !!employee.device_employee_number && isValidDeviceNumber(employee.device_employee_number),
+    detail: !employee.device_employee_number
+      ? 'Falta el número de empleado'
+      : isValidDeviceNumber(employee.device_employee_number)
+        ? `Número de empleado: ${employee.device_employee_number}`
+        : `El número ${employee.device_employee_number} no es válido para el reloj (solo dígitos); corrígelo para poder sincronizar`,
   },
   {
     key: 'schedule',

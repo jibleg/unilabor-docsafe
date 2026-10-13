@@ -7,7 +7,7 @@ import {
   type CreateShiftInput,
   type UpdateShiftInput,
 } from '../../schemas/attendance/shifts.schema';
-import { createShift, listShifts, updateShift } from '../../services/attendance/shifts.service';
+import { createShift, deleteShift, listShifts, updateShift } from '../../services/attendance/shifts.service';
 import { handleAttendanceError } from './attendance-http';
 
 /** Valida query/params con Zod; responde 400 con el formato uniforme y devuelve null si falla. */
@@ -51,5 +51,16 @@ export const updateShiftController = async (req: AuthRequest, res: Response) => 
     return res.json({ shift });
   } catch (error) {
     return handleAttendanceError(res, error, 'No se pudo actualizar el turno.');
+  }
+};
+
+export const deleteShiftController = async (req: AuthRequest, res: Response) => {
+  const params = parseInput(shiftIdParamsSchema, req.params, res);
+  if (!params) return res;
+  try {
+    await deleteShift(params.id, req.user?.id ?? '', req.ip ?? null);
+    return res.status(204).send();
+  } catch (error) {
+    return handleAttendanceError(res, error, 'No se pudo eliminar el turno.');
   }
 };

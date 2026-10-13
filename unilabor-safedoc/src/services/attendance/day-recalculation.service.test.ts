@@ -68,7 +68,8 @@ const newEmployee = async (hireDate: string | null = null): Promise<number> => {
 const newShift = async (name: string, start: string, end: string, breakMinutes = 0): Promise<number> => {
   seq += 1;
   const { rows } = await client.query<{ id: string }>(
-    `INSERT INTO attendance.shifts (name, start_time, end_time, break_minutes) VALUES ($1, $2, $3, $4) RETURNING id`,
+    `INSERT INTO attendance.shifts (name, start_time, end_time, break_minutes, entry_before_min, entry_after_min, exit_before_min, exit_after_min)
+     VALUES ($1, $2, $3, $4, 60, 240, 240, 240) RETURNING id`,
     [`TEST ${name} ${Date.now()}-${seq}`, start, end, breakMinutes],
   );
   return Number(rows[0]?.id);

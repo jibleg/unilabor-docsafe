@@ -9,7 +9,7 @@ import {
 import type { AttendanceBranch } from '../../../api/service.api-attendance-common';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifySuccess } from '../../../utils/notify';
-import { isValidDeviceNumber } from './readiness';
+import { DEVICE_NUMBER_HELP, isValidDeviceNumber } from './readiness';
 import { inputClass, labelClass, modalBackdropClass, modalPanelClass, primaryButtonClass, secondaryButtonClass } from './ui';
 
 interface Props {
@@ -23,7 +23,7 @@ interface Selection {
   number: string;
 }
 
-/** Habilitado en lote tipo hoja: elige colaboradores sin habilitar, sucursal por defecto y numero de reloj. */
+/** Habilitado en lote tipo hoja: elige colaboradores sin habilitar, sucursal por defecto y numero de empleado. */
 export const BulkEnableModal = ({ branches, onClose, onDone }: Props) => {
   const [search, setSearch] = useState('');
   const [candidates, setCandidates] = useState<AttendanceEmployee[]>([]);
@@ -75,8 +75,8 @@ export const BulkEnableModal = ({ branches, onClose, onDone }: Props) => {
     if (selectedList.length === 0) return setError('Elige al menos un colaborador.');
     const local: Record<number, string> = {};
     for (const { employee, number } of selectedList) {
-      if (!number.trim()) local[employee.id] = 'Falta el número de reloj.';
-      else if (!isValidDeviceNumber(number)) local[employee.id] = 'Solo letras, números y guion (hasta 20).';
+      if (!number.trim()) local[employee.id] = 'Falta el número de empleado.';
+      else if (!isValidDeviceNumber(number)) local[employee.id] = DEVICE_NUMBER_HELP;
       else if (!defaultBranch && employee.branch_id === null) local[employee.id] = 'Sin sucursal: elige una por defecto.';
     }
     if (Object.keys(local).length > 0) {
@@ -142,7 +142,7 @@ export const BulkEnableModal = ({ branches, onClose, onDone }: Props) => {
                     <th className="w-10 px-3 py-2"><span className="sr-only">Elegir</span></th>
                     <th className="px-3 py-2">Colaborador</th>
                     <th className="px-3 py-2">Sucursal</th>
-                    <th className="px-3 py-2">N.º reloj</th>
+                    <th className="px-3 py-2">N.º empleado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[rgba(0,65,106,0.08)]">
@@ -162,7 +162,7 @@ export const BulkEnableModal = ({ branches, onClose, onDone }: Props) => {
                           {row ? (
                             <>
                               <input
-                                aria-label={`Número de reloj de ${employee.full_name}`}
+                                aria-label={`Número de empleado de ${employee.full_name}`}
                                 className={`${inputClass} max-w-[160px] py-1 ${rowErrors[employee.id] ? 'border-red-400' : ''}`}
                                 maxLength={20}
                                 value={row.number}

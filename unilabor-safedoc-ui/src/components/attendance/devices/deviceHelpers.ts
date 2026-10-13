@@ -60,11 +60,15 @@ export const clockDriftLabel = (seconds: number | null | undefined): string => {
 
 /** Mensaje de exito para el resultado de encolar sincronizaciones. */
 export const syncResultMessage = (result: SyncResult): string => {
-  if (result.queued === 0 && result.skipped_without_number === 0) return 'No hay nada pendiente de sincronizar.';
+  const invalid = result.skipped_invalid_number ?? 0;
+  if (result.queued === 0 && result.skipped_without_number === 0 && invalid === 0) return 'No hay nada pendiente de sincronizar.';
   const parts = [`${result.queued_sync} alta(s)`, `${result.queued_remove} baja(s)`];
   let text = `Se encolaron ${parts.join(' y ')}.`;
   if (result.skipped_without_number > 0) {
-    text += ` ${result.skipped_without_number} sin número de reloj se omitieron.`;
+    text += ` ${result.skipped_without_number} sin número de empleado se omitieron.`;
+  }
+  if (invalid > 0) {
+    text += ` ${invalid} con número no válido para el reloj (solo dígitos) se omitieron.`;
   }
   return text;
 };

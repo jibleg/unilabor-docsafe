@@ -5,16 +5,23 @@ import { enableViolation, nextSyncStatus, suggestDeviceNumber, type ProfileState
 const base: ProfileState = { is_enabled: false, device_employee_number: null, branch_id: null };
 
 describe('perfiles de colaborador', () => {
-  it('sugiere el numero de reloj desde el codigo solo si es valido', () => {
-    expect(suggestDeviceNumber('EMP-001')).toBe('EMP-001');
+  it('sugiere el numero de empleado desde el codigo solo si es valido', () => {
+    expect(suggestDeviceNumber('1001')).toBe('1001');
+    expect(suggestDeviceNumber('EMP-001')).toBeNull(); // el reloj solo acepta digitos
     expect(suggestDeviceNumber('EMP 001')).toBeNull();
     expect(suggestDeviceNumber(null)).toBeNull();
   });
   it('no permite habilitar sin sucursal ni numero', () => {
     expect(enableViolation({ ...base, is_enabled: true })).toMatch(/sucursal/);
-    expect(enableViolation({ ...base, is_enabled: true, branch_id: 1 })).toMatch(/numero de reloj/);
+    expect(enableViolation({ ...base, is_enabled: true, branch_id: 1 })).toMatch(/numero de empleado/);
     expect(enableViolation({ is_enabled: true, branch_id: 1, device_employee_number: '12' })).toBeNull();
     expect(enableViolation(base)).toBeNull();
+  });
+  it('deshabilitar a quien sigue en el reloj lo deja pendiente de baja', () => {
+    const on: ProfileState = { is_enabled: true, device_employee_number: '12', branch_id: 1 };
+    const off: ProfileState = { ...on, is_enabled: false };
+    expect(nextSyncStatus(on, off, true)).toBe('pending');
+    expect(nextSyncStatus(on, off, false)).toBe('not_applicable');
   });
   it('calcula el estado de sincronizacion', () => {
     const enabled: ProfileState = { is_enabled: true, device_employee_number: 'A1', branch_id: 1 };

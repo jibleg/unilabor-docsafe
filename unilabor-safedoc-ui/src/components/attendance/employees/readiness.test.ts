@@ -4,8 +4,9 @@ import { computeReadiness, isReadyToPunch, isValidDeviceNumber, validateVacation
 
 const employee: AttendanceEmployee = {
   id: 1, employee_code: 'E1', full_name: 'Ana', email: null, area: null, position: null, is_active: true,
-  branch_id: 1, branch_name: 'Centro', hire_date: null, is_enabled: true, device_employee_number: 'E1',
-  suggested_device_number: 'E1', device_sync_status: 'synced', device_sync_error: null, device_synced_at: null, has_schedule: true,
+  branch_id: 1, branch_name: 'Centro', hire_date: null, is_enabled: true, device_employee_number: '1001',
+  suggested_device_number: '1001', device_sync_status: 'synced', device_sync_error: null, device_synced_at: null, has_schedule: true,
+  number_locked: false, has_face_photo: false, face_photo_updated_at: null, face_sync_status: 'not_applicable', face_sync_error: null,
 };
 
 describe('readiness', () => {
@@ -19,11 +20,12 @@ describe('readiness', () => {
     expect(isReadyToPunch({ ...employee, device_employee_number: null })).toBe(false);
   });
 
-  it('valida numero de reloj', () => {
-    expect(isValidDeviceNumber('AB-12')).toBe(true);
+  it('valida numero de empleado', () => {
+    expect(isValidDeviceNumber('54321')).toBe(true);
+    expect(isValidDeviceNumber('AB-12')).toBe(false); // el reloj no acepta letras ni guiones
     expect(isValidDeviceNumber('con espacio')).toBe(false);
     expect(isValidDeviceNumber('')).toBe(false);
-    expect(isValidDeviceNumber('x'.repeat(21))).toBe(false);
+    expect(isValidDeviceNumber('1'.repeat(21))).toBe(false);
   });
 
   it('valida ajuste de vacaciones', () => {
@@ -32,5 +34,15 @@ describe('readiness', () => {
     expect(validateVacationAdjustment('61', 'motivo ok')).toMatch(/-60/);
     expect(validateVacationAdjustment('0.3', 'motivo ok')).toMatch(/0.5/);
     expect(validateVacationAdjustment('1', 'abc')).toMatch(/motivo/);
+  });
+});
+
+describe('numero de empleado no valido para el reloj', () => {
+  it('un numero con letras ya guardado no cuenta como listo y explica por que', () => {
+    const legacy = { ...employee, device_employee_number: 'TEST-3' };
+    const item = computeReadiness(legacy).find((entry) => entry.key === 'number');
+    expect(item?.ok).toBe(false);
+    expect(item?.detail).toContain('no es válido para el reloj');
+    expect(isReadyToPunch(legacy)).toBe(false);
   });
 });

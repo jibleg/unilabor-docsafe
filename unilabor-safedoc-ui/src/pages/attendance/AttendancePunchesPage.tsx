@@ -109,7 +109,7 @@ export const AttendancePunchesPage = () => {
   const approve = async (punch: AttendancePunch) => {
     const ok = await confirmAction(
       'Aprobar checada',
-      `La checada de ${punch.employee?.full_name ?? `reloj ${punch.device_employee_number ?? '—'}`} se tomará en cuenta para el cálculo del día.`,
+      `La checada de ${punch.employee?.full_name ?? `empleado ${punch.device_employee_number ?? '—'}`} se tomará en cuenta para el cálculo del día.`,
       'Aprobar',
       'primary',
     );

@@ -19,6 +19,13 @@ const openAssign = async () => {
   return screen.findByRole('dialog', { name: 'Programar turno' });
 };
 
+/** Los turnos se eligen en un desplegable: lo abre (si esta cerrado) y devuelve la opcion. */
+const shiftOption = (dialog: HTMLElement, name: RegExp | string) => {
+  const trigger = within(dialog).getByRole('button', { name: 'Elegir turnos' });
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+  return screen.getByRole('option', { name }); // el panel flota en un portal, fuera del dialogo
+};
+
 describe('Calendario de horarios', () => {
   it('cargando', async () => {
     respond('GET', '/attendance/schedule', () => pending());
@@ -84,7 +91,7 @@ describe('Calendario de horarios', () => {
     await page();
     await ready();
     const dialog = await openAssign();
-    const shift = (n: string) => within(dialog).getByRole('button', { name: new RegExp(n) });
+    const shift = (n: string) => shiftOption(dialog, new RegExp(n));
     fireEvent.click(shift('Matutino'));
     fireEvent.click(shift('Vespertino'));
     expect(within(dialog).getByText(/se encima con/)).toBeInTheDocument();
@@ -94,7 +101,7 @@ describe('Calendario de horarios', () => {
     fireEvent.click(shift('Nocturno'));
     expect(within(dialog).getByText(/Máximo 3 turnos por día|se encima/)).toBeInTheDocument();
     // descanso es excluyente
-    fireEvent.click(within(dialog).getByRole('button', { name: /Descanso/ }));
+    fireEvent.click(shiftOption(dialog, /Descanso/));
     expect(within(dialog).queryByText(/se encima con/)).not.toBeInTheDocument();
     fireEvent.click(shift('Matutino'));
     respond('POST', '/attendance/assignments', () => {
@@ -113,7 +120,7 @@ describe('Calendario de horarios', () => {
     await page();
     await ready();
     const dialog = await openAssign();
-    fireEvent.click(within(dialog).getByRole('button', { name: /Matutino/ }));
+    fireEvent.click(shiftOption(dialog, /Matutino/));
     fireEvent.change(within(dialog).getByLabelText('Desde'), { target: { value: '2026-10-14' } });
     fireEvent.click(within(dialog).getByRole('button', { name: /^Programar$/ }));
     await waitFor(() => expect(callsTo('POST', '/attendance/assignments')).toHaveLength(1));
@@ -127,7 +134,7 @@ describe('Calendario de horarios', () => {
     await page();
     await ready();
     const dialog = await openAssign();
-    fireEvent.click(within(dialog).getByRole('button', { name: /Matutino/ }));
+    fireEvent.click(shiftOption(dialog, /Matutino/));
     fireEvent.click(within(dialog).getByLabelText(/Repetir/i));
     const group = within(dialog).getByRole('group', { name: 'Días de la semana' });
     for (const b of within(group).getAllByRole('button')) if (b.getAttribute('aria-pressed') === 'true') fireEvent.click(b);
@@ -205,5 +212,36 @@ describe('Calendario de horarios', () => {
     expect(screen.queryByRole('button', { name: /Programar a/ })).not.toBeInTheDocument();
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     expectNoBrokenText();
+  });
+});
+
+describe('Selector de turnos del modal Programar', () => {
+  it('tiene buscador que filtra por nombre', async () => {
+    await page();
+    await ready();
+    const dialog = await openAssign();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Elegir turnos' }));
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(2);
+    fireEvent.change(screen.getByLabelText('Buscar turno'), { target: { value: 'zzz-no-existe' } });
+    expect(screen.queryAllByRole('option', { name: /Matutino/ })).toHaveLength(1 - 1);
+    expect(screen.getByText('Ningún turno coincide.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Buscar turno'), { target: { value: 'matut' } });
+    expect(screen.getByRole('option', { name: /Matutino/ })).toBeInTheDocument();
+  });
+});
+
+describe('Selector de turnos: cierre', () => {
+  it('se cierra al elegir un turno y se puede reabrir para sumar otro', async () => {
+    await page();
+    await ready();
+    const dialog = await openAssign();
+    const trigger = within(dialog).getByRole('button', { name: 'Elegir turnos' });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('option', { name: /Matutino/ }));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveTextContent(/Matutino/);
+    fireEvent.click(trigger);
+    expect(screen.getByRole('option', { name: /Matutino/ })).toHaveAttribute('aria-selected', 'true');
   });
 });

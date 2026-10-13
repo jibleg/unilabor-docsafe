@@ -32,7 +32,7 @@ interface ColumnDef {
 
 const COLUMNS: readonly ColumnDef[] = [
   { key: 'employee_number', required: true, width: 18, aliases: ['numero_empleado', 'numero_de_reloj'],
-    help: 'Numero de reloj del colaborador o su employee_code. Debe estar habilitado en asistencias.',
+    help: 'Numero de empleado del colaborador o su employee_code. Debe estar habilitado en asistencias.',
     format: 'Texto. Ver hoja Catalogos.', example: '1001' },
   { key: 'type', required: true, width: 26, aliases: ['tipo'],
     help: 'Tipo de incidencia: el nombre o el codigo del catalogo.', format: 'Elige de la lista.', example: 'Vacaciones' },

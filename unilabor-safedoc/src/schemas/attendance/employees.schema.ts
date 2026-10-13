@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { DEVICE_NUMBER_MESSAGE, DEVICE_NUMBER_PATTERN } from '../../services/attendance/device-number';
 import { isoDateSchema } from './holidays.schema';
 
 export const deviceNumberSchema = z
   .string()
   .trim()
-  .regex(/^[A-Za-z0-9-]{1,20}$/, 'Numero de reloj invalido: letras, digitos y guion (1-20).');
+  .regex(DEVICE_NUMBER_PATTERN, DEVICE_NUMBER_MESSAGE);
 
 const boolText = z.enum(['true', 'false']).transform((text) => text === 'true');
 

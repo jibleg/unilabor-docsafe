@@ -73,6 +73,10 @@ interface ShiftRow {
   break_minutes: number;
   shift_type: string;
   is_active: boolean;
+  entry_before_min: number;
+  entry_after_min: number;
+  exit_before_min: number;
+  exit_after_min: number;
 }
 
 interface AssignmentRow {
@@ -132,6 +136,10 @@ const toEngineShift = (row: ShiftRow): EngineShift => ({
   breakMinutes: Number(row.break_minutes),
   flexible: row.shift_type === 'flexible',
   isActive: row.is_active,
+  entryBeforeMin: Number(row.entry_before_min),
+  entryAfterMin: Number(row.entry_after_min),
+  exitBeforeMin: Number(row.exit_before_min),
+  exitAfterMin: Number(row.exit_after_min),
 });
 
 const toEngineAssignment = (row: AssignmentRow): EngineAssignment => ({
@@ -290,7 +298,8 @@ const loadSharedData = async (
 ): Promise<Pick<RangeData, 'shifts' | 'holidays'>> => {
   const shiftRows = await db.query<ShiftRow>(
       `SELECT id, name, to_char(start_time, 'HH24:MI') AS start_time, to_char(end_time, 'HH24:MI') AS end_time,
-              break_minutes, shift_type, is_active
+              break_minutes, shift_type, is_active,
+              entry_before_min, entry_after_min, exit_before_min, exit_after_min
          FROM attendance.shifts`,
   );
   const holidayRows = await db.query<{ holiday_date: string }>(

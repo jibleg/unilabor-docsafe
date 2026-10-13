@@ -209,7 +209,7 @@ export const linkPunchToEmployee = async (id: number, employeeId: number): Promi
   return response.data as PunchMutationResult;
 };
 
-/** Busca colaboradores (nombre, codigo o numero de reloj) para los selectores. */
+/** Busca colaboradores (nombre, codigo o numero de empleado) para los selectores. */
 export const searchAttendanceEmployees = async (search: string): Promise<AttendanceEmployeeOption[]> => {
   const response = await api.get('/attendance/employees', { params: clean({ search: search.trim(), limit: 30 }) });
   return ((response.data?.data ?? []) as AttendanceEmployeeOption[]).map((item) => ({

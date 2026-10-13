@@ -9,6 +9,8 @@ import { buildPaginatedResult, resolvePagination } from '../../utils/pagination'
 import { withTransaction, type Queryable } from '../../utils/transaction';
 import { registerAuditEvent } from '../audit.service';
 import { conflict, invalid, notFound } from './attendance-errors';
+import { triggerEmployeeDeviceSync } from './device-reconcile.service';
+import { isDeviceNumber } from './device-number';
 
 /** Colaboradores de RH habilitados (o no) para el control de asistencia. */
 
@@ -32,14 +34,18 @@ export interface AttendanceEmployee {
   device_sync_error: string | null;
   device_synced_at: string | null;
   has_schedule: boolean;
+  number_locked: boolean;
+  has_face_photo: boolean;
+  face_photo_updated_at: string | null;
+  face_sync_status: SyncStatus;
+  face_sync_error: string | null;
 }
 
-const DEVICE_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,20}$/;
 
-/** El numero de reloj se SUGIERE desde el codigo de empleado (nunca se asigna solo). */
+/** El numero de empleado se SUGIERE desde el codigo de empleado (nunca se asigna solo). */
 export const suggestDeviceNumber = (employeeCode: string | null | undefined): string | null => {
   const code = (employeeCode ?? '').trim();
-  return DEVICE_NUMBER_PATTERN.test(code) ? code : null;
+  return isDeviceNumber(code) ? code : null;
 };
 
 export interface ProfileState {
@@ -52,18 +58,19 @@ export interface ProfileState {
 export const enableViolation = (state: ProfileState): string | null => {
   if (!state.is_enabled) return null;
   if (state.branch_id === null) return 'Asigna una sucursal antes de habilitar al colaborador.';
-  if (!state.device_employee_number) return 'Captura el numero de reloj antes de habilitar al colaborador.';
+  if (!state.device_employee_number) return 'Captura el numero de empleado antes de habilitar al colaborador.';
   return null;
 };
 
 /** Estado de sincronizacion con el reloj tras un cambio; null = no cambia. */
-export const nextSyncStatus = (before: ProfileState, after: ProfileState): SyncStatus | null => {
+export const nextSyncStatus = (before: ProfileState, after: ProfileState, onTerminal = false): SyncStatus | null => {
   const changed =
     before.is_enabled !== after.is_enabled ||
     before.branch_id !== after.branch_id ||
     (before.device_employee_number ?? '').toUpperCase() !== (after.device_employee_number ?? '').toUpperCase();
   if (!changed) return null;
-  return after.is_enabled ? 'pending' : 'not_applicable';
+  // Deshabilitado pero todavia dado de alta en el reloj: queda pendiente de baja.
+  return after.is_enabled || onTerminal ? 'pending' : 'not_applicable';
 };
 
 const SCHEDULE_EXISTS = `EXISTS (
@@ -78,7 +85,15 @@ const EMPLOYEE_SELECT = `
          COALESCE(p.device_sync_status, 'not_applicable') AS device_sync_status,
          p.device_sync_error,
          to_char(p.device_synced_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS device_synced_at,
-         ${SCHEDULE_EXISTS} AS has_schedule
+         (p.face_photo_path IS NOT NULL) AS has_face_photo,
+         to_char(p.face_photo_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS face_photo_updated_at,
+         COALESCE(p.face_sync_status, 'not_applicable') AS face_sync_status,
+         p.face_sync_error,
+         ${SCHEDULE_EXISTS} AS has_schedule,
+         (p.device_employee_number IS NOT NULL AND EXISTS (
+           SELECT 1 FROM attendance.punches pu
+            WHERE pu.employee_id = e.id OR UPPER(pu.device_employee_number) = UPPER(p.device_employee_number)
+         )) AS number_locked
     FROM public.employees e
     LEFT JOIN public.helpdesk_asset_units b ON b.id = e.branch_id
     LEFT JOIN attendance.employee_profiles p ON p.employee_id = e.id`;
@@ -181,18 +196,39 @@ const assertDeviceNumberFree = async (db: Queryable, employeeId: number, deviceN
       WHERE upper(p.device_employee_number) = upper($1) AND p.employee_id <> $2`,
     [deviceNumber, employeeId],
   );
-  if (rows.length > 0) conflict(`El numero de reloj ${deviceNumber} ya lo usa ${rows[0].full_name}.`);
+  if (rows.length > 0) conflict(`El numero de empleado ${deviceNumber} ya lo usa ${rows[0].full_name}.`);
+};
+
+const sameNumber = (a: string | null, b: string | null): boolean => (a ?? '').toUpperCase() === (b ?? '').toUpperCase();
+
+/** Con checadas registradas el numero de empleado queda fijo: es el vinculo de la evidencia con la persona. */
+const assertNumberEditable = async (
+  db: Queryable,
+  employeeId: number,
+  before: string | null,
+  after: string | null,
+): Promise<void> => {
+  if (!before || sameNumber(before, after)) return;
+  const { rows } = await db.query(
+    `SELECT 1 FROM attendance.punches WHERE employee_id = $1 OR UPPER(device_employee_number) = UPPER($2) LIMIT 1`,
+    [employeeId, before],
+  );
+  if (rows.length > 0) {
+    conflict(`El numero de empleado ${before} ya tiene checadas y no se puede cambiar.`);
+  }
 };
 
 interface StoredEmployee extends ProfileState {
   is_active: boolean;
   hire_date: string | null;
+  /** Numero con el que esta dado de alta en el reloj (null = no esta en ningun reloj). */
+  device_synced_number: string | null;
 }
 
 const loadStoredState = async (db: Queryable, employeeId: number, lock: boolean): Promise<StoredEmployee> => {
   const { rows } = await db.query(
     `SELECT e.is_active, e.branch_id::int AS branch_id, e.hire_date::text AS hire_date,
-            COALESCE(p.is_enabled, FALSE) AS is_enabled, p.device_employee_number
+            COALESCE(p.is_enabled, FALSE) AS is_enabled, p.device_employee_number, p.device_synced_number
        FROM public.employees e
        LEFT JOIN attendance.employee_profiles p ON p.employee_id = e.id
       WHERE e.id = $1 ${lock ? 'FOR UPDATE OF e' : ''}`,
@@ -216,6 +252,7 @@ const writeEmployeeAndProfile = async (
   before: StoredEmployee,
   after: StoredEmployee,
 ): Promise<void> => {
+  await assertNumberEditable(client, employeeId, before.device_employee_number, after.device_employee_number);
   if (before.branch_id !== after.branch_id || before.hire_date !== after.hire_date) {
     await client.query('UPDATE public.employees SET branch_id = $2, hire_date = $3 WHERE id = $1', [
       employeeId,
@@ -223,7 +260,7 @@ const writeEmployeeAndProfile = async (
       after.hire_date,
     ]);
   }
-  const syncStatus = nextSyncStatus(before, after);
+  const syncStatus = nextSyncStatus(before, after, before.device_synced_number !== null);
   await client.query(
     `INSERT INTO attendance.employee_profiles (employee_id, is_enabled, device_employee_number, device_sync_status)
      VALUES ($1, $2, $3, COALESCE($4, 'not_applicable'))
@@ -231,7 +268,8 @@ const writeEmployeeAndProfile = async (
        is_enabled = EXCLUDED.is_enabled,
        device_employee_number = EXCLUDED.device_employee_number,
        device_sync_status = COALESCE($4, attendance.employee_profiles.device_sync_status),
-       device_sync_error = CASE WHEN $4 IS NULL THEN attendance.employee_profiles.device_sync_error ELSE NULL END`,
+       device_sync_error = CASE WHEN $4 IS NULL THEN attendance.employee_profiles.device_sync_error ELSE NULL END,
+       device_sync_attempts = CASE WHEN $4 IS NULL THEN attendance.employee_profiles.device_sync_attempts ELSE 0 END`,
     [employeeId, after.is_enabled, after.device_employee_number, syncStatus],
   );
 };
@@ -264,10 +302,12 @@ export const updateAttendanceEmployee = async (
       await writeEmployeeAndProfile(client, employeeId, before, after);
     });
   } catch (error) {
-    if (isUniqueViolation(error)) return conflict('Ese numero de reloj ya lo usa otro colaborador.');
+    if (isUniqueViolation(error)) return conflict('Ese numero de empleado ya lo usa otro colaborador.');
     throw error;
   }
   await auditEmployee(userId, 'attendance_employee_updated', employeeId, { ...input });
+  // Lo que afecta al reloj (alta, baja, numero, sucursal) se encola solo; no espera a que alguien pulse Sincronizar.
+  await triggerEmployeeDeviceSync([employeeId], userId);
   return getAttendanceEmployee(employeeId);
 };
 
@@ -293,7 +333,7 @@ const validateBulkRows = async (db: Queryable, input: BulkEnableInput) => {
     const numberKey = row.device_employee_number.toUpperCase();
     const duplicateOf = seenNumbers.get(numberKey);
     if (duplicateOf !== undefined) {
-      fail(`El numero de reloj ${row.device_employee_number} se repite con el colaborador ${duplicateOf}.`);
+      fail(`El numero de empleado ${row.device_employee_number} se repite con el colaborador ${duplicateOf}.`);
       continue;
     }
     seenNumbers.set(numberKey, row.employee_id);
@@ -351,12 +391,13 @@ export const bulkEnableEmployees = async (input: BulkEnableInput, userId: string
         branch_id: item.after.branch_id,
       });
     }
+    await triggerEmployeeDeviceSync(planned.map((item) => item.id), userId);
     return { enabled: planned.length, employee_ids: planned.map((item) => item.id) };
   } catch (error) {
     if (error instanceof BulkValidationAbort) {
       return invalid('Hay filas con errores; no se habilito a nadie.', { rows: error.rowErrors });
     }
-    if (isUniqueViolation(error)) return conflict('Un numero de reloj del lote ya lo usa otro colaborador.');
+    if (isUniqueViolation(error)) return conflict('Un numero de empleado del lote ya lo usa otro colaborador.');
     throw error;
   }
 };

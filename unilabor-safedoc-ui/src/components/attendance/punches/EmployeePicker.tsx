@@ -16,7 +16,7 @@ interface EmployeePickerProps {
 }
 
 const hintOf = (e: AttendanceEmployeeOption): string =>
-  [e.employee_code, e.branch_name, e.device_employee_number ? `reloj ${e.device_employee_number}` : ''].filter(Boolean).join(' · ');
+  [e.employee_code, e.branch_name, e.device_employee_number ? `empleado ${e.device_employee_number}` : ''].filter(Boolean).join(' · ');
 
 /** Selector de colaborador con busqueda en el servidor (GET /attendance/employees?search=). */
 export const EmployeePicker = ({ value, onChange, placeholder = 'Selecciona colaborador', emptyLabel = 'Todos', seed = null }: EmployeePickerProps) => {

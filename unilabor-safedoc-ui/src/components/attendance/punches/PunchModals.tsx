@@ -40,7 +40,7 @@ export const RejectPunchModal = ({ punch, onClose, onDone }: PunchModalProps) =>
   return (
     <ModalShell
       title="Rechazar checada"
-      subtitle={`${punch.employee?.full_name ?? `Reloj ${punch.device_employee_number ?? '—'}`} · ${formatDateTime(punch.punched_at)}`}
+      subtitle={`${punch.employee?.full_name ?? `Empleado ${punch.device_employee_number ?? '—'}`} · ${formatDateTime(punch.punched_at)}`}
       onClose={onClose}
       busy={saving}
       footer={
@@ -83,7 +83,7 @@ export const LinkPunchModal = ({ punch, onClose, onDone }: PunchModalProps) => {
   return (
     <ModalShell
       title="Vincular a colaborador"
-      subtitle={`Reloj ${punch.device_employee_number ?? '—'} · ${formatDateTime(punch.punched_at)}`}
+      subtitle={`Empleado ${punch.device_employee_number ?? '—'} · ${formatDateTime(punch.punched_at)}`}
       onClose={onClose}
       busy={saving}
       footer={

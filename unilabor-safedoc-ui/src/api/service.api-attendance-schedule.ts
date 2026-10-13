@@ -15,6 +15,11 @@ export interface AttendanceShift {
   shift_type: ShiftType;
   color_hex: string;
   is_active: boolean;
+  /** Ventanas de checada, en minutos respecto a la hora de entrada y de salida del turno. */
+  entry_before_min: number;
+  entry_after_min: number;
+  exit_before_min: number;
+  exit_after_min: number;
   /** Solo en GET /shifts. */
   assignments_count?: number;
 }
@@ -27,6 +32,10 @@ export interface ShiftInput {
   shift_type: ShiftType;
   color_hex: string;
   is_active?: boolean;
+  entry_before_min?: number;
+  entry_after_min?: number;
+  exit_before_min?: number;
+  exit_after_min?: number;
 }
 
 export interface ScheduleChip {
@@ -218,6 +227,10 @@ export const createShift = async (input: ShiftInput): Promise<AttendanceShift> =
 export const updateShift = async (id: number, input: Partial<ShiftInput>): Promise<AttendanceShift> => {
   const { data } = await api.patch(`/attendance/shifts/${id}`, input);
   return data.shift as AttendanceShift;
+};
+
+export const deleteShift = async (id: number): Promise<void> => {
+  await api.delete(`/attendance/shifts/${id}`);
 };
 
 export const getScheduleWeek = async (query: ScheduleQuery): Promise<ScheduleWeek> => {

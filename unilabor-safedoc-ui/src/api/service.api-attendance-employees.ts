@@ -22,6 +22,13 @@ export interface AttendanceEmployee {
   device_sync_error: string | null;
   device_synced_at: string | null;
   has_schedule: boolean;
+  /** Con checadas registradas el número de empleado ya no se puede cambiar. */
+  number_locked: boolean;
+  has_face_photo: boolean;
+  face_photo_updated_at: string | null;
+  /** Estado del envío de la foto al reloj (pending = aún no está en el equipo). */
+  face_sync_status: DeviceSyncStatus;
+  face_sync_error: string | null;
 }
 
 export interface EmployeeListParams {
@@ -233,6 +240,7 @@ export interface SyncResult {
   queued_sync: number;
   queued_remove: number;
   skipped_without_number: number;
+  skipped_invalid_number?: number;
 }
 
 export const syncAgent = async (agentId: number, all = false): Promise<SyncResult> => {
@@ -242,13 +250,33 @@ export const syncAgent = async (agentId: number, all = false): Promise<SyncResul
 
 export type EnrollMode = 'fingerprint' | 'face';
 
+/** Sube la fotografía de rostro (JPEG ya recortado); si el colaborador está sincronizado se envía sola al reloj. */
+export const uploadFacePhoto = async (employeeId: number, photo: Blob): Promise<{ employee: AttendanceEmployee; queued: boolean }> => {
+  const form = new FormData();
+  form.append('photo', photo, 'rostro.jpg');
+  const response = await api.post(`/attendance/employees/${employeeId}/face-photo`, form);
+  return response.data as { employee: AttendanceEmployee; queued: boolean };
+};
+
+/** Reenvía al reloj la fotografía vigente (el colaborador debe estar sincronizado). */
+export const sendFacePhoto = async (employeeId: number): Promise<AttendanceEmployee> => {
+  const response = await api.post(`/attendance/employees/${employeeId}/face-photo/send`);
+  return (response.data as { employee: AttendanceEmployee }).employee;
+};
+
+/** Descarga la fotografía vigente como URL de objeto (liberar con URL.revokeObjectURL). */
+export const fetchFacePhotoUrl = async (employeeId: number): Promise<string> => {
+  const response = await api.get(`/attendance/employees/${employeeId}/face-photo`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
+};
+
 export const enrollEmployee = async (employeeId: number, mode: EnrollMode): Promise<{ order_id: number; terminal_id: number }> => {
   const response = await api.post(`/attendance/devices/employees/${employeeId}/enroll`, { mode });
   return response.data as { order_id: number; terminal_id: number };
 };
 
 /**
- * Los chips "sin sucursal" / "sin numero de reloj" no tienen filtro en el backend: se recorren los
+ * Los chips "sin sucursal" / "sin numero de empleado" no tienen filtro en el backend: se recorren los
  * habilitados (hasta 1000) y se filtra en el cliente. Es un caso raro (el PATCH no permite habilitar sin ambos).
  */
 export const listEmployeesWithGap = async (

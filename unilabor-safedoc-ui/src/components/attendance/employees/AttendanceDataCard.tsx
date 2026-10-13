@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifyError, notifySuccess } from '../../../utils/notify';
 import { formatDate, formatDateTime } from '../shared/format';
 import { AttendanceDataForm } from './AttendanceDataForm';
+import { FacePhotoSection } from './FacePhotoSection';
 import { ReadinessIcons } from './ReadinessIcons';
 import { SYNC_LABEL, syncBadgeClass } from './readiness';
 import { cardClass, iconButtonClass, secondaryButtonClass } from './ui';
@@ -74,10 +75,12 @@ export const AttendanceDataCard = ({ employee, branches, canWrite, canDevices, o
               <span className={`badge badge-sm ${employee.is_enabled ? 'badge-success' : 'badge-ghost'}`}>{employee.is_enabled ? 'Sí' : 'No'}</span>
             </Row>
             <Row label="Sucursal">{employee.branch_name}</Row>
-            <Row label="Número de reloj"><span className="font-mono">{employee.device_employee_number}</span></Row>
+            <Row label="Número de empleado"><span className="font-mono">{employee.device_employee_number}</span></Row>
             <Row label="Ingreso">{employee.hire_date ? formatDate(employee.hire_date) : null}</Row>
           </dl>
           {employee.is_enabled ? <ReadinessIcons employee={employee} showLabel /> : null}
+
+          <FacePhotoSection employee={employee} canWrite={canWrite} onChanged={onChanged} />
 
           <div className="rounded-xl border border-[rgba(0,65,106,0.1)] p-3">
             <p className="flex flex-wrap items-center gap-2 text-sm">

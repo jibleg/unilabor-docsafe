@@ -95,6 +95,7 @@ export interface SyncResult {
   queued_sync: number;
   queued_remove: number;
   skipped_without_number: number;
+  skipped_invalid_number?: number;
 }
 
 export const getDevicesOverview = async (): Promise<DevicesOverview> => {

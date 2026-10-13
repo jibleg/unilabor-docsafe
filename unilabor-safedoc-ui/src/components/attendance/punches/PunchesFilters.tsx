@@ -61,7 +61,7 @@ export const PunchesFilters = ({ values, branches, rangeError, onChange }: Punch
           <Search size={15} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" />
           <input
             className={`${inputClass} pl-9`}
-            placeholder="Nombre, código o número de reloj"
+            placeholder="Nombre, código o número de empleado"
             value={values.q}
             onChange={(e) => onChange({ q: e.target.value })}
           />

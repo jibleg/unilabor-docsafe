@@ -1,19 +1,29 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Edit3, Moon, Plus, RefreshCw, Timer } from 'lucide-react';
+import { Copy, Edit3, Moon, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
 import { getApiErrorMessage } from '../../api/service';
-import { listShifts, type AttendanceShift } from '../../api/service.api-attendance-schedule';
-import { ModalShell } from '../../components/attendance/schedule/ModalShell';
+import { deleteShift, listShifts, type AttendanceShift } from '../../api/service.api-attendance-schedule';
+import { DrawerShell } from '../../components/attendance/schedule/DrawerShell';
 import { ShiftForm } from '../../components/attendance/schedule/ShiftForm';
 import { formatHoursValue, netHours } from '../../components/attendance/schedule/scheduleHelpers';
+import { confirmAction } from '../../utils/confirm';
+import { notifyError, notifySuccess } from '../../utils/notify';
 import { cardClass, primaryButton, secondaryButton } from '../../components/attendance/schedule/ui';
 
-type ModalState = { shift: AttendanceShift | null } | null;
+type DrawerTarget = { shift: AttendanceShift | null; template?: AttendanceShift };
 
 export const AttendanceShiftsPage = () => {
   const [shifts, setShifts] = useState<AttendanceShift[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modal, setModal] = useState<ModalState>(null);
+  // El destino se conserva al cerrar para que el drawer termine su animacion de salida con su contenido.
+  const [target, setTarget] = useState<DrawerTarget>({ shift: null });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [openCount, setOpenCount] = useState(0);
+  const openDrawer = (next: DrawerTarget) => {
+    setTarget(next);
+    setOpenCount((count) => count + 1);
+    setDrawerOpen(true);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,6 +41,22 @@ export const AttendanceShiftsPage = () => {
     void load();
   }, [load]);
 
+  const remove = async (shift: AttendanceShift) => {
+    const ok = await confirmAction(
+      'Eliminar turno',
+      `Se eliminará el turno "${shift.name}". Solo es posible si nunca se asignó a un colaborador; si ya se usó, desactívalo.`,
+      'Eliminar',
+    );
+    if (!ok) return;
+    try {
+      await deleteShift(shift.id);
+      notifySuccess('Turno eliminado.');
+      void load();
+    } catch (err) {
+      notifyError(getApiErrorMessage(err, 'No se pudo eliminar el turno.'));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -42,7 +68,7 @@ export const AttendanceShiftsPage = () => {
           <button type="button" className={secondaryButton} onClick={() => void load()} disabled={loading} aria-label="Actualizar">
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
-          <button type="button" className={primaryButton} onClick={() => setModal({ shift: null })}>
+          <button type="button" className={primaryButton} onClick={() => openDrawer({ shift: null })}>
             <Plus size={16} /> Nuevo turno
           </button>
         </div>
@@ -59,7 +85,7 @@ export const AttendanceShiftsPage = () => {
         <div className={`${cardClass} flex flex-col items-center gap-3 p-10 text-center`}>
           <Timer size={32} className="text-[var(--color-brand-300)]" />
           <p className="text-sm text-[var(--unilabor-neutral)]">Aún no hay turnos. Crea el primero para empezar a programar horarios.</p>
-          <button type="button" className={primaryButton} onClick={() => setModal({ shift: null })}><Plus size={16} /> Nuevo turno</button>
+          <button type="button" className={primaryButton} onClick={() => openDrawer({ shift: null })}><Plus size={16} /> Nuevo turno</button>
         </div>
       ) : (
         <div className={`${cardClass} overflow-x-auto`}>
@@ -91,8 +117,14 @@ export const AttendanceShiftsPage = () => {
                   <td className="px-3 py-2.5 tabular-nums">{shift.break_minutes} min</td>
                   <td className="px-3 py-2.5 tabular-nums">{shift.assignments_count ?? 0}</td>
                   <td className="px-3 py-2.5 text-right">
-                    <button type="button" className="rounded-lg p-1.5 text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]" aria-label={`Editar ${shift.name}`} onClick={() => setModal({ shift })}>
+                    <button type="button" className="rounded-lg p-1.5 text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]" aria-label={`Editar ${shift.name}`} title="Editar turno" onClick={() => openDrawer({ shift })}>
                       <Edit3 size={16} />
+                    </button>
+                    <button type="button" className="rounded-lg p-1.5 text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]" aria-label={`Duplicar ${shift.name}`} title="Duplicar turno" onClick={() => openDrawer({ shift: null, template: shift })}>
+                      <Copy size={16} />
+                    </button>
+                    <button type="button" className="rounded-lg p-1.5 text-[#d03b3b] hover:bg-[rgba(208,59,59,0.12)]" aria-label={`Eliminar ${shift.name}`} title="Eliminar turno" onClick={() => void remove(shift)}>
+                      <Trash2 size={16} />
                     </button>
                   </td>
                 </tr>
@@ -102,18 +134,22 @@ export const AttendanceShiftsPage = () => {
         </div>
       )}
 
-      {modal && (
-        <ModalShell title={modal.shift ? 'Editar turno' : 'Nuevo turno'} onClose={() => setModal(null)} widthClass="max-w-xl">
-          <ShiftForm
-            shift={modal.shift}
-            onCancel={() => setModal(null)}
-            onSaved={() => {
-              setModal(null);
-              void load();
-            }}
-          />
-        </ModalShell>
-      )}
+      <DrawerShell
+        open={drawerOpen}
+        title={target.shift ? 'Editar turno' : target.template ? 'Duplicar turno' : 'Nuevo turno'}
+        onClose={() => setDrawerOpen(false)}
+      >
+        <ShiftForm
+          key={openCount}
+          shift={target.shift}
+          template={target.template ?? null}
+          onCancel={() => setDrawerOpen(false)}
+          onSaved={() => {
+            setDrawerOpen(false);
+            void load();
+          }}
+        />
+      </DrawerShell>
     </div>
   );
 };

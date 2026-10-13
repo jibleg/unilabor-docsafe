@@ -83,3 +83,25 @@ export const deviceTimeDiffers = (punchedAt: string, reportedAt: string | null):
   const b = new Date(reportedAt).getTime();
   return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) >= 1000;
 };
+
+const localDay = (value: string): string => {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+};
+
+/** Clave colaborador + dia (zona del navegador) para agrupar las checadas de un mismo dia. */
+export const punchDayKey = (punch: { employee: { id: number } | null; device_employee_number: string | null; punched_at: string }): string =>
+  `${punch.employee ? `e${punch.employee.id}` : `n${punch.device_employee_number ?? ''}`}|${localDay(punch.punched_at)}`;
+
+/** Todas las checadas cargadas de cada colaborador por dia, en orden cronologico. */
+export const groupPunchesByDay = <T extends { id: number; employee: { id: number } | null; device_employee_number: string | null; punched_at: string }>(
+  punches: T[],
+): Map<string, T[]> => {
+  const groups = new Map<string, T[]>();
+  for (const punch of punches) {
+    const key = punchDayKey(punch);
+    groups.set(key, [...(groups.get(key) ?? []), punch]);
+  }
+  groups.forEach((list) => list.sort((a, b) => new Date(a.punched_at).getTime() - new Date(b.punched_at).getTime()));
+  return groups;
+};

@@ -7,7 +7,7 @@ import {
 import type { AttendanceBranch } from '../../../api/service.api-attendance-common';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifySuccess } from '../../../utils/notify';
-import { isValidDeviceNumber } from './readiness';
+import { DEVICE_NUMBER_HELP, isValidDeviceNumber } from './readiness';
 import { inputClass, labelClass, primaryButtonClass, secondaryButtonClass } from './ui';
 
 interface Props {
@@ -17,7 +17,7 @@ interface Props {
   onCancel: () => void;
 }
 
-/** Formulario de datos de asistencia (habilitado, numero de reloj, sucursal, ingreso). */
+/** Formulario de datos de asistencia (habilitado, numero de empleado, sucursal, ingreso). */
 export const AttendanceDataForm = ({ employee, branches, onSaved, onCancel }: Props) => {
   const [isEnabled, setIsEnabled] = useState(employee.is_enabled);
   const [deviceNumber, setDeviceNumber] = useState(employee.device_employee_number ?? '');
@@ -29,9 +29,9 @@ export const AttendanceDataForm = ({ employee, branches, onSaved, onCancel }: Pr
   const numberInvalid = deviceNumber.trim() !== '' && !isValidDeviceNumber(deviceNumber);
 
   const handleSave = async () => {
-    if (numberInvalid) return setError('El número de reloj admite letras, números y guion (hasta 20).');
+    if (numberInvalid) return setError(`Número de empleado no válido. ${DEVICE_NUMBER_HELP}`);
     if (isEnabled && (!branchId || !deviceNumber.trim())) {
-      return setError('Para habilitar necesitas sucursal y número de reloj.');
+      return setError('Para habilitar necesitas sucursal y número de empleado.');
     }
     setSaving(true);
     setError('');
@@ -70,24 +70,28 @@ export const AttendanceDataForm = ({ employee, branches, onSaved, onCancel }: Pr
           <input id={`ad-hire-${employee.id}`} type="date" className={inputClass} value={hireDate} onChange={(event) => setHireDate(event.target.value)} />
         </div>
         <div className="sm:col-span-2">
-          <label className={labelClass} htmlFor={`ad-num-${employee.id}`}>Número de reloj</label>
+          <label className={labelClass} htmlFor={`ad-num-${employee.id}`}>Número de empleado</label>
           <div className="flex gap-2">
             <input
               id={`ad-num-${employee.id}`}
               className={`${inputClass} ${numberInvalid ? 'border-red-400' : ''}`}
               maxLength={20}
+              inputMode="numeric"
               aria-invalid={numberInvalid}
               value={deviceNumber}
+              disabled={employee.number_locked}
               onChange={(event) => setDeviceNumber(event.target.value)}
             />
-            {employee.suggested_device_number && deviceNumber !== employee.suggested_device_number ? (
+            {!employee.number_locked && employee.suggested_device_number && deviceNumber !== employee.suggested_device_number ? (
               <button type="button" className={secondaryButtonClass} onClick={() => setDeviceNumber(employee.suggested_device_number ?? '')}>
                 <Wand2 size={15} aria-hidden="true" /> Usar {employee.suggested_device_number}
               </button>
             ) : null}
           </div>
           <p className={`mt-1 text-xs ${numberInvalid ? 'text-red-700' : 'text-[var(--unilabor-neutral)]'}`}>
-            Letras, números y guion, hasta 20 caracteres. No se repite entre colaboradores.
+            {employee.number_locked
+              ? 'Ya tiene checadas registradas: el número de empleado no se puede cambiar.'
+              : `${DEVICE_NUMBER_HELP} No se repite entre colaboradores.`}
           </p>
         </div>
       </div>

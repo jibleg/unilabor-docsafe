@@ -12,7 +12,8 @@ import type { Queryable } from '../../utils/transaction';
 export const SHIFT_COLUMNS = `s.id, s.name,
   to_char(s.start_time, 'HH24:MI') AS start_time,
   to_char(s.end_time, 'HH24:MI') AS end_time,
-  s.crosses_midnight, s.break_minutes, s.shift_type, s.color_hex, s.is_active`;
+  s.crosses_midnight, s.break_minutes, s.shift_type, s.color_hex, s.is_active,
+  s.entry_before_min, s.entry_after_min, s.exit_before_min, s.exit_after_min`;
 
 export interface ShiftRow {
   id: number | string;
@@ -24,6 +25,10 @@ export interface ShiftRow {
   shift_type: 'fixed' | 'flexible';
   color_hex: string;
   is_active: boolean;
+  entry_before_min: number;
+  entry_after_min: number;
+  exit_before_min: number;
+  exit_after_min: number;
 }
 
 export interface ShiftView {
@@ -36,6 +41,10 @@ export interface ShiftView {
   shift_type: 'fixed' | 'flexible';
   color_hex: string;
   is_active: boolean;
+  entry_before_min: number;
+  entry_after_min: number;
+  exit_before_min: number;
+  exit_after_min: number;
 }
 
 export const toShiftView = (row: ShiftRow): ShiftView => ({
@@ -48,6 +57,10 @@ export const toShiftView = (row: ShiftRow): ShiftView => ({
   shift_type: row.shift_type,
   color_hex: row.color_hex,
   is_active: row.is_active,
+  entry_before_min: Number(row.entry_before_min),
+  entry_after_min: Number(row.entry_after_min),
+  exit_before_min: Number(row.exit_before_min),
+  exit_after_min: Number(row.exit_after_min),
 });
 
 export const toEngineShift = (row: ShiftRow): EngineShift => ({
@@ -58,6 +71,10 @@ export const toEngineShift = (row: ShiftRow): EngineShift => ({
   breakMinutes: Number(row.break_minutes),
   flexible: row.shift_type === 'flexible',
   isActive: row.is_active,
+  entryBeforeMin: Number(row.entry_before_min),
+  entryAfterMin: Number(row.entry_after_min),
+  exitBeforeMin: Number(row.exit_before_min),
+  exitAfterMin: Number(row.exit_after_min),
 });
 
 /** Todos los turnos (activos e inactivos) por id. */

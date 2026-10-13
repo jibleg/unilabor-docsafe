@@ -104,7 +104,8 @@ export const SyncDevicesModal = ({ onClose, onSynced }: Props) => {
                     <p className="mt-2 flex items-center gap-2 text-xs text-emerald-800">
                       <CheckCircle2 size={14} aria-hidden="true" />
                       {result.queued} orden(es): {result.queued_sync} alta(s), {result.queued_remove} baja(s)
-                      {result.skipped_without_number > 0 ? `, ${result.skipped_without_number} omitido(s) sin número` : ''}.
+                      {result.skipped_without_number > 0 ? `, ${result.skipped_without_number} omitido(s) sin número` : ''}
+                      {(result.skipped_invalid_number ?? 0) > 0 ? `, ${result.skipped_invalid_number} con número no válido` : ''}.
                     </p>
                   ) : null}
                 </div>

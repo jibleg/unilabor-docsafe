@@ -27,6 +27,11 @@ export interface EngineShift {
   breakMinutes: number;
   flexible: boolean;
   isActive: boolean;
+  /** Ventanas de checada en minutos (ver DEFAULT_PUNCH_WINDOWS); si faltan se usan las de por defecto. */
+  entryBeforeMin?: number;
+  entryAfterMin?: number;
+  exitBeforeMin?: number;
+  exitAfterMin?: number;
 }
 
 export interface EngineAssignment {
@@ -42,6 +47,9 @@ export interface EngineAssignment {
   weekdays: number[];
 }
 
+/** Ventana por defecto de un turno (coincide con los DEFAULT de la columna en BD). */
+export const DEFAULT_PUNCH_WINDOWS = { entryBeforeMin: 20, entryAfterMin: 30, exitBeforeMin: 1, exitAfterMin: 20 } as const;
+
 /** Tramo de una jornada. Los minutos son desde la medianoche del dia laboral; el fin puede pasar de 1440. */
 export interface DaySegment {
   shiftId: number;
@@ -51,6 +59,12 @@ export interface DaySegment {
   breakMinutes: number;
   flexible: boolean;
   crossesMidnight: boolean;
+  /** Minutos antes / despues de la entrada en que vale la checada de entrada. */
+  entryBeforeMin: number;
+  entryAfterMin: number;
+  /** Minutos antes / despues de la salida en que vale la checada de salida. */
+  exitBeforeMin: number;
+  exitAfterMin: number;
 }
 
 export interface DayPlan {
@@ -95,6 +109,10 @@ export const segmentFromShift = (shift: EngineShift): DaySegment => {
     breakMinutes: shift.breakMinutes,
     flexible: shift.flexible,
     crossesMidnight,
+    entryBeforeMin: shift.entryBeforeMin ?? DEFAULT_PUNCH_WINDOWS.entryBeforeMin,
+    entryAfterMin: shift.entryAfterMin ?? DEFAULT_PUNCH_WINDOWS.entryAfterMin,
+    exitBeforeMin: shift.exitBeforeMin ?? DEFAULT_PUNCH_WINDOWS.exitBeforeMin,
+    exitAfterMin: shift.exitAfterMin ?? DEFAULT_PUNCH_WINDOWS.exitAfterMin,
   };
 };
 

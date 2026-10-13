@@ -12,10 +12,13 @@ const at = (hhmm: string): number => {
   return MIDNIGHT + (h * 60 + m) * 60_000;
 };
 
+/** Ventanas amplias: estas pruebas ejercitan retardo/salida anticipada, no las ventanas (ver punch-windows.test.ts). */
+const WIDE = { entryBeforeMin: 60, entryAfterMin: 240, exitBeforeMin: 240, exitAfterMin: 240 };
+
 const shifts = new Map<number, EngineShift>([
-  [1, { id: 1, name: 'Mat', startTime: '08:00', endTime: '14:00', breakMinutes: 0, flexible: false, isActive: true }],
-  [2, { id: 2, name: 'Tarde', startTime: '16:00', endTime: '20:00', breakMinutes: 0, flexible: false, isActive: true }],
-  [3, { id: 3, name: 'Flex', startTime: '08:00', endTime: '16:00', breakMinutes: 0, flexible: true, isActive: true }],
+  [1, { id: 1, name: 'Mat', startTime: '08:00', endTime: '14:00', breakMinutes: 0, flexible: false, isActive: true, ...WIDE }],
+  [2, { id: 2, name: 'Tarde', startTime: '16:00', endTime: '20:00', breakMinutes: 0, flexible: false, isActive: true, ...WIDE }],
+  [3, { id: 3, name: 'Flex', startTime: '08:00', endTime: '16:00', breakMinutes: 0, flexible: true, isActive: true, ...WIDE }],
 ]);
 const assign = (id: number, shiftId: number | null): EngineAssignment => ({
   id, shiftId, startDate: '2026-01-01', endDate: null, repeatsWeekly: true, weekInterval: 1, weekdays: [1, 2, 3, 4, 5, 6, 7],

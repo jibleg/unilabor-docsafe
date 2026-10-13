@@ -109,7 +109,9 @@ const computeLivePeople = async (
     ),
     pool.query<{
       id: string; name: string; start_time: string; end_time: string; break_minutes: number; shift_type: string; is_active: boolean;
-    }>('SELECT id, name, start_time::text, end_time::text, break_minutes, shift_type, is_active FROM attendance.shifts'),
+      entry_before_min: number; entry_after_min: number; exit_before_min: number; exit_after_min: number;
+    }>(`SELECT id, name, start_time::text, end_time::text, break_minutes, shift_type, is_active,
+               entry_before_min, entry_after_min, exit_before_min, exit_after_min FROM attendance.shifts`),
     pool.query('SELECT 1 FROM attendance.holidays WHERE holiday_date = $1::date AND is_active', [date]),
     pool.query<{ employee_id: string }>(
       `SELECT DISTINCT i.employee_id
@@ -125,6 +127,8 @@ const computeLivePeople = async (
     shiftRes.rows.map((row) => [Number(row.id), {
       id: Number(row.id), name: row.name, startTime: row.start_time, endTime: row.end_time,
       breakMinutes: row.break_minutes, flexible: row.shift_type === 'flexible', isActive: row.is_active,
+      entryBeforeMin: row.entry_before_min, entryAfterMin: row.entry_after_min,
+      exitBeforeMin: row.exit_before_min, exitAfterMin: row.exit_after_min,
     }]),
   );
   const assignments = groupBy(

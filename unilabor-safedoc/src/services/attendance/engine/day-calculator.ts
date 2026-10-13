@@ -137,7 +137,7 @@ export const normalizePunches = (
   return kept;
 };
 
-interface PunchPair {
+export interface PunchPair {
   entry: EnginePunch | null;
   exit: EnginePunch | null;
 }
@@ -169,7 +169,7 @@ export const pairPunches = (punches: readonly EnginePunch[]): PunchPair => {
 };
 
 /** Reparte las checadas entre tramos usando el punto medio entre tramo y tramo. */
-const splitBySegment = (
+export const splitBySegment = (
   punches: readonly EnginePunch[],
   segments: readonly DaySegment[],
   midnight: LocalMs,
@@ -195,6 +195,38 @@ const splitBySegment = (
     (groups[target] as EnginePunch[]).push(punch);
   }
   return groups;
+};
+
+/**
+ * Entrada y salida de UN tramo segun las ventanas de checada de su turno:
+ *  - entrada = primera checada (sin tipo o 'in') en [inicio - antes, inicio + despues];
+ *  - salida  = ultima checada (sin tipo o 'out') en [fin - antes, fin + despues],
+ *    estrictamente posterior a la entrada si la hay.
+ * Las checadas fuera de ambas ventanas no cuentan. Un tramo flexible (sin horas
+ * fijas) conserva la regla general primera/ultima.
+ */
+export const pairForSegment = (
+  group: readonly EnginePunch[],
+  segment: DaySegment,
+  midnight: LocalMs,
+): PunchPair => {
+  if (segment.flexible) return pairPunches(group);
+  const ordered = group
+    .filter((punch) => punch.type !== 'break_start' && punch.type !== 'break_end')
+    .slice()
+    .sort((a, b) => a.at - b.at);
+  const at = (minute: number): LocalMs => midnight + minute * MS_PER_MINUTE;
+  const entryFrom = at(segment.startMinute - segment.entryBeforeMin);
+  const entryTo = at(segment.startMinute + segment.entryAfterMin);
+  const exitFrom = at(segment.endMinute - segment.exitBeforeMin);
+  const exitTo = at(segment.endMinute + segment.exitAfterMin);
+
+  const entry =
+    ordered.find((punch) => (punch.type === 'in' || punch.type === null) && punch.at >= entryFrom && punch.at <= entryTo) ?? null;
+  const exits = ordered.filter(
+    (punch) => (punch.type === 'out' || punch.type === null) && punch.at >= exitFrom && punch.at <= exitTo && (!entry || punch.at > entry.at),
+  );
+  return { entry, exit: exits[exits.length - 1] ?? null };
 };
 
 const formatMinute = (minute: number): string => {
@@ -231,7 +263,17 @@ export const calculateDay = (input: DayInput): DayCalculation => {
   const punches = normalizePunches(input.punches, settings.punch_debounce_seconds);
   result.hasPendingReview = punches.some((punch) => punch.reviewStatus === 'pending');
 
-  const overall = pairPunches(punches);
+  // Con horario fijo, entrada/salida salen de las ventanas de cada tramo; sin tramos (descanso, festivo) rige primera/ultima.
+  const midnight = dateToLocalMs(input.workDate);
+  const useWindows = input.plan.segments.length > 0 && !input.isHoliday;
+  const groups = splitBySegment(punches, input.plan.segments, midnight);
+  const segmentPairs = input.plan.segments.map((segment, index) => pairForSegment(groups[index] ?? [], segment, midnight));
+  const overall: PunchPair = useWindows
+    ? {
+        entry: segmentPairs.map((pair) => pair.entry).find((punch) => punch !== null) ?? null,
+        exit: [...segmentPairs].reverse().map((pair) => pair.exit).find((punch) => punch !== null) ?? null,
+      }
+    : pairPunches(punches);
   result.clockInRef = overall.entry?.ref ?? null;
   result.clockOutRef = overall.exit?.ref ?? null;
   result.clockInAt = overall.entry?.at ?? null;
@@ -270,15 +312,12 @@ export const calculateDay = (input: DayInput): DayCalculation => {
   // 4. Sin ninguna checada: falta.
   if (!overall.entry) {
     result.dayResult = 'absent';
-    result.reason = 'no_punches';
+    result.reason = punches.length === 0 ? 'no_punches' : 'no_entry_in_window';
     result.segments = input.plan.segments.map((segment) => emptySegmentDetail(segment));
     return result;
   }
 
   // 5. Evaluacion por tramo.
-  const midnight = dateToLocalMs(input.workDate);
-  const groups = splitBySegment(punches, input.plan.segments, midnight);
-
   let totalLate = 0;
   let totalEarly = 0;
   let worked = 0;
@@ -290,15 +329,14 @@ export const calculateDay = (input: DayInput): DayCalculation => {
   const details: SegmentDetail[] = [];
 
   input.plan.segments.forEach((segment, index) => {
-    const group = groups[index] ?? [];
+    const pair = segmentPairs[index] ?? { entry: null, exit: null };
     expectedHours += segmentHours(segment);
-    if (group.length === 0) {
+    if (!pair.entry) {
       missingSegments += 1;
       details.push(emptySegmentDetail(segment));
       return;
     }
 
-    const pair = pairPunches(group);
     const expectedStart = midnight + segment.startMinute * MS_PER_MINUTE;
     const expectedEnd = midnight + segment.endMinute * MS_PER_MINUTE;
 

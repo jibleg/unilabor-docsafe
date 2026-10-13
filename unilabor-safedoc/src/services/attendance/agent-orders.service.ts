@@ -1,6 +1,8 @@
 import type { PoolClient } from 'pg';
 import pool from '../../config/db';
 import { withTransaction } from '../../utils/transaction';
+import { isDeviceNumber } from './device-number';
+import { loadFacePhotoBase64 } from './face-photo-files';
 import { registerAuditEvent } from '../audit.service';
 import { conflict, invalid, notFound } from './attendance-errors';
 import type { AuthenticatedAgent } from './agent-auth.service';
@@ -12,9 +14,9 @@ import { requireAgent } from './agents.service';
 export const ORDER_STALE_MINUTES = 10;
 export const ORDER_MAX_ATTEMPTS = 5;
 
-type OrderType = 'sync_person' | 'remove_person' | 'enroll_fingerprint' | 'enroll_face' | 'check_status';
+export type OrderType = 'sync_person' | 'remove_person' | 'enroll_fingerprint' | 'enroll_face' | 'upload_face' | 'check_status';
 
-const insertOrder = async (
+export const insertOrder = async (
   client: Pick<PoolClient, 'query'>,
   order: {
     agentId: number;
@@ -22,7 +24,8 @@ const insertOrder = async (
     employeeId?: number | null;
     type: OrderType;
     payload?: Record<string, unknown>;
-    userId: string;
+    /** null = proceso automatico del sistema. */
+    userId: string | null;
   },
 ): Promise<number> => {
   const { rows } = await client.query<{ id: string }>(
@@ -33,7 +36,7 @@ const insertOrder = async (
   return Number(rows[0]!.id);
 };
 
-const auditOrders = (userId: string, action: string, agentId: number, metadata: Record<string, unknown>) =>
+export const auditOrders = (userId: string, action: string, agentId: number, metadata: Record<string, unknown>) =>
   registerAuditEvent({
     user_id: userId,
     action,
@@ -50,71 +53,6 @@ export const queueTestOrder = async (agentId: number, userId: string): Promise<{
   return { order_id: orderId };
 };
 
-/** Encola altas y bajas de personas del reloj de la sucursal del agente. */
-export const queueSyncOrders = async (agentId: number, all: boolean, userId: string) => {
-  const agent = await requireAgent(agentId);
-  if (!agent.is_active) conflict('El agente esta desactivado.');
-
-  const result = await withTransaction(async (client) => {
-    // Serializa por agente para no duplicar ordenes si se pulsa dos veces a la vez.
-    await client.query('SELECT id FROM attendance.agents WHERE id = $1 FOR UPDATE', [agentId]);
-    const { rows } = await client.query<{
-      employee_id: string; full_name: string; number: string | null; is_enabled: boolean; is_active: boolean; status: string;
-    }>(
-      `SELECT e.id AS employee_id, e.full_name, p.device_employee_number AS number, p.is_enabled,
-              e.is_active, p.device_sync_status AS status
-         FROM attendance.employee_profiles p
-         JOIN public.employees e ON e.id = p.employee_id
-        WHERE e.branch_id = $1`,
-      [agent.branch_id],
-    );
-    const open = await client.query<{ employee_id: string; order_type: string }>(
-      `SELECT employee_id, order_type FROM attendance.agent_orders
-        WHERE agent_id = $1 AND order_status IN ('pending', 'processing')
-          AND order_type IN ('sync_person', 'remove_person') AND employee_id IS NOT NULL`,
-      [agentId],
-    );
-    const hasOpen = new Set(open.rows.map((r) => `${r.order_type}:${r.employee_id}`));
-
-    let queuedSync = 0;
-    let queuedRemove = 0;
-    let skippedWithoutNumber = 0;
-    for (const row of rows) {
-      const shouldBeOnDevice = row.is_enabled && row.is_active;
-      let type: OrderType | null = null;
-      if (shouldBeOnDevice) {
-        if (!row.number) {
-          skippedWithoutNumber += 1;
-          continue;
-        }
-        if (all || ['pending', 'error', 'not_applicable'].includes(row.status)) type = 'sync_person';
-      } else if (row.status === 'synced' && row.number) {
-        type = 'remove_person';
-      }
-      if (!type || hasOpen.has(`${type}:${row.employee_id}`)) continue;
-
-      await insertOrder(client, {
-        agentId,
-        employeeId: Number(row.employee_id),
-        type,
-        payload: { employeeNo: row.number, name: row.full_name },
-        userId,
-      });
-      await client.query(
-        `UPDATE attendance.employee_profiles
-            SET device_sync_status = 'pending', device_sync_error = NULL WHERE employee_id = $1`,
-        [row.employee_id],
-      );
-      if (type === 'sync_person') queuedSync += 1;
-      else queuedRemove += 1;
-    }
-    return { queued: queuedSync + queuedRemove, queued_sync: queuedSync, queued_remove: queuedRemove, skipped_without_number: skippedWithoutNumber };
-  });
-
-  await auditOrders(userId, 'attendance_agent_sync_queued', agentId, { all, ...result });
-  return result;
-};
-
 export const queueEnrollOrder = async (employeeId: number, mode: 'fingerprint' | 'face', userId: string) => {
   const { rows } = await pool.query<{
     id: string; full_name: string; branch_id: string | null; number: string | null; status: string | null;
@@ -128,7 +66,8 @@ export const queueEnrollOrder = async (employeeId: number, mode: 'fingerprint' |
   const employee = rows[0];
   if (!employee) return notFound('Colaborador no encontrado.');
   if (!employee.branch_id) return invalid('El colaborador no tiene sucursal asignada.');
-  if (!employee.number) return invalid('El colaborador no tiene numero de reloj asignado.');
+  if (!employee.number) return invalid('El colaborador no tiene numero de empleado asignado.');
+  if (!isDeviceNumber(employee.number)) return invalid(`El numero de empleado ${employee.number} no es valido para el reloj (solo digitos).`);
   if (employee.status !== 'synced') {
     return invalid('Sincroniza primero al colaborador con el reloj de su sucursal.');
   }
@@ -211,7 +150,7 @@ export interface AgentOrderView {
 
 /** Toma ordenes (SKIP LOCKED), cuenta el intento y las marca en proceso. */
 export const takeOrders = async (agent: AuthenticatedAgent, limit: number): Promise<AgentOrderView[]> =>
-  withTransaction(async (client) => {
+  withTransaction<TakenOrder[]>(async (client) => {
     // Las ordenes en proceso que ya agotaron los intentos se cierran con error.
     const exhausted = await client.query<{ id: string; employee_id: string | null; order_type: string }>(
       `UPDATE attendance.agent_orders
@@ -223,6 +162,13 @@ export const takeOrders = async (agent: AuthenticatedAgent, limit: number): Prom
       [agent.id, ORDER_MAX_ATTEMPTS, ORDER_STALE_MINUTES],
     );
     for (const row of exhausted.rows) {
+      if (row.employee_id && row.order_type === 'upload_face') {
+        await client.query(
+          `UPDATE attendance.employee_profiles SET face_sync_status = 'error',
+                  face_sync_error = 'El agente no respondio tras varios intentos' WHERE employee_id = $1`,
+          [row.employee_id],
+        );
+      }
       if (row.employee_id && (row.order_type === 'sync_person' || row.order_type === 'remove_person')) {
         await client.query(
           `UPDATE attendance.employee_profiles SET device_sync_status = 'error',
@@ -243,18 +189,33 @@ export const takeOrders = async (agent: AuthenticatedAgent, limit: number): Prom
       [agent.id, ORDER_MAX_ATTEMPTS, ORDER_STALE_MINUTES, limit],
     );
     if (rows.length === 0) return [];
-    const taken = await client.query<{ id: string; order_type: string; payload: unknown; terminal_serial: string | null }>(
+    const taken = await client.query<{ id: string; order_type: string; payload: unknown; terminal_serial: string | null; employee_id: string | null }>(
       `UPDATE attendance.agent_orders o
           SET order_status = 'processing', attempt_count = attempt_count + 1, picked_up_at = NOW()
         WHERE o.id = ANY($1::bigint[])
-    RETURNING o.id, o.order_type, o.payload,
+    RETURNING o.id, o.order_type, o.payload, o.employee_id,
               (SELECT t.serial_number FROM attendance.terminals t WHERE t.id = o.terminal_id) AS terminal_serial`,
       [rows.map((r) => r.id)],
     );
     return taken.rows
-      .map((r) => ({ id: Number(r.id), type: r.order_type, terminalSerial: r.terminal_serial, payload: r.payload }))
+      .map((r) => ({
+        id: Number(r.id), type: r.order_type, terminalSerial: r.terminal_serial, payload: r.payload,
+        employeeId: r.employee_id === null ? null : Number(r.employee_id),
+      }))
       .sort((a, b) => a.id - b.id);
-  });
+  }).then(attachFacePhotos);
+
+type TakenOrder = AgentOrderView & { employeeId: number | null };
+
+/** Las ordenes upload_face llevan la foto vigente (se lee del disco; no se guarda en la orden). */
+const attachFacePhotos = async (orders: TakenOrder[]): Promise<AgentOrderView[]> =>
+  Promise.all(
+    orders.map(async ({ employeeId, ...order }) => {
+      if (order.type !== 'upload_face' || employeeId === null) return order;
+      const photoBase64 = await loadFacePhotoBase64(employeeId);
+      return { ...order, payload: { ...(order.payload as Record<string, unknown>), photoBase64 } };
+    }),
+  );
 
 export const finishOrder = async (
   agent: AuthenticatedAgent,
@@ -263,37 +224,61 @@ export const finishOrder = async (
 ): Promise<void> => {
   const errorMessage = outcome.ok ? null : (outcome.error ?? 'Error sin detalle').slice(0, 500);
   await withTransaction(async (client) => {
-    const { rows } = await client.query<{ employee_id: string | null; order_type: string }>(
+    const { rows } = await client.query<{
+      employee_id: string | null; order_type: string; payload: { employeeNo?: string; replaced?: boolean } | null;
+    }>(
       `UPDATE attendance.agent_orders
           SET order_status = $3, result = $4::jsonb, error_message = $5, finished_at = NOW()
         WHERE id = $1 AND agent_id = $2 AND order_status = 'processing'
-    RETURNING employee_id, order_type`,
+    RETURNING employee_id, order_type, payload`,
       [orderId, agent.id, outcome.ok ? 'done' : 'error', outcome.result ? JSON.stringify(outcome.result) : null, errorMessage],
     );
     const order = rows[0];
     if (!order) return notFound('Orden no encontrada o ya cerrada.');
     if (!order.employee_id) return;
+    const employeeId = order.employee_id;
 
     if (order.order_type === 'sync_person') {
+      if (outcome.ok) {
+        // Queda registrado QUE numero y en QUE sucursal esta dado de alta (base para bajas y cambios de numero).
+        await client.query(
+          `UPDATE attendance.employee_profiles
+              SET device_sync_status = 'synced', device_synced_at = NOW(), device_sync_error = NULL, device_sync_attempts = 0,
+                  device_synced_number = $2, device_synced_branch_id = $3
+            WHERE employee_id = $1`,
+          [employeeId, order.payload?.employeeNo ?? null, agent.branch_id],
+        );
+      } else {
+        await client.query(
+          `UPDATE attendance.employee_profiles SET device_sync_status = 'error', device_sync_error = $2 WHERE employee_id = $1`,
+          [employeeId, errorMessage],
+        );
+      }
+    } else if (order.order_type === 'upload_face') {
       await client.query(
         outcome.ok
           ? `UPDATE attendance.employee_profiles
-                SET device_sync_status = 'synced', device_synced_at = NOW(), device_sync_error = NULL
+                SET face_sync_status = 'synced', face_synced_at = NOW(), face_sync_error = NULL, face_sync_attempts = 0
               WHERE employee_id = $1`
           : `UPDATE attendance.employee_profiles
-                SET device_sync_status = 'error', device_sync_error = $2 WHERE employee_id = $1`,
-        outcome.ok ? [order.employee_id] : [order.employee_id, errorMessage],
+                SET face_sync_status = 'error', face_sync_error = $2 WHERE employee_id = $1`,
+        outcome.ok ? [employeeId] : [employeeId, errorMessage],
       );
     } else if (order.order_type === 'remove_person') {
-      // Una baja correcta deja al colaborador fuera del reloj: ya no hay nada que sincronizar.
+      // Baja "de paso" (cambio de numero o de sucursal): el alta que sigue es la que fija el estado final.
+      if (order.payload?.replaced) return;
+      // Una baja correcta deja al colaborador fuera del reloj; su foto tendra que volver a enviarse si regresa.
       await client.query(
         outcome.ok
           ? `UPDATE attendance.employee_profiles
-                SET device_sync_status = 'not_applicable', device_sync_error = NULL, device_synced_at = NULL
+                SET device_sync_status = 'not_applicable', device_sync_error = NULL, device_synced_at = NULL,
+                    device_synced_number = NULL, device_synced_branch_id = NULL, device_sync_attempts = 0,
+                    face_sync_status = CASE WHEN face_photo_path IS NULL THEN 'not_applicable' ELSE 'pending' END,
+                    face_synced_at = NULL, face_sync_attempts = 0
               WHERE employee_id = $1`
           : `UPDATE attendance.employee_profiles
                 SET device_sync_status = 'error', device_sync_error = $2 WHERE employee_id = $1`,
-        outcome.ok ? [order.employee_id] : [order.employee_id, errorMessage],
+        outcome.ok ? [employeeId] : [employeeId, errorMessage],
       );
     }
   });

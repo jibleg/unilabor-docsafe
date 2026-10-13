@@ -9,8 +9,7 @@ import { isIsoDate } from '../../components/attendance/board/boardHelpers';
 import { ErrorBlock, LoadingBlock } from '../../components/attendance/board/BoardParts';
 import { LiveKpis } from '../../components/attendance/board/LiveKpis';
 import { LivePeopleTable } from '../../components/attendance/board/LivePeopleTable';
-import { AbsencesPanel, DevicesPanel, MonthRanking } from '../../components/attendance/board/LiveSidePanels';
-import { LiveTrend } from '../../components/attendance/board/TrendChart';
+import { DevicesPanel } from '../../components/attendance/board/LiveSidePanels';
 import { ghostButtonClass, inputClass, labelClass } from '../../components/attendance/board/boardStyles';
 
 const REFRESH_MS = 60_000;
@@ -18,7 +17,7 @@ const REFRESH_MS = 60_000;
 const AlertsBanner = ({ alerts }: { alerts: LiveBoard['alerts'] }) => {
   const items = [
     { count: alerts.without_schedule, text: 'sin horario vigente' },
-    { count: alerts.without_device_number, text: 'sin número de reloj' },
+    { count: alerts.without_device_number, text: 'sin número de empleado' },
     { count: alerts.pending_sync, text: 'por sincronizar' },
   ].filter((item) => item.count > 0);
   if (items.length === 0) return null;
@@ -143,13 +142,8 @@ export const AttendanceDashboardPage = () => {
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
             <LivePeopleTable board={board} />
             <div className="space-y-5">
-              <AbsencesPanel board={board} />
               <DevicesPanel board={board} />
             </div>
-          </div>
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <LiveTrend days={board.trend_14_days} />
-            <MonthRanking board={board} />
           </div>
         </>
       ) : null}

@@ -107,3 +107,15 @@ export const readableTextColor = (hex: string): string => {
 };
 
 export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export const DEFAULT_PUNCH_WINDOWS = { entry_before_min: 20, entry_after_min: 30, exit_before_min: 1, exit_after_min: 20 } as const;
+
+const shiftClock = (time: string, offsetMinutes: number): string => {
+  const [h, m] = time.slice(0, 5).split(':').map(Number);
+  const total = (((h ?? 0) * 60 + (m ?? 0) + offsetMinutes) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
+
+/** Rango horario de una ventana de checada: [hora - antes, hora + despues]. */
+export const windowRange = (time: string, before: number, after: number): string =>
+  `${shiftClock(time, -before)}–${shiftClock(time, after)}`;

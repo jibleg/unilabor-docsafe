@@ -1,9 +1,6 @@
-import { BarChart3 } from 'lucide-react';
-import type { LiveTrendDay } from '../../../api/service.api-attendance-boards';
 import { DAY_RESULT_COLOR } from '../shared/dayResult';
-import { formatDateShort } from '../shared/format';
 import { niceMax } from './boardHelpers';
-import { EmptyNote, SectionCard } from './BoardParts';
+import { EmptyNote } from './BoardParts';
 
 interface Block { key: string; label: string; attendances: number; lates: number; absences: number; incidents: number }
 
@@ -79,16 +76,3 @@ export const StackedTrend = ({ blocks, title, tooltipLabel }: {
     </div>
   );
 };
-
-export const LiveTrend = ({ days }: { days: LiveTrendDay[] }) => (
-  <SectionCard title="Tendencia de 14 días" icon={<BarChart3 size={18} />}>
-    <StackedTrend title="Tendencia de asistencias de los últimos 14 días"
-      blocks={days.map((d) => ({
-        key: d.date, label: d.date.slice(8, 10), attendances: d.attendances, lates: d.lates, absences: d.absences, incidents: d.incidents,
-      }))}
-      tooltipLabel={(b) => {
-        const day = days.find((d) => d.date === b.key);
-        return `${formatDateShort(b.key)}: ${day?.attendances ?? 0} asistencias, ${day?.lates ?? 0} retardos, ${day?.absences ?? 0} faltas, ${day?.incidents ?? 0} incidencias`;
-      }} />
-  </SectionCard>
-);
