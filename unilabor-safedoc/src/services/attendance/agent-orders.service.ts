@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import pool from '../../config/db';
 import { withTransaction } from '../../utils/transaction';
 import { isDeviceNumber } from './device-number';
+import { refreshSyncSummary } from './device-sync-summary';
 import { loadFacePhotoBase64 } from './face-photo-files';
 import { registerAuditEvent } from '../audit.service';
 import { conflict, invalid, notFound } from './attendance-errors';
@@ -57,7 +58,9 @@ export const queueEnrollOrder = async (employeeId: number, mode: 'fingerprint' |
   const { rows } = await pool.query<{
     id: string; full_name: string; branch_id: string | null; number: string | null; status: string | null;
   }>(
-    `SELECT e.id, e.full_name, e.branch_id, p.device_employee_number AS number, p.device_sync_status AS status
+    `SELECT e.id, e.full_name, e.branch_id, p.device_employee_number AS number,
+            (SELECT r.sync_status FROM attendance.employee_device_branches r
+              WHERE r.employee_id = e.id AND r.branch_id = e.branch_id AND r.synced_number IS NOT NULL) AS status
        FROM public.employees e
        LEFT JOIN attendance.employee_profiles p ON p.employee_id = e.id
       WHERE e.id = $1`,
@@ -162,20 +165,16 @@ export const takeOrders = async (agent: AuthenticatedAgent, limit: number): Prom
       [agent.id, ORDER_MAX_ATTEMPTS, ORDER_STALE_MINUTES],
     );
     for (const row of exhausted.rows) {
-      if (row.employee_id && row.order_type === 'upload_face') {
-        await client.query(
-          `UPDATE attendance.employee_profiles SET face_sync_status = 'error',
-                  face_sync_error = 'El agente no respondio tras varios intentos' WHERE employee_id = $1`,
-          [row.employee_id],
-        );
-      }
-      if (row.employee_id && (row.order_type === 'sync_person' || row.order_type === 'remove_person')) {
-        await client.query(
-          `UPDATE attendance.employee_profiles SET device_sync_status = 'error',
-                  device_sync_error = 'El agente no respondio tras varios intentos' WHERE employee_id = $1`,
-          [row.employee_id],
-        );
-      }
+      if (!row.employee_id) continue;
+      const column = row.order_type === 'upload_face' ? 'face' : row.order_type === 'sync_person' || row.order_type === 'remove_person' ? 'sync' : null;
+      if (!column) continue;
+      await client.query(
+        `UPDATE attendance.employee_device_branches
+            SET ${column}_sync_status = 'error', ${column}_sync_error = 'El agente no respondio tras varios intentos'
+          WHERE employee_id = $1 AND branch_id = $2`,
+        [row.employee_id, agent.branch_id],
+      );
+      await refreshSyncSummary(client, [Number(row.employee_id)]);
     }
 
     const { rows } = await client.query<{ id: string }>(
@@ -238,48 +237,43 @@ export const finishOrder = async (
     if (!order.employee_id) return;
     const employeeId = order.employee_id;
 
+    const row = (set: string, params: unknown[] = []) =>
+      client.query(
+        `UPDATE attendance.employee_device_branches SET ${set} WHERE employee_id = $1 AND branch_id = ${Number(agent.branch_id)}`,
+        [employeeId, ...params],
+      );
+
     if (order.order_type === 'sync_person') {
+      // Queda registrado QUE numero esta dado de alta EN ESTE reloj (base para bajas y cambios de numero).
       if (outcome.ok) {
-        // Queda registrado QUE numero y en QUE sucursal esta dado de alta (base para bajas y cambios de numero).
-        await client.query(
-          `UPDATE attendance.employee_profiles
-              SET device_sync_status = 'synced', device_synced_at = NOW(), device_sync_error = NULL, device_sync_attempts = 0,
-                  device_synced_number = $2, device_synced_branch_id = $3
-            WHERE employee_id = $1`,
-          [employeeId, order.payload?.employeeNo ?? null, agent.branch_id],
+        await row(
+          `sync_status = 'synced', synced_at = NOW(), sync_error = NULL, sync_attempts = 0, synced_number = $2`,
+          [order.payload?.employeeNo ?? null],
         );
       } else {
-        await client.query(
-          `UPDATE attendance.employee_profiles SET device_sync_status = 'error', device_sync_error = $2 WHERE employee_id = $1`,
-          [employeeId, errorMessage],
-        );
+        await row(`sync_status = 'error', sync_error = $2`, [errorMessage]);
       }
     } else if (order.order_type === 'upload_face') {
-      await client.query(
-        outcome.ok
-          ? `UPDATE attendance.employee_profiles
-                SET face_sync_status = 'synced', face_synced_at = NOW(), face_sync_error = NULL, face_sync_attempts = 0
-              WHERE employee_id = $1`
-          : `UPDATE attendance.employee_profiles
-                SET face_sync_status = 'error', face_sync_error = $2 WHERE employee_id = $1`,
-        outcome.ok ? [employeeId] : [employeeId, errorMessage],
-      );
+      if (outcome.ok) await row(`face_sync_status = 'synced', face_synced_at = NOW(), face_sync_error = NULL, face_sync_attempts = 0`);
+      else await row(`face_sync_status = 'error', face_sync_error = $2`, [errorMessage]);
     } else if (order.order_type === 'remove_person') {
-      // Baja "de paso" (cambio de numero o de sucursal): el alta que sigue es la que fija el estado final.
+      // Baja "de paso" (cambio de numero): el alta que sigue es la que fija el estado final.
       if (order.payload?.replaced) return;
-      // Una baja correcta deja al colaborador fuera del reloj; su foto tendra que volver a enviarse si regresa.
-      await client.query(
-        outcome.ok
-          ? `UPDATE attendance.employee_profiles
-                SET device_sync_status = 'not_applicable', device_sync_error = NULL, device_synced_at = NULL,
-                    device_synced_number = NULL, device_synced_branch_id = NULL, device_sync_attempts = 0,
-                    face_sync_status = CASE WHEN face_photo_path IS NULL THEN 'not_applicable' ELSE 'pending' END,
-                    face_synced_at = NULL, face_sync_attempts = 0
-              WHERE employee_id = $1`
-          : `UPDATE attendance.employee_profiles
-                SET device_sync_status = 'error', device_sync_error = $2 WHERE employee_id = $1`,
-        outcome.ok ? [employeeId] : [employeeId, errorMessage],
-      );
+      if (outcome.ok) {
+        // Fuera del reloj; si regresa, su foto tendra que volver a enviarse.
+        await client.query(
+          `UPDATE attendance.employee_device_branches r
+              SET sync_status = 'not_applicable', sync_error = NULL, synced_number = NULL, synced_at = NULL, sync_attempts = 0,
+                  face_sync_status = CASE WHEN p.face_photo_path IS NULL THEN 'not_applicable' ELSE 'pending' END,
+                  face_synced_at = NULL, face_sync_attempts = 0
+             FROM attendance.employee_profiles p
+            WHERE r.employee_id = $1 AND r.branch_id = $2 AND p.employee_id = r.employee_id`,
+          [employeeId, agent.branch_id],
+        );
+      } else {
+        await row(`sync_status = 'error', sync_error = $2`, [errorMessage]);
+      }
     }
+    await refreshSyncSummary(client, [Number(employeeId)]);
   });
 };

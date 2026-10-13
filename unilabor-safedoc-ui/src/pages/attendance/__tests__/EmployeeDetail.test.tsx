@@ -70,11 +70,15 @@ describe('Ficha de colaborador', () => {
     await ready();
     fireEvent.click(await screen.findByRole('button', { name: 'Editar datos de asistencia' }));
     const num = await screen.findByLabelText('Número de empleado');
-    fireEvent.change(num, { target: { value: 'ab cd!' } });
+    // Un numero heredado con letras (TEST-3) se marca invalido y no deja guardar.
     expect(num).toHaveAttribute('aria-invalid', 'true');
     fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
     expect(screen.getByRole('alert')).toHaveTextContent('Solo dígitos');
     expect(callsTo('PATCH', /employees\/3$/)).toHaveLength(0);
+    // Al teclear o pegar, las letras y simbolos no entran: solo digitos.
+    fireEvent.change(num, { target: { value: 'ab-12 c3!' } });
+    expect(num).toHaveValue('123');
+    expect(num).toHaveAttribute('inputmode', 'numeric');
     fireEvent.change(num, { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
     // habilitado + sin numero => error
@@ -174,5 +178,25 @@ describe('Ficha de colaborador', () => {
     expect(screen.queryByRole('button', { name: 'Editar datos de asistencia' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Ajustar|Abrir periodos/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Capturar/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Ficha: varias sucursales', () => {
+  it('muestra los relojes donde se registra y permite elegir sucursales adicionales', async () => {
+    respond('GET', '/attendance/branches', () => ({ branches: [{ id: 1, code: 'C', name: 'UNILABOR CENTRO' }, { id: 2, code: 'D', name: 'UNILABOR CIDE' }, { id: 3, code: 'L', name: 'UNILABOR LOMAS' }] }));
+    respond('PATCH', /employees\/3$/, () => ({ employee: fx<{ employee: object }>('employee-detail').employee }));
+    await page();
+    await ready();
+    expect(await screen.findByLabelText('Relojes donde se registra')).toHaveTextContent('UNILABOR CENTRO');
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar datos de asistencia' }));
+    const group = await screen.findByRole('group', { name: 'Registrar también en estos relojes' });
+    // la sucursal base no se ofrece como adicional
+    expect(within(group).queryByLabelText('UNILABOR CENTRO')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Número de empleado'), { target: { value: '3003' } });
+    fireEvent.click(within(group).getByLabelText('UNILABOR CIDE'));
+    fireEvent.click(within(group).getByLabelText('UNILABOR LOMAS'));
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(callsTo('PATCH', /employees\/3$/)).toHaveLength(1));
+    expect((callsTo('PATCH', /employees\/3$/)[0].data as { extra_branch_ids: number[] }).extra_branch_ids.sort()).toEqual([2, 3]);
   });
 });

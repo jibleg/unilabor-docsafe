@@ -9,7 +9,7 @@ import {
 import type { AttendanceBranch } from '../../../api/service.api-attendance-common';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifySuccess } from '../../../utils/notify';
-import { DEVICE_NUMBER_HELP, isValidDeviceNumber } from './readiness';
+import { DEVICE_NUMBER_HELP, isValidDeviceNumber, onlyDeviceDigits } from './readiness';
 import { inputClass, labelClass, modalBackdropClass, modalPanelClass, primaryButtonClass, secondaryButtonClass } from './ui';
 
 interface Props {
@@ -165,8 +165,10 @@ export const BulkEnableModal = ({ branches, onClose, onDone }: Props) => {
                                 aria-label={`Número de empleado de ${employee.full_name}`}
                                 className={`${inputClass} max-w-[160px] py-1 ${rowErrors[employee.id] ? 'border-red-400' : ''}`}
                                 maxLength={20}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={row.number}
-                                onChange={(event) => setNumber(employee.id, event.target.value)}
+                                onChange={(event) => setNumber(employee.id, onlyDeviceDigits(event.target.value))}
                               />
                               {rowErrors[employee.id] ? <p className="mt-1 text-xs text-red-700">{rowErrors[employee.id]}</p> : null}
                             </>

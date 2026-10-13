@@ -7,7 +7,7 @@ import {
 import type { AttendanceBranch } from '../../../api/service.api-attendance-common';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifySuccess } from '../../../utils/notify';
-import { DEVICE_NUMBER_HELP, isValidDeviceNumber } from './readiness';
+import { DEVICE_NUMBER_HELP, isValidDeviceNumber, onlyDeviceDigits } from './readiness';
 import { inputClass, labelClass, primaryButtonClass, secondaryButtonClass } from './ui';
 
 interface Props {
@@ -23,6 +23,7 @@ export const AttendanceDataForm = ({ employee, branches, onSaved, onCancel }: Pr
   const [deviceNumber, setDeviceNumber] = useState(employee.device_employee_number ?? '');
   const [branchId, setBranchId] = useState(employee.branch_id !== null ? String(employee.branch_id) : '');
   const [hireDate, setHireDate] = useState(employee.hire_date ?? '');
+  const [extraIds, setExtraIds] = useState<number[]>(() => employee.device_branches.filter((b) => b.is_extra).map((b) => b.branch_id));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,6 +42,7 @@ export const AttendanceDataForm = ({ employee, branches, onSaved, onCancel }: Pr
         device_employee_number: deviceNumber.trim() || null,
         branch_id: branchId ? Number(branchId) : null,
         hire_date: hireDate || null,
+        extra_branch_ids: extraIds.filter((id) => String(id) !== branchId),
       });
       notifySuccess('Datos de asistencia guardados.');
       onSaved(saved);
@@ -77,10 +79,11 @@ export const AttendanceDataForm = ({ employee, branches, onSaved, onCancel }: Pr
               className={`${inputClass} ${numberInvalid ? 'border-red-400' : ''}`}
               maxLength={20}
               inputMode="numeric"
+              pattern="[0-9]*"
               aria-invalid={numberInvalid}
               value={deviceNumber}
               disabled={employee.number_locked}
-              onChange={(event) => setDeviceNumber(event.target.value)}
+              onChange={(event) => setDeviceNumber(onlyDeviceDigits(event.target.value))}
             />
             {!employee.number_locked && employee.suggested_device_number && deviceNumber !== employee.suggested_device_number ? (
               <button type="button" className={secondaryButtonClass} onClick={() => setDeviceNumber(employee.suggested_device_number ?? '')}>
@@ -95,6 +98,36 @@ export const AttendanceDataForm = ({ employee, branches, onSaved, onCancel }: Pr
           </p>
         </div>
       </div>
+      <fieldset>
+        <legend className={labelClass}>Registrar también en estos relojes</legend>
+        <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">
+          Para quien checa en varias sucursales (ej. choferes). Su turno y el tablero siguen contando bajo la sucursal base.
+        </p>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {branches.filter((branch) => String(branch.id) !== branchId).map((branch) => (
+            <label key={branch.id} className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-[rgba(0,65,106,0.12)] px-3 py-1.5 text-sm">
+              <span className="min-w-0 truncate">{branch.name}</span>
+              <input
+                type="checkbox"
+                role="switch"
+                className="toggle toggle-sm shrink-0"
+                aria-label={branch.name}
+                checked={extraIds.includes(branch.id)}
+                onChange={(event) =>
+                  setExtraIds((current) => (event.target.checked ? [...current, branch.id] : current.filter((id) => id !== branch.id)))}
+              />
+            </label>
+          ))}
+        </div>
+        {branches.filter((branch) => String(branch.id) !== branchId).length > 1 && (
+          <div className="mt-1.5 flex gap-3 text-xs font-semibold">
+            <button type="button" className="text-[var(--color-brand-700)] hover:underline" onClick={() => setExtraIds(branches.filter((b) => String(b.id) !== branchId).map((b) => b.id))}>
+              Todas
+            </button>
+            <button type="button" className="text-[var(--color-brand-700)] hover:underline" onClick={() => setExtraIds([])}>Ninguna</button>
+          </div>
+        )}
+      </fieldset>
       {error ? (
         <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> {error}

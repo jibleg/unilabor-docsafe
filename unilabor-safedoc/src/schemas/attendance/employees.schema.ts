@@ -34,6 +34,8 @@ export const updateEmployeeProfileSchema = z
     device_employee_number: deviceNumberSchema.nullable().optional(),
     branch_id: z.number().int().positive().nullable().optional(),
     hire_date: isoDateSchema.nullable().optional(),
+    /** Relojes (sucursales) adicionales donde se registra, ademas de su sucursal base (ej. choferes). */
+    extra_branch_ids: z.array(z.number().int().positive()).max(100).optional(),
   })
   .refine((body) => Object.keys(body).length > 0, 'No hay cambios que guardar.');
 

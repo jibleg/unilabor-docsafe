@@ -29,6 +29,20 @@ export interface AttendanceEmployee {
   /** Estado del envío de la foto al reloj (pending = aún no está en el equipo). */
   face_sync_status: DeviceSyncStatus;
   face_sync_error: string | null;
+  /** Relojes (sucursales) donde se registra: la base y las adicionales, con su estado. */
+  device_branches: DeviceBranchView[];
+}
+
+export interface DeviceBranchView {
+  branch_id: number;
+  branch_name: string | null;
+  /** Elegida a mano como adicional a la sucursal base. */
+  is_extra: boolean;
+  sync_status: DeviceSyncStatus;
+  sync_error: string | null;
+  face_sync_status: DeviceSyncStatus;
+  face_sync_error: string | null;
+  on_device: boolean;
 }
 
 export interface EmployeeListParams {
@@ -79,6 +93,8 @@ export interface EmployeePatch {
   device_employee_number?: string | null;
   branch_id?: number | null;
   hire_date?: string | null;
+  /** Sucursales adicionales a la base donde tambien se registra (ej. choferes). */
+  extra_branch_ids?: number[];
 }
 
 export const patchAttendanceEmployee = async (id: number, patch: EmployeePatch): Promise<AttendanceEmployee> => {

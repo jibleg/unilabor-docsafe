@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { AttendanceEmployee } from '../../../api/service.api-attendance-employees';
-import { computeReadiness, isReadyToPunch, isValidDeviceNumber, validateVacationAdjustment } from './readiness';
+import { computeReadiness, isReadyToPunch, isValidDeviceNumber, onlyDeviceDigits, validateVacationAdjustment } from './readiness';
 
 const employee: AttendanceEmployee = {
   id: 1, employee_code: 'E1', full_name: 'Ana', email: null, area: null, position: null, is_active: true,
   branch_id: 1, branch_name: 'Centro', hire_date: null, is_enabled: true, device_employee_number: '1001',
   suggested_device_number: '1001', device_sync_status: 'synced', device_sync_error: null, device_synced_at: null, has_schedule: true,
-  number_locked: false, has_face_photo: false, face_photo_updated_at: null, face_sync_status: 'not_applicable', face_sync_error: null,
+  number_locked: false, has_face_photo: false, face_photo_updated_at: null, face_sync_status: 'not_applicable', face_sync_error: null, device_branches: [],
 };
 
 describe('readiness', () => {
@@ -44,5 +44,14 @@ describe('numero de empleado no valido para el reloj', () => {
     expect(item?.ok).toBe(false);
     expect(item?.detail).toContain('no es válido para el reloj');
     expect(isReadyToPunch(legacy)).toBe(false);
+  });
+});
+
+describe('onlyDeviceDigits', () => {
+  it('descarta todo lo que no sea digito y limita a 20', () => {
+    expect(onlyDeviceDigits('ab-12 c3!')).toBe('123');
+    expect(onlyDeviceDigits('TEST-3')).toBe('3');
+    expect(onlyDeviceDigits('9'.repeat(25))).toBe('9'.repeat(20));
+    expect(onlyDeviceDigits('')).toBe('');
   });
 });

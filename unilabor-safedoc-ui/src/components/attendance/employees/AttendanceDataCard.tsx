@@ -89,6 +89,19 @@ export const AttendanceDataCard = ({ employee, branches, canWrite, canDevices, o
               {employee.device_synced_at ? <span className="text-xs text-[var(--unilabor-neutral)]">{formatDateTime(employee.device_synced_at)}</span> : null}
             </p>
             {employee.device_sync_error ? <p className="mt-1 text-xs text-red-700">{employee.device_sync_error}</p> : null}
+            {employee.device_branches.length > 0 ? (
+              <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Relojes donde se registra">
+                {employee.device_branches.map((branch) => (
+                  <li
+                    key={branch.branch_id}
+                    title={branch.sync_error ?? `${branch.is_extra ? 'Adicional' : 'Base'}: ${SYNC_LABEL[branch.sync_status]}`}
+                    className={`badge badge-sm gap-1 ${syncBadgeClass(branch.sync_status)}`}
+                  >
+                    {branch.branch_name}{branch.is_extra ? ' (adicional)' : ''}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {canDevices ? (
               <div className="mt-3 space-y-2">
                 <div className="flex flex-wrap gap-2">

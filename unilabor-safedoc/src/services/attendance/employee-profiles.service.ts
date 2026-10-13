@@ -39,6 +39,20 @@ export interface AttendanceEmployee {
   face_photo_updated_at: string | null;
   face_sync_status: SyncStatus;
   face_sync_error: string | null;
+  /** Relojes (sucursales) donde se registra: la base y las adicionales, con su estado de sincronizacion. */
+  device_branches: DeviceBranchView[];
+}
+
+export interface DeviceBranchView {
+  branch_id: number;
+  branch_name: string | null;
+  /** Seleccionada a mano como adicional a la sucursal base. */
+  is_extra: boolean;
+  sync_status: SyncStatus;
+  sync_error: string | null;
+  face_sync_status: SyncStatus;
+  face_sync_error: string | null;
+  on_device: boolean;
 }
 
 
@@ -89,6 +103,15 @@ const EMPLOYEE_SELECT = `
          to_char(p.face_photo_updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS face_photo_updated_at,
          COALESCE(p.face_sync_status, 'not_applicable') AS face_sync_status,
          p.face_sync_error,
+         COALESCE((
+           SELECT json_agg(json_build_object(
+                    'branch_id', r.branch_id, 'branch_name', rb.name, 'is_extra', r.is_extra,
+                    'sync_status', r.sync_status, 'sync_error', r.sync_error,
+                    'face_sync_status', r.face_sync_status, 'face_sync_error', r.face_sync_error,
+                    'on_device', r.synced_number IS NOT NULL) ORDER BY rb.name)
+             FROM attendance.employee_device_branches r
+             JOIN public.helpdesk_asset_units rb ON rb.id = r.branch_id
+            WHERE r.employee_id = e.id), '[]'::json) AS device_branches,
          ${SCHEDULE_EXISTS} AS has_schedule,
          (p.device_employee_number IS NOT NULL AND EXISTS (
            SELECT 1 FROM attendance.punches pu
@@ -221,14 +244,16 @@ const assertNumberEditable = async (
 interface StoredEmployee extends ProfileState {
   is_active: boolean;
   hire_date: string | null;
-  /** Numero con el que esta dado de alta en el reloj (null = no esta en ningun reloj). */
-  device_synced_number: string | null;
+  /** Esta dado de alta en algun reloj (si se deshabilita, queda pendiente de baja). */
+  on_terminal: boolean;
 }
 
 const loadStoredState = async (db: Queryable, employeeId: number, lock: boolean): Promise<StoredEmployee> => {
   const { rows } = await db.query(
     `SELECT e.is_active, e.branch_id::int AS branch_id, e.hire_date::text AS hire_date,
-            COALESCE(p.is_enabled, FALSE) AS is_enabled, p.device_employee_number, p.device_synced_number
+            COALESCE(p.is_enabled, FALSE) AS is_enabled, p.device_employee_number,
+            EXISTS (SELECT 1 FROM attendance.employee_device_branches r
+                     WHERE r.employee_id = e.id AND r.synced_number IS NOT NULL) AS on_terminal
        FROM public.employees e
        LEFT JOIN attendance.employee_profiles p ON p.employee_id = e.id
       WHERE e.id = $1 ${lock ? 'FOR UPDATE OF e' : ''}`,
@@ -260,7 +285,7 @@ const writeEmployeeAndProfile = async (
       after.hire_date,
     ]);
   }
-  const syncStatus = nextSyncStatus(before, after, before.device_synced_number !== null);
+  const syncStatus = nextSyncStatus(before, after, before.on_terminal);
   await client.query(
     `INSERT INTO attendance.employee_profiles (employee_id, is_enabled, device_employee_number, device_sync_status)
      VALUES ($1, $2, $3, COALESCE($4, 'not_applicable'))
@@ -272,6 +297,13 @@ const writeEmployeeAndProfile = async (
        device_sync_attempts = CASE WHEN $4 IS NULL THEN attendance.employee_profiles.device_sync_attempts ELSE 0 END`,
     [employeeId, after.is_enabled, after.device_employee_number, syncStatus],
   );
+  if (syncStatus !== null) {
+    // Un cambio relevante da otra oportunidad a los reintentos automaticos de todos sus relojes.
+    await client.query(
+      'UPDATE attendance.employee_device_branches SET sync_attempts = 0, face_sync_attempts = 0 WHERE employee_id = $1',
+      [employeeId],
+    );
+  }
 };
 
 const auditEmployee = (userId: string, action: string, employeeId: number, metadata: Record<string, unknown>) =>
@@ -284,6 +316,34 @@ const auditEmployee = (userId: string, action: string, employeeId: number, metad
     employee_id: employeeId,
     metadata,
   }).catch(() => undefined);
+
+/**
+ * Define en que relojes MAS (ademas de la sucursal base) se registra el colaborador. Quitar uno deja la fila sin
+ * seleccion y la sincronizacion lo da de baja de ese reloj; se conservan las filas para no perder el estado.
+ */
+const applyExtraBranches = async (
+  client: PoolClient,
+  employeeId: number,
+  branchIds: number[],
+  baseBranchId: number | null,
+): Promise<void> => {
+  const wanted = [...new Set(branchIds)].filter((id) => id !== baseBranchId);
+  for (const id of wanted) await assertBranchExists(client, id);
+  await client.query(
+    `UPDATE attendance.employee_device_branches SET is_extra = FALSE, sync_attempts = 0
+      WHERE employee_id = $1 AND is_extra AND NOT (branch_id = ANY($2::bigint[]))`,
+    [employeeId, wanted],
+  );
+  if (wanted.length === 0) return;
+  await client.query(
+    `INSERT INTO attendance.employee_device_branches (employee_id, branch_id, is_extra, face_sync_status)
+     SELECT $1, b, TRUE, CASE WHEN p.face_photo_path IS NULL THEN 'not_applicable' ELSE 'pending' END
+       FROM UNNEST($2::bigint[]) AS b
+       JOIN attendance.employee_profiles p ON p.employee_id = $1
+     ON CONFLICT (employee_id, branch_id) DO UPDATE SET is_extra = TRUE, sync_attempts = 0, face_sync_attempts = 0`,
+    [employeeId, wanted],
+  );
+};
 
 export const updateAttendanceEmployee = async (
   employeeId: number,
@@ -300,6 +360,9 @@ export const updateAttendanceEmployee = async (
       if (input.branch_id) await assertBranchExists(client, input.branch_id);
       if (after.device_employee_number) await assertDeviceNumberFree(client, employeeId, after.device_employee_number);
       await writeEmployeeAndProfile(client, employeeId, before, after);
+      if (input.extra_branch_ids !== undefined) {
+        await applyExtraBranches(client, employeeId, input.extra_branch_ids, after.branch_id);
+      }
     });
   } catch (error) {
     if (isUniqueViolation(error)) return conflict('Ese numero de empleado ya lo usa otro colaborador.');

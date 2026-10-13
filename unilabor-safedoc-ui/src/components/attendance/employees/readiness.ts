@@ -6,6 +6,9 @@ import type { AttendanceEmployee, DeviceSyncStatus } from '../../../api/service.
 export const DEVICE_NUMBER_PATTERN = /^[0-9]{1,20}$/;
 export const DEVICE_NUMBER_HELP = 'Solo dígitos (hasta 20): el reloj no acepta letras ni guiones.';
 
+/** Deja solo digitos (hasta 20): al teclear o pegar, las letras y simbolos no entran. */
+export const onlyDeviceDigits = (value: string): string => value.replace(/\D/g, '').slice(0, 20);
+
 export const isValidDeviceNumber = (value: string): boolean => DEVICE_NUMBER_PATTERN.test(value.trim());
 
 export const SYNC_LABEL: Record<DeviceSyncStatus, string> = {

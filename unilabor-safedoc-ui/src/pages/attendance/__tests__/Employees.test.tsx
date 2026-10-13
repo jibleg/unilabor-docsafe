@@ -124,9 +124,13 @@ describe('Colaboradores', () => {
       fireEvent.click(within(dialog).getByRole('button', { name: /^Habilitar$/ }));
       expect(within(dialog).getByRole('alert')).toHaveTextContent('Corrige las filas marcadas.');
       expect(within(dialog).getByText('Falta el número de empleado.')).toBeInTheDocument();
+      // Las letras no entran al campo: solo quedan los digitos.
+      fireEvent.change(input, { target: { value: 'ab-12 c3!' } });
+      expect(input).toHaveValue('123');
       fireEvent.change(input, { target: { value: 'ab cd!' } });
+      expect(input).toHaveValue('');
       fireEvent.click(within(dialog).getByRole('button', { name: /^Habilitar$/ }));
-      expect(within(dialog).getByText('Solo dígitos (hasta 20): el reloj no acepta letras ni guiones.')).toBeInTheDocument();
+      expect(within(dialog).getByText('Falta el número de empleado.')).toBeInTheDocument();
       expect(callsTo('POST', '/attendance/employees/bulk-enable')).toHaveLength(0);
     });
     it('muestra errores por fila del 400 y no cierra', async () => {

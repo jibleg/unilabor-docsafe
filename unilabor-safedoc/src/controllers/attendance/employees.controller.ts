@@ -91,8 +91,8 @@ export const uploadFacePhotoController = async (req: AuthRequest, res: Response)
 export const sendFacePhotoController = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = parseInput(employeeIdParamsSchema, req.params);
-    const { order_id } = await queueFacePhotoOrder(id, req.user!.id);
-    return res.status(202).json({ order_id, employee: await getAttendanceEmployee(id) });
+    const { queued } = await queueFacePhotoOrder(id, req.user!.id);
+    return res.status(202).json({ queued, employee: await getAttendanceEmployee(id) });
   } catch (error) {
     return handleAttendanceError(res, error, 'No se pudo enviar la fotografía al reloj.');
   }

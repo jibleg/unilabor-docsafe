@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Check, ChevronsLeft, ChevronsRight, Link2, X } from 'lucide-react';
-import type { AttendancePunch } from '../../../api/service.api-attendance-days';
+import { Camera, Check, ChevronsLeft, ChevronsRight, CreditCard, Fingerprint, HelpCircle, KeyRound, Link2, PenLine, ScanFace, X, type LucideIcon } from 'lucide-react';
+import type { AttendancePunch, VerificationMethod } from '../../../api/service.api-attendance-days';
 import { openAttendanceFile } from '../../../api/service.api-attendance-common';
 import { notifyError } from '../../../utils/notify';
 import { formatDateTime } from '../shared/format';
@@ -26,21 +26,49 @@ const formatDay = (value: string): string =>
 
 const unique = (values: Array<string | null | undefined>): string[] => [...new Set(values.filter((v): v is string => !!v))];
 
+/** Color e icono por metodo de verificacion (el icono evita depender solo del color). */
+const METHOD_STYLE: Record<VerificationMethod, { Icon: LucideIcon; background: string; color: string; border: string }> = {
+  fingerprint: { Icon: Fingerprint, background: '#ede9fe', color: '#5b21b6', border: '#c4b5fd' },
+  face: { Icon: ScanFace, background: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
+  card: { Icon: CreditCard, background: '#e0f2fe', color: '#075985', border: '#7dd3fc' },
+  pin: { Icon: KeyRound, background: '#f1f5f9', color: '#334155', border: '#cbd5e1' },
+  manual: { Icon: PenLine, background: '#f1f5f9', color: '#334155', border: '#cbd5e1' },
+  other: { Icon: HelpCircle, background: '#f1f5f9', color: '#475569', border: '#cbd5e1' },
+};
+
 const PunchChip = ({ item }: { item: AttendancePunch }) => {
   const rejected = item.review_status === 'rejected';
   const pending = item.review_status === 'pending';
+  const style = METHOD_STYLE[item.verification_method ?? 'other'] ?? METHOD_STYLE.other;
   return (
     <span
-      title={[punchTypeLabel(item.punch_type), methodLabel(item.verification_method), pending ? 'pendiente' : rejected ? 'rechazada' : '']
+      title={[methodLabel(item.verification_method), punchTypeLabel(item.punch_type), pending ? 'pendiente' : rejected ? 'rechazada' : '']
         .filter(Boolean)
         .join(' · ')}
-      className={`rounded-md border px-1.5 py-0.5 font-mono text-[11px] text-[var(--unilabor-ink)] ${rejected ? 'line-through opacity-60' : ''}`}
-      style={{ borderColor: pending ? AMBER : 'rgba(0,65,106,0.18)' }}
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold ${rejected ? 'line-through opacity-60' : ''}`}
+      style={{ backgroundColor: style.background, color: style.color, borderColor: pending ? AMBER : style.border, borderWidth: pending ? 2 : 1 }}
     >
+      <style.Icon size={11} aria-hidden="true" />
+      <span className="sr-only">{methodLabel(item.verification_method)}: </span>
       {clockOnly(item.punched_at)}
     </span>
   );
 };
+
+/** Leyenda de colores de los metodos que aparecen en la tabla. */
+const MethodLegend = ({ methods }: { methods: VerificationMethod[] }) => (
+  <ul className="flex flex-wrap items-center gap-2 px-3 pb-2 text-[11px]" aria-label="Leyenda de métodos de verificación">
+    <li className="font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Método:</li>
+    {methods.map((method) => {
+      const style = METHOD_STYLE[method] ?? METHOD_STYLE.other;
+      return (
+        <li key={method} className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-semibold" style={{ backgroundColor: style.background, color: style.color, borderColor: style.border }}>
+          <style.Icon size={11} aria-hidden="true" /> {methodLabel(method)}
+        </li>
+      );
+    })}
+  </ul>
+);
 
 /** Primera y ultima checada del dia; si hay mas, un indicador "+N" despliega las intermedias. */
 const DayPunches = ({ list }: { list: AttendancePunch[] }) => {
@@ -120,8 +148,12 @@ const iconBtn = 'rounded-lg p-1.5 transition disabled:opacity-40';
 /** Un renglon por colaborador y dia; las acciones de revision van por cada checada pendiente. */
 export const PunchesTable = ({ punches, canAuthorize, busyId, onApprove, onReject, onLink }: PunchesTableProps) => {
   const groups = [...groupPunchesByDay(punches).entries()];
+  const usedMethods = (['fingerprint', 'face', 'card', 'pin', 'manual', 'other'] as VerificationMethod[]).filter((method) =>
+    punches.some((punch) => (punch.verification_method ?? 'other') === method),
+  );
   return (
     <div className="overflow-x-auto">
+      <MethodLegend methods={usedMethods} />
       <table className="min-w-full text-sm">
         <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
           <tr>

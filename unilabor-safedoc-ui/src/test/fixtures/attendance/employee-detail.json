@@ -1,21 +1,33 @@
 {
- "employee": {
-  "id": 3,
-  "employee_code": "AKHA",
-  "full_name": "Ana Torres Ruiz",
-  "email": "colaborador@example.com",
-  "area": "VALIDACION",
-  "position": "COORDINADOR DE ANALITICOS",
-  "is_active": true,
-  "branch_id": 1,
-  "branch_name": "UNILABOR CENTRO",
-  "hire_date": null,
-  "is_enabled": true,
-  "device_employee_number": "TEST-3",
-  "device_sync_status": "pending",
-  "device_sync_error": null,
-  "device_synced_at": null,
-  "has_schedule": true,
-  "suggested_device_number": "AKHA"
- }
+  "employee": {
+    "id": 3,
+    "employee_code": "AKHA",
+    "full_name": "Ana Torres Ruiz",
+    "email": "colaborador@example.com",
+    "area": "VALIDACION",
+    "position": "COORDINADOR DE ANALITICOS",
+    "is_active": true,
+    "branch_id": 1,
+    "branch_name": "UNILABOR CENTRO",
+    "hire_date": null,
+    "is_enabled": true,
+    "device_employee_number": "TEST-3",
+    "device_sync_status": "pending",
+    "device_sync_error": null,
+    "device_synced_at": null,
+    "has_schedule": true,
+    "suggested_device_number": "AKHA",
+    "device_branches": [
+      {
+        "branch_id": 1,
+        "branch_name": "UNILABOR CENTRO",
+        "is_extra": false,
+        "sync_status": "synced",
+        "sync_error": null,
+        "face_sync_status": "not_applicable",
+        "face_sync_error": null,
+        "on_device": true
+      }
+    ]
+  }
 }

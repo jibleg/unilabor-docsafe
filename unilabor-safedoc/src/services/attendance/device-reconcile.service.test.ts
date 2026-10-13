@@ -52,15 +52,19 @@ afterEach(async () => {
 interface Seed {
   enabled?: boolean;
   active?: boolean;
+  /** Sucursal base del colaborador. */
   branch?: number;
   number?: string | null;
-  status?: string;
-  syncedNumber?: string | null;
-  syncedBranch?: number | null;
-  attempts?: number;
   photo?: boolean;
-  faceStatus?: string;
-  faceAttempts?: number;
+  /** Registro de sincronizacion en el reloj de prueba (agent.branch); omitido = no hay fila. */
+  row?: {
+    status?: string;
+    syncedNumber?: string | null;
+    attempts?: number;
+    faceStatus?: string;
+    faceAttempts?: number;
+    extra?: boolean;
+  };
 }
 
 const seed = async (o: Seed = {}): Promise<number> => {
@@ -73,15 +77,25 @@ const seed = async (o: Seed = {}): Promise<number> => {
   );
   const id = Number(rows[0]?.id);
   await client.query(
-    `INSERT INTO attendance.employee_profiles
-       (employee_id, is_enabled, device_employee_number, device_sync_status, device_synced_number, device_synced_branch_id,
-        device_sync_attempts, face_photo_path, face_sync_status, face_sync_attempts)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    `INSERT INTO attendance.employee_profiles (employee_id, is_enabled, device_employee_number, face_photo_path)
+     VALUES ($1, $2, $3, $4)`,
     [
-      id, o.enabled ?? true, o.number === undefined ? `7${String(seq).padStart(3, '0')}${String(Date.now()).slice(-6)}` : o.number, o.status ?? 'pending', o.syncedNumber ?? null,
-      o.syncedBranch ?? null, o.attempts ?? 0, o.photo ? `${id}/x.jpg` : null, o.faceStatus ?? 'not_applicable', o.faceAttempts ?? 0,
+      id, o.enabled ?? true,
+      o.number === undefined ? `7${String(seq).padStart(3, '0')}${String(Date.now()).slice(-6)}` : o.number,
+      o.photo ? `${id}/x.jpg` : null,
     ],
   );
+  if (o.row) {
+    await client.query(
+      `INSERT INTO attendance.employee_device_branches
+         (employee_id, branch_id, is_extra, sync_status, synced_number, sync_attempts, face_sync_status, face_sync_attempts)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        id, agent!.branch, o.row.extra ?? false, o.row.status ?? 'pending', o.row.syncedNumber ?? null,
+        o.row.attempts ?? 0, o.row.faceStatus ?? (o.photo ? 'pending' : 'not_applicable'), o.row.faceAttempts ?? 0,
+      ],
+    );
+  }
   return id;
 };
 
@@ -94,40 +108,48 @@ const orders = async (employeeId: number) =>
     [employeeId],
   )).rows;
 
-const attempts = async (employeeId: number, column: 'device_sync_attempts' | 'face_sync_attempts' | 'device_sync_status') =>
-  (await client.query(`SELECT ${column} AS v FROM attendance.employee_profiles WHERE employee_id = $1`, [employeeId])).rows[0].v;
+const rowOf = async (employeeId: number) =>
+  (await client.query(
+    `SELECT * FROM attendance.employee_device_branches WHERE employee_id = $1 AND branch_id = $2`,
+    [employeeId, agent!.branch],
+  )).rows[0] as Record<string, unknown> | undefined;
+
+const profileStatus = async (employeeId: number) =>
+  (await client.query('SELECT device_sync_status, face_sync_status FROM attendance.employee_profiles WHERE employee_id = $1', [employeeId])).rows[0];
 
 describe('sincronizacion automatica con el reloj', () => {
-  it('habilitado y no sincronizado: encola el alta', async () => {
+  it('habilitado y sin registro: lo crea y encola el alta', async () => {
     const id = await seed();
     const result = await run(id);
     expect(result.queued_sync).toBe(1);
     expect((await orders(id)).map((o) => o.order_type)).toEqual(['sync_person']);
+    expect(await rowOf(id)).toMatchObject({ sync_status: 'pending', is_extra: false });
+    expect((await profileStatus(id)).device_sync_status).toBe('pending');
   });
 
   it('no duplica ordenes abiertas', async () => {
     const id = await seed();
     await run(id);
-    const second = await run(id);
-    expect(second.queued).toBe(0);
+    expect((await run(id)).queued).toBe(0);
     expect(await orders(id)).toHaveLength(1);
   });
 
   it('al deshabilitar a quien esta en el reloj: encola la baja y queda pendiente', async () => {
-    const id = await seed({ enabled: false, status: 'not_applicable', syncedNumber: '555001', syncedBranch: agent!.branch });
-    const result = await run(id);
-    expect(result.queued_remove).toBe(1);
-    expect((await orders(id))[0]).toMatchObject({ order_type: 'remove_person', payload: { employeeNo: '555001', replaced: false } });
-    expect(await attempts(id, 'device_sync_status')).toBe('pending');
+    const id = await seed({ enabled: false, row: { status: 'synced', syncedNumber: '555001' } });
+    expect((await run(id)).queued_remove).toBe(1);
+    expect((await orders(id))[0]).toMatchObject({ order_type: 'remove_person', payload: { employeeNo: '555001' } });
+    expect((await orders(id))[0]?.payload.replaced).toBeUndefined();
+    expect(await rowOf(id)).toMatchObject({ sync_status: 'pending' });
+    expect((await profileStatus(id)).device_sync_status).toBe('pending');
   });
 
   it('un colaborador inactivo en RH tambien se da de baja', async () => {
-    const id = await seed({ active: false, status: 'synced', syncedNumber: '555001', syncedBranch: agent!.branch });
+    const id = await seed({ active: false, row: { status: 'synced', syncedNumber: '555001' } });
     expect((await run(id)).queued_remove).toBe(1);
   });
 
   it('cambio de numero: baja del anterior y alta del nuevo, en ese orden', async () => {
-    const id = await seed({ number: '555002', status: 'pending', syncedNumber: '555001', syncedBranch: agent!.branch });
+    const id = await seed({ number: '555002', row: { status: 'synced', syncedNumber: '555001' } });
     await run(id);
     const list = await orders(id);
     expect(list.map((o) => o.order_type)).toEqual(['remove_person', 'sync_person']);
@@ -135,14 +157,38 @@ describe('sincronizacion automatica con el reloj', () => {
     expect(list[1]?.payload).toMatchObject({ employeeNo: '555002' });
   });
 
-  it('cambio de sucursal: baja "de paso" en la sucursal anterior', async () => {
-    const id = await seed({ branch: otherBranch!, status: 'pending', syncedNumber: '555001', syncedBranch: agent!.branch });
+  it('cambio de sucursal base: se da de baja de este reloj', async () => {
+    const id = await seed({ branch: otherBranch!, row: { status: 'synced', syncedNumber: '555001' } });
+    expect((await run(id)).queued_remove).toBe(1);
+    expect((await orders(id))[0]).toMatchObject({ order_type: 'remove_person' });
+  });
+
+  it('sucursal adicional elegida (chofer): se da de alta tambien en este reloj', async () => {
+    const id = await seed({ branch: otherBranch!, row: { extra: true } });
+    const result = await run(id);
+    expect(result.queued_sync).toBe(1);
+    expect(await rowOf(id)).toMatchObject({ is_extra: true, sync_status: 'pending' });
+  });
+
+  it('adicional retirada: se da de baja de ese reloj', async () => {
+    const id = await seed({ branch: otherBranch!, row: { extra: false, status: 'synced', syncedNumber: '555001' } });
+    expect((await run(id)).queued_remove).toBe(1);
+  });
+
+  it('deshabilitado con adicional elegida y sin estar en el reloj: no hace nada y conserva la seleccion', async () => {
+    const id = await seed({ enabled: false, branch: otherBranch!, row: { extra: true } });
+    expect((await run(id)).queued).toBe(0);
+    expect(await rowOf(id)).toBeDefined();
+  });
+
+  it('registro sobrante (no debe estar ni esta): se limpia', async () => {
+    const id = await seed({ branch: otherBranch!, row: { extra: false } });
     await run(id);
-    expect((await orders(id))[0]).toMatchObject({ order_type: 'remove_person', payload: { replaced: true } });
+    expect(await rowOf(id)).toBeUndefined();
   });
 
   it('ya sincronizado y sin cambios: no hace nada, salvo reenvio total', async () => {
-    const id = await seed({ number: '555001', status: 'synced', syncedNumber: '555001', syncedBranch: agent!.branch });
+    const id = await seed({ number: '555001', row: { status: 'synced', syncedNumber: '555001' } });
     expect((await run(id)).queued).toBe(0);
     expect((await run(id, false, true)).queued_sync).toBe(1);
   });
@@ -155,31 +201,43 @@ describe('sincronizacion automatica con el reloj', () => {
   });
 
   it('tope de reintentos: la red de seguridad se detiene; la accion manual lo reinicia', async () => {
-    const id = await seed({ status: 'error', attempts: AUTO_SYNC_MAX_RETRIES });
+    const id = await seed({ row: { status: 'error', attempts: AUTO_SYNC_MAX_RETRIES } });
     expect((await run(id, true)).skipped_max_retries).toBe(1);
     expect(await orders(id)).toHaveLength(0);
     expect((await run(id, false)).queued_sync).toBe(1);
-    expect(await attempts(id, 'device_sync_attempts')).toBe(0);
+    expect(await rowOf(id)).toMatchObject({ sync_attempts: 0 });
   });
 
   it('reintento automatico bajo el tope: cuenta el intento', async () => {
-    const id = await seed({ status: 'error', attempts: 1 });
+    const id = await seed({ row: { status: 'error', attempts: 1 } });
     expect((await run(id, true)).queued_sync).toBe(1);
-    expect(await attempts(id, 'device_sync_attempts')).toBe(2);
+    expect(await rowOf(id)).toMatchObject({ sync_attempts: 2 });
   });
 
   it('con foto: viaja despues del alta; si ya esta en el reloj, sola', async () => {
-    const fresh = await seed({ photo: true, faceStatus: 'pending' });
+    const fresh = await seed({ photo: true });
     await run(fresh);
     expect((await orders(fresh)).map((o) => o.order_type)).toEqual(['sync_person', 'upload_face']);
-    const synced = await seed({ number: '555001', photo: true, faceStatus: 'pending', status: 'synced', syncedNumber: '555001', syncedBranch: agent!.branch });
+    const synced = await seed({ number: '555001', photo: true, row: { status: 'synced', syncedNumber: '555001', faceStatus: 'pending' } });
     await run(synced);
     expect((await orders(synced)).map((o) => o.order_type)).toEqual(['upload_face']);
   });
 
   it('foto con error: respeta su propio tope', async () => {
-    const id = await seed({ number: '555001', photo: true, faceStatus: 'error', faceAttempts: AUTO_SYNC_MAX_RETRIES, status: 'synced', syncedNumber: '555001', syncedBranch: agent!.branch });
+    const id = await seed({
+      number: '555001', photo: true,
+      row: { status: 'synced', syncedNumber: '555001', faceStatus: 'error', faceAttempts: AUTO_SYNC_MAX_RETRIES },
+    });
     expect((await run(id, true)).skipped_max_retries).toBe(1);
     expect(await orders(id)).toHaveLength(0);
+  });
+
+  it('el resumen del perfil refleja todos los relojes', async () => {
+    const id = await seed({ number: '555001', row: { status: 'synced', syncedNumber: '555001' } });
+    await run(id);
+    expect((await profileStatus(id)).device_sync_status).toBe('synced');
+    await client.query('UPDATE attendance.employee_device_branches SET sync_status = $2 WHERE employee_id = $1', [id, 'error']);
+    await run(id, true);
+    expect((await profileStatus(id)).device_sync_status).toBe('pending');
   });
 });
