@@ -7,5 +7,6 @@
   ],
   "intervals": { "heartbeat": 60, "orders": 15, "recovery": 600 },
   "recoveryHours": 24,
-  "queuePath": "./queue.sqlite"
+  "queuePath": "./queue.sqlite",
+  "logPath": "./agente.log"
 }

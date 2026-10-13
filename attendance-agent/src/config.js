@@ -10,6 +10,7 @@ const DEFAULTS = {
   intervals: { heartbeat: 60, orders: 15, recovery: 600 },
   recoveryHours: 24,
   queuePath: './queue.sqlite',
+  logPath: './agente.log',
 };
 
 /** Valida y completa una configuracion ya parseada. Lanza Error con un mensaje claro. */

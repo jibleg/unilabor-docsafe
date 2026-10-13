@@ -1,3 +1,4 @@
 agent.config.json
 queue.sqlite*
+agente.log*
 node_modules/

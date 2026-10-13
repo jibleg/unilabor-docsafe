@@ -64,14 +64,14 @@ export class IsapiClient {
     return fields;
   }
 
-  async multipart(path, jsonField, json, file) {
+  async multipart(path, jsonField, json, file, method = 'POST') {
     const boundary = `----docsafe${randomBytes(8).toString('hex')}`;
     const head = `--${boundary}\r\nContent-Disposition: form-data; name="${jsonField}"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(json)}\r\n`
       + `--${boundary}\r\nContent-Disposition: form-data; name="img"; filename="${file.name}"\r\nContent-Type: ${file.mime}\r\n\r\n`;
     const body = Buffer.concat([Buffer.from(head), file.data, Buffer.from(`\r\n--${boundary}--\r\n`)]);
-    const r = await this.request('POST', path, body, { 'Content-Type': `multipart/form-data; boundary=${boundary}` });
+    const r = await this.request(method, path, body, { 'Content-Type': `multipart/form-data; boundary=${boundary}` });
     const text = await r.text();
-    if (!r.ok) throw new Error(`ISAPI POST ${path} -> ${r.status}: ${text.slice(0, 200)}`);
+    if (!r.ok) throw new Error(`ISAPI ${method} ${path} -> ${r.status}: ${text.slice(0, 200)}`);
     return text ? JSON.parse(text) : {};
   }
 }
@@ -141,6 +141,25 @@ export async function captureFace(c, employeeNo) {
   if (!data) throw new Error('El reloj no devolvio el rostro (nadie se coloco frente a la camara o el equipo no soporta la captura remota). Enrola directamente en el equipo.');
   await c.multipart('/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json', 'FaceDataRecord',
     { faceLibType: 'blackFD', FDID: '1', FPID: employeeNo }, { name: `${employeeNo}.jpg`, mime: 'image/jpeg', data: Buffer.from(data, 'base64') });
+}
+
+/**
+ * Sube la fotografia de rostro de una persona (JPEG enviado desde DocSafe) a la biblioteca de rostros del equipo.
+ * Si la persona ya tiene rostro, lo reemplaza (FDSetUp). La persona debe existir en el reloj (sync_person).
+ */
+export async function uploadFace(c, employeeNo, jpeg) {
+  const record = { faceLibType: 'blackFD', FDID: '1', FPID: employeeNo };
+  const file = { name: `${employeeNo}.jpg`, mime: 'image/jpeg', data: jpeg };
+  try {
+    await c.multipart('/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json', 'FaceDataRecord', record, file);
+  } catch (err) {
+    // Ya tenia rostro (o el equipo lo rechazo por duplicado): se intenta reemplazarlo.
+    try {
+      await c.multipart('/ISAPI/Intelligent/FDLib/FDSetUp?format=json', 'FaceDataRecord', record, file, 'PUT');
+    } catch (second) {
+      throw new Error(`El reloj rechazo la fotografia (verifica que sea un rostro de frente, nítido y que la persona exista en el equipo). ${second.message}`);
+    }
+  }
 }
 
 /** Apunta el push (HTTP listening) del reloj al agente. Mejor esfuerzo. */

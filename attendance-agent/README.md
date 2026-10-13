@@ -54,6 +54,9 @@ pm2 startup        # sigue las instrucciones (en Windows: pm2-installer)
 ## Variables
 `AGENT_CONFIG`: ruta alterna del archivo de configuracion.
 
+## Log
+El agente imprime su log en la terminal y lo guarda en `agente.log` (opcion `logPath` del archivo de configuracion; vacio = solo terminal), con la **hora local** y su desfase (`2026-10-13T12:29:33-06:00`). Rota a 5 MB y conserva 5 archivos (`agente.log.1` ... `.5`). Un fallo al escribir el archivo no detiene al agente.
+
 ## Solucion de problemas
 | Sintoma | Causa probable |
 |---|---|

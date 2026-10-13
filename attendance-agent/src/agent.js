@@ -9,15 +9,15 @@ import { readConfig } from './config.js';
 import { DocsafeClient } from './docsafe.js';
 import { takeWithinSize, toQueueEvent } from './events.js';
 import {
-  IsapiClient, captureFace, captureFingerprint, configurePush, removePerson, searchEvents, syncPerson, terminalInfo,
+  IsapiClient, captureFace, captureFingerprint, configurePush, removePerson, searchEvents, syncPerson, terminalInfo, uploadFace,
 } from './isapi.js';
 import { startListener } from './listener.js';
+import { createLogger } from './logger.js';
 import { Queue } from './queue.js';
 
 const VERSION = '1.0.0';
-const log = (m) => console.log(`${new Date().toISOString()} ${m}`);
-
 const cfg = readConfig();
+const log = createLogger({ logPath: cfg.logPath });
 const queue = new Queue(cfg.queuePath);
 const docsafe = new DocsafeClient(cfg, VERSION);
 const terminals = cfg.terminals.map((t) => ({ cfg: t, client: new IsapiClient(t), info: null, online: false, driftSeconds: null, pushConfigured: false }));
@@ -142,6 +142,10 @@ async function executeOrder(o) {
       case 'enroll_face':
         await captureFace(targets[0].client, String(p.employeeNo));
         return { ok: true, result: { terminal: targets[0].cfg.name } };
+      case 'upload_face':
+        if (!p.photoBase64) return { ok: false, error: 'DocSafe no envio la fotografia (ya no existe o no se pudo leer).' };
+        for (const t of targets) await uploadFace(t.client, String(p.employeeNo), Buffer.from(String(p.photoBase64), 'base64'));
+        return { ok: true, result: { terminals: targets.length } };
       case 'fetch_events': {
         const from = new Date(String(p.from ?? Date.now() - cfg.recoveryHours * 3_600_000));
         const to = new Date(String(p.to ?? new Date().toISOString()));
