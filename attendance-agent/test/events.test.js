@@ -3,10 +3,15 @@ import assert from 'node:assert/strict';
 import { methodOfEvent, normalizeDeviceTime, takeWithinSize, toQueueEvent, toWireEvent } from '../src/events.js';
 
 test('metodo de verificacion', () => {
-  assert.equal(methodOfEvent({ currentVerifyMode: 'faceOrFpOrCardOrPw' }), 'face');
+  // currentVerifyMode es el modo configurado: con varios metodos permitidos no dice cual se uso.
+  assert.equal(methodOfEvent({ currentVerifyMode: 'faceOrFpOrCardOrPw' }), 'other');
+  assert.equal(methodOfEvent({ currentVerifyMode: 'cardOrFaceOrFp', minor: 38 }), 'fingerprint');
+  assert.equal(methodOfEvent({ currentVerifyMode: 'cardOrFaceOrFp', minor: 75 }), 'face');
   assert.equal(methodOfEvent({ currentVerifyMode: 'fp' }), 'fingerprint');
-  assert.equal(methodOfEvent({ currentVerifyMode: 'cardOrPw' }), 'card');
+  assert.equal(methodOfEvent({ currentVerifyMode: 'face' }), 'face');
   assert.equal(methodOfEvent({ currentVerifyMode: 'pw' }), 'pin');
+  assert.equal(methodOfEvent({ subEventType: 38, currentVerifyMode: 'faceOrFpOrCardOrPw' }), 'fingerprint'); // push
+  assert.equal(methodOfEvent({ subEventType: 75 }), 'face');
   assert.equal(methodOfEvent({ minor: 75 }), 'face');
   assert.equal(methodOfEvent({ minor: 38 }), 'fingerprint');
   assert.equal(methodOfEvent({}), 'other');

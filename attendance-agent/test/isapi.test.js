@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { digestAuthorization } from '../src/isapi.js';
+import { digestAuthorization, extractJpeg, summarizeError, xmlTag } from '../src/isapi.js';
 import { normalizeConfig } from '../src/config.js';
 import { parseMultipart, parsePush, pushToQueueEvent } from '../src/listener.js';
 
@@ -51,4 +51,21 @@ test('push multipart con evento y foto', () => {
 test('push JSON de otro tipo de evento se ignora', () => {
   const { event } = parsePush('application/json', Buffer.from(JSON.stringify({ eventType: 'heartBeat' })));
   assert.equal(pushToQueueEvent('S1', event, null), null);
+});
+
+test('summarizeError resume respuestas de error XML y JSON', () => {
+  const xml = '<?xml version="1.0"?><ResponseStatus><statusCode>6</statusCode><statusString>Invalid Content</statusString><subStatusCode>badXmlContent</subStatusCode></ResponseStatus>';
+  assert.equal(summarizeError(xml), 'Invalid Content / badXmlContent');
+  const json = '{"statusCode": 6, "statusString": "Invalid Content", "subStatusCode": "badJsonContent", "errorMsg": "employeeNo"}';
+  assert.equal(summarizeError(json), 'Invalid Content / badJsonContent / employeeNo');
+  assert.equal(summarizeError('texto   libre\ncon saltos'), 'texto libre con saltos');
+});
+
+test('xmlTag y extractJpeg', () => {
+  assert.equal(xmlTag('<a><fingerData>QUJD</fingerData></a>', 'fingerData'), 'QUJD');
+  assert.equal(xmlTag('<a></a>', 'fingerData'), null);
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 0xff, 0xd9]);
+  const body = Buffer.concat([Buffer.from('--b\r\nContent-Type: image/jpeg\r\n\r\n'), jpeg, Buffer.from('\r\n--b--')]);
+  assert.deepEqual(extractJpeg(body), jpeg);
+  assert.equal(extractJpeg(Buffer.from('sin imagen')), null);
 });

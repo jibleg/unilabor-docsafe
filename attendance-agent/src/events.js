@@ -3,16 +3,23 @@
  * HikVision, conversion a la forma que espera DocSafe y corte de lotes por tamano.
  */
 
-/** Metodo de identificacion segun currentVerifyMode / minor de HikVision. */
+/**
+ * Metodo con el que se identifico la persona. El `minor` (o `subEventType` en el push) del evento dice QUE paso (75 rostro, 38 huella, 1 tarjeta);
+ * `currentVerifyMode` es el modo CONFIGURADO en el reloj (p. ej. "cardOrFaceOrFp" admite varios metodos), asi que solo
+ * sirve cuando nombra uno solo.
+ */
 export function methodOfEvent(e) {
+  // La busqueda de eventos trae `minor`; el push (HTTP listening) lo trae como `subEventType`.
+  const minor = Number(e?.minor ?? e?.subEventType);
+  if (minor === 75) return 'face';
+  if (minor === 38) return 'fingerprint';
+  if (minor === 1) return 'card';
   const mode = String(e?.currentVerifyMode ?? '').toLowerCase();
+  if (/or|and/.test(mode)) return 'other';
   if (mode.includes('face')) return 'face';
   if (mode.includes('fp') || mode.includes('finger')) return 'fingerprint';
   if (mode.includes('card')) return 'card';
   if (mode.includes('pw') || mode.includes('password')) return 'pin';
-  if (e?.minor === 75) return 'face';
-  if (e?.minor === 38) return 'fingerprint';
-  if (e?.minor === 1) return 'card';
   return 'other';
 }
 
@@ -46,7 +53,8 @@ export function toQueueEvent(terminalSerial, e, photoBase64 = null) {
     serial: String(serial),
     employeeNo: String(employeeNo),
     deviceTime,
-    attendanceStatus: e.attendanceStatus ?? null,
+    // El reloj manda el texto "undefined" cuando no tiene configurado el estado de asistencia.
+    attendanceStatus: e.attendanceStatus && e.attendanceStatus !== 'undefined' ? e.attendanceStatus : null,
     method: methodOfEvent(e),
     photoBase64,
   };

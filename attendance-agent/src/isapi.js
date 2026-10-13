@@ -7,6 +7,34 @@ import { isoLocal } from './events.js';
 
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 export const TIMEOUT_MS = 15_000;
+/** Las capturas esperan a que la persona ponga el dedo o el rostro frente al equipo. */
+export const CAPTURE_TIMEOUT_MS = 60_000;
+
+const ISAPI_XML_NS = 'xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0"';
+
+/** Resumen corto de una respuesta de error del reloj (XML o JSON): estado, subestado y mensaje. */
+export function summarizeError(text) {
+  const pick = (xml, json) => text.match(xml)?.[1] ?? text.match(json)?.[1];
+  const parts = [
+    pick(/<statusString>([^<]*)</, /"statusString"\s*:\s*"([^"]*)"/),
+    pick(/<subStatusCode>([^<]*)</, /"subStatusCode"\s*:\s*"([^"]*)"/),
+    pick(/<errorMsg>([^<]*)</, /"errorMsg"\s*:\s*"([^"]*)"/),
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' / ') : text.replace(/\s+/g, ' ').slice(0, 200);
+}
+
+/** Texto de una etiqueta XML plana (<tag>valor</tag>); null si no esta. */
+export function xmlTag(xml, tag) {
+  return xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))?.[1]?.trim() || null;
+}
+
+/** Primer JPEG dentro de un cuerpo binario (p. ej. multipart): de FFD8FF al ultimo FFD9. */
+export function extractJpeg(buffer) {
+  const start = buffer.indexOf(Buffer.from([0xff, 0xd8, 0xff]));
+  if (start < 0) return null;
+  const end = buffer.lastIndexOf(Buffer.from([0xff, 0xd9]));
+  return end > start ? buffer.subarray(start, end + 2) : null;
+}
 
 /** Cabecera Authorization: Digest ... para un reto WWW-Authenticate. */
 export function digestAuthorization(challenge, method, uri, username, password, cnonce = randomBytes(8).toString('hex')) {
@@ -36,22 +64,30 @@ export class IsapiClient {
   }
 
   /** Peticion con Digest: primer intento sin credenciales, segundo con la respuesta al reto. */
-  async request(method, path, body, headers = {}) {
+  async request(method, path, body, headers = {}, timeoutMs = TIMEOUT_MS) {
     const url = `${this.base}${path}`;
-    const first = await fetch(url, { method, body: body ?? undefined, headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const first = await fetch(url, { method, body: body ?? undefined, headers, signal: AbortSignal.timeout(timeoutMs) });
     if (first.status !== 401) return first;
     const challenge = first.headers.get('www-authenticate') ?? '';
     const auth = challenge.toLowerCase().startsWith('digest')
       ? digestAuthorization(challenge, method, path, this.t.username, this.t.password)
       : `Basic ${Buffer.from(`${this.t.username}:${this.t.password}`).toString('base64')}`;
-    return fetch(url, { method, body: body ?? undefined, headers: { ...headers, Authorization: auth }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    return fetch(url, { method, body: body ?? undefined, headers: { ...headers, Authorization: auth }, signal: AbortSignal.timeout(timeoutMs) });
   }
 
-  async json(method, path, body) {
-    const r = await this.request(method, path, body === undefined ? null : JSON.stringify(body), { 'Content-Type': 'application/json' });
+  async json(method, path, body, timeoutMs = TIMEOUT_MS) {
+    const r = await this.request(method, path, body === undefined ? null : JSON.stringify(body), { 'Content-Type': 'application/json' }, timeoutMs);
     const text = await r.text();
-    if (!r.ok) throw new Error(`ISAPI ${method} ${path} -> ${r.status}: ${text.slice(0, 200)}`);
+    if (!r.ok) throw new Error(`ISAPI ${method} ${path} -> ${r.status}: ${summarizeError(text)}`);
     return text ? JSON.parse(text) : {};
+  }
+
+  /** Peticion con cuerpo XML; devuelve el estado, el tipo de contenido y el cuerpo binario. */
+  async xmlRequest(method, path, xmlBody, timeoutMs = TIMEOUT_MS) {
+    const r = await this.request(method, path, `<?xml version="1.0" encoding="UTF-8"?>${xmlBody}`, { 'Content-Type': 'application/xml' }, timeoutMs);
+    const buffer = Buffer.from(await r.arrayBuffer());
+    if (!r.ok) throw new Error(`ISAPI ${method} ${path} -> ${r.status}: ${summarizeError(buffer.toString('utf8'))}`);
+    return { status: r.status, contentType: r.headers.get('content-type') ?? '', buffer };
   }
 
   /** Campos de un XML plano (deviceInfo, time). */
@@ -71,7 +107,7 @@ export class IsapiClient {
     const body = Buffer.concat([Buffer.from(head), file.data, Buffer.from(`\r\n--${boundary}--\r\n`)]);
     const r = await this.request(method, path, body, { 'Content-Type': `multipart/form-data; boundary=${boundary}` });
     const text = await r.text();
-    if (!r.ok) throw new Error(`ISAPI ${method} ${path} -> ${r.status}: ${text.slice(0, 200)}`);
+    if (!r.ok) throw new Error(`ISAPI ${method} ${path} -> ${r.status}: ${summarizeError(text)}`);
     return text ? JSON.parse(text) : {};
   }
 }
@@ -125,22 +161,75 @@ export async function removePerson(c, employeeNo) {
   await c.json('PUT', '/ISAPI/AccessControl/UserInfo/Delete?format=json', { UserInfoDelCond: { EmployeeNoList: [{ employeeNo }] } });
 }
 
-/** Captura guiada de huella en el equipo; depende del modelo (verificar con el equipo real). */
+/** Prueba cada variante de la peticion (el firmware decide si habla XML o JSON) y junta los errores para diagnosticar. */
+async function firstSuccess(attempts, failure) {
+  const errors = [];
+  for (const attempt of attempts) {
+    try {
+      const value = await attempt();
+      if (value) return value;
+      errors.push('respuesta sin datos');
+    } catch (err) {
+      errors.push(err.message);
+    }
+  }
+  throw new Error(`${failure} Detalle: ${errors.join(' | ')}`);
+}
+
+/** Captura guiada de huella en el equipo (la persona pone el dedo); depende del modelo. */
 export async function captureFingerprint(c, employeeNo, finger) {
-  const cap = await c.json('POST', '/ISAPI/AccessControl/CaptureFingerPrint', { CaptureFingerPrintCond: { fingerNo: finger } });
-  const data = cap.CaptureFingerPrint?.fingerData;
-  if (!data) throw new Error('El reloj no devolvio la huella (no se coloco el dedo o el equipo no soporta la captura remota). Enrola directamente en el equipo.');
+  const fingerData = await firstSuccess([
+    async () => {
+      const r = await c.xmlRequest('POST', '/ISAPI/AccessControl/CaptureFingerPrint',
+        `<CaptureFingerPrintCond ${ISAPI_XML_NS}><fingerNo>${finger}</fingerNo></CaptureFingerPrintCond>`, CAPTURE_TIMEOUT_MS);
+      return xmlTag(r.buffer.toString('utf8'), 'fingerData');
+    },
+    async () => (await c.json('POST', '/ISAPI/AccessControl/CaptureFingerPrint?format=json', { CaptureFingerPrintCond: { fingerNo: finger } }, CAPTURE_TIMEOUT_MS)).CaptureFingerPrint?.fingerData,
+  ], 'El reloj no devolvio la huella (no se coloco el dedo a tiempo o el equipo no soporta la captura remota). Enrola directamente en el equipo.');
   await c.json('POST', '/ISAPI/AccessControl/FingerPrintDownload?format=json', {
-    FingerPrintCfg: { employeeNo, enableCardReader: [1], fingerPrintID: finger, fingerType: 'normalFP', fingerData: data },
+    FingerPrintCfg: { employeeNo, enableCardReader: [1], fingerPrintID: finger, fingerType: 'normalFP', fingerData },
   });
 }
 
+/** Foto del rostro capturada por el equipo: base64 (JSON), JPEG dentro de multipart o una URL a descargar. */
+async function readCapturedFace(c, contentType, buffer) {
+  const jpeg = extractJpeg(buffer);
+  if (jpeg) return jpeg;
+  const text = buffer.toString('utf8');
+  let base64 = xmlTag(text, 'faceData');
+  let url = xmlTag(text, 'faceDataUrl');
+  if (!base64 && !url && text.trim().startsWith('{')) {
+    const json = JSON.parse(text).CaptureFaceData ?? {};
+    base64 = json.faceData ?? null;
+    url = json.faceDataUrl ?? null;
+  }
+  if (base64) return Buffer.from(base64, 'base64');
+  if (url) {
+    const path = url.replace(/^https?:\/\/[^/]+/, '');
+    const r = await c.request('GET', path);
+    if (!r.ok) throw new Error(`ISAPI GET ${path} -> ${r.status}`);
+    return Buffer.from(await r.arrayBuffer());
+  }
+  throw new Error(`respuesta no reconocida (${contentType || 'sin tipo'}): ${summarizeError(text)}`);
+}
+
 export async function captureFace(c, employeeNo) {
-  const cap = await c.json('POST', '/ISAPI/AccessControl/CaptureFaceData', { CaptureFaceDataCond: { captureInfrared: false, dataType: 'binary' } });
-  const data = cap.CaptureFaceData?.faceData;
-  if (!data) throw new Error('El reloj no devolvio el rostro (nadie se coloco frente a la camara o el equipo no soporta la captura remota). Enrola directamente en el equipo.');
+  const image = await firstSuccess([
+    async () => {
+      const r = await c.xmlRequest('POST', '/ISAPI/AccessControl/CaptureFaceData',
+        `<CaptureFaceDataCond ${ISAPI_XML_NS}><captureInfrared>false</captureInfrared><dataType>binary</dataType></CaptureFaceDataCond>`, CAPTURE_TIMEOUT_MS);
+      return readCapturedFace(c, r.contentType, r.buffer);
+    },
+    async () => {
+      const r = await c.request('POST', '/ISAPI/AccessControl/CaptureFaceData?format=json',
+        JSON.stringify({ CaptureFaceDataCond: { captureInfrared: false, dataType: 'binary' } }), { 'Content-Type': 'application/json' }, CAPTURE_TIMEOUT_MS);
+      const buffer = Buffer.from(await r.arrayBuffer());
+      if (!r.ok) throw new Error(`ISAPI POST CaptureFaceData -> ${r.status}: ${summarizeError(buffer.toString('utf8'))}`);
+      return readCapturedFace(c, r.headers.get('content-type') ?? '', buffer);
+    },
+  ], 'El reloj no devolvio el rostro (nadie se coloco frente a la camara o el equipo no soporta la captura remota). Enrola directamente en el equipo.');
   await c.multipart('/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json', 'FaceDataRecord',
-    { faceLibType: 'blackFD', FDID: '1', FPID: employeeNo }, { name: `${employeeNo}.jpg`, mime: 'image/jpeg', data: Buffer.from(data, 'base64') });
+    { faceLibType: 'blackFD', FDID: '1', FPID: employeeNo }, { name: `${employeeNo}.jpg`, mime: 'image/jpeg', data: image });
 }
 
 /**

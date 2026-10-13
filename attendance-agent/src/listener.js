@@ -65,7 +65,13 @@ export function startListener(port, queue, serialOfIp, log) {
         const remoteIp = (req.socket.remoteAddress ?? '').replace('::ffff:', '');
         const serial = serialOfIp(remoteIp);
         const queued = serial ? pushToQueueEvent(serial, event, photoBase64) : null;
-        if (queued && queue.add(queued)) log(`push ${serial} #${queued.employeeNo} ${queued.attendanceStatus ?? ''} serial ${queued.serial}`);
+        if (queued && queue.add(queued)) {
+          const acs = event?.AccessControllerEvent ?? {};
+          const minor = acs.minor ?? acs.subEventType ?? '?';
+          log(`push ${serial} #${queued.employeeNo} serial ${queued.serial} metodo=${queued.method} (minor=${minor}, modo=${acs.currentVerifyMode ?? '?'}) estado=${queued.attendanceStatus ?? 'sin estado'}`);
+          // Si el metodo no se pudo deducir, se registran los nombres de los campos del evento para poder ajustarlo.
+          if (queued.method === 'other') log(`  campos del evento: ${Object.keys(acs).join(', ')}`);
+        }
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('OK');
       } catch (err) {
