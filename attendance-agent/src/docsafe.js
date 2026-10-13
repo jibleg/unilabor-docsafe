@@ -8,12 +8,21 @@ export class DocsafeClient {
   }
 
   async request(method, path, body) {
-    const r = await fetch(`${this.cfg.docsafeUrl}/api/attendance/agent${path}`, {
-      method,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.cfg.agentKey}`, 'User-Agent': `docsafe-attendance-agent/${this.version}` },
-      signal: AbortSignal.timeout(30_000),
-    });
+    let r;
+    try {
+      r = await fetch(`${this.cfg.docsafeUrl}/api/attendance/agent${path}`, {
+        method,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.cfg.agentKey}`, 'User-Agent': `docsafe-attendance-agent/${this.version}` },
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      // "fetch failed" no dice nada: se agrega el motivo (ECONNREFUSED = DocSafe apagado o reiniciando, ECONNRESET, ENOTFOUND...).
+      const reason = err?.cause?.code ?? err?.cause?.message ?? err?.name ?? 'sin detalle';
+      const wrapped = new Error(`no se pudo conectar con DocSafe (${reason})`);
+      wrapped.cause = err;
+      throw wrapped;
+    }
     const text = await r.text();
     if (!r.ok) {
       const err = new Error(`DocSafe ${method} ${path} -> ${r.status}: ${text.slice(0, 200)}`);
