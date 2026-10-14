@@ -39,6 +39,8 @@ const MODULE_LABELS: Record<string, string> = {
   RH: 'Recursos Humanos',
   HELPDESK: 'Gestión de Activos',
   ADMIN: 'Administración',
+  PROVIDERS: 'Acuerdos con Proveedores y Clientes',
+  ATTENDANCE: 'Control de Asistencias',
   GLOBAL: 'General',
 };
 const moduleLabel = (code: string | null | undefined): string =>
