@@ -75,6 +75,21 @@ export class IsapiClient {
     return fetch(url, { method, body: body ?? undefined, headers: { ...headers, Authorization: auth }, signal: AbortSignal.timeout(timeoutMs) });
   }
 
+  /**
+   * GET con credenciales desde el primer intento. Las rutas /LOCALS/pic/... no piden
+   * autenticacion: sin credenciales el reloj contesta 404 en vez de 401, y `request` nunca
+   * llega a firmar. Se toma el reto de una ruta protegida y se firma la ruta de la foto.
+   */
+  async getAuthed(path, timeoutMs = TIMEOUT_MS) {
+    const probe = await fetch(`${this.base}/ISAPI/System/deviceInfo`, { signal: AbortSignal.timeout(timeoutMs) });
+    await probe.arrayBuffer();
+    const challenge = probe.headers.get('www-authenticate') ?? '';
+    const auth = challenge.toLowerCase().startsWith('digest')
+      ? digestAuthorization(challenge, 'GET', path, this.t.username, this.t.password)
+      : `Basic ${Buffer.from(`${this.t.username}:${this.t.password}`).toString('base64')}`;
+    return fetch(`${this.base}${path}`, { headers: { Authorization: auth }, signal: AbortSignal.timeout(timeoutMs) });
+  }
+
   async json(method, path, body, timeoutMs = TIMEOUT_MS) {
     const r = await this.request(method, path, body === undefined ? null : JSON.stringify(body), { 'Content-Type': 'application/json' }, timeoutMs);
     const text = await r.text();
@@ -256,4 +271,31 @@ export async function configurePush(c, agentIp, port) {
   const xml = `<?xml version="1.0" encoding="UTF-8"?><HttpHostNotification><id>1</id><url>/evento</url><protocolType>HTTP</protocolType><parameterFormatType>JSON</parameterFormatType><addressingFormatType>ipaddress</addressingFormatType><ipAddress>${agentIp}</ipAddress><portNo>${port}</portNo><httpAuthenticationMethod>none</httpAuthenticationMethod></HttpHostNotification>`;
   const r = await c.request('PUT', '/ISAPI/Event/notification/httpHosts/1', xml, { 'Content-Type': 'application/xml' });
   return r.ok;
+}
+
+/** Todas las personas registradas en el reloj (paginado de 30 en 30). `faceURL` solo viene si la persona tiene rostro. */
+export async function listPeople(c) {
+  const people = [];
+  const searchID = randomBytes(4).toString('hex');
+  for (let position = 0; position < 20_000;) {
+    const r = await c.json('POST', '/ISAPI/AccessControl/UserInfo/Search?format=json', {
+      UserInfoSearchCond: { searchID, searchResultPosition: position, maxResults: 30 },
+    });
+    const list = r.UserInfoSearch?.UserInfo ?? [];
+    people.push(...list.map((u) => ({
+      employeeNo: String(u.employeeNo), name: String(u.name ?? '').trim(),
+      numOfFace: Number(u.numOfFace ?? 0), faceURL: u.faceURL ?? null,
+    })));
+    position += list.length;
+    if (r.UserInfoSearch?.responseStatusStrg !== 'MORE' || list.length === 0) break;
+  }
+  return people;
+}
+
+/** Foto de rostro de una persona (JPEG) a partir de su `faceURL`; null si el reloj no devuelve un JPEG. */
+export async function downloadFace(c, faceURL) {
+  const url = new URL(faceURL, c.base);
+  const r = await c.getAuthed(`${url.pathname}${url.search}`);
+  if (!r.ok) throw new Error(`ISAPI GET ${url.pathname} -> ${r.status}`);
+  return extractJpeg(Buffer.from(await r.arrayBuffer()));
 }

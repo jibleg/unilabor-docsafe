@@ -48,9 +48,10 @@ nssm start DocSafeAgente
 ### pm2
 ```
 npm i -g pm2
-pm2 start src/agent.js --name docsafe-agente
+pm2 start ecosystem.config.cjs      # fija el cwd a esta carpeta
 pm2 save
-pm2 startup        # sigue las instrucciones (en Windows: pm2-installer)
+pm2 startup        # Linux/macOS; en Windows no existe: usar pm2-installer (jessety/pm2-installer)
+                   # o una tarea programada "al iniciar el sistema" que ejecute `pm2 resurrect`
 ```
 
 ## Variables
