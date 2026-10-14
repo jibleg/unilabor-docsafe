@@ -23,6 +23,14 @@ export function methodOfEvent(e) {
   return 'other';
 }
 
+/** `minor` de las verificaciones exitosas: tarjeta, huella y rostro. El resto (intentos, deteccion, alarmas) no son checadas. */
+export const VERIFIED_MINORS = new Set([1, 38, 75]);
+
+/** true si el evento es una verificacion exitosa (busqueda: `minor`; push: `subEventType`). */
+export function isVerifiedPunch(e) {
+  return VERIFIED_MINORS.has(Number(e?.minor ?? e?.subEventType));
+}
+
 const HAS_OFFSET = /(Z|[+-]\d{2}:?\d{2})$/i;
 
 /** Desfase de la zona de esta PC para una fecha, como "+hh:mm" / "-hh:mm". */
@@ -42,8 +50,9 @@ export function normalizeDeviceTime(value) {
   return Number.isNaN(date.getTime()) ? null : withOffset;
 }
 
-/** Evento ISAPI (AcsEvent / push) -> evento de cola, o null si no es una checada con numero de empleado. */
+/** Evento ISAPI (AcsEvent / push) -> evento de cola, o null si no es una verificacion exitosa con numero de empleado. */
 export function toQueueEvent(terminalSerial, e, photoBase64 = null) {
+  if (!isVerifiedPunch(e)) return null;
   const employeeNo = e?.employeeNoString ?? (e?.employeeNo != null ? String(e.employeeNo) : null);
   const serial = e?.serialNo ?? e?.serial;
   const deviceTime = normalizeDeviceTime(e?.time ?? e?.dateTime);

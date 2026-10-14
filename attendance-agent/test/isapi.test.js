@@ -32,7 +32,7 @@ test('configuracion: valida y completa defaults', () => {
 });
 
 test('push multipart con evento y foto', () => {
-  const event = { eventType: 'AccessControllerEvent', dateTime: '2026-10-12T08:00:00-06:00', AccessControllerEvent: { serialNo: 7, employeeNoString: 'T9', attendanceStatus: 'checkOut', currentVerifyMode: 'fp' } };
+  const event = { eventType: 'AccessControllerEvent', dateTime: '2026-10-12T08:00:00-06:00', AccessControllerEvent: { serialNo: 7, employeeNoString: 'T9', attendanceStatus: 'checkOut', subEventType: 38, currentVerifyMode: 'fp' } };
   const b = 'BOUND';
   const body = Buffer.concat([
     Buffer.from(`--${b}\r\nContent-Disposition: form-data; name="event_log"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(event)}\r\n`),

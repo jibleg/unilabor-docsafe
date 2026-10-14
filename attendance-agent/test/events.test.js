@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { methodOfEvent, normalizeDeviceTime, takeWithinSize, toQueueEvent, toWireEvent } from '../src/events.js';
+import { isVerifiedPunch, methodOfEvent, normalizeDeviceTime, takeWithinSize, toQueueEvent, toWireEvent } from '../src/events.js';
 
 test('metodo de verificacion', () => {
   // currentVerifyMode es el modo configurado: con varios metodos permitidos no dice cual se uso.
@@ -46,4 +46,13 @@ test('corta lotes por tamano y cantidad', () => {
   assert.equal(takeWithinSize([{ serial: '1', photoBase64: photo.repeat(5) }], 100).length, 1, 'siempre al menos uno');
   const small = Array.from({ length: 250 }, (_, i) => ({ serial: String(i) }));
   assert.equal(takeWithinSize(small).length, 100);
+});
+
+test('solo las verificaciones exitosas (tarjeta 1, huella 38, rostro 75) son checadas', () => {
+  const base = { serialNo: 9, time: '2026-10-14T08:00:00-06:00', employeeNoString: 'T001' };
+  for (const minor of [1, 38, 75]) assert.ok(toQueueEvent('SER1', { ...base, minor }), `minor ${minor}`);
+  assert.ok(toQueueEvent('SER1', { ...base, subEventType: 75 }), 'push con subEventType');
+  for (const minor of [104, 76, 39, undefined]) assert.equal(toQueueEvent('SER1', { ...base, minor }), null, `minor ${minor}`);
+  assert.equal(isVerifiedPunch({ minor: '75' }), true);
+  assert.equal(isVerifiedPunch(null), false);
 });
