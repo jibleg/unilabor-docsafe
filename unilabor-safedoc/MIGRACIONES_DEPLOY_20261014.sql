@@ -2,7 +2,10 @@
 -- Contiene 20261012_01/02 y 20261013_01..04. Aditiva (esquema nuevo `attendance` + columnas nuevas); sin DROP de datos.
 -- PRE-CHEQUEO: SELECT filename FROM public.schema_migrations ORDER BY filename DESC LIMIT 3;  -> la ultima debe ser 20261007_01.
 -- Aplicar ANTES de subir el backend nuevo. Idempotente (ON CONFLICT DO NOTHING).
--- Cada archivo conserva su propio BEGIN/COMMIT; el registro en schema_migrations va tras cada uno.
+-- COMPATIBLE CON POSTGRESQL < 12 (prod): las columnas GENERATED ... STORED (shifts.crosses_midnight,
+-- shift_assignments.is_rest_day) son columnas normales mantenidas por trigger, y los triggers usan
+-- EXECUTE PROCEDURE. El resultado es equivalente al de sql/*.sql; se registra el checksum del archivo original.
+-- Si falla a medias: cada archivo va en su BEGIN/COMMIT; ejecutar con psql -v ON_ERROR_STOP=1 -1 no aplica (hay varios COMMIT).
 
 -- ============ 20261012_01_attendance_schema.sql ============
 -- =============================================================================
@@ -138,7 +141,7 @@ CREATE TABLE IF NOT EXISTS attendance.shifts (
   start_time         TIME NOT NULL,
   end_time           TIME NOT NULL,
   -- Un turno cruza medianoche cuando termina a la misma hora o antes de iniciar.
-  crosses_midnight   BOOLEAN GENERATED ALWAYS AS (end_time <= start_time) STORED,
+  crosses_midnight   BOOLEAN NOT NULL DEFAULT FALSE,
   break_minutes      SMALLINT NOT NULL DEFAULT 0 CHECK (break_minutes BETWEEN 0 AND 480),
   -- fixed: evalua retardo y salida anticipada. flexible: solo cuenta horas.
   shift_type         TEXT NOT NULL DEFAULT 'fixed' CHECK (shift_type IN ('fixed', 'flexible')),
@@ -156,7 +159,7 @@ CREATE TABLE IF NOT EXISTS attendance.shift_assignments (
   id                  BIGSERIAL PRIMARY KEY,
   employee_id         BIGINT NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
   shift_id            BIGINT NULL REFERENCES attendance.shifts(id) ON DELETE CASCADE,
-  is_rest_day         BOOLEAN GENERATED ALWAYS AS (shift_id IS NULL) STORED,
+  is_rest_day         BOOLEAN NOT NULL DEFAULT FALSE,
   start_date          DATE NOT NULL,
   end_date            DATE NULL,                      -- NULL = sin fin
   repeats_weekly      BOOLEAN NOT NULL DEFAULT TRUE,
@@ -343,12 +346,12 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_attendance_punches_immutable_update ON attendance.punches;
 CREATE TRIGGER trg_attendance_punches_immutable_update
   BEFORE UPDATE ON attendance.punches
-  FOR EACH ROW EXECUTE FUNCTION attendance.guard_punch_immutability();
+  FOR EACH ROW EXECUTE PROCEDURE attendance.guard_punch_immutability();
 
 DROP TRIGGER IF EXISTS trg_attendance_punches_immutable_delete ON attendance.punches;
 CREATE TRIGGER trg_attendance_punches_immutable_delete
   BEFORE DELETE ON attendance.punches
-  FOR EACH ROW EXECUTE FUNCTION attendance.guard_punch_immutability();
+  FOR EACH ROW EXECUTE PROCEDURE attendance.guard_punch_immutability();
 
 -- =============================================================================
 -- 6. INCIDENCIAS
@@ -493,6 +496,27 @@ CREATE TABLE IF NOT EXISTS attendance.vacation_periods (
   CONSTRAINT ux_attendance_vacation_periods_employee_year UNIQUE (employee_id, seniority_year)
 );
 
+
+-- Compat PG < 12: reemplaza las columnas GENERATED ALWAYS AS ... STORED.
+CREATE OR REPLACE FUNCTION attendance.fill_derived_columns()
+RETURNS TRIGGER AS $fn$
+BEGIN
+  IF TG_TABLE_NAME = 'shifts' THEN
+    NEW.crosses_midnight := (NEW.end_time <= NEW.start_time);
+  ELSIF TG_TABLE_NAME = 'shift_assignments' THEN
+    NEW.is_rest_day := (NEW.shift_id IS NULL);
+  END IF;
+  RETURN NEW;
+END;
+$fn$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_fill_derived ON attendance.shifts;
+CREATE TRIGGER trg_fill_derived BEFORE INSERT OR UPDATE ON attendance.shifts
+  FOR EACH ROW EXECUTE PROCEDURE attendance.fill_derived_columns();
+DROP TRIGGER IF EXISTS trg_fill_derived ON attendance.shift_assignments;
+CREATE TRIGGER trg_fill_derived BEFORE INSERT OR UPDATE ON attendance.shift_assignments
+  FOR EACH ROW EXECUTE PROCEDURE attendance.fill_derived_columns();
+
 -- =============================================================================
 -- updated_at automatico
 -- =============================================================================
@@ -508,7 +532,7 @@ BEGIN
     EXECUTE format('DROP TRIGGER IF EXISTS trg_touch_updated_at ON attendance.%I', t);
     EXECUTE format(
       'CREATE TRIGGER trg_touch_updated_at BEFORE UPDATE ON attendance.%I
-         FOR EACH ROW EXECUTE FUNCTION attendance.touch_updated_at()', t);
+         FOR EACH ROW EXECUTE PROCEDURE attendance.touch_updated_at()', t);
   END LOOP;
 END $$;
 
@@ -736,7 +760,7 @@ BEGIN
        AND tgrelid = 'attendance.employee_device_branches'::regclass
   ) THEN
     CREATE TRIGGER trg_touch_updated_at BEFORE UPDATE ON attendance.employee_device_branches
-      FOR EACH ROW EXECUTE FUNCTION attendance.touch_updated_at();
+      FOR EACH ROW EXECUTE PROCEDURE attendance.touch_updated_at();
   END IF;
 END $$;
 
