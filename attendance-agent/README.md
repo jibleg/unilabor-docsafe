@@ -49,10 +49,26 @@ nssm start DocSafeAgente
 ```
 npm i -g pm2
 pm2 start ecosystem.config.cjs      # fija el cwd a esta carpeta
-pm2 save
-pm2 startup        # Linux/macOS; en Windows no existe: usar pm2-installer (jessety/pm2-installer)
-                   # o una tarea programada "al iniciar el sistema" que ejecute `pm2 resurrect`
+pm2 save                            # guarda la lista de procesos; sin esto `pm2 resurrect` no levanta nada
+pm2 startup                         # solo Linux/macOS
 ```
+
+**Windows: `pm2 startup` no existe.** Si la PC se apaga y encienden a diario (caso CIDE), PM2 no arranca solo y el reloj
+aparece "Fuera de linea" hasta que alguien lo levanta a mano. Registra el arranque automatico con el instalador de
+`windows\instalar-arranque.ps1` (tarea programada "al iniciar el sistema" que ejecuta `pm2 resurrect` 1 min despues
+del arranque), en PowerShell **como administrador** y con el **mismo usuario** que hizo `pm2 save`:
+```
+cd C:\docsafe-agente
+pm2 start ecosystem.config.cjs
+pm2 save
+powershell -ExecutionPolicy Bypass -File windows\instalar-arranque.ps1
+```
+Pide la contraseña de Windows de ese usuario (la tarea corre aunque nadie inicie sesion). Si la cuenta no tiene
+contraseña usa `-AlIniciarSesion` (arranca al iniciar sesion). Prueba sin reiniciar: `pm2 kill`, luego
+`Start-ScheduledTask -TaskName 'DocSafe Agente'`, espera 15 s y `pm2 list` debe mostrar `docsafe-agente` online.
+`-Desinstalar` quita la tarea. Cada vez que cambies `ecosystem.config.cjs` o agregues procesos vuelve a correr `pm2 save`.
+
+Diagnostico en la PC: `pm2 list`, `pm2 logs docsafe-agente --lines 50`, `Get-ScheduledTask 'DocSafe Agente'`.
 
 ## Variables
 `AGENT_CONFIG`: ruta alterna del archivo de configuracion.
