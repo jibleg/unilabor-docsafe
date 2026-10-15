@@ -5,7 +5,7 @@ import { buildCommitmentParams, type CommitmentBoard, type CommitmentQuery } fro
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifyError } from '../../../utils/notify';
 import { SearchableSelect } from '../../SearchableSelect';
-import { todayIso } from '../shared/format';
+import { pastDateBounds, todayIso } from '../shared/format';
 import { PERIOD_OPTIONS } from './boardHelpers';
 import { cardClass, ghostButtonClass, inputClass, labelClass } from './boardStyles';
 
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export const CommitmentFilters = ({ query, board, onChange }: Props) => {
+  const bounds = pastDateBounds();
   const [busy, setBusy] = useState<'pdf' | 'xlsx' | null>(null);
   const isCustom = query.period === 'custom';
 
@@ -73,11 +74,11 @@ export const CommitmentFilters = ({ query, board, onChange }: Props) => {
           <>
             <label className="block">
               <span className={labelClass}>Desde</span>
-              <input type="date" value={query.from ?? board?.from ?? ''} onChange={(e) => onChange({ from: e.target.value })} className={`${inputClass} mt-1 !w-auto`} />
+              <input type="date" min={bounds.min} max={bounds.max} value={query.from ?? board?.from ?? ''} onChange={(e) => onChange({ from: e.target.value })} className={`${inputClass} mt-1 !w-auto`} />
             </label>
             <label className="block">
               <span className={labelClass}>Hasta</span>
-              <input type="date" value={query.to ?? board?.to ?? ''} onChange={(e) => onChange({ to: e.target.value })} className={`${inputClass} mt-1 !w-auto`} />
+              <input type="date" min={bounds.min} max={bounds.max} value={query.to ?? board?.to ?? ''} onChange={(e) => onChange({ to: e.target.value })} className={`${inputClass} mt-1 !w-auto`} />
             </label>
           </>
         ) : null}

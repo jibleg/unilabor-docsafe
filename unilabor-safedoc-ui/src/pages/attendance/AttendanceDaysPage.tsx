@@ -21,7 +21,7 @@ import { RecalculateModal } from '../../components/attendance/days/RecalculateMo
 import { ManualPunchModal } from '../../components/attendance/punches/ManualPunchModal';
 import { secondaryButtonClass } from '../../components/attendance/punches/formStyles';
 import {
-  PAGE_SIZE, defaultDaysRange, exportResultParam, formatSummary, resultFilterToQuery, validateRange,
+  PAGE_SIZE, defaultDaysRange, exportResultParam, formatSummary, isFutureOrToday, resultFilterToQuery, validateRange,
 } from '../../components/attendance/days/dayHelpers';
 
 export const AttendanceDaysPage = () => {
@@ -173,7 +173,11 @@ export const AttendanceDaysPage = () => {
         ) : rangeError ? (
           <p className="px-5 py-12 text-center text-sm text-[var(--unilabor-neutral)]">Corrige el rango de fechas para consultar.</p>
         ) : days.length === 0 ? (
-          <p className="px-5 py-12 text-center text-sm text-[var(--unilabor-neutral)]">No hay días para los filtros seleccionados.</p>
+          <p className="px-5 py-12 text-center text-sm text-[var(--unilabor-neutral)]">
+            {isFutureOrToday(from)
+              ? 'El día de hoy aún no está calculado: cada día se cierra a las 03:30 del día siguiente. Para ver lo que ocurre ahora usa "Hoy en vivo" o Checadas.'
+              : 'No hay días para los filtros seleccionados.'}
+          </p>
         ) : (
           <div className={loading ? 'opacity-60 transition' : 'transition'}>
             <DaysTable days={days} canAuthorize={canAuthorize} onJustify={setJustifyDay} onManualPunch={setManualDay} />

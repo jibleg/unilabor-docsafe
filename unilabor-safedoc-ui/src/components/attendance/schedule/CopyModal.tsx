@@ -4,7 +4,7 @@ import { getApiErrorMessage } from '../../../api/service';
 import { copySchedule, getScheduleWeek, type CopyResult } from '../../../api/service.api-attendance-schedule';
 import { SearchableSelect } from '../../SearchableSelect';
 import { notifyError, notifyWarning } from '../../../utils/notify';
-import { formatDateShort } from '../shared/format';
+import { ATTENDANCE_MIN_DATE, formatDateShort } from '../shared/format';
 import { ModalShell } from './ModalShell';
 import { inputClass, labelClass, primaryButton, secondaryButton } from './ui';
 
@@ -125,7 +125,7 @@ export const CopyModal = ({ weekDate, defaultSourceId, onClose, onCopied }: Copy
           </div>
           <div>
             <label className={labelClass} htmlFor="copy-date">Semana (cualquier día)</label>
-            <input id="copy-date" type="date" className={inputClass} value={sourceDate} onChange={(e) => setSourceDate(e.target.value)} />
+            <input id="copy-date" type="date" min={ATTENDANCE_MIN_DATE} className={inputClass} value={sourceDate} onChange={(e) => setSourceDate(e.target.value)} />
           </div>
         </div>
 

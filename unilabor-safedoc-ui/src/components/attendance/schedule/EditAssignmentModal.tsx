@@ -11,7 +11,7 @@ import {
   type ScheduleConflictDetail,
 } from '../../../api/service.api-attendance-schedule';
 import { notifyError, notifySuccess, notifyWarning } from '../../../utils/notify';
-import { formatDate } from '../shared/format';
+import { ATTENDANCE_MIN_DATE, formatDate } from '../shared/format';
 import { ConflictList } from './ConflictList';
 import { ModalShell } from './ModalShell';
 import { RepeatFields, type RepeatState } from './RepeatFields';
@@ -159,11 +159,11 @@ export const EditAssignmentModal = ({ target, shifts, weekdayOrder, onClose, onC
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className={labelClass} htmlFor="edit-start">Desde</label>
-                  <input id="edit-start" type="date" className={inputClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  <input id="edit-start" type="date" min={ATTENDANCE_MIN_DATE} className={inputClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                 </div>
                 <div>
                   <label className={labelClass} htmlFor="edit-end">Hasta</label>
-                  <input id="edit-end" type="date" className={inputClass} value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+                  <input id="edit-end" type="date" className={inputClass} value={endDate} min={startDate || ATTENDANCE_MIN_DATE} onChange={(e) => setEndDate(e.target.value)} />
                   <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">{repeat.repeats ? 'Vacío = sin fin' : 'Vacío = solo ese día'}</p>
                 </div>
               </div>

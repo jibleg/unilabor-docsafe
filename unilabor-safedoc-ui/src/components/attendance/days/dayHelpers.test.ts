@@ -1,19 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canJustifyDay, defaultDaysRange, dayRowTone, exportResultParam, formatSummary, rangeDays, reasonLabel, resultFilterToQuery, validateRange,
+  canJustifyDay, defaultDaysRange, defaultPunchesRange, dayRowTone, exportResultParam, formatSummary, rangeDays, reasonLabel, resultFilterToQuery, validateRange,
 } from './dayHelpers';
 import { deviceTimeDiffers, isFutureMoment, normalizeReviewParam, validateManualPunch } from '../punches/punchHelpers';
 
 describe('dayHelpers', () => {
-  it('rango por defecto: hoy-14 a ayer', () => {
-    expect(defaultDaysRange('2026-10-12')).toEqual({ from: '2026-09-28', to: '2026-10-11' });
+  it('rango por defecto: el dia actual en Dias y en Checadas', () => {
+    expect(defaultDaysRange('2026-10-12')).toEqual({ from: '2026-10-12', to: '2026-10-12' });
+    expect(defaultPunchesRange('2026-10-12')).toEqual({ from: '2026-10-12', to: '2026-10-12' });
   });
   it('valida el rango', () => {
-    expect(validateRange('2026-01-01', '2026-01-10')).toBeNull();
-    expect(validateRange('2026-02-01', '2026-01-10')).toMatch(/posterior/);
-    expect(validateRange('2025-01-01', '2026-06-01')).toMatch(/366/);
+    const today = '2027-03-01';
+    expect(validateRange('2026-01-01', '2026-01-10', today)).toBeNull();
+    expect(validateRange('2026-02-01', '2026-01-10', today)).toMatch(/posterior a la final/);
+    expect(validateRange('2026-01-01', '2027-01-02', today)).toMatch(/366/);
     expect(rangeDays('2024-01-01', '2024-12-31')).toBe(366);
-    expect(validateRange('2024-01-01', '2024-12-31')).toBeNull();
+    expect(validateRange('2026-01-01', '2026-12-31', today)).toBeNull();
+  });
+  it('rechaza fechas anteriores al 01/01/2026 o posteriores a hoy', () => {
+    expect(validateRange('2025-12-31', '2026-01-05', '2026-10-15')).toMatch(/01\/01\/2026/);
+    expect(validateRange('2026-10-10', '2026-10-16', '2026-10-15')).toMatch(/posterior a hoy/);
+    expect(validateRange('2026-10-15', '2026-10-15', '2026-10-15')).toBeNull();
   });
   it('traduce el filtro de resultado', () => {
     expect(resultFilterToQuery('problems')).toEqual({ only_issues: true });

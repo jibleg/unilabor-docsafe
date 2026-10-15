@@ -3,6 +3,7 @@ import type { AttendanceBranch } from '../../../api/service.api-attendance-commo
 import { EmployeePicker } from './EmployeePicker';
 import { inputClass, labelClass } from './formStyles';
 import { REVIEW_FILTER_OPTIONS, SOURCE_FILTER_OPTIONS } from './punchHelpers';
+import { pastDateBounds } from '../shared/format';
 
 export interface PunchesFilterValues {
   from: string;
@@ -26,11 +27,11 @@ export const PunchesFilters = ({ values, branches, rangeError, onChange }: Punch
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
       <label>
         <span className={labelClass}>Desde</span>
-        <input type="date" className={inputClass} value={values.from} onChange={(e) => onChange({ from: e.target.value })} />
+        <input type="date" {...pastDateBounds()} className={inputClass} value={values.from} onChange={(e) => onChange({ from: e.target.value })} />
       </label>
       <label>
         <span className={labelClass}>Hasta</span>
-        <input type="date" className={inputClass} value={values.to} onChange={(e) => onChange({ to: e.target.value })} />
+        <input type="date" {...pastDateBounds()} className={inputClass} value={values.to} onChange={(e) => onChange({ to: e.target.value })} />
       </label>
       <label>
         <span className={labelClass}>Sucursal</span>

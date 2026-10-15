@@ -4,7 +4,7 @@ import { Activity, AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from 'l
 import { getApiErrorMessage } from '../../api/service.parsers';
 import { listAttendanceBranches, type AttendanceBranch } from '../../api/service.api-attendance-common';
 import { getLiveBoard, type LiveBoard } from '../../api/service.api-attendance-boards';
-import { addDaysIso, formatDate, todayIso } from '../../components/attendance/shared/format';
+import { ATTENDANCE_MIN_DATE, addDaysIso, formatDate, todayIso } from '../../components/attendance/shared/format';
 import { isIsoDate } from '../../components/attendance/board/boardHelpers';
 import { ErrorBlock, LoadingBlock } from '../../components/attendance/board/BoardParts';
 import { LiveKpis } from '../../components/attendance/board/LiveKpis';
@@ -107,7 +107,7 @@ export const AttendanceDashboardPage = () => {
               <button type="button" aria-label="Día anterior" className={`${ghostButtonClass} !px-2`} onClick={() => updateParam('date', addDaysIso(date, -1))}>
                 <ChevronLeft size={16} />
               </button>
-              <input type="date" aria-label="Fecha" value={date} onChange={(e) => updateParam('date', e.target.value === todayIso() ? '' : e.target.value)} className={`${inputClass} !w-auto`} />
+              <input type="date" aria-label="Fecha" min={ATTENDANCE_MIN_DATE} max={todayIso()} value={date} onChange={(e) => updateParam('date', e.target.value === todayIso() ? '' : e.target.value)} className={`${inputClass} !w-auto`} />
               <button type="button" aria-label="Día siguiente" className={`${ghostButtonClass} !px-2`} onClick={() => updateParam('date', addDaysIso(date, 1))}>
                 <ChevronRight size={16} />
               </button>

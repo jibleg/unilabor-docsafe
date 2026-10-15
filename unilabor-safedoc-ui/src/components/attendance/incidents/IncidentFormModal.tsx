@@ -8,7 +8,7 @@ import {
 import type { AttendanceEmployee } from '../../../api/service.api-attendance-employees';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { notifySuccess, notifyWarning } from '../../../utils/notify';
-import { todayIso } from '../shared/format';
+import { ATTENDANCE_MIN_DATE, todayIso } from '../shared/format';
 import { EmployeePicker } from '../employees/EmployeePicker';
 import { inputClass, labelClass, modalBackdropClass, modalPanelClass, primaryButtonClass, secondaryButtonClass } from '../employees/ui';
 import { AttachmentPicker } from './AttachmentPicker';
@@ -105,7 +105,7 @@ export const IncidentFormModal = ({ types, onClose, onCreated }: Props) => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className={labelClass} htmlFor="inc-start">{isHourly ? 'Fecha' : 'Desde'}</label>
-              <input id="inc-start" type="date" className={inputClass} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+              <input id="inc-start" type="date" min={ATTENDANCE_MIN_DATE} className={inputClass} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
             </div>
             {isHourly ? (
               <div>
@@ -115,7 +115,7 @@ export const IncidentFormModal = ({ types, onClose, onCreated }: Props) => {
             ) : (
               <div>
                 <label className={labelClass} htmlFor="inc-end">Hasta</label>
-                <input id="inc-end" type="date" min={startDate} className={inputClass} value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+                <input id="inc-end" type="date" min={startDate || ATTENDANCE_MIN_DATE} className={inputClass} value={endDate} onChange={(event) => setEndDate(event.target.value)} />
               </div>
             )}
           </div>

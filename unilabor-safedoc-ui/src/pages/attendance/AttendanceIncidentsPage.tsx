@@ -13,6 +13,7 @@ import { listAttendanceBranches, type AttendanceBranch } from '../../api/service
 import { getApiErrorMessage } from '../../api/service.parsers';
 import { Pagination } from '../../components/Pagination';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
+import { ATTENDANCE_MIN_DATE } from '../../components/attendance/shared/format';
 import { confirmAction } from '../../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
 import { useHasPermission } from '../../utils/permissions';
@@ -152,11 +153,11 @@ export const AttendanceIncidentsPage = () => {
       <div className={`${cardClass} grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6`}>
         <div>
           <label className={labelClass} htmlFor="f-from">Desde</label>
-          <input id="f-from" type="date" className={inputClass} value={from} onChange={(event) => setParam({ from: event.target.value })} />
+          <input id="f-from" type="date" min={ATTENDANCE_MIN_DATE} className={inputClass} value={from} onChange={(event) => setParam({ from: event.target.value })} />
         </div>
         <div>
           <label className={labelClass} htmlFor="f-to">Hasta</label>
-          <input id="f-to" type="date" className={inputClass} value={to} min={from} onChange={(event) => setParam({ to: event.target.value })} />
+          <input id="f-to" type="date" className={inputClass} value={to} min={from || ATTENDANCE_MIN_DATE} onChange={(event) => setParam({ to: event.target.value })} />
         </div>
         <div>
           <label className={labelClass} htmlFor="f-branch">Sucursal</label>

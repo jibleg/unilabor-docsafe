@@ -3,7 +3,7 @@ import { Loader2, PenLine } from 'lucide-react';
 import { createManualPunch, type AttendanceEmployeeOption } from '../../../api/service.api-attendance-days';
 import { getApiErrorMessage } from '../../../api/service';
 import { notifyError, notifySuccess } from '../../../utils/notify';
-import { todayIso } from '../shared/format';
+import { ATTENDANCE_MIN_DATE, todayIso } from '../shared/format';
 import { EmployeePicker } from './EmployeePicker';
 import { ModalShell } from './ModalShell';
 import { inputClass, labelClass, primaryButtonClass, secondaryButtonClass } from './formStyles';
@@ -75,7 +75,7 @@ export const ManualPunchModal = ({ onClose, onDone, preset }: ManualPunchModalPr
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label>
           <span className={labelClass}>Fecha</span>
-          <input type="date" className={inputClass} value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} />
+          <input type="date" className={inputClass} value={date} min={ATTENDANCE_MIN_DATE} max={todayIso()} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label>
           <span className={labelClass}>Hora</span>

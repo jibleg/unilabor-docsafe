@@ -36,10 +36,17 @@ describe('Dias', () => {
     expectNoBrokenText();
   });
 
-  it('vacio', async () => {
+  it('vacio con rango pasado', async () => {
+    emptyAll(emptyBodies);
+    await page('?from=2026-10-01&to=2026-10-05');
+    expect(await screen.findByText('No hay días para los filtros seleccionados.')).toBeInTheDocument();
+    expectNoBrokenText();
+  });
+
+  it('vacio con el rango por defecto (hoy): avisa que el dia aun no se calcula', async () => {
     emptyAll(emptyBodies);
     await page();
-    expect(await screen.findByText('No hay días para los filtros seleccionados.')).toBeInTheDocument();
+    expect(await screen.findByText(/aún no está calculado/)).toBeInTheDocument();
     expectNoBrokenText();
   });
 

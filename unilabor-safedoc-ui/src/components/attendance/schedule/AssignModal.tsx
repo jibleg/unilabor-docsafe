@@ -8,6 +8,7 @@ import {
   type ScheduleConflictDetail,
 } from '../../../api/service.api-attendance-schedule';
 import { notifyError, notifySuccess, notifyWarning } from '../../../utils/notify';
+import { ATTENDANCE_MIN_DATE } from '../shared/format';
 import { ConflictList } from './ConflictList';
 import { DrawerShell } from './DrawerShell';
 import { ModalShell } from './ModalShell';
@@ -141,11 +142,11 @@ export const AssignModal = ({ employees, shifts, weekdayOrder, maxShiftsPerDay, 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className={labelClass} htmlFor="assign-start">Desde</label>
-              <input id="assign-start" type="date" className={inputClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <input id="assign-start" type="date" min={ATTENDANCE_MIN_DATE} className={inputClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
             <div>
               <label className={labelClass} htmlFor="assign-end">Hasta</label>
-              <input id="assign-end" type="date" className={inputClass} value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+              <input id="assign-end" type="date" className={inputClass} value={endDate} min={startDate || ATTENDANCE_MIN_DATE} onChange={(e) => setEndDate(e.target.value)} />
               <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">{repeat.repeats ? 'Vacío = sin fin' : 'Vacío = solo ese día'}</p>
             </div>
           </div>

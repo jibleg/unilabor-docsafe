@@ -48,6 +48,15 @@ export const todayIso = (): string => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+/** Primer dia con datos del modulo: ningun campo de fecha admite algo anterior. */
+export const ATTENDANCE_MIN_DATE = '2026-01-01';
+
+/** Limites (min/max) para campos de fecha de hechos pasados: desde ATTENDANCE_MIN_DATE hasta hoy. */
+export const pastDateBounds = (today: string = todayIso()): { min: string; max: string } => ({
+  min: ATTENDANCE_MIN_DATE,
+  max: today,
+});
+
 export const addDaysIso = (date: string, days: number): string => {
   const [y, m, d] = date.split('-').map(Number);
   const result = new Date(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + days);

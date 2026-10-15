@@ -3,7 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { getApiErrorMessage } from '../../../api/service';
 import { listScheduleLog, type ScheduleLogEntry, type SchedulePagination } from '../../../api/service.api-attendance-schedule';
 import { Pagination } from '../../Pagination';
-import { formatDateTime } from '../shared/format';
+import { formatDateTime, pastDateBounds } from '../shared/format';
 import { cardClass, inputClass, labelClass, secondaryButton } from './ui';
 
 const ACTION_LABEL: Record<string, string> = {
@@ -24,6 +24,7 @@ const PAGE_SIZE = 20;
 
 /** Bitacora de cambios del calendario con filtros y paginacion. */
 export const ScheduleLogPanel = ({ refreshKey }: { refreshKey: number }) => {
+  const bounds = pastDateBounds();
   const [action, setAction] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -68,11 +69,11 @@ export const ScheduleLogPanel = ({ refreshKey }: { refreshKey: number }) => {
         </div>
         <div>
           <label className={labelClass} htmlFor="log-from">Desde</label>
-          <input id="log-from" type="date" className={inputClass} value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
+          <input id="log-from" type="date" min={bounds.min} max={bounds.max} className={inputClass} value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
         </div>
         <div>
           <label className={labelClass} htmlFor="log-to">Hasta</label>
-          <input id="log-to" type="date" className={inputClass} value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
+          <input id="log-to" type="date" min={bounds.min} max={bounds.max} className={inputClass} value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
         </div>
         <button type="button" className={secondaryButton} aria-label="Actualizar bitácora" onClick={() => setReloadKey((k) => k + 1)}>
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />

@@ -9,6 +9,7 @@ import {
 import { notifyError, notifySuccess } from '../../../utils/notify';
 import { inputClass, labelClass, ModalShell, primaryButtonClass, secondaryButtonClass } from '../devices/ModalShell';
 import { isValidIsoDate } from './settingsHelpers';
+import { ATTENDANCE_MIN_DATE } from '../shared/format';
 
 interface HolidayModalProps {
   holiday: AttendanceHoliday | null;
@@ -46,7 +47,7 @@ export const HolidayModal = ({ holiday, defaultYear, onClose, onSaved }: Holiday
       <form onSubmit={(event) => void submit(event)} className="space-y-4">
         <div>
           <label className={labelClass} htmlFor="holiday-date">Fecha</label>
-          <input id="holiday-date" type="date" className={inputClass} value={date} onChange={(event) => setDate(event.target.value)} />
+          <input id="holiday-date" type="date" min={ATTENDANCE_MIN_DATE} className={inputClass} value={date} onChange={(event) => setDate(event.target.value)} />
         </div>
         <div>
           <label className={labelClass} htmlFor="holiday-name">Nombre</label>

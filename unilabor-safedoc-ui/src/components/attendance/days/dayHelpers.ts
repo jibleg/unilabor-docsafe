@@ -1,5 +1,5 @@
 import { DAY_RESULT_LABEL, type DayResultCode } from '../shared/dayResult';
-import { addDaysIso, todayIso } from '../shared/format';
+import { ATTENDANCE_MIN_DATE, todayIso } from '../shared/format';
 import type { AttendanceDay, DaysQuery } from '../../../api/service.api-attendance-days';
 
 export const MAX_RANGE_DAYS = 366;
@@ -43,15 +43,15 @@ export const RESULT_FILTER_OPTIONS: { value: string; label: string }[] = [
   ...(Object.keys(DAY_RESULT_LABEL) as DayResultCode[]).map((code) => ({ value: code, label: DAY_RESULT_LABEL[code] })),
 ];
 
-/** Rango por defecto de Dias: hoy-14 a ayer. */
+/** Rango por defecto de Dias: el dia actual (hoy se cierra a las 03:30 del dia siguiente). */
 export const defaultDaysRange = (today: string = todayIso()): { from: string; to: string } => ({
-  from: addDaysIso(today, -14),
-  to: addDaysIso(today, -1),
+  from: today,
+  to: today,
 });
 
-/** Rango por defecto de Checadas: ultimos 7 dias hasta hoy. */
+/** Rango por defecto de Checadas: el dia actual. */
 export const defaultPunchesRange = (today: string = todayIso()): { from: string; to: string } => ({
-  from: addDaysIso(today, -7),
+  from: today,
   to: today,
 });
 
@@ -63,8 +63,10 @@ const dayNumber = (iso: string): number => {
 export const rangeDays = (from: string, to: string): number => dayNumber(to) - dayNumber(from) + 1;
 
 /** Devuelve el mensaje de error del rango o null si es valido. */
-export const validateRange = (from: string, to: string): string | null => {
+export const validateRange = (from: string, to: string, today: string = todayIso()): string | null => {
   if (!ISO_DATE.test(from) || !ISO_DATE.test(to)) return 'Indica fechas válidas en el rango.';
+  if (from < ATTENDANCE_MIN_DATE) return 'Las fechas no pueden ser anteriores al 01/01/2026.';
+  if (to > today) return 'La fecha final no puede ser posterior a hoy.';
   if (from > to) return 'La fecha inicial no puede ser posterior a la final.';
   if (rangeDays(from, to) > MAX_RANGE_DAYS) return `El rango máximo es de ${MAX_RANGE_DAYS} días.`;
   return null;
