@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { CheckCheck, Loader2, MinusCircle, Save } from 'lucide-react';
 import { getPositionSupervisionConfig, listSupervisionFormItems, setPositionSupervisionConfig } from '../../../api/service.api-rh-supervision';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { SupervisionFormItem } from '../../../types/models';
@@ -106,9 +106,23 @@ export const PositionSupervisionItemsPanel = ({ positionId, positionName }: Posi
             {applicable} de {items.length} aspectos aplican.
           </span>
         </p>
-        <button type="button" onClick={handleSave} disabled={saving || !dirty} className={buttonClass}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setNa(new Set())} disabled={na.size === 0} className={buttonClass} title="Todos los aspectos de todas las secciones aplican al puesto">
+            <CheckCheck size={14} /> Todos aplican
+          </button>
+          <button
+            type="button"
+            onClick={() => setNa(new Set(items.map((item) => item.id)))}
+            disabled={na.size === items.length}
+            className={buttonClass}
+            title="Ningún aspecto aplica (marca los 31 como N/A); después desmarca los que sí apliquen"
+          >
+            <MinusCircle size={14} /> Ninguno aplica
+          </button>
+          <button type="button" onClick={handleSave} disabled={saving || !dirty} className={buttonClass}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
+          </button>
+        </div>
       </div>
       {sections.map(([code, section]) => {
         const allNa = section.items.every((item) => na.has(item.id));
