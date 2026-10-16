@@ -7,4 +7,5 @@ export * from './evaluations';
 export * from './reading';
 export * from './rh-induction';
 export * from './rh-competency';
+export * from './rh-supervision';
 export * from './agreements';

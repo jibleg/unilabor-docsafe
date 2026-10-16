@@ -1,11 +1,17 @@
-import { CheckCircle2, CircleDashed, ClipboardList, Settings2, StepForward } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, CircleDashed, ClipboardList, ClipboardPen, Settings2, StepForward, Workflow } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { updatePhaseAutoAdvance } from '../../../api/service.api-rh-induction-dashboard';
+import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { InductionPhaseOverview } from '../../../types/models';
+import { notifyError, notifySuccess } from '../../../utils/notify';
 
 interface InductionPositionPhasePanelProps {
   phase: InductionPhaseOverview;
   onOpenTransitions: () => void;
   onOpenPositions: () => void;
+  /** Recargar el panorama tras cambiar una regla (interruptor de la Fase 6). */
+  onChanged?: () => void;
 }
 
 const Row = ({ ok, label, value }: { ok: boolean; label: string; value: string }) => (
@@ -23,8 +29,20 @@ const Row = ({ ok, label, value }: { ok: boolean; label: string; value: string }
  * en cada puesto, así que aquí se resume cuántos puestos están listos, quién
  * espera entrar y se enlaza a la bandeja y a la preparación por puesto.
  */
-export const InductionPositionPhasePanel = ({ phase, onOpenTransitions, onOpenPositions }: InductionPositionPhasePanelProps) => {
+export const InductionPositionPhasePanel = ({ phase, onOpenTransitions, onOpenPositions, onChanged }: InductionPositionPhasePanelProps) => {
   const navigate = useNavigate();
+  const [togglingAuto, setTogglingAuto] = useState(false);
+  const toggleAutoAdvance = async (next: boolean) => {
+    setTogglingAuto(true);
+    try {
+      notifySuccess(await updatePhaseAutoAdvance(phase.phase_id, next));
+      onChanged?.();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cambiar la entrada automática.'));
+    } finally {
+      setTogglingAuto(false);
+    }
+  };
   const summary = phase.position_summary ?? { positions_enabled: 0, positions_ready: 0, waiting: 0, waiting_ready: 0 };
   const blocked = summary.waiting - summary.waiting_ready;
   const isPractical = phase.phase_number === 6;
@@ -45,11 +63,47 @@ export const InductionPositionPhasePanel = ({ phase, onOpenTransitions, onOpenPo
         </ul>
         <p className="mt-3 text-[11px] leading-5 text-[var(--unilabor-neutral)]">
           {isPractical
-            ? 'Sin lectura: RH captura la evaluación práctica (0-10) de cada inscrito desde la tabla.'
+            ? 'Sin lectura: el responsable del área aplica la Lista de verificación ANA-REG-060 por puesto; su porcentaje (≥ 80 %) acredita la fase. La captura manual (0-10) queda como respaldo.'
             : 'Cada colaborador lee los documentos de su puesto y presenta el cuestionario de su puesto.'}{' '}
           Solo se inscribe a quien tiene su puesto listo.
         </p>
+        {isPractical ? (
+          <button
+            type="button"
+            onClick={() => navigate('/rh/supervision-checklists')}
+            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--color-brand-700)] px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+          >
+            <ClipboardPen size={14} /> Aplicar listas ANA-REG-060
+          </button>
+        ) : null}
       </div>
+
+      {isPractical ? (
+        <div className="rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/90 p-4">
+          <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-500)]">
+            <Workflow size={13} /> Progresión autónoma
+          </p>
+          <button
+            type="button"
+            disabled={togglingAuto}
+            onClick={() => void toggleAutoAdvance(!phase.rules.auto_advance_on_pass)}
+            className="mt-2 flex w-full items-start gap-3 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-left transition hover:border-[var(--color-brand-300)] disabled:opacity-50"
+            role="switch"
+            aria-checked={phase.rules.auto_advance_on_pass}
+          >
+            <span className={`mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition ${phase.rules.auto_advance_on_pass ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+              <span className={`h-4 w-4 rounded-full bg-white shadow transition ${phase.rules.auto_advance_on_pass ? 'translate-x-4' : ''}`} />
+            </span>
+            <span>
+              <span className="block text-xs font-semibold text-[var(--unilabor-ink)]">Entrar solo a la Fase 6 al acreditar la Fase 5</span>
+              <span className="block text-[11px] leading-4 text-[var(--unilabor-neutral)]">
+                Cuando un colaborador acredita la Fase 5 de TODOS sus puestos, se le abre la Fase 6 sin pasar por la bandeja (una inscripción por puesto, en
+                el orden de la Fase 5). Requiere la fase publicada y la práctica del puesto publicada.
+              </span>
+            </span>
+          </button>
+        </div>
+      ) : null}
 
       <div className={`rounded-2xl border p-4 ${blocked > 0 ? 'border-rose-200 bg-rose-50/70' : 'border-emerald-200 bg-emerald-50/70'}`}>
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--unilabor-neutral)]">Esperan entrar a la Fase {phase.phase_number}</p>

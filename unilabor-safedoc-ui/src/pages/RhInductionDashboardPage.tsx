@@ -464,6 +464,7 @@ export const RhInductionDashboardPage = () => {
                 phase={selectedPhase}
                 onOpenTransitions={() => openTransitions(selectedPhase.phase_number as InductionTransitionTarget)}
                 onOpenPositions={() => openTransitions('positions')}
+                onChanged={() => void refreshAll()}
               />
             ) : (
               <InductionPhaseRulesPanel phase={selectedPhase} pendingReaders={pendingReaders} onChanged={refreshAll} />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Briefcase, FileText, GraduationCap, ListChecks, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { Briefcase, ClipboardPen, FileText, GraduationCap, ListChecks, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -17,6 +17,7 @@ import { CompactListPager } from '../components/CompactListPager';
 import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
 import { ExpedientTabs } from '../components/rh/ExpedientTabs';
 import { PositionTrainingCoursesPanel } from '../components/rh/PositionTrainingCoursesPanel';
+import { PositionSupervisionItemsPanel } from '../components/rh/supervision/PositionSupervisionItemsPanel';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { confirmAction } from '../utils/confirm';
 import type { RhPosition } from '../types/models';
@@ -31,7 +32,7 @@ const buttonClass =
 /** Tamaños de página del listado de puestos y de sus documentos obligatorios. */
 const POSITION_PAGE_SIZES = [10, 20, 30];
 
-type PositionTabKey = 'competencies' | 'documents' | 'courses';
+type PositionTabKey = 'competencies' | 'documents' | 'courses' | 'supervision';
 
 export const RhPositionsPage = () => {
   const [positions, setPositions] = useState<RhPosition[]>([]);
@@ -138,6 +139,7 @@ export const RhPositionsPage = () => {
         badge: String(selectedPosition.documents.length),
       },
       { key: 'courses', label: 'Capacitaciones del puesto', icon: <GraduationCap size={14} /> },
+      { key: 'supervision', label: 'Supervisión (ANA-REG-060)', icon: <ClipboardPen size={14} /> },
     ];
   }, [selectedPosition]);
 
@@ -472,6 +474,10 @@ export const RhPositionsPage = () => {
                   positionName={selectedPosition.name}
                   focus={searchParams.get('focus') === 'courses' && Number(searchParams.get('position')) === selectedPosition.id}
                 />
+              ) : null}
+
+              {activeTab === 'supervision' ? (
+                <PositionSupervisionItemsPanel key={selectedPosition.id} positionId={selectedPosition.id} positionName={selectedPosition.name} />
               ) : null}
             </div>
           )}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ClipboardCheck, Loader2, X } from 'lucide-react';
+import { ClipboardCheck, ClipboardPen, Loader2, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { captureEnrollmentPractical } from '../../../api/service.api-rh-induction-dashboard';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { InductionRosterRow } from '../../../types/models';
@@ -56,6 +57,19 @@ export const InductionPracticalCaptureModal = ({ row, onClose, onDone }: Inducti
           </button>
         </div>
         <div className="space-y-3 px-5 py-4 text-sm text-[var(--unilabor-ink)]">
+          <Link
+            to={`/rh/supervision-checklists?enrollment=${row.enrollment_id}`}
+            className="flex items-start gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(238,245,250,0.9)] px-3 py-2 text-xs text-[var(--unilabor-ink)] hover:border-[var(--color-brand-300)]"
+          >
+            <ClipboardPen size={14} className="mt-0.5 shrink-0 text-[var(--color-brand-500)]" />
+            <span>
+              <span className="block font-semibold text-[var(--color-brand-700)]">Aplicar la Lista de verificación ANA-REG-060 (recomendado)</span>
+              <span className="block leading-5 text-[var(--unilabor-neutral)]">
+                Evidencia oficial de la Fase 6 (REH-MAN-002): al cerrarla con firmas, su porcentaje se registra aquí automáticamente y se archiva el PDF
+                en el expediente. La captura manual de abajo queda para casos sin lista.
+              </span>
+            </span>
+          </Link>
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-xs font-semibold">
               Calificación (0 a 10)

@@ -161,6 +161,11 @@ const RhCompetencyEvaluationsPage = lazy(() =>
     default: module.RhCompetencyEvaluationsPage,
   })),
 );
+const RhSupervisionChecklistsPage = lazy(() =>
+  import('./pages/RhSupervisionChecklistsPage').then((module) => ({
+    default: module.RhSupervisionChecklistsPage,
+  })),
+);
 const RhInductionDashboardPage = lazy(() =>
   import('./pages/RhInductionDashboardPage').then((module) => ({
     default: module.RhInductionDashboardPage,
@@ -529,6 +534,14 @@ function App() {
           element={
             <PermissionGate permission="RH.COMPETENCY.MANAGE" redirectTo="/rh">
               <RhCompetencyEvaluationsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="supervision-checklists"
+          element={
+            <PermissionGate permission="RH.SUPERVISION.MANAGE" redirectTo="/rh">
+              <RhSupervisionChecklistsPage />
             </PermissionGate>
           }
         />

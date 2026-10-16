@@ -405,6 +405,61 @@ export const startEmployeePositionTrack = async (
   return { enrollment_ids: ids, activated_enrollment_id: sync.activated, positions: ids.length };
 };
 
+/**
+ * Entrada automatica a la Fase 6: si la Fase 6 tiene el interruptor
+ * `auto_advance_on_pass`, esta publicada y el colaborador acredito la Fase 5
+ * de TODOS sus puestos sin haber entrado aun a la 6, se le crea la ruta de la
+ * Fase 6 (una inscripcion por puesto, en el orden de la 5) y arranca la
+ * practica del primero. Idempotente; silencioso cuando aun no procede.
+ */
+export const tryAutoStartPhase6 = async (employeeId: number, actorUserId: string | null = null): Promise<boolean> => {
+  try {
+    const phase6 = await pool.query(
+      `SELECT id, auto_advance_on_pass, published_at IS NOT NULL AS published
+         FROM public.rh_induction_phases WHERE phase_number = 6 AND scope = 'POSITION' LIMIT 1;`,
+    );
+    const row = phase6.rows[0];
+    if (!row || !row.auto_advance_on_pass || !row.published) {
+      return false;
+    }
+    const existing = await loadTrackEntries(employeeId, Number(row.id));
+    if (existing.some((entry) => entry.queue_status !== 'CANCELLED')) {
+      return false;
+    }
+    if (!(await isEmployeePositionPhaseComplete(employeeId, 5))) {
+      return false;
+    }
+    const actor = actorUserId ?? (await loadEmployeeUserId(employeeId));
+    if (!actor) {
+      return false;
+    }
+    const lastPhase5 = await pool.query(
+      `SELECT e.id FROM public.rh_induction_enrollments e
+         JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number = 5
+         JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id AND ea.status = 'passed'
+        WHERE e.employee_id = $1 AND e.queue_status <> 'CANCELLED'
+        ORDER BY ea.graded_at DESC NULLS LAST, e.id DESC LIMIT 1;`,
+      [employeeId],
+    );
+    const started = await startEmployeePositionTrack(employeeId, 6, actor, {
+      origin: 'AUTO_ADVANCE',
+      advancedFromEnrollmentId: lastPhase5.rows[0]?.id ? Number(lastPhase5.rows[0].id) : null,
+    });
+    console.info(
+      `Induccion: el colaborador ${employeeId} acredito la Fase 5 de todos sus puestos y entro solo a la Fase 6 ` +
+        `(${started.positions} puesto(s); practica activa en la inscripcion ${started.activated_enrollment_id ?? '-'}).`,
+    );
+    return true;
+  } catch (error: any) {
+    // Puesto sin habilitar o practica sin publicar: se reintenta en el siguiente gancho/cron sin ruido.
+    if (error?.code === 'RH_INDUCTION_POSITION_EVALUATION_NOT_READY' || error?.code === 'RH_INDUCTION_ALREADY_ENROLLED') {
+      return false;
+    }
+    console.error(`No se pudo iniciar automaticamente la Fase 6 del colaborador ${employeeId}:`, error);
+    return false;
+  }
+};
+
 /** Version best-effort para ganchos (aprobacion, cambio de puestos, cron): nunca lanza. */
 export const trySyncEmployeePositionTracks = async (employeeId: number, actorUserId: string | null = null): Promise<void> => {
   for (const phaseNumber of [5, 6] as PositionTrackPhase[]) {
@@ -420,6 +475,7 @@ export const trySyncEmployeePositionTracks = async (employeeId: number, actorUse
       console.error(`No se pudo sincronizar la ruta por puesto (Fase ${phaseNumber}) del colaborador ${employeeId}:`, error);
     }
   }
+  await tryAutoStartPhase6(employeeId, actorUserId);
 };
 
 /** Cron: sincroniza a todos los colaboradores que estan dentro de una fase por puesto. */

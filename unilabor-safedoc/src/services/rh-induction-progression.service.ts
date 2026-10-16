@@ -107,10 +107,17 @@ export const setPhaseAutoAdvance = async (phaseId: number, enabled: boolean): Pr
   if (phase.rows.length === 0) {
     return false;
   }
-  if (String(phase.rows[0].scope) !== 'INSTITUTIONAL' || Number(phase.rows[0].phase_number) >= LAST_INSTITUTIONAL_PHASE) {
+  // Fases 1-3: avanza a la siguiente institucional al acreditar. Fase 6 (por
+  // puesto): entra solo a la Fase 6 quien acredita la Fase 5 de TODOS sus
+  // puestos (ver rh-induction-position-track.service, tryAutoStartPhase6).
+  const scope = String(phase.rows[0].scope);
+  const phaseNumber = Number(phase.rows[0].phase_number);
+  const applicable =
+    (scope === 'INSTITUTIONAL' && phaseNumber < LAST_INSTITUTIONAL_PHASE) || (scope === 'POSITION' && phaseNumber === 6);
+  if (!applicable) {
     throwCoded(
       'RH_INDUCTION_AUTO_ADVANCE_NOT_APPLICABLE',
-      'El avance automatico solo aplica a las Fases 1 a 3 (la Fase 4 cierra el bloque institucional).',
+      'El avance automatico aplica a las Fases 1 a 3 (siguiente fase institucional) y a la Fase 6 (entrada automatica al acreditar la Fase 5 de todos los puestos).',
     );
   }
   const result = await pool.query(
