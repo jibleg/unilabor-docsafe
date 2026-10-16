@@ -2,7 +2,9 @@ import api from './axios';
 import { asRecord, unwrapPayload } from './service.shared';
 import type {
   PositionSupervisionConfig,
+  SupervisionAreaSignatory,
   SupervisionChecklist,
+  SupervisionGenerateDraftsResult,
   SupervisionChecklistPage,
   SupervisionChecklistStatus,
   SupervisionFormItem,
@@ -158,4 +160,26 @@ export const deleteSupervisionDraft = async (id: number): Promise<void> => {
 export const getSupervisionChecklistPdfUrl = async (id: number): Promise<string> => {
   const response = await api.get(`${BASE}/${id}/pdf`, { responseType: 'blob' });
   return URL.createObjectURL(response.data as Blob);
+};
+
+export const listAreaSignatories = async (): Promise<SupervisionAreaSignatory[]> => {
+  const response = await api.get(`${BASE}/signatories`);
+  return (asRecord(unwrapPayload(response.data))?.rows as SupervisionAreaSignatory[]) ?? [];
+};
+
+export interface AreaSignatoryPayload {
+  area_name: string;
+  supervisor_name: string;
+  area_responsible_name: string;
+}
+
+export const saveAreaSignatories = async (rows: AreaSignatoryPayload[]): Promise<SupervisionAreaSignatory[]> => {
+  const response = await api.put(`${BASE}/signatories`, { rows });
+  return (asRecord(unwrapPayload(response.data))?.rows as SupervisionAreaSignatory[]) ?? [];
+};
+
+export const generateSupervisionDrafts = async (employeeIds?: number[]): Promise<{ message: string; result: SupervisionGenerateDraftsResult }> => {
+  const response = await api.post(`${BASE}/pending/generate`, employeeIds ? { employee_ids: employeeIds } : {});
+  const data = asRecord(unwrapPayload(response.data)) ?? {};
+  return { message: String(data.message ?? ''), result: data.result as SupervisionGenerateDraftsResult };
 };

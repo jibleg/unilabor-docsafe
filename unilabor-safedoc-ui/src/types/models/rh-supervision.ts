@@ -126,3 +126,22 @@ export interface PositionSupervisionConfig {
   position_id: number;
   na_item_ids: number[];
 }
+
+export interface SupervisionAreaSignatory {
+  area_key: string;
+  area_name: string;
+  supervisor_name: string;
+  supervisor_user_id: string | null;
+  area_responsible_name: string;
+  employees: number;
+  phase6_pending: number;
+  configured: boolean;
+}
+
+export interface SupervisionGenerateDraftsResult {
+  created: number;
+  already_had_list: number;
+  failed: number;
+  areas_without_signatories: string[];
+  details: Array<{ enrollment_id: number; employee_name: string; position_code: string; checklist_id: number | null; message: string }>;
+}

@@ -17,9 +17,16 @@ import {
   setPositionSupervisionConfig,
 } from '../services/rh-supervision-position.service';
 import {
+  generateSupervisionDrafts,
+  listAreaSignatories,
+  saveAreaSignatories,
+} from '../services/rh-supervision-draft-generator.service';
+import {
   supervisionListQuerySchema,
   supervisionPendingQuerySchema,
   type CloseSupervisionChecklistBody,
+  type GenerateDraftsBody,
+  type SaveAreaSignatoriesBody,
   type CreateSupervisionChecklistBody,
   type SaveSupervisionResultsBody,
   type SetPositionNaItemsBody,
@@ -291,5 +298,53 @@ export const getSupervisionChecklistPdfController = async (req: AuthRequest, res
     return res.send(pdf);
   } catch (error) {
     return fail(res, error, 'Error generando PDF de supervision', 'No se pudo generar el PDF.');
+  }
+};
+
+/** GET /rh/supervision-checklists/signatories */
+export const listAreaSignatoriesController = async (_req: AuthRequest, res: Response) => {
+  try {
+    return res.json({ rows: await listAreaSignatories() });
+  } catch (error) {
+    return fail(res, error, 'Error listando firmantes por area', 'No se pudieron cargar los firmantes por area.');
+  }
+};
+
+/** PUT /rh/supervision-checklists/signatories {rows} */
+export const saveAreaSignatoriesController = async (req: AuthRequest, res: Response) => {
+  const body = req.body as SaveAreaSignatoriesBody;
+  try {
+    const rows = await saveAreaSignatories(body.rows, req.user?.id ?? null);
+    return res.json({ message: 'Firmantes por area guardados.', rows });
+  } catch (error) {
+    return fail(res, error, 'Error guardando firmantes por area', 'No se pudieron guardar los firmantes.');
+  }
+};
+
+/** POST /rh/supervision-checklists/pending/generate {employee_ids?} */
+export const generateSupervisionDraftsController = async (req: AuthRequest, res: Response) => {
+  const body = (req.body ?? {}) as GenerateDraftsBody;
+  try {
+    const result = await generateSupervisionDrafts(req.user?.id ?? null, body.employee_ids);
+    if (req.user?.id) {
+      await registerAuditEvent({
+        user_id: req.user.id,
+        action: `RH_SUPERVISION_DRAFTS_GENERATED:${result.created}`,
+        ip_address: req.ip ?? null,
+        module_code: 'RH',
+        entity_type: 'supervision_checklist',
+        entity_id: null,
+        metadata: { created: result.created, failed: result.failed, areas_without_signatories: result.areas_without_signatories },
+      }).catch(() => undefined);
+    }
+    const message =
+      result.created > 0
+        ? `${result.created} borrador(es) abiertos.${result.failed ? ` ${result.failed} no se pudieron abrir.` : ''}`
+        : result.failed > 0
+          ? `No se abrieron borradores: ${result.failed} inscripcion(es) con error.`
+          : 'Todas las inscripciones activas de la Fase 6 ya tienen su lista.';
+    return res.json({ message, result });
+  } catch (error) {
+    return fail(res, error, 'Error generando borradores ANA-REG-060', 'No se pudieron generar los borradores.');
   }
 };

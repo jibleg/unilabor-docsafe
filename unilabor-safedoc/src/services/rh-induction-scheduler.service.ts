@@ -3,6 +3,7 @@ import pool from '../config/db';
 import { activateDeferredEnrollments } from './rh-induction-grace.service';
 import { sweepPositionTracks } from './rh-induction-position-track.service';
 import { sweepExpiredInductionReadings } from './rh-induction.service';
+import { sweepSupervisionDrafts } from './rh-supervision-draft-generator.service';
 
 /**
  * Scheduler in-process del programa de Induccion: abre la evaluacion de las
@@ -35,6 +36,8 @@ export const runInductionReadingSweep = async (): Promise<void> => {
     if (opened > 0) {
       console.log(`Induccion: ${opened} inscripcion(es) con lectura vencida pasaron a evaluacion.`);
     }
+    // Fase 6: abre el borrador ANA-REG-060 de cada inscripcion activa que aun no lo tenga.
+    await sweepSupervisionDrafts();
   } catch (error) {
     console.error('Error en el barrido de lecturas de induccion vencidas:', error);
   }

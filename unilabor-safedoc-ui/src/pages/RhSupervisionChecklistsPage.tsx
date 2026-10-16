@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ClipboardPen, Loader2, Plus, Search } from 'lucide-react';
+import { ArrowLeft, ClipboardPen, Loader2, Plus, Search, Sparkles } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { listEmployees } from '../api/service.api-core';
 import { listPositions } from '../api/service.api-rh-position';
 import {
   createSupervisionChecklist,
+  generateSupervisionDrafts,
   getSupervisionChecklist,
   listSupervisionChecklists,
   listSupervisionPending,
@@ -15,11 +16,12 @@ import { Pagination } from '../components/Pagination';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SupervisionChecklistEditor } from '../components/rh/supervision/SupervisionChecklistEditor';
 import { SupervisionPendingTable } from '../components/rh/supervision/SupervisionPendingTable';
+import { SupervisionSignatoriesPanel } from '../components/rh/supervision/SupervisionSignatoriesPanel';
 import { CONCLUSION_UI, buttonClass, cardClass, formatDateOnly, formatPct, inputClass, labelClass, primaryButtonClass, todayIsoDate } from '../components/rh/supervision/supervision-ui';
 import type { Employee, RhPosition, SupervisionChecklist, SupervisionChecklistListRow, SupervisionChecklistStatus, SupervisionPendingRow } from '../types/models';
-import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+import { notifyError, notifyInfo, notifySuccess, notifyWarning } from '../utils/notify';
 
-type Tab = 'pending' | 'records';
+type Tab = 'pending' | 'records' | 'signatories';
 const PAGE_SIZE = 20;
 
 /**
@@ -36,6 +38,7 @@ export const RhSupervisionChecklistsPage = () => {
   const [includePassed, setIncludePassed] = useState(false);
   const [loadingPending, setLoadingPending] = useState(true);
   const [opening, setOpening] = useState<number | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   const [rows, setRows] = useState<SupervisionChecklistListRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -164,6 +167,23 @@ export const RhSupervisionChecklistsPage = () => {
     }
   };
 
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const { message, result } = await generateSupervisionDrafts();
+      if (result.created > 0) notifySuccess(message);
+      else notifyInfo(message);
+      if (result.areas_without_signatories.length > 0) {
+        notifyWarning(`Áreas sin firmantes configurados: ${result.areas_without_signatories.join(', ')}. Los borradores se abrieron con los nombres vacíos.`);
+      }
+      refreshLists();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudieron generar los borradores.'));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handleClosed = (result: CloseSupervisionChecklistResult) => {
     setSelected(result.checklist);
     if (result.practical && !result.practical.captured) notifyWarning(result.message);
@@ -255,6 +275,7 @@ export const RhSupervisionChecklistsPage = () => {
           [
             ['pending', `Pendientes Fase 6 (${pending.length})`],
             ['records', `Registros (${total})`],
+            ['signatories', 'Firmantes por área'],
           ] as Array<[Tab, string]>
         ).map(([key, label]) => (
           <button
@@ -268,7 +289,11 @@ export const RhSupervisionChecklistsPage = () => {
         ))}
       </div>
 
-      {tab === 'pending' ? (
+      {tab === 'signatories' ? (
+        <section className={cardClass}>
+          <SupervisionSignatoriesPanel />
+        </section>
+      ) : tab === 'pending' ? (
         <section className={`${cardClass} space-y-4`}>
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative min-w-[260px] flex-1">
@@ -278,6 +303,15 @@ export const RhSupervisionChecklistsPage = () => {
             <label className="inline-flex items-center gap-2 text-xs text-[var(--unilabor-ink)]">
               <input type="checkbox" checked={includePassed} onChange={(e) => setIncludePassed(e.target.checked)} /> Incluir acreditadas (correcciones)
             </label>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={generating}
+              className={buttonClass}
+              title="Abre un borrador por cada inscripción activa de Fase 6 que aún no tenga lista, con el puesto, los N/A del puesto y los firmantes del área. También corre solo cada 10 minutos."
+            >
+              {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Generar borradores
+            </button>
           </div>
           <SupervisionPendingTable rows={pending} loading={loadingPending} openingEnrollmentId={opening} onOpen={(row) => void openForEnrollment(row.enrollment_id, row.draft_checklist_id)} />
         </section>

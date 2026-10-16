@@ -104,3 +104,26 @@ export const supervisionPendingQuerySchema = z.object({
     .optional()
     .transform((value) => value === true || value === 'true' || value === '1'),
 });
+
+export const saveAreaSignatoriesSchema = z
+  .object({
+    rows: z
+      .array(
+        z.object({
+          area_name: z.string().trim().min(1, 'Area vacia').max(120),
+          supervisor_name: z.string().trim().max(200).default(''),
+          area_responsible_name: z.string().trim().max(200).default(''),
+        }),
+      )
+      .min(1)
+      .max(200),
+  })
+  .passthrough();
+export type SaveAreaSignatoriesBody = z.infer<typeof saveAreaSignatoriesSchema>;
+
+export const generateDraftsSchema = z
+  .object({
+    employee_ids: z.array(positiveId).max(500).optional(),
+  })
+  .passthrough();
+export type GenerateDraftsBody = z.infer<typeof generateDraftsSchema>;

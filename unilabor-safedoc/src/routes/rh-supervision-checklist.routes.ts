@@ -3,7 +3,10 @@ import {
   closeSupervisionChecklistController,
   createSupervisionChecklistController,
   deleteSupervisionDraftController,
+  generateSupervisionDraftsController,
   getPositionNaItemsController,
+  listAreaSignatoriesController,
+  saveAreaSignatoriesController,
   getSupervisionChecklistController,
   getSupervisionChecklistPdfController,
   listSupervisionChecklistsController,
@@ -18,6 +21,8 @@ import { validate } from '../middlewares/validate.middleware';
 import {
   closeSupervisionChecklistSchema,
   createSupervisionChecklistSchema,
+  generateDraftsSchema,
+  saveAreaSignatoriesSchema,
   saveSupervisionResultsSchema,
   setPositionNaItemsSchema,
   updateSupervisionChecklistSchema,
@@ -36,6 +41,9 @@ router.get('/items', listSupervisionFormItemsController);
 router.get('/positions/:positionId/na-items', getPositionNaItemsController);
 router.put('/positions/:positionId/na-items', validate(setPositionNaItemsSchema), setPositionNaItemsController);
 router.get('/pending', listSupervisionPendingController);
+router.post('/pending/generate', validate(generateDraftsSchema), generateSupervisionDraftsController);
+router.get('/signatories', listAreaSignatoriesController);
+router.put('/signatories', validate(saveAreaSignatoriesSchema), saveAreaSignatoriesController);
 
 router.get('/', listSupervisionChecklistsController);
 router.post('/', validate(createSupervisionChecklistSchema), createSupervisionChecklistController);
