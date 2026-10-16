@@ -100,14 +100,15 @@ export const PositionSupervisionItemsPanel = ({ positionId, positionName }: Posi
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-sm leading-6 text-[var(--unilabor-ink)]">
-          Marca los aspectos del <strong>ANA-REG-060</strong> que <strong>no aplican</strong> a este puesto (p. ej. control de calidad interno para un
-          puesto administrativo). Al aplicar la lista quedan en N/A y no cuentan para el porcentaje; el supervisor puede cambiarlos caso por caso.{' '}
+          Deja marcados los aspectos del <strong>ANA-REG-060</strong> que <strong>sí aplican</strong> a este puesto y desmarca los que no (p. ej. control de
+          calidad interno para un puesto administrativo). Los desmarcados salen en N/A al aplicar la lista y no cuentan para el porcentaje; el supervisor
+          puede cambiarlos caso por caso.{' '}
           <span className="font-semibold text-[var(--color-brand-700)]">
             {applicable} de {items.length} aspectos aplican.
           </span>
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setNa(new Set())} disabled={na.size === 0} className={buttonClass} title="Todos los aspectos de todas las secciones aplican al puesto">
+          <button type="button" onClick={() => setNa(new Set())} disabled={na.size === 0} className={buttonClass} title="Marca los 31 aspectos como aplicables">
             <CheckCheck size={14} /> Todos aplican
           </button>
           <button
@@ -115,7 +116,7 @@ export const PositionSupervisionItemsPanel = ({ positionId, positionName }: Posi
             onClick={() => setNa(new Set(items.map((item) => item.id)))}
             disabled={na.size === items.length}
             className={buttonClass}
-            title="Ningún aspecto aplica (marca los 31 como N/A); después desmarca los que sí apliquen"
+            title="Desmarca los 31 aspectos (todos en N/A); después marca solo los que sí apliquen"
           >
             <MinusCircle size={14} /> Ninguno aplica
           </button>
@@ -131,14 +132,14 @@ export const PositionSupervisionItemsPanel = ({ positionId, positionName }: Posi
             <header className="flex items-center justify-between bg-[rgba(238,245,250,0.9)] px-4 py-2">
               <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-brand-700)]">{section.title}</p>
               <button type="button" onClick={() => toggleSection(section.items, !allNa)} className="text-[11px] font-semibold text-[var(--color-brand-500)] hover:underline">
-                {allNa ? 'Toda la sección aplica' : 'Toda la sección no aplica'}
+                {allNa ? 'Marcar toda la sección' : 'Desmarcar toda la sección'}
               </button>
             </header>
             <ul className="divide-y divide-[rgba(0,65,106,0.08)]">
               {section.items.map((item) => (
                 <li key={item.id}>
                   <label className={`flex cursor-pointer items-start gap-3 px-4 py-2 text-sm ${na.has(item.id) ? 'bg-slate-50 text-slate-500' : 'text-[var(--unilabor-ink)]'}`}>
-                    <input type="checkbox" checked={na.has(item.id)} onChange={() => toggle(item.id)} className="mt-1" aria-label={`No aplica: ${item.item_text}`} />
+                    <input type="checkbox" checked={!na.has(item.id)} onChange={() => toggle(item.id)} className="mt-1" aria-label={`Aplica: ${item.item_text}`} />
                     <span>
                       <span className="font-bold">{item.item_no}. </span>
                       {item.item_text}

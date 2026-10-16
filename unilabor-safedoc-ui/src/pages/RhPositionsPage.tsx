@@ -139,7 +139,7 @@ export const RhPositionsPage = () => {
         badge: String(selectedPosition.documents.length),
       },
       { key: 'courses', label: 'Capacitaciones del puesto', icon: <GraduationCap size={14} /> },
-      { key: 'supervision', label: 'Supervisión (ANA-REG-060)', icon: <ClipboardPen size={14} /> },
+      { key: 'supervision', label: 'Supervisión', icon: <ClipboardPen size={14} /> },
     ];
   }, [selectedPosition]);
 
