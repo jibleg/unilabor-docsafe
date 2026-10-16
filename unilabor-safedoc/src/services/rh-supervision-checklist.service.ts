@@ -312,7 +312,7 @@ export const createSupervisionChecklist = async (raw: CreateSupervisionChecklist
   if (employee.rows.length === 0 || !employee.rows[0].is_active) {
     return throwCoded('RH_SUPERVISION_EMPLOYEE_NOT_FOUND', 'El colaborador no existe o esta inactivo.');
   }
-  const position = await pool.query(`SELECT id FROM public.rh_positions WHERE id = $1 AND is_active = TRUE LIMIT 1;`, [input.positionId]);
+  const position = await pool.query(`SELECT id, name FROM public.rh_positions WHERE id = $1 AND is_active = TRUE LIMIT 1;`, [input.positionId]);
   if (position.rows.length === 0) {
     return throwCoded('RH_SUPERVISION_POSITION_NOT_FOUND', 'El puesto no existe o esta inactivo.');
   }
@@ -374,7 +374,8 @@ export const createSupervisionChecklist = async (raw: CreateSupervisionChecklist
         enrollmentId,
         input.supervisionDate,
         input.supervisionType ?? 'PROGRAMADA',
-        (input.areaName ?? employee.rows[0].area ?? null) || null,
+        // "Area evaluada" del formato = el PUESTO supervisado (decision RH 2026-10-16); editable.
+        (input.areaName ?? String(position.rows[0].name ?? '') ?? null) || null,
         employee.rows[0].branch_name ? String(employee.rows[0].branch_name) : null,
         supervisorName,
         input.createdByUserId,
