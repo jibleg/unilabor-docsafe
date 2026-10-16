@@ -147,6 +147,7 @@ export const listSupervisionChecklistsController = async (req: AuthRequest, res:
       employeeId: parsed.data.employee_id,
       positionId: parsed.data.position_id,
       enrollmentId: parsed.data.enrollment_id,
+      employeeArea: parsed.data.area,
       search: parsed.data.q,
       page: parsed.data.page,
       limit: parsed.data.limit,

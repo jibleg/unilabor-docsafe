@@ -65,6 +65,8 @@ export interface SupervisionChecklistListRow {
   supervision_date: string;
   supervision_type: SupervisionType;
   area_name: string | null;
+  /** Area de la ficha del colaborador (agrupa la firma por area). */
+  employee_area: string | null;
   branch_name: string | null;
   supervisor_name: string;
   area_responsible_name: string;
@@ -104,7 +106,7 @@ const LIST_SELECT = `
          c.area_responsible_name, c.compliance_pct, c.conclusion, c.passed, c.is_final, c.closed_at, c.document_id,
          c.sgc_follow_up_required, c.sgc_reference, c.supervisor_comments, c.employee_signature_path IS NOT NULL AS employee_signed,
          c.created_at, c.updated_at,
-         emp.full_name AS employee_name, emp.employee_code,
+         emp.full_name AS employee_name, emp.employee_code, emp.area AS employee_area,
          rp.code AS position_code, rp.name AS position_name,
          (SELECT count(*) FROM public.rh_supervision_checklist_results r WHERE r.checklist_id = c.id AND r.result IS NULL) AS items_pending
     FROM public.rh_supervision_checklists c
@@ -127,6 +129,7 @@ const mapListRow = (row: any): SupervisionChecklistListRow => ({
   supervision_date: dateOnly(row.supervision_date),
   supervision_type: String(row.supervision_type) as SupervisionType,
   area_name: row.area_name ? String(row.area_name) : null,
+  employee_area: row.employee_area ? String(row.employee_area) : null,
   branch_name: row.branch_name ? String(row.branch_name) : null,
   supervisor_name: String(row.supervisor_name ?? ''),
   area_responsible_name: String(row.area_responsible_name ?? ''),
@@ -476,6 +479,8 @@ export interface SupervisionChecklistQuery {
   employeeId?: number | undefined;
   positionId?: number | undefined;
   enrollmentId?: number | undefined;
+  /** Area de la ficha del colaborador (comparacion sin mayusculas ni espacios sobrantes). */
+  employeeArea?: string | undefined;
   search?: string | undefined;
   page: number;
   limit: number;
@@ -500,6 +505,7 @@ export const listSupervisionChecklists = async (query: SupervisionChecklistQuery
   if (query.employeeId) add('c.employee_id = ?', query.employeeId);
   if (query.positionId) add('c.position_id = ?', query.positionId);
   if (query.enrollmentId) add('c.enrollment_id = ?', query.enrollmentId);
+  if (query.employeeArea?.trim()) add(`lower(regexp_replace(trim(COALESCE(emp.area, '')), '\\s+', ' ', 'g')) = ?`, query.employeeArea.trim().toLowerCase().replace(/\s+/g, ' '));
   if (query.search?.trim()) {
     params.push(`%${query.search.trim()}%`);
     const n = `$${params.length}`;

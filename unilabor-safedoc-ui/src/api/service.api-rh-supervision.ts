@@ -53,6 +53,7 @@ export interface SupervisionListQuery {
   employee_id?: number;
   position_id?: number;
   enrollment_id?: number;
+  area?: string;
   q?: string;
   page?: number;
   limit?: number;
@@ -64,6 +65,7 @@ export const listSupervisionChecklists = async (query: SupervisionListQuery = {}
   if (query.employee_id) params.employee_id = query.employee_id;
   if (query.position_id) params.position_id = query.position_id;
   if (query.enrollment_id) params.enrollment_id = query.enrollment_id;
+  if (query.area) params.area = query.area;
   if (query.q) params.q = query.q;
   params.page = query.page ?? 1;
   params.limit = query.limit ?? 20;

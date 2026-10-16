@@ -17,11 +17,12 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import { SupervisionChecklistEditor } from '../components/rh/supervision/SupervisionChecklistEditor';
 import { SupervisionPendingTable } from '../components/rh/supervision/SupervisionPendingTable';
 import { SupervisionSignatoriesPanel } from '../components/rh/supervision/SupervisionSignatoriesPanel';
+import { SupervisionBatchSignPanel } from '../components/rh/supervision/SupervisionBatchSignPanel';
 import { CONCLUSION_UI, buttonClass, cardClass, formatDateOnly, formatPct, inputClass, labelClass, primaryButtonClass, todayIsoDate } from '../components/rh/supervision/supervision-ui';
 import type { Employee, RhPosition, SupervisionChecklist, SupervisionChecklistListRow, SupervisionChecklistStatus, SupervisionPendingRow } from '../types/models';
 import { notifyError, notifyInfo, notifySuccess, notifyWarning } from '../utils/notify';
 
-type Tab = 'pending' | 'records' | 'signatories';
+type Tab = 'pending' | 'batch' | 'records' | 'signatories';
 const PAGE_SIZE = 20;
 
 /**
@@ -274,6 +275,7 @@ export const RhSupervisionChecklistsPage = () => {
         {(
           [
             ['pending', `Pendientes Fase 6 (${pending.length})`],
+            ['batch', 'Firmar por área'],
             ['records', `Registros (${total})`],
             ['signatories', 'Firmantes por área'],
           ] as Array<[Tab, string]>
@@ -292,6 +294,10 @@ export const RhSupervisionChecklistsPage = () => {
       {tab === 'signatories' ? (
         <section className={cardClass}>
           <SupervisionSignatoriesPanel />
+        </section>
+      ) : tab === 'batch' ? (
+        <section className={cardClass}>
+          <SupervisionBatchSignPanel key={tab} />
         </section>
       ) : tab === 'pending' ? (
         <section className={`${cardClass} space-y-4`}>

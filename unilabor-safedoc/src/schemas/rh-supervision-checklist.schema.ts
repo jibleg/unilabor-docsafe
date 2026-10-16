@@ -91,6 +91,7 @@ export const supervisionListQuerySchema = z.object({
   employee_id: positiveId.optional(),
   position_id: positiveId.optional(),
   enrollment_id: positiveId.optional(),
+  area: z.string().trim().max(120).optional(),
   q: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),

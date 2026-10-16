@@ -64,6 +64,7 @@ export interface SupervisionChecklistListRow {
   supervision_date: string;
   supervision_type: SupervisionType;
   area_name: string | null;
+  employee_area: string | null;
   branch_name: string | null;
   supervisor_name: string;
   area_responsible_name: string;
