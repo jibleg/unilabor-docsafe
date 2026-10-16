@@ -111,7 +111,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: Briefcase, label: 'Puestos (inducción)', path: '/rh/positions', permission: 'RH.INDUCTION.MANAGE' },
         { icon: LayoutDashboard, label: 'Tablero de inducción', path: '/rh/induction/dashboard', permission: 'RH.INDUCTION.MANAGE' },
         { icon: GraduationCap, label: 'Fases de inducción', path: '/rh/induction', permission: 'RH.INDUCTION.MANAGE' },
-        { icon: ClipboardPen, label: 'Supervisión (ANA-REG-060)', path: '/rh/supervision-checklists', permission: 'RH.SUPERVISION.MANAGE' },
+        { icon: ClipboardPen, label: 'Supervisión de inducción', path: '/rh/supervision-checklists', permission: 'RH.SUPERVISION.MANAGE' },
         { icon: ClipboardCheck, label: 'Evaluación de competencia', path: '/rh/competency-evaluations', permission: 'RH.COMPETENCY.MANAGE' },
         { icon: Gauge, label: 'Tablero de competencia', path: '/rh/competency-dashboard', permission: 'RH.COMPETENCY.MANAGE' },
       ],
