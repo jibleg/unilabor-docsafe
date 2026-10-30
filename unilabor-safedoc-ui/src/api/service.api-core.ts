@@ -15,6 +15,7 @@ import { tokenRequiresPasswordChange } from '../utils/auth';
 import type {
   Category,
   Employee,
+  EmployeeArea,
   EmployeeBranch,
   EmployeeSummary,
   ManagedUser,
@@ -288,5 +289,17 @@ export const deleteEmployeeById = async (employeeId: number): Promise<void> => {
 export const listBranches = async (): Promise<EmployeeBranch[]> => {
   const response = await api.get('/employees/branches');
   return getArrayFromPayload(response.data, ['branches']) as EmployeeBranch[];
+};
+
+/** Catalogo de areas del colaborador (lista con buscador del campo "Area"). */
+export const listEmployeeAreas = async (): Promise<EmployeeArea[]> => {
+  const response = await api.get('/employees/areas');
+  return getArrayFromPayload(response.data, ['areas']) as EmployeeArea[];
+};
+
+/** Alta de un area nueva; el backend la guarda en MAYUSCULAS y rechaza duplicados. */
+export const createEmployeeArea = async (name: string): Promise<EmployeeArea> => {
+  const response = await api.post('/employees/areas', { name });
+  return (response.data as { area: EmployeeArea }).area;
 };
 

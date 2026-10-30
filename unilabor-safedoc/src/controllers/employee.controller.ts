@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
+import { createEmployeeArea, listEmployeeAreas } from '../services/rh-employee-area.service';
 import {
   listEmployeeDocumentAccessMatrix,
   updateEmployeeDocumentAccessMatrix,
@@ -40,6 +41,14 @@ const mapEmployeeError = (res: Response, error: any) => {
     return res.status(409).json({
       message: 'La tabla employees no existe. Ejecuta la migracion base de RH antes de continuar.',
     });
+  }
+
+  if (error?.code === 'EMPLOYEE_AREA_NOT_IN_CATALOG' || error?.code === 'EMPLOYEE_AREA_INVALID') {
+    return res.status(400).json({ message: error.publicMessage });
+  }
+
+  if (error?.code === 'EMPLOYEE_AREA_DUPLICATED') {
+    return res.status(409).json({ message: error.publicMessage, existing_name: error.existing_name });
   }
 
   if (error?.code === 'EMPLOYEE_EMAIL_ALREADY_EXISTS') {
@@ -145,6 +154,31 @@ export const listBranchesController = async (_req: AuthRequest, res: Response) =
   } catch (error) {
     console.error('Error obteniendo el catalogo de sucursales:', error);
     return res.status(500).json({ message: 'No se pudo cargar el catalogo de sucursales.' });
+  }
+};
+
+export const listEmployeeAreasController = async (_req: AuthRequest, res: Response) => {
+  try {
+    const areas = await listEmployeeAreas();
+    return res.json({ areas });
+  } catch (error) {
+    console.error('Error obteniendo el catalogo de areas:', error);
+    return res.status(500).json({ message: 'No se pudo cargar el catalogo de areas.' });
+  }
+};
+
+export const createEmployeeAreaController = async (req: AuthRequest, res: Response) => {
+  try {
+    const area = await createEmployeeArea(String(req.body.name), req.user?.id ?? null);
+    await logEmployeeAudit(req.user?.id, `RH_EMPLOYEE_AREA_CREATE:${area.id}`, req.ip);
+    return res.status(201).json({ area });
+  } catch (error: any) {
+    const mappedError = mapEmployeeError(res, error);
+    if (mappedError) {
+      return mappedError;
+    }
+    console.error('Error creando area:', error);
+    return res.status(500).json({ message: 'No se pudo crear el area.' });
   }
 };
 

@@ -28,6 +28,7 @@ import {
 import type { Employee, EmployeeBranch, EmployeeDocumentAccessMatrix, LinkableUser } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { usePaginatedList } from '../hooks/usePaginatedList';
+import { EmployeeAreaSelect } from '../components/rh/EmployeeAreaSelect';
 import { Pagination } from '../components/Pagination';
 
 interface EmployeeFormState {
@@ -478,7 +479,7 @@ export const RhEmployeesPage = () => {
                 <tr>
                   <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Código</th>
                   <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Colaborador</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Área / Puesto</th>
+                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Sección / Puesto</th>
                   <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acciones</th>
                 </tr>
               </thead>
@@ -504,7 +505,7 @@ export const RhEmployeesPage = () => {
                         <p className="text-xs text-[var(--unilabor-neutral)]">{employee.email}</p>
                       </td>
                       <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">
-                        <p>{employee.area || 'Sin área'}</p>
+                        <p>{employee.area || 'Sin sección'}</p>
                         <p className="text-xs text-[var(--unilabor-neutral)]">{employee.position || 'Sin puesto'}</p>
                       </td>
                       <td className="px-5 py-4">
@@ -597,8 +598,8 @@ export const RhEmployeesPage = () => {
                   <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.email}</p>
                 </div>
                 <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Área</p>
-                  <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.area || 'Sin área'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Sección / Departamento</p>
+                  <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.area || 'Sin sección'}</p>
                 </div>
                 <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Puesto</p>
@@ -748,14 +749,9 @@ export const RhEmployeesPage = () => {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
-                    Área
+                    Sección / Departamento
                   </label>
-                  <input
-                    value={form.area}
-                    onChange={(event) => setForm((current) => ({ ...current, area: event.target.value }))}
-                    className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
-                    placeholder="Recursos Humanos, Calidad, Laboratorio..."
-                  />
+                  <EmployeeAreaSelect value={form.area} onChange={(area) => setForm((current) => ({ ...current, area }))} />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
@@ -840,7 +836,7 @@ export const RhEmployeesPage = () => {
                   {accessEmployee.full_name}
                 </h2>
                 <p className="mt-1 text-xs text-[var(--unilabor-neutral)]">
-                  {accessEmployee.employee_code} | {accessEmployee.area || 'Sin área'} | {accessEmployee.position || 'Sin puesto'}
+                  {accessEmployee.employee_code} | {accessEmployee.area || 'Sin sección'} | {accessEmployee.position || 'Sin puesto'}
                 </p>
               </div>
 

@@ -90,6 +90,13 @@ export interface EmployeeBranch {
   name: string;
 }
 
+/** Area oficial del catalogo (employees.area solo acepta estos nombres). */
+export interface EmployeeArea {
+  id: number;
+  name: string;
+  employees: number;
+}
+
 export interface EmployeeSummary {
   total: number;
   active: number;

@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import {
+  createEmployeeAreaController,
   createEmployeeController,
   deleteEmployeeController,
   getEmployeeByIdController,
   getEmployeeDocumentAccessController,
   getEmployeeSummaryController,
   listBranchesController,
+  listEmployeeAreasController,
   listEmployeesController,
   listLinkableUsersController,
   updateEmployeeDocumentAccessController,
@@ -14,6 +16,7 @@ import {
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
+  createEmployeeAreaSchema,
   createEmployeeSchema,
   updateEmployeeDocumentAccessSchema,
   updateEmployeeSchema,
@@ -38,6 +41,10 @@ router.get(
 // Catalogo de sucursales para el campo "Sucursal" del colaborador (reusa
 // helpdesk_asset_units sin acoplar RH a permisos de Helpdesk).
 router.get('/branches', requirePermission('RH.EMPLOYEES.READ'), listBranchesController);
+// Catalogo de areas del colaborador: el expediente solo acepta areas de aqui
+// (evita variantes como Validacion / VALIDACIÓN). Alta con el permiso de edicion.
+router.get('/areas', requirePermission('RH.EMPLOYEES.READ'), listEmployeeAreasController);
+router.post('/areas', requirePermission('RH.EMPLOYEES.WRITE'), validate(createEmployeeAreaSchema), createEmployeeAreaController);
 // La LISTA de empleados es directorio de referencia que el modulo de Activos
 // (HELPDESK) necesita para asignar responsables en activos, movimientos,
 // mantenimiento y calibracion. Se permite tambien a quien puede ver activos

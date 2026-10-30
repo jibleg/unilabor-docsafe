@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import pool from '../config/db';
 import { getUserAccessibleModules, invalidateUserPermissions } from './permission.service';
 import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
+import { resolveEmployeeAreaName } from './rh-employee-area.service';
 import type { EmployeeRecord, EmployeeSummary, LinkableUser } from '../types';
 import {
   PaginatedResult,
@@ -339,6 +340,7 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
 
     await ensureUniqueEmployeeEmail(client, normalizedEmail);
     await ensureLinkedUserIsAvailable(client, normalizedUserId);
+    const resolvedArea = await resolveEmployeeAreaName(client, payload.area);
 
     const generatedIdentity = requestedCode ? null : await generateEmployeeIdentity(client);
     const employeeCode = requestedCode ?? generatedIdentity?.employeeCode ?? `COL-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -376,7 +378,7 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
         payload.full_name.trim(),
         normalizedEmail,
         normalizeOptionalText(payload.phone),
-        normalizeOptionalText(payload.area),
+        resolvedArea,
         normalizeOptionalText(payload.position),
         payload.branch_id ?? null,
       ],
@@ -443,6 +445,10 @@ export const updateEmployee = async (
 
     await ensureUniqueEmployeeEmail(client, resolvedEmail, employeeId);
     await ensureLinkedUserIsAvailable(client, resolvedUserId, employeeId);
+    const resolvedArea =
+      payload.area !== undefined
+        ? await resolveEmployeeAreaName(client, payload.area, currentEmployee.area ? String(currentEmployee.area) : null)
+        : currentEmployee.area;
 
     await client.query(
       `
@@ -465,7 +471,7 @@ export const updateEmployee = async (
         payload.full_name !== undefined ? payload.full_name.trim() : String(currentEmployee.full_name),
         resolvedEmail,
         payload.phone !== undefined ? normalizeOptionalText(payload.phone) : currentEmployee.phone,
-        payload.area !== undefined ? normalizeOptionalText(payload.area) : currentEmployee.area,
+        resolvedArea,
         payload.position !== undefined ? normalizeOptionalText(payload.position) : currentEmployee.position,
         payload.branch_id !== undefined ? payload.branch_id : currentEmployee.branch_id,
         employeeId,

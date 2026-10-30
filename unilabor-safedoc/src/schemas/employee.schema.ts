@@ -24,6 +24,10 @@ export const createEmployeeSchema = z
   })
   .passthrough();
 
+export const createEmployeeAreaSchema = z.object({
+  name: z.string().trim().min(2, 'El nombre del area debe tener al menos 2 caracteres').max(80, 'El nombre del area admite hasta 80 caracteres'),
+});
+
 const UPDATE_EMPLOYEE_FIELDS = ['employee_code', 'user_id', 'full_name', 'email', 'phone', 'area', 'position', 'branch_id'] as const;
 
 export const updateEmployeeSchema = z
