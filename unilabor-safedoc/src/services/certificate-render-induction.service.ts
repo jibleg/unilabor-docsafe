@@ -47,6 +47,8 @@ export interface InductionCertificateRenderInput {
   issueDateLong: string;
   logoPath?: string | null;
   signatures: InductionCertificateSignatureInput[];
+  /** Leyenda bajo cada firma; por defecto la tercera es "de recibido" (acuse del colaborador). */
+  captions?: string[] | undefined;
 }
 
 const resolveImagePath = (relativeOrAbsolute: string | null | undefined): string | null => {
@@ -189,7 +191,7 @@ export const renderInductionCertificatePdf = (input: InductionCertificateRenderI
 
   // Firmas
   const signatures = input.signatures.slice(0, 3);
-  const captions = ['Nombre y firma', 'Nombre y firma', 'Nombre y firma de recibido'];
+  const captions = input.captions ?? ['Nombre y firma', 'Nombre y firma', 'Nombre y firma de recibido'];
   SIGNATURE_COLUMNS.forEach((column, index) => {
     const signature = signatures[index];
     if (!signature) {

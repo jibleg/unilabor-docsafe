@@ -4,6 +4,7 @@ import pool from '../config/db';
 import { isCompetencyKnowledgeCourseCode } from './rh-competency-knowledge.constants';
 import { renderCertificatePdf } from './certificate-render.service';
 import { renderInductionCertificatePdf } from './certificate-render-induction.service';
+import { loadPhase6CertificateSignatures, PHASE6_CERTIFICATE_CAPTIONS } from './rh-supervision-certificate-signers.service';
 import {
   getEmployeeActivePositionName,
   getInductionPhaseByCourseId,
@@ -181,6 +182,9 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
   const inductionPhase = context.inductionPhase;
   // Las constancias de Induccion NO llevan folio (decision de RH, 2026-09-03);
   // el folio opcional de la plantilla aplica solo al motor generico.
+  // Fase 6: RH + Supervisor / Auditor + Responsable del Area de la lista ANA-REG-060 que acredito el puesto.
+  const phase6Signatures =
+    inductionPhase?.phaseNumber === 6 ? await loadPhase6CertificateSignatures(context.assignmentId, template.signatures) : null;
   const referenceCode = template.show_folio
     ? `CP-${issueDate.getFullYear()}-${String(context.assignmentId).padStart(4, '0')}`
     : undefined;
@@ -191,13 +195,16 @@ const persistCertificate = async (context: IssuanceContext, documentTypeId: numb
         position: inductionPhase.positionName ?? (await getEmployeeActivePositionName(context.employeeId)) ?? '—',
         branch: context.branchName ?? '—',
         scoreText: `${context.percentage} / 100`,
-        durationText: inductionPhase.durationHours ? `${inductionPhase.durationHours} HORAS` : '—',
+        // Fase 6: practica supervisada, sin horas fijas (pedido de RH).
+        durationText:
+          inductionPhase.phaseNumber === 6 ? 'PRÁCTICA' : inductionPhase.durationHours ? `${inductionPhase.durationHours} HORAS` : '—',
         evaluationDateText: formatDateShort(context.submittedAt ?? issueDate),
         phaseNumber: inductionPhase.phaseNumber,
         phaseName: inductionPhase.phaseName,
         issueDateLong: formatDate(issueDate),
         logoPath: template.logo_path,
-        signatures: template.signatures,
+        signatures: phase6Signatures ?? template.signatures,
+        captions: phase6Signatures ? PHASE6_CERTIFICATE_CAPTIONS : undefined,
       })
     : await renderCertificatePdf({
         recipientName: context.employeeName,
