@@ -4,6 +4,7 @@ import { KnowledgeQuizPanel } from './KnowledgeQuizPanel';
 import { toast } from 'react-toastify';
 import {
   closeCompetencyEvaluation,
+  getCompetencySuggestedSigners,
   issueCompetencyCertificate,
   replaceCompetencyActions,
   replaceCompetencySectionItems,
@@ -17,6 +18,9 @@ import { AUTHORIZATION_UI, DICTAMEN_UI, formatDateOnly } from '../../utils/compe
 import { useHasPermission } from '../../utils/permissions';
 import { CompetencyAuthorizeModal } from './CompetencyAuthorizeModal';
 import { SignaturePad } from '../helpdesk/SignaturePad';
+import { CompactListPager } from '../CompactListPager';
+import { SearchableSelect } from '../SearchableSelect';
+import { useEmployeeOptions } from './supervision/useEmployeeOptions';
 import type {
   RhCompetencyCriticality,
   RhCompetencyEvaluation,
@@ -53,6 +57,7 @@ const METHOD_LABELS: Record<string, string> = {
 
 
 const SECTION_TABS: RhCompetencySection[] = ['COMPETENCIA', 'DESEMPENO', 'CONOCIMIENTO'];
+const KNOWLEDGE_PAGE_SIZES = [20, 30, 50];
 
 const SECTION_META: Record<RhCompetencySection, { title: string; weight: string; hint: string }> = {
   COMPETENCIA: {
@@ -106,11 +111,21 @@ const SectionEditor = ({
   const [items, setItems] = useState<RhCompetencyEvaluationItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Conocimiento puede traer decenas de preguntas (cuestionario de la Fase 5): se pagina.
+  const paginated = section === 'CONOCIMIENTO';
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(KNOWLEDGE_PAGE_SIZES[0]);
 
   useEffect(() => {
     setItems((evaluation.items ?? []).filter((item) => item.section === section));
     setDirty(false);
+    setPage(1);
   }, [evaluation.id, evaluation.items, section]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = paginated ? (currentPage - 1) * pageSize : 0;
+  const pageEnd = paginated ? pageStart + pageSize : items.length;
 
   const patchItem = (index: number, patch: Partial<RhCompetencyEvaluationItem>) => {
     setItems((current) => current.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -118,6 +133,7 @@ const SectionEditor = ({
   };
 
   const addItem = () => {
+    if (paginated) setPage(Math.ceil((items.length + 1) / pageSize));
     setItems((current) => [
       ...current,
       {
@@ -191,6 +207,7 @@ const SectionEditor = ({
           </p>
         )}
         {items.map((item, index) => {
+          if (index < pageStart || index >= pageEnd) return null;
           const vetoHit = section === 'COMPETENCIA' && item.criticality === 'A' && item.score !== null && item.score < 3;
           return (
             <div key={index} className={`rounded-xl border p-3 ${vetoHit ? 'border-rose-300 bg-rose-50/60' : 'border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.8)]'}`}>
@@ -290,6 +307,22 @@ const SectionEditor = ({
           );
         })}
       </div>
+      {paginated && items.length > 0 ? (
+        <div className="-mx-4 -mb-4 mt-3 overflow-hidden rounded-b-2xl">
+          <CompactListPager
+            page={currentPage}
+            pageSize={pageSize}
+            total={items.length}
+            pageSizeOptions={KNOWLEDGE_PAGE_SIZES}
+            onPageChange={setPage}
+            sizeLabel="Preguntas por página"
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </div>
+      ) : null}
     </section>
   );
 };
@@ -417,6 +450,20 @@ const CloseModal = ({
   const [directorName, setDirectorName] = useState('');
   const [signatures, setSignatures] = useState<Record<string, string | null>>({});
   const [saving, setSaving] = useState(false);
+  // Firmantes institucionales: precargados (responsable del área del puesto, CRH y DG) y elegibles de la lista.
+  const employeeOptions = useEmployeeOptions();
+  const signerOptions = employeeOptions
+    .filter((option) => option.value !== String(evaluation.employee_id))
+    .map((option) => ({ ...option, value: option.label }));
+  useEffect(() => {
+    getCompetencySuggestedSigners(evaluation.id)
+      .then((suggested) => {
+        setAreaName((current) => current || suggested.area || '');
+        setRhName((current) => current || suggested.rh || '');
+        setDirectorName((current) => current || suggested.director || '');
+      })
+      .catch(() => undefined);
+  }, [evaluation.id]);
 
   const setSignature = (key: string) => (dataUrl: string | null) =>
     setSignatures((current) => ({ ...current, [key]: dataUrl }));
@@ -477,22 +524,22 @@ const CloseModal = ({
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className={labelClass}>Coordinador del área</label>
-              <input value={areaName} onChange={(event) => setAreaName(event.target.value)} placeholder="Nombre completo" className={inputClass} />
+              <SearchableSelect value={areaName} options={signerOptions} onChange={setAreaName} placeholder="Elige al coordinador" searchPlaceholder="Buscar colaborador..." />
             </div>
             <div>
               <label className={labelClass}>Coordinador de RH</label>
-              <input value={rhName} onChange={(event) => setRhName(event.target.value)} placeholder="Nombre completo" className={inputClass} />
+              <SearchableSelect value={rhName} options={signerOptions} onChange={setRhName} placeholder="Elige al coordinador de RH" searchPlaceholder="Buscar colaborador..." />
             </div>
             <div>
               <label className={labelClass}>Director General</label>
-              <input value={directorName} onChange={(event) => setDirectorName(event.target.value)} placeholder="Nombre completo" className={inputClass} />
+              <SearchableSelect value={directorName} options={signerOptions} onChange={setDirectorName} placeholder="Elige al director" searchPlaceholder="Buscar colaborador..." />
             </div>
           </div>
           <SignaturePad label={`Colaborador evaluado — ${evaluation.employee_name}`} onChange={setSignature('collaborator')} />
           <SignaturePad label={`Evaluador técnico — ${evaluation.evaluator_name}`} onChange={setSignature('evaluator')} />
-          <SignaturePad label="Coordinador del área" onChange={setSignature('area')} />
-          <SignaturePad label="Coordinador de RH" onChange={setSignature('rh')} />
-          <SignaturePad label="Director General" onChange={setSignature('director')} />
+          <SignaturePad label={`Coordinador del área — ${areaName || 'sin elegir'}`} onChange={setSignature('area')} />
+          <SignaturePad label={`Coordinador de RH — ${rhName || 'sin elegir'}`} onChange={setSignature('rh')} />
+          <SignaturePad label={`Director General — ${directorName || 'sin elegir'}`} onChange={setSignature('director')} />
         </div>
         <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-5 py-4">
           <button type="button" onClick={onClose} disabled={saving} className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50">

@@ -5,6 +5,8 @@ import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { InductionTransitionResult, InductionTransitionTarget } from '../../../types/models';
 import { TRANSITION_TARGET_META, todayIsoDate } from '../../../utils/inductionDashboard';
 import { notifyError, notifySuccess } from '../../../utils/notify';
+import { SearchableSelect } from '../../SearchableSelect';
+import { useEmployeeOptions } from '../supervision/useEmployeeOptions';
 
 export interface TransitionCandidateRef {
   employee_id: number;
@@ -39,6 +41,11 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
   const [progress, setProgress] = useState<{ done: number; current: string } | null>(null);
   const meta = TRANSITION_TARGET_META[target];
   const needsEvaluator = target === 7;
+  // Evaluador: colaborador activo elegido de la lista (el REH-REG-003 guarda su nombre); nunca uno de los evaluados.
+  const employeeOptions = useEmployeeOptions();
+  const evaluatorOptions = employeeOptions
+    .filter((option) => !candidates.some((candidate) => String(candidate.employee_id) === option.value))
+    .map((option) => ({ ...option, value: option.label }));
   const canConfirm = !needsEvaluator || evaluatorName.trim().length >= 3;
 
   // Uno por uno: cada inscripcion de Fase 5 asigna todos los documentos del
@@ -122,15 +129,19 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
               <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">{TARGET_EXPLANATION[target]}</p>
               {needsEvaluator ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-                  <label className="block text-xs font-semibold">
+                  <div className="block text-xs font-semibold">
                     Evaluador (quien aplicará la evaluación)
-                    <input
-                      value={evaluatorName}
-                      onChange={(e) => setEvaluatorName(e.target.value.slice(0, 160))}
-                      placeholder="Ej. Responsable del área analítica"
-                      className="mt-1 w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2 text-sm font-normal focus:border-[var(--color-brand-300)] focus:outline-none"
-                    />
-                  </label>
+                    <div className="mt-1 font-normal">
+                      <SearchableSelect
+                        value={evaluatorName}
+                        options={evaluatorOptions}
+                        onChange={setEvaluatorName}
+                        placeholder="Elige al evaluador"
+                        emptyLabel="Sin elegir"
+                        searchPlaceholder="Buscar colaborador..."
+                      />
+                    </div>
+                  </div>
                   <label className="block text-xs font-semibold">
                     Fecha
                     <input

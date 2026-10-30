@@ -289,7 +289,18 @@ export const assignCourseKnowledge = async (input: AssignCourseKnowledgeInput): 
   }
 
   const assignmentId = await resolveAssignment(evaluation, input.courseId, input.mode, input.actorUserId);
+  return bindKnowledgeAssignment(evaluation, assignmentId, input.courseId);
+};
 
+/**
+ * Vuelca a la seccion 3 las preguntas del intento (snapshot) con su respuesta
+ * correcta y, si ya estaba contestado, sus respuestas y aciertos.
+ */
+const bindKnowledgeAssignment = async (
+  evaluation: CompetencyEvaluationRecord,
+  assignmentId: number,
+  courseId: number,
+): Promise<CompetencyEvaluationRecord> => {
   // Preguntas del intento (snapshot) con su respuesta correcta.
   const questions = await pool.query(
     `SELECT q.id, q.type, q.text,
@@ -316,7 +327,7 @@ export const assignCourseKnowledge = async (input: AssignCourseKnowledgeInput): 
           SET knowledge_assignment_id = $2, knowledge_selection_mode = 'course', knowledge_synced_at = NULL,
               reference_course_id = $3, reference_course_date = $4, updated_at = NOW()
         WHERE id = $1;`,
-      [evaluation.id, assignmentId, input.courseId, referenceDate.rows[0]?.d ?? null],
+      [evaluation.id, assignmentId, courseId, referenceDate.rows[0]?.d ?? null],
     );
     await client.query(`DELETE FROM public.rh_competency_evaluation_items WHERE evaluation_id = $1 AND section = 'CONOCIMIENTO';`, [
       evaluation.id,
@@ -335,4 +346,49 @@ export const assignCourseKnowledge = async (input: AssignCourseKnowledgeInput): 
   // Si el intento ya estaba contestado (modo 'existing'), se vuelca de inmediato.
   await syncKnowledgeFromAssignment(evaluation.id, assignmentId);
   return (await getEvaluationById(evaluation.id)) as CompetencyEvaluationRecord;
+};
+
+// -----------------------------------------------------------------------------
+// Fase 7: Conocimiento desde el cuestionario de la FASE 5 del mismo puesto
+// (decision 2026-10-30). El colaborador ya lo acredito sobre los documentos
+// del puesto; se toma ese intento como evidencia de la seccion 3.
+// -----------------------------------------------------------------------------
+
+export const assignPhase5Knowledge = async (evaluationId: number): Promise<CompetencyEvaluationRecord> => {
+  const evaluation = await getEvaluationById(evaluationId);
+  if (!evaluation) {
+    return throwCoded('RH_COMP_EVAL_NOT_FOUND', 'La evaluacion indicada no existe.');
+  }
+  assertEditable(evaluation);
+  const attempt = await pool.query(
+    `SELECT ea.id AS assignment_id, t.training_course_id
+       FROM public.rh_induction_enrollments e
+       JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number = 5
+       JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id AND ea.status = 'passed'
+       JOIN public.evaluation_templates t ON t.id = ea.template_id
+      WHERE e.employee_id = $1 AND e.position_id = $2 AND e.queue_status <> 'CANCELLED'
+      ORDER BY ea.graded_at DESC NULLS LAST, ea.id DESC
+      LIMIT 1;`,
+    [evaluation.employee_id, evaluation.position_id],
+  );
+  if (attempt.rows.length === 0) {
+    return throwCoded(
+      'RH_COMP_EVAL_PHASE5_NOT_FOUND',
+      'El colaborador no tiene acreditado el cuestionario de la Fase 5 de este puesto; usa el banco del puesto o captura la seccion 3 a mano.',
+    );
+  }
+  return bindKnowledgeAssignment(evaluation, Number(attempt.rows[0].assignment_id), Number(attempt.rows[0].training_course_id));
+};
+
+/** Version best-effort para el paso a la Fase 7: nunca lanza. */
+export const tryAssignPhase5Knowledge = async (evaluationId: number): Promise<boolean> => {
+  try {
+    await assignPhase5Knowledge(evaluationId);
+    return true;
+  } catch (error: any) {
+    if (error?.code !== 'RH_COMP_EVAL_PHASE5_NOT_FOUND') {
+      console.error(`REH-REG-003 ${evaluationId}: no se pudo tomar el Conocimiento de la Fase 5:`, error);
+    }
+    return false;
+  }
 };

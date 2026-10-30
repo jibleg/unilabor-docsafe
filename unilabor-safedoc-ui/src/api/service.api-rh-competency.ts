@@ -187,6 +187,22 @@ export const listKnowledgeCourseOptions = async (id: number): Promise<KnowledgeC
   return (asRecord(unwrapPayload(response.data))?.courses as KnowledgeCourseOption[]) ?? [];
 };
 
+/** Firmantes institucionales sugeridos para el cierre (responsable del área del puesto, titular de CRH y de DG). */
+export const getCompetencySuggestedSigners = async (
+  id: number,
+): Promise<{ area: string | null; rh: string | null; director: string | null }> => {
+  const response = await api.get(`/rh/competency-evaluations/${id}/suggested-signers`);
+  const data = asRecord(unwrapPayload(response.data));
+  return (data?.signers as { area: string | null; rh: string | null; director: string | null }) ?? { area: null, rh: null, director: null };
+};
+
+/** Sección 3 desde el cuestionario de la Fase 5 que el colaborador ya acreditó en el puesto (Fase 7). */
+export const assignPhase5Knowledge = async (id: number): Promise<{ evaluation: RhCompetencyEvaluation; message: string }> => {
+  const response = await api.post(`/rh/competency-evaluations/${id}/knowledge-phase5`);
+  const data = asRecord(unwrapPayload(response.data));
+  return { evaluation: data?.evaluation as RhCompetencyEvaluation, message: String(data?.message ?? '') };
+};
+
 /** Sección 3 desde la capacitación del puesto: 'new' asigna su cuestionario, 'existing' usa el último intento. */
 export const assignCourseKnowledge = async (
   id: number,

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { authorizationSignerLabel } from './rh-competency-signers.service';
 import path from 'path';
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
 import { winAnsiSafe } from './reading/reading-annex.pdf';
@@ -371,7 +372,7 @@ export const buildCompetencyEvaluationPdf = async (input: CompetencyEvaluationPd
   drawText(authTone.title, authTextX, cursor.y - 32, 14, bold, authTone.accent);
   const authDetail = authPending
     ? 'Pendiente: la decisión la registra RH o Dirección General en la plataforma. La vigencia se fija al autorizar.'
-    : `${record.authorized_by_name ? `Autorizó: ${record.authorized_by_name}   ·   ` : ''}Fecha: ${formatDate(input.authorizedAt)}${input.validUntil ? `   ·   Vigente hasta el ${formatDate(input.validUntil)}` : ''}`;
+    : `${authorizationSignerLabel(record) ? `Autorizó: ${authorizationSignerLabel(record)}   ·   ` : ''}Fecha: ${formatDate(input.authorizedAt)}${input.validUntil ? `   ·   Vigente hasta el ${formatDate(input.validUntil)}` : ''}`;
   drawText(wrapText(safe(authDetail), regular, 8, CONTENT_W - 96)[0] ?? '', authTextX, cursor.y - 46, 8, regular, INK);
   authNoteLines.forEach((line, index) => drawText(line, authTextX, cursor.y - 57 - index * 10, 7.5, italic, MUTED));
   cursor.y -= authCardH + 8;
@@ -532,7 +533,7 @@ export const buildCompetencyEvaluationPdf = async (input: CompetencyEvaluationPd
   drawText(
     authPending
       ? 'Pendiente de autorización por RH o Dirección General. La vigencia (12 meses) se fija al autorizar.'
-      : `Decisión: ${formatDate(input.authorizedAt)}${record.authorized_by_name ? `  ·  Por: ${record.authorized_by_name}` : ''}   ·   Vigencia: ${input.validUntil ? `12 meses, hasta el ${formatDate(input.validUntil)}` : 'No aplica'}`,
+      : `Decisión: ${formatDate(input.authorizedAt)}${authorizationSignerLabel(record) ? `  ·  Por: ${authorizationSignerLabel(record)}` : ''}   ·   Vigencia: ${input.validUntil ? `12 meses, hasta el ${formatDate(input.validUntil)}` : 'No aplica'}`,
     MARGIN + 12,
     gy - 38,
     8,
@@ -655,12 +656,14 @@ export const buildCompetencyEvaluationPdf = async (input: CompetencyEvaluationPd
     if (authResult === 'AUTORIZADO_CON_SEGUIMIENTO') {
       page.drawText('CON SEGUIMIENTO', { x: stampX + (stampW - textWidth('CON SEGUIMIENTO', bold, 7.5)) / 2 + 1, y: stampY + stampH - 38, size: 7.5, font: bold, color: stampColor, rotate: tilt, opacity: 0.9 });
     }
+    // Fecha y quien autoriza institucionalmente (titulo, nombre y cargo; hasta 2 renglones).
+    const signer = authorizationSignerLabel(record);
     const stampLines = [
-      `${formatDate(input.authorizedAt)} · RH / Dirección General`,
-      record.authorized_by_name ? wrapText(safe(record.authorized_by_name), regular, 6.5, stampW - 24)[0] ?? '' : 'Plataforma SafeDoc',
+      formatDate(input.authorizedAt),
+      ...(signer ? wrapText(safe(signer), regular, 6.5, stampW - 24).slice(0, 2) : ['Plataforma SafeDoc']),
     ];
     stampLines.forEach((line, index) => {
-      page.drawText(safe(line), { x: stampX + (stampW - textWidth(line, regular, 6.5)) / 2, y: stampY + 20 - index * 9, size: 6.5, font: regular, color: stampColor, rotate: tilt, opacity: 0.9 });
+      page.drawText(safe(line), { x: stampX + (stampW - textWidth(line, regular, 6.5)) / 2, y: stampY + 26 - index * 8, size: 6.5, font: regular, color: stampColor, rotate: tilt, opacity: 0.9 });
     });
   }
   ensureSpace(30);

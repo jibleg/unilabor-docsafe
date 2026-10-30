@@ -1,5 +1,6 @@
 import type { Response } from 'express';
-import { assignCourseKnowledge, listKnowledgeCourseOptions } from '../services/rh-competency-course-knowledge.service';
+import { getCompetencySuggestedSigners } from '../services/rh-competency-signers.service';
+import { assignCourseKnowledge, assignPhase5Knowledge, listKnowledgeCourseOptions, tryAssignPhase5Knowledge } from '../services/rh-competency-course-knowledge.service';
 import type { AssignCourseKnowledgeInput } from '../schemas/rh-competency-evaluation.schema';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
@@ -59,6 +60,7 @@ const ERROR_STATUS: Record<string, number> = {
   RH_COMP_EVAL_COURSE_NOT_LINKED: 409,
   RH_COMP_EVAL_COURSE_NO_QUIZ: 409,
   RH_COMP_EVAL_COURSE_NO_ATTEMPT: 409,
+  RH_COMP_EVAL_PHASE5_NOT_FOUND: 409,
 };
 
 const mapError = (res: Response, error: any): Response | null => {
@@ -83,7 +85,7 @@ const logAudit = async (userId: string | undefined, action: string, entityId: nu
 
 export const createCompetencyEvaluationController = async (req: AuthRequest, res: Response) => {
   try {
-    const evaluation = await createEvaluation({
+    let evaluation = await createEvaluation({
       employeeId: Number(req.body.employee_id),
       positionId: Number(req.body.position_id),
       evaluationType: req.body.evaluation_type,
@@ -94,6 +96,10 @@ export const createCompetencyEvaluationController = async (req: AuthRequest, res
       createdByUserId: req.user?.id ?? null,
     });
     await logAudit(req.user?.id, `RH_COMP_EVAL_CREATE:${evaluation.id}`, evaluation.id, req.ip);
+    // INICIAL (Fase 7): la seccion 3 toma el cuestionario de la Fase 5 del puesto si existe.
+    if (evaluation.evaluation_type === 'INICIAL' && (await tryAssignPhase5Knowledge(evaluation.id))) {
+      evaluation = (await getEvaluationById(evaluation.id)) ?? evaluation;
+    }
     return res.status(201).json({ message: 'Evaluacion creada como borrador.', evaluation });
   } catch (error: any) {
     const mapped = mapError(res, error);
@@ -389,6 +395,43 @@ export const listKnowledgeCourseOptionsController = async (req: AuthRequest, res
 };
 
 /** POST /rh/competency-evaluations/:id/knowledge-course {course_id, mode} - seccion 3 desde la capacitacion del puesto. */
+/** GET /rh/competency-evaluations/:id/suggested-signers — firmantes institucionales sugeridos para el cierre. */
+export const getCompetencySuggestedSignersController = async (req: AuthRequest, res: Response) => {
+  const evaluationId = parseId(req.params.id);
+  if (!evaluationId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const signers = await getCompetencySuggestedSigners(evaluationId);
+    if (!signers) return res.status(404).json({ message: 'La evaluacion indicada no existe.' });
+    return res.json({ signers });
+  } catch (error) {
+    console.error('Error sugiriendo firmantes del REH-REG-003:', error);
+    return res.status(500).json({ message: 'No se pudieron sugerir los firmantes.' });
+  }
+};
+
+/** POST /rh/competency-evaluations/:id/knowledge-phase5 — Conocimiento desde el cuestionario de la Fase 5 del puesto. */
+export const assignPhase5KnowledgeController = async (req: AuthRequest, res: Response) => {
+  const evaluationId = parseId(req.params.id);
+  if (!evaluationId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const evaluation = await assignPhase5Knowledge(evaluationId);
+    await logAudit(req.user?.id, `RH_COMP_EVAL_KNOWLEDGE_PHASE5:${evaluationId}:${evaluation.knowledge_quiz?.assignment_id ?? 0}`, evaluationId, req.ip);
+    return res.status(201).json({
+      message: `Seccion 3 llenada con el cuestionario de la Fase 5 del puesto (${evaluation.knowledge_quiz?.question_count ?? 0} preguntas).`,
+      evaluation,
+    });
+  } catch (error: any) {
+    const mapped = mapError(res, error);
+    if (mapped) return mapped;
+    console.error('Error tomando el Conocimiento de la Fase 5:', error);
+    return res.status(500).json({ message: 'No se pudo tomar el cuestionario de la Fase 5.' });
+  }
+};
+
 export const assignCourseKnowledgeController = async (req: AuthRequest, res: Response) => {
   const evaluationId = parseId(req.params.id);
   if (!evaluationId) {

@@ -477,7 +477,15 @@ export const RhCompetencyEvaluationsPage = () => {
             </div>
             <div>
               <label className={labelClass}>Tutor asignado / evaluador</label>
-              <input value={createEvaluator} onChange={(event) => setCreateEvaluator(event.target.value)} placeholder="Nombre del evaluador técnico" className={inputClass} />
+              <SearchableSelect
+                value={createEvaluator}
+                onChange={setCreateEvaluator}
+                options={employees
+                  .filter((employee) => employee.is_active && String(employee.id) !== createEmployeeId)
+                  .map((employee) => ({ value: employee.full_name, label: employee.full_name, hint: employee.employee_code }))}
+                placeholder="Selecciona al evaluador"
+                searchPlaceholder="Buscar colaborador..."
+              />
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowCreate(false)} disabled={creating} className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50">

@@ -1,6 +1,7 @@
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
 import { createEvaluation } from './rh-competency-evaluation.service';
+import { tryAssignPhase5Knowledge } from './rh-competency-course-knowledge.service';
 import { normalizeSearchText } from './rh-induction-dashboard.service';
 import { enrollEmployeeInPhase } from './rh-induction.service';
 import { queueNotifyCompetencyOpened } from './rh-induction-notification.service';
@@ -617,6 +618,8 @@ const runOne = async (row: TransitionRow, phase: TransitionPhaseInfo, input: Exe
         referenceCourseId: await loadPositionCourse(6, row.position_id as number),
         createdByUserId: input.actorUserId,
       });
+      // Seccion 3 "Conocimiento": el cuestionario de la Fase 5 que acredito en este puesto.
+      await tryAssignPhase5Knowledge(evaluation.id);
       // Aviso al colaborador (SMS): se abrio su evaluacion de competencia de este puesto.
       queueNotifyCompetencyOpened(row.employee_id, row.position_id as number);
       return {

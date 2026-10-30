@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpenCheck, Clock3, GraduationCap, Loader2, RefreshCw, Shuffle, ListChecks, Sparkles, X, XCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { getApiErrorMessage } from '../../api/service';
-import { assignKnowledgeQuiz, cancelKnowledgeQuiz, getCompetencyEvaluation } from '../../api/service.api-rh-competency';
+import { assignKnowledgeQuiz, assignPhase5Knowledge, cancelKnowledgeQuiz, getCompetencyEvaluation } from '../../api/service.api-rh-competency';
 import { listApprovedPositionQuestions } from '../../api/service.api-rh-question-bank';
 import { getPositionById } from '../../api/service.api-rh-position';
 import type { QuestionBankItem, RhCompetencyEvaluation, RhPositionDocument } from '../../types/models';
@@ -61,7 +61,21 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
   const [showResponses, setShowResponses] = useState(false);
   const isCourse = quiz?.selection_mode === 'course';
   // Fuente de la sección 3: la capacitación del puesto es la opción preferida; el banco IA queda como alternativa.
-  const [source, setSource] = useState<'course' | 'bank'>(quiz && !isCourse ? 'bank' : 'course');
+  // Por defecto (Fase 7) el cuestionario de la Fase 5 que el colaborador ya acredito en el puesto.
+  const [source, setSource] = useState<'phase5' | 'course' | 'bank'>(quiz && !isCourse ? 'bank' : 'phase5');
+  const [usingPhase5, setUsingPhase5] = useState(false);
+  const takePhase5Knowledge = async () => {
+    setUsingPhase5(true);
+    try {
+      const result = await assignPhase5Knowledge(evaluation.id);
+      toast.success(result.message);
+      onChanged(result.evaluation);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo tomar el cuestionario de la Fase 5.'));
+    } finally {
+      setUsingPhase5(false);
+    }
+  };
 
   const loadBank = useCallback(async () => {
     setLoadingBank(true);
@@ -223,6 +237,13 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
+            onClick={() => setSource('phase5')}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${source === 'phase5' ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'}`}
+          >
+            <BookOpenCheck size={13} /> Cuestionario de la Fase 5
+          </button>
+          <button
+            type="button"
             onClick={() => setSource('course')}
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${source === 'course' ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'}`}
           >
@@ -234,6 +255,23 @@ export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanel
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${source === 'bank' ? 'bg-[var(--color-brand-700)] text-white' : 'bg-[rgba(191,212,230,0.4)] text-[var(--color-brand-700)] hover:bg-[rgba(124,173,211,0.3)]'}`}
           >
             <Sparkles size={13} /> Banco de preguntas IA del puesto
+          </button>
+        </div>
+      ) : null}
+
+      {!readOnly && canReassign && source === 'phase5' ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[rgba(0,65,106,0.1)] bg-[rgba(248,251,253,0.9)] px-3 py-2">
+          <p className="text-xs leading-5 text-[var(--unilabor-ink)]">
+            Usa como evidencia de Conocimiento el cuestionario de la Fase 5 (documentos del puesto) que el colaborador ya acreditó en este puesto: sus
+            preguntas, respuestas y aciertos.
+          </p>
+          <button
+            type="button"
+            onClick={() => void takePhase5Knowledge()}
+            disabled={usingPhase5}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-brand-700)] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {usingPhase5 ? <Loader2 size={13} className="animate-spin" /> : <BookOpenCheck size={13} />} Usar cuestionario de la Fase 5
           </button>
         </div>
       ) : null}

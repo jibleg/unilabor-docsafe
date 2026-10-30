@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   assignKnowledgeQuizController,
   assignCourseKnowledgeController,
+  assignPhase5KnowledgeController,
+  getCompetencySuggestedSignersController,
   listKnowledgeCourseOptionsController,
   cancelKnowledgeQuizController,
   issueCompetencyCertificateController,
@@ -76,6 +78,8 @@ router.post('/:id/knowledge-quiz', validate(assignKnowledgeQuizSchema), assignKn
 router.delete('/:id/knowledge-quiz', cancelKnowledgeQuizController);
 router.get('/:id/knowledge-courses', listKnowledgeCourseOptionsController);
 router.post('/:id/knowledge-course', validate(assignCourseKnowledgeSchema), assignCourseKnowledgeController);
+router.post('/:id/knowledge-phase5', assignPhase5KnowledgeController);
+router.get('/:id/suggested-signers', getCompetencySuggestedSignersController);
 router.post('/:id/certificate', issueCompetencyCertificateController);
 // Autorizar: solo RH o Direccion General (permiso propio, ademas del MANAGE del router).
 router.post(
