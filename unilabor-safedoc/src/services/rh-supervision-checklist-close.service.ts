@@ -5,6 +5,7 @@ import { archiveGeneratedPdfToExpedient } from './employee-document-archive.serv
 import { captureEnrollmentPractical } from './rh-induction-practical.service';
 import { buildSupervisionChecklistPdf } from './rh-supervision-checklist.pdf';
 import { practicalScoreFromPct, SUPERVISION_CONCLUSION_LABELS } from './rh-supervision-checklist.rules';
+import { assertIndependentSigners } from './rh-supervision-signers.service';
 import {
   getSupervisionChecklist,
   updateSupervisionChecklist,
@@ -18,6 +19,9 @@ import {
 // y, cuando la lista es la FINAL de una inscripcion de la Fase 6, captura la
 // calificacion en la evaluacion practica del puesto (motor existente: emite la
 // constancia, marca el checklist REH-REG-005 y activa el siguiente puesto).
+// Dos caminos: RH cierra en una sola sesion con ambas firmas (DRAFT -> CLOSED),
+// o el supervisor firma con su cuenta (DRAFT -> SUPERVISOR_SIGNED) y despues el
+// responsable del area avala con la suya (SUPERVISOR_SIGNED -> CLOSED).
 // Una lista cerrada nunca se modifica ni se borra.
 // -----------------------------------------------------------------------------
 
@@ -32,7 +36,8 @@ const throwCoded = (code: string, publicMessage?: string): never => {
 
 export interface CloseSupervisionChecklistInput {
   id: number;
-  supervisorSignature: string;
+  /** Obligatoria si la lista sigue en borrador; se ignora si el supervisor ya firmo. */
+  supervisorSignature?: string | null | undefined;
   areaResponsibleSignature: string;
   employeeSignature?: string | null;
   /** Decide la Fase 6 de la inscripcion. Default: true si la lista esta ligada a una inscripcion. */
@@ -40,6 +45,8 @@ export interface CloseSupervisionChecklistInput {
   /** Ultimos cambios de cabecera que llegan junto con el cierre. */
   header?: UpdateSupervisionChecklistInput | undefined;
   closedByUserId: string;
+  /** true = el responsable del area avalo con su propia cuenta (Mis supervisiones); si RH recaba el aval, queda solo closed_by. */
+  endorsedByOwnAccount?: boolean | undefined;
 }
 
 export interface SupervisionPracticalOutcome {
@@ -91,14 +98,8 @@ const resolveFallbackUserId = async (): Promise<string | null> => {
   return admin.rows.length > 0 ? String(admin.rows[0].id) : null;
 };
 
-export const closeSupervisionChecklist = async (input: CloseSupervisionChecklistInput): Promise<CloseSupervisionChecklistResult> => {
-  let record = await getSupervisionChecklist(input.id);
-  if (record.status !== 'DRAFT') {
-    throwCoded('RH_SUPERVISION_ALREADY_CLOSED', 'La lista ya esta cerrada y firmada.');
-  }
-  if (input.header) {
-    record = await updateSupervisionChecklist(input.id, input.header);
-  }
+/** Requisitos comunes para firmar: datos completos, items calificados y firmantes independientes. */
+const assertReadyToSign = (record: SupervisionChecklistRecord): void => {
   if (!record.supervisor_name.trim()) {
     throwCoded('RH_SUPERVISION_SUPERVISOR_REQUIRED', 'Captura el nombre del supervisor / auditor.');
   }
@@ -106,10 +107,7 @@ export const closeSupervisionChecklist = async (input: CloseSupervisionChecklist
     throwCoded('RH_SUPERVISION_RESPONSIBLE_REQUIRED', 'Captura el nombre del responsable del area.');
   }
   if (record.summary.pending > 0) {
-    throwCoded(
-      'RH_SUPERVISION_ITEMS_PENDING',
-      `Faltan ${record.summary.pending} item(s) por calificar (Si, No o N/A).`,
-    );
+    throwCoded('RH_SUPERVISION_ITEMS_PENDING', `Faltan ${record.summary.pending} item(s) por calificar (Si, No o N/A).`);
   }
   if (record.summary.evaluated === 0 || record.summary.compliance_pct === null || !record.summary.conclusion) {
     throwCoded('RH_SUPERVISION_NOTHING_EVALUATED', 'Todos los items quedaron en N/A; la lista debe evaluar al menos un aspecto.');
@@ -117,6 +115,72 @@ export const closeSupervisionChecklist = async (input: CloseSupervisionChecklist
   if (record.sgc_follow_up_required && !record.sgc_reference?.trim()) {
     throwCoded('RH_SUPERVISION_SGC_REFERENCE_REQUIRED', 'Indica la referencia o descripcion de la situacion que requiere gestion del SGC.');
   }
+  assertIndependentSigners(record);
+};
+
+const readStoredSupervisorSignaturePath = async (id: number): Promise<string | null> => {
+  const result = await pool.query(`SELECT supervisor_signature_path FROM public.rh_supervision_checklists WHERE id = $1 LIMIT 1;`, [id]);
+  return result.rows[0]?.supervisor_signature_path ? String(result.rows[0].supervisor_signature_path) : null;
+};
+
+const readStoredSupervisorSignature = async (id: number): Promise<Buffer | null> => {
+  const filePath = await readStoredSupervisorSignaturePath(id);
+  try {
+    return filePath ? fs.readFileSync(filePath) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Paso 1 del cierre en dos firmas: el supervisor asignado califico todo y firma
+ * con su cuenta. La lista queda bloqueada esperando el aval del responsable.
+ */
+export const signSupervisionAsSupervisor = async (input: {
+  id: number;
+  signature: string;
+  header?: UpdateSupervisionChecklistInput | undefined;
+  userId: string;
+}): Promise<SupervisionChecklistRecord> => {
+  let record = await getSupervisionChecklist(input.id);
+  if (record.status !== 'DRAFT') {
+    throwCoded('RH_SUPERVISION_SUPERVISOR_SIGNED', 'La lista ya fue firmada por el supervisor.');
+  }
+  if (input.header) {
+    record = await updateSupervisionChecklist(input.id, input.header);
+  }
+  assertReadyToSign(record);
+  const png = decodeSignaturePng(input.signature);
+  if (!png) {
+    throwCoded('RH_SUPERVISION_INVALID_SIGNATURE', 'Traza tu firma para firmar la lista.');
+  }
+  const signaturePath = writeSignaturePng(png!, 'SUP-ANA060');
+  const updated = await pool.query(
+    `UPDATE public.rh_supervision_checklists
+        SET status = 'SUPERVISOR_SIGNED', supervisor_signature_path = $2, supervisor_user_id = $3, supervisor_signed_at = NOW(), updated_at = NOW()
+      WHERE id = $1 AND status = 'DRAFT' RETURNING id;`,
+    [input.id, signaturePath, input.userId],
+  );
+  if (updated.rows.length === 0) {
+    try {
+      fs.unlinkSync(signaturePath);
+    } catch {
+      /* limpieza best-effort */
+    }
+    throwCoded('RH_SUPERVISION_SUPERVISOR_SIGNED', 'La lista ya fue firmada por el supervisor.');
+  }
+  return getSupervisionChecklist(input.id);
+};
+
+export const closeSupervisionChecklist = async (input: CloseSupervisionChecklistInput): Promise<CloseSupervisionChecklistResult> => {
+  let record = await getSupervisionChecklist(input.id);
+  if (record.status === 'CLOSED') {
+    throwCoded('RH_SUPERVISION_ALREADY_CLOSED', 'La lista ya esta cerrada y firmada.');
+  }
+  if (input.header && record.status === 'DRAFT') {
+    record = await updateSupervisionChecklist(input.id, input.header);
+  }
+  assertReadyToSign(record);
 
   const isFinal = input.isFinal ?? record.enrollment_id !== null;
   if (isFinal && !record.enrollment_id) {
@@ -126,7 +190,8 @@ export const closeSupervisionChecklist = async (input: CloseSupervisionChecklist
     await assertPracticalAvailable(record.enrollment_id);
   }
 
-  const supervisorPng = decodeSignaturePng(input.supervisorSignature);
+  const supervisorPng =
+    record.status === 'SUPERVISOR_SIGNED' ? await readStoredSupervisorSignature(record.id) : decodeSignaturePng(input.supervisorSignature ?? '');
   const areaPng = decodeSignaturePng(input.areaResponsibleSignature);
   if (!supervisorPng || !areaPng) {
     throwCoded('RH_SUPERVISION_INVALID_SIGNATURE', 'Las firmas del supervisor y del responsable del area son obligatorias.');
@@ -159,8 +224,9 @@ export const closeSupervisionChecklist = async (input: CloseSupervisionChecklist
     uploadedByUserId,
   });
 
+  const storedSupervisorPath = record.status === 'SUPERVISOR_SIGNED' ? await readStoredSupervisorSignaturePath(record.id) : null;
   const paths = {
-    supervisor: writeSignaturePng(supervisorPng!, 'SUP-ANA060'),
+    supervisor: storedSupervisorPath ?? writeSignaturePng(supervisorPng!, 'SUP-ANA060'),
     area: writeSignaturePng(areaPng!, 'SUP-ANA060'),
     employee: employeePng ? writeSignaturePng(employeePng, 'SUP-ANA060') : null,
   };
@@ -177,8 +243,9 @@ export const closeSupervisionChecklist = async (input: CloseSupervisionChecklist
       `UPDATE public.rh_supervision_checklists
           SET status = 'CLOSED', items_evaluated = $2, items_compliant = $3, items_non_compliant = $4, compliance_pct = $5,
               conclusion = $6, passed = $7, is_final = $8, supervisor_signature_path = $9, area_responsible_signature_path = $10,
-              employee_signature_path = $11, closed_at = $12, closed_by_user_id = $13, document_id = $14, updated_at = NOW()
-        WHERE id = $1 AND status = 'DRAFT';`,
+              employee_signature_path = $11, closed_at = $12, closed_by_user_id = $13, document_id = $14,
+              area_responsible_user_id = $15, updated_at = NOW()
+        WHERE id = $1 AND status IN ('DRAFT', 'SUPERVISOR_SIGNED');`,
       [
         record.id,
         summary.evaluated,
@@ -194,12 +261,13 @@ export const closeSupervisionChecklist = async (input: CloseSupervisionChecklist
         closedAt,
         input.closedByUserId,
         documentId,
+        input.endorsedByOwnAccount ? input.closedByUserId : null,
       ],
     );
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
-    for (const filePath of Object.values(paths)) {
+    for (const filePath of [storedSupervisorPath ? null : paths.supervisor, paths.area, paths.employee]) {
       try {
         filePath && fs.existsSync(filePath) && fs.unlinkSync(filePath);
       } catch {
@@ -259,7 +327,7 @@ export const renderSupervisionChecklistPdf = async (id: number): Promise<{ recor
     }
   };
   let signatures = { supervisor: null as Buffer | null, areaResponsible: null as Buffer | null, employee: null as Buffer | null };
-  if (record.status === 'CLOSED') {
+  if (record.status !== 'DRAFT') {
     const result = await pool.query(
       `SELECT supervisor_signature_path, area_responsible_signature_path, employee_signature_path
          FROM public.rh_supervision_checklists WHERE id = $1 LIMIT 1;`,
@@ -272,6 +340,7 @@ export const renderSupervisionChecklistPdf = async (id: number): Promise<{ recor
       employee: await readPng(row.employee_signature_path ? String(row.employee_signature_path) : null),
     };
   }
-  const pdf = await buildSupervisionChecklistPdf({ record, draft: record.status === 'DRAFT', generatedAt: new Date(), signatures });
+  // Firmada solo por el supervisor: sigue con marca de agua hasta el aval del responsable.
+  const pdf = await buildSupervisionChecklistPdf({ record, draft: record.status !== 'CLOSED', generatedAt: new Date(), signatures });
   return { record, pdf };
 };

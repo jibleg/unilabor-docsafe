@@ -142,6 +142,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: GraduationCap, label: 'Mis evaluaciones', path: '/rh/my-evaluations', permission: 'RH.SELF.EVALUATIONS', badge: 'pendingEvaluations' },
         { icon: PenLine, label: 'Sala de lectura', path: '/rh/my-acknowledgements', permission: 'RH.SELF.ACKNOWLEDGEMENTS' },
         { icon: Briefcase, label: 'Mi inducción', path: '/rh/my-induction', permission: 'RH.SELF.INDUCTION' },
+        { icon: ClipboardCheck, label: 'Mis supervisiones', path: '/rh/my-supervisions', permission: 'RH.SELF.INDUCTION' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
       ],
     },

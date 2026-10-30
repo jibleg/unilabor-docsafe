@@ -16,6 +16,7 @@ import {
   listSupervisionPending,
   setPositionSupervisionConfig,
 } from '../services/rh-supervision-position.service';
+import { assignPhase6Supervisor } from '../services/rh-supervision-signers.service';
 import {
   generateSupervisionDrafts,
   listAreaSignatories,
@@ -24,6 +25,7 @@ import {
 import {
   supervisionListQuerySchema,
   supervisionPendingQuerySchema,
+  type AssignSupervisorBody,
   type CloseSupervisionChecklistBody,
   type GenerateDraftsBody,
   type SaveAreaSignatoriesBody,
@@ -38,7 +40,7 @@ import {
  * /api/rh/supervision-checklists, guard RH.SUPERVISION.MANAGE.
  */
 
-const parseId = (value: unknown): number | null => {
+export const parseId = (value: unknown): number | null => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
@@ -62,10 +64,17 @@ const ERROR_STATUS: Record<string, number> = {
   RH_SUPERVISION_PRACTICAL_NOT_AVAILABLE: 409,
   RH_SUPERVISION_INVALID_SIGNATURE: 400,
   RH_SUPERVISION_USER_NOT_FOUND: 409,
+  RH_SUPERVISION_SUPERVISOR_SIGNED: 409,
+  RH_SUPERVISION_SUPERVISOR_NOT_ASSIGNED: 409,
+  RH_SUPERVISION_SUPERVISOR_INVALID: 400,
+  RH_SUPERVISION_SELF_SUPERVISION: 409,
+  RH_SUPERVISION_SELF_ENDORSEMENT: 409,
+  RH_SUPERVISION_NOT_YOURS: 403,
+  RH_SUPERVISION_NO_EMPLOYEE: 403,
   ARCHIVE_DOCUMENT_TYPE_NOT_FOUND: 409,
 };
 
-const fail = (res: Response, error: any, logLabel: string, fallback: string): Response => {
+export const fail = (res: Response, error: any, logLabel: string, fallback: string): Response => {
   const status = ERROR_STATUS[error?.code];
   if (status) {
     return res.status(status).json({ message: error?.publicMessage || fallback });
@@ -74,7 +83,7 @@ const fail = (res: Response, error: any, logLabel: string, fallback: string): Re
   return res.status(500).json({ message: fallback });
 };
 
-const audit = async (req: AuthRequest, action: string, checklistId: number, employeeId: number, metadata?: Record<string, unknown>) => {
+export const audit = async (req: AuthRequest, action: string, checklistId: number, employeeId: number, metadata?: Record<string, unknown>) => {
   const userId = req.user?.id;
   if (!userId) return;
   await registerAuditEvent({
@@ -137,6 +146,30 @@ export const listSupervisionPendingController = async (req: AuthRequest, res: Re
   }
 };
 
+/** POST /rh/supervision-checklists/pending/assign-supervisor {enrollment_ids, supervisor_employee_id} */
+export const assignSupervisorController = async (req: AuthRequest, res: Response) => {
+  const body = req.body as AssignSupervisorBody;
+  try {
+    const updated = await assignPhase6Supervisor(body.enrollment_ids, body.supervisor_employee_id);
+    const userId = req.user?.id;
+    if (userId) {
+      await registerAuditEvent({
+        user_id: userId,
+        action: 'RH_SUPERVISION_SUPERVISOR_ASSIGNED',
+        ip_address: req.ip ?? null,
+        module_code: 'RH',
+        entity_type: 'induction_enrollment',
+        entity_id: body.enrollment_ids[0] ?? null,
+        employee_id: null,
+        metadata: { enrollment_ids: body.enrollment_ids, supervisor_employee_id: body.supervisor_employee_id },
+      }).catch((error) => console.error('Auditoria asignacion de supervisor:', error));
+    }
+    return res.json({ updated, message: body.supervisor_employee_id ? `Supervisor asignado a ${updated} inscripcion(es).` : `Supervisor retirado de ${updated} inscripcion(es).` });
+  } catch (error) {
+    return fail(res, error, 'Error asignando supervisor', 'No se pudo asignar el supervisor.');
+  }
+};
+
 /** GET /rh/supervision-checklists?status=&employee_id=&position_id=&enrollment_id=&q=&page=&limit= */
 export const listSupervisionChecklistsController = async (req: AuthRequest, res: Response) => {
   const parsed = supervisionListQuerySchema.safeParse(req.query ?? {});
@@ -147,7 +180,7 @@ export const listSupervisionChecklistsController = async (req: AuthRequest, res:
       employeeId: parsed.data.employee_id,
       positionId: parsed.data.position_id,
       enrollmentId: parsed.data.enrollment_id,
-      employeeArea: parsed.data.area,
+      processArea: parsed.data.area,
       search: parsed.data.q,
       page: parsed.data.page,
       limit: parsed.data.limit,
@@ -240,7 +273,7 @@ export const closeSupervisionChecklistController = async (req: AuthRequest, res:
   try {
     const result = await closeSupervisionChecklist({
       id,
-      supervisorSignature: body.supervisor_signature,
+      supervisorSignature: body.supervisor_signature ?? null,
       areaResponsibleSignature: body.area_responsible_signature,
       employeeSignature: body.employee_signature ?? null,
       isFinal: body.is_final,

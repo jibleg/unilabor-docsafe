@@ -45,7 +45,13 @@ export interface SupervisionPendingRow {
   employee_id: number;
   employee_name: string;
   employee_code: string;
+  /** Area del proceso que rige el puesto (agrupa la bandeja y define los firmantes). */
   area: string | null;
+  /** Seccion / departamento de la ficha del colaborador. */
+  section: string | null;
+  /** Supervisor / Auditor asignado a esta inscripcion (colaborador x puesto). */
+  supervisor_employee_id: number | null;
+  supervisor_name: string | null;
   branch_name: string | null;
   position_id: number;
   position_code: string;
@@ -77,15 +83,16 @@ export const listSupervisionPending = async (query: SupervisionPendingQuery = {}
   }
   if (query.area?.trim()) {
     params.push(query.area.trim());
-    clauses.push(`LOWER(COALESCE(emp.area, '')) = LOWER($${params.length})`);
+    clauses.push(`(UPPER(COALESCE(pa.code, '')) = UPPER($${params.length}) OR LOWER(COALESCE(pa.name, '')) = LOWER($${params.length}))`);
   }
   if (query.search?.trim()) {
     params.push(`%${query.search.trim()}%`);
     const n = `$${params.length}`;
-    clauses.push(`(emp.full_name ILIKE ${n} OR emp.employee_code ILIKE ${n} OR rp.code ILIKE ${n} OR rp.name ILIKE ${n} OR COALESCE(emp.area, '') ILIKE ${n})`);
+    clauses.push(`(emp.full_name ILIKE ${n} OR emp.employee_code ILIKE ${n} OR rp.code ILIKE ${n} OR rp.name ILIKE ${n} OR COALESCE(emp.area, '') ILIKE ${n} OR COALESCE(pa.name, '') ILIKE ${n} OR COALESCE(sup.full_name, '') ILIKE ${n})`);
   }
   const result = await pool.query(
-    `SELECT e.id AS enrollment_id, e.employee_id, emp.full_name, emp.employee_code, emp.area, bu.name AS branch_name,
+    `SELECT e.id AS enrollment_id, e.employee_id, emp.full_name, emp.employee_code, pa.name AS area, emp.area AS section, bu.name AS branch_name,
+            e.supervisor_employee_id, sup.full_name AS supervisor_name,
             e.position_id, rp.code AS position_code, rp.name AS position_name, e.activated_at,
             ea.status AS evaluation_status, ea.percentage AS evaluation_percentage,
             d.id AS draft_checklist_id, COALESCE(cl.closed_count, 0) AS closed_count, cl.last_closed_pct,
@@ -94,10 +101,13 @@ export const listSupervisionPending = async (query: SupervisionPendingQuery = {}
        JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number = 6
        JOIN public.employees emp ON emp.id = e.employee_id
        JOIN public.rh_positions rp ON rp.id = e.position_id
+       LEFT JOIN public.rh_process_areas pa ON pa.id = rp.process_area_id
+       LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
        LEFT JOIN public.helpdesk_asset_units bu ON bu.id = emp.branch_id
        LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
        LEFT JOIN LATERAL (
-         SELECT id FROM public.rh_supervision_checklists WHERE enrollment_id = e.id AND status = 'DRAFT' ORDER BY id DESC LIMIT 1
+         SELECT id FROM public.rh_supervision_checklists
+          WHERE enrollment_id = e.id AND status IN ('DRAFT', 'SUPERVISOR_SIGNED') ORDER BY id DESC LIMIT 1
        ) d ON TRUE
        LEFT JOIN LATERAL (
          SELECT count(*) AS closed_count,
@@ -105,7 +115,7 @@ export const listSupervisionPending = async (query: SupervisionPendingQuery = {}
            FROM public.rh_supervision_checklists WHERE enrollment_id = e.id AND status = 'CLOSED'
        ) cl ON TRUE
       WHERE ${clauses.join(' AND ')}
-      ORDER BY COALESCE(emp.area, 'zzz') ASC, emp.full_name ASC, e.position_sequence ASC;`,
+      ORDER BY COALESCE(pa.sort_order, 99) ASC, emp.full_name ASC, e.position_sequence ASC;`,
     params,
   );
   return result.rows.map((row) => ({
@@ -114,6 +124,9 @@ export const listSupervisionPending = async (query: SupervisionPendingQuery = {}
     employee_name: String(row.full_name),
     employee_code: String(row.employee_code),
     area: row.area ? String(row.area) : null,
+    section: row.section ? String(row.section) : null,
+    supervisor_employee_id: row.supervisor_employee_id ? Number(row.supervisor_employee_id) : null,
+    supervisor_name: row.supervisor_name ? String(row.supervisor_name) : null,
     branch_name: row.branch_name ? String(row.branch_name) : null,
     position_id: Number(row.position_id),
     position_code: String(row.position_code),

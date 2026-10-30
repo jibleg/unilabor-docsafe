@@ -177,6 +177,9 @@ export const RhSupervisionChecklistsPage = () => {
       if (result.areas_without_signatories.length > 0) {
         notifyWarning(`Áreas sin firmantes configurados: ${result.areas_without_signatories.join(', ')}. Los borradores se abrieron con los nombres vacíos.`);
       }
+      if (result.positions_without_area.length > 0) {
+        notifyWarning(`Puestos sin área asignada: ${result.positions_without_area.join(', ')}. Asígnales área en Puestos para que tomen sus firmantes.`);
+      }
       refreshLists();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron generar los borradores.'));
@@ -275,7 +278,7 @@ export const RhSupervisionChecklistsPage = () => {
         {(
           [
             ['pending', `Pendientes Fase 6 (${pending.length})`],
-            ['batch', 'Firmar por área'],
+            ['batch', 'Firmar como supervisor'],
             ['records', `Registros (${total})`],
             ['signatories', 'Firmantes por área'],
           ] as Array<[Tab, string]>
@@ -319,7 +322,13 @@ export const RhSupervisionChecklistsPage = () => {
               {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Generar borradores
             </button>
           </div>
-          <SupervisionPendingTable rows={pending} loading={loadingPending} openingEnrollmentId={opening} onOpen={(row) => void openForEnrollment(row.enrollment_id, row.draft_checklist_id)} />
+          <SupervisionPendingTable
+            rows={pending}
+            loading={loadingPending}
+            openingEnrollmentId={opening}
+            onOpen={(row) => void openForEnrollment(row.enrollment_id, row.draft_checklist_id)}
+            onAssigned={() => void loadPending()}
+          />
         </section>
       ) : (
         <section className={`${cardClass} space-y-4`}>
@@ -331,6 +340,7 @@ export const RhSupervisionChecklistsPage = () => {
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as SupervisionChecklistStatus | ''); setPage(1); }} className={`${inputClass} w-auto`}>
               <option value="">Todas</option>
               <option value="DRAFT">Borradores</option>
+              <option value="SUPERVISOR_SIGNED">Esperan aval</option>
               <option value="CLOSED">Cerradas</option>
             </select>
           </div>
@@ -370,7 +380,7 @@ export const RhSupervisionChecklistsPage = () => {
                       </td>
                       <td className="px-3 py-2 text-xs">{formatDateOnly(row.supervision_date)}</td>
                       <td className="px-3 py-2 text-xs">
-                        {row.status === 'CLOSED' ? (
+                        {row.status !== 'DRAFT' ? (
                           <span className="inline-flex items-center gap-2">
                             {formatPct(row.compliance_pct)}
                             {conclusion ? <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${conclusion.className}`}>{conclusion.label}</span> : null}
@@ -382,6 +392,10 @@ export const RhSupervisionChecklistsPage = () => {
                       <td className="px-3 py-2 text-xs">
                         {row.status === 'CLOSED' ? (
                           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700">Cerrada</span>
+                        ) : row.status === 'SUPERVISOR_SIGNED' ? (
+                          <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-bold text-sky-700" title="Firmada por el supervisor; falta el aval del responsable del área">
+                            Espera aval
+                          </span>
                         ) : (
                           <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-bold text-amber-700">Borrador</span>
                         )}

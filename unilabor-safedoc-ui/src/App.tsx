@@ -171,6 +171,11 @@ const RhInductionDashboardPage = lazy(() =>
     default: module.RhInductionDashboardPage,
   })),
 );
+const RhMySupervisionsPage = lazy(() =>
+  import('./pages/RhMySupervisionsPage').then((module) => ({
+    default: module.RhMySupervisionsPage,
+  })),
+);
 const RhMyInductionPage = lazy(() =>
   import('./pages/RhMyInductionPage').then((module) => ({
     default: module.RhMyInductionPage,
@@ -558,6 +563,14 @@ function App() {
           element={
             <PermissionGate permission="RH.SELF.ACKNOWLEDGEMENTS" redirectTo="/rh">
               <MyAcknowledgementsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="my-supervisions"
+          element={
+            <PermissionGate permission="RH.SELF.INDUCTION" redirectTo="/rh">
+              <RhMySupervisionsPage />
             </PermissionGate>
           }
         />

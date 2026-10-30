@@ -131,7 +131,8 @@ export const saveSupervisionResults = async (id: number, results: SupervisionRes
 };
 
 export interface CloseSupervisionChecklistPayload {
-  supervisor_signature: string;
+  /** Se omite cuando el supervisor ya firmo con su cuenta. */
+  supervisor_signature?: string | null;
   area_responsible_signature: string;
   employee_signature?: string | null;
   is_final?: boolean;
@@ -170,10 +171,15 @@ export const listAreaSignatories = async (): Promise<SupervisionAreaSignatory[]>
 };
 
 export interface AreaSignatoryPayload {
-  area_name: string;
-  supervisor_name: string;
-  area_responsible_name: string;
+  area_key: string;
+  area_responsible_employee_id: number | null;
 }
+
+/** Asigna (o quita con null) el Supervisor / Auditor de una o varias inscripciones de la Fase 6. */
+export const assignPhase6Supervisor = async (enrollmentIds: number[], supervisorEmployeeId: number | null): Promise<string> => {
+  const response = await api.post(`${BASE}/pending/assign-supervisor`, { enrollment_ids: enrollmentIds, supervisor_employee_id: supervisorEmployeeId });
+  return String(asRecord(unwrapPayload(response.data))?.message ?? '');
+};
 
 export const saveAreaSignatories = async (rows: AreaSignatoryPayload[]): Promise<SupervisionAreaSignatory[]> => {
   const response = await api.put(`${BASE}/signatories`, { rows });

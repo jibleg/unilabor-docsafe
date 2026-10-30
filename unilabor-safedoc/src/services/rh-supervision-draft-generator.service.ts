@@ -1,86 +1,94 @@
 import pool from '../config/db';
 import { createSupervisionChecklist } from './rh-supervision-checklist.service';
+import { syncDraftSigners } from './rh-supervision-signers.service';
 
 // -----------------------------------------------------------------------------
 // Generador de borradores ANA-REG-060 (Fase 6): por cada inscripcion ACTIVA de
 // la Fase 6 sin lista (ni borrador ni final cerrada) abre un borrador con el
-// puesto como area evaluada, los N/A del puesto, la fecha del dia y los
-// firmantes configurados para el area del colaborador. Nunca califica ni
+// puesto como area evaluada, los N/A del puesto, la fecha del dia, el
+// supervisor asignado a la inscripcion y el responsable configurado para el
+// AREA DEL PROCESO que rige el puesto (Preanalitica, Analitica, Posanalitica,
+// Administracion). Nunca califica ni
 // firma: eso lo hace el supervisor. Idempotente (corre en el cron de
 // induccion y a peticion desde la UI).
 // -----------------------------------------------------------------------------
 
-const normalizeArea = (value: string | null | undefined): string => (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
-
 export interface SupervisionAreaSignatory {
+  /** Codigo del area del proceso (PRE, ANA, POS, ADM). */
   area_key: string;
   area_name: string;
-  supervisor_name: string;
-  supervisor_user_id: string | null;
+  /** Colaborador que firma como Responsable del Area (avala las listas del area). */
+  area_responsible_employee_id: number | null;
   area_responsible_name: string;
-  /** Colaboradores activos del area (para priorizar la captura). */
+  /** Puestos activos que rige el area. */
+  positions: number;
+  /** Colaboradores activos con al menos un puesto del area. */
   employees: number;
-  /** Inscripciones de Fase 6 activas sin acreditar en el area. */
+  /** Inscripciones de Fase 6 activas sin acreditar en puestos del area. */
   phase6_pending: number;
   configured: boolean;
 }
 
-/** Areas de los colaboradores activos (texto libre de su ficha) + firmantes configurados. */
+/** Las 4 areas del proceso con sus firmantes configurados y la carga pendiente. */
 export const listAreaSignatories = async (): Promise<SupervisionAreaSignatory[]> => {
   const result = await pool.query(
-    `WITH areas AS (
-       SELECT lower(regexp_replace(trim(emp.area), '\\s+', ' ', 'g')) AS area_key,
-              min(trim(emp.area)) AS area_name,
-              count(*) AS employees,
-              count(*) FILTER (WHERE EXISTS (
-                SELECT 1 FROM public.rh_induction_enrollments e
-                  JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number = 6
-                  LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
-                 WHERE e.employee_id = emp.id AND e.queue_status = 'ACTIVE' AND (ea.status IS NULL OR ea.status <> 'passed')
-              )) AS phase6_pending
-         FROM public.employees emp
-        WHERE emp.is_active = TRUE AND emp.area IS NOT NULL AND trim(emp.area) <> ''
-        GROUP BY 1
-     )
-     SELECT COALESCE(a.area_key, s.area_key) AS area_key, COALESCE(a.area_name, s.area_name) AS area_name,
-            COALESCE(s.supervisor_name, '') AS supervisor_name, s.supervisor_user_id,
-            COALESCE(s.area_responsible_name, '') AS area_responsible_name,
-            COALESCE(a.employees, 0) AS employees, COALESCE(a.phase6_pending, 0) AS phase6_pending,
+    `SELECT pa.code AS area_key, pa.name AS area_name,
+            s.area_responsible_employee_id, COALESCE(resp.full_name, s.area_responsible_name, '') AS area_responsible_name,
+            (SELECT count(*) FROM public.rh_positions rp WHERE rp.process_area_id = pa.id AND rp.is_active) AS positions,
+            (SELECT count(DISTINCT ep.employee_id)
+               FROM public.rh_employee_positions ep
+               JOIN public.rh_positions rp ON rp.id = ep.position_id AND rp.process_area_id = pa.id
+               JOIN public.employees emp ON emp.id = ep.employee_id AND emp.is_active
+              WHERE ep.is_active) AS employees,
+            (SELECT count(*)
+               FROM public.rh_induction_enrollments e
+               JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number = 6
+               JOIN public.rh_positions rp ON rp.id = e.position_id AND rp.process_area_id = pa.id
+               LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
+              WHERE e.queue_status = 'ACTIVE' AND (ea.status IS NULL OR ea.status <> 'passed')) AS phase6_pending,
             s.area_key IS NOT NULL AS configured
-       FROM areas a
-       FULL OUTER JOIN public.rh_supervision_area_signatories s ON s.area_key = a.area_key
-      ORDER BY COALESCE(a.phase6_pending, 0) DESC, COALESCE(a.area_name, s.area_name) ASC;`,
+       FROM public.rh_process_areas pa
+       LEFT JOIN public.rh_supervision_area_signatories s ON s.area_key = pa.code
+       LEFT JOIN public.employees resp ON resp.id = s.area_responsible_employee_id
+      WHERE pa.is_active
+      ORDER BY pa.sort_order ASC;`,
   );
   return result.rows.map((row) => ({
     area_key: String(row.area_key),
     area_name: String(row.area_name),
-    supervisor_name: String(row.supervisor_name ?? ''),
-    supervisor_user_id: row.supervisor_user_id ? String(row.supervisor_user_id) : null,
+    area_responsible_employee_id: row.area_responsible_employee_id ? Number(row.area_responsible_employee_id) : null,
     area_responsible_name: String(row.area_responsible_name ?? ''),
+    positions: Number(row.positions ?? 0),
     employees: Number(row.employees ?? 0),
     phase6_pending: Number(row.phase6_pending ?? 0),
-    configured: Boolean(row.configured),
+    configured: Boolean(row.area_responsible_employee_id),
   }));
 };
 
 export interface AreaSignatoryInput {
-  area_name: string;
-  supervisor_name: string;
-  area_responsible_name: string;
+  area_key: string;
+  area_responsible_employee_id: number | null;
 }
 
 export const saveAreaSignatories = async (rows: AreaSignatoryInput[], actorUserId: string | null): Promise<SupervisionAreaSignatory[]> => {
   for (const row of rows) {
-    const key = normalizeArea(row.area_name);
-    if (!key) continue;
+    const area = await pool.query(`SELECT code, name FROM public.rh_process_areas WHERE code = $1 AND is_active LIMIT 1;`, [row.area_key.trim().toUpperCase()]);
+    if (area.rows.length === 0) continue;
+    const responsible = row.area_responsible_employee_id
+      ? await pool.query(`SELECT full_name FROM public.employees WHERE id = $1 AND is_active LIMIT 1;`, [row.area_responsible_employee_id])
+      : null;
+    const responsibleId = responsible && responsible.rows.length > 0 ? row.area_responsible_employee_id : null;
+    const code = String(area.rows[0].code);
     await pool.query(
-      `INSERT INTO public.rh_supervision_area_signatories (area_key, area_name, supervisor_name, area_responsible_name, updated_by_user_id, updated_at)
+      `INSERT INTO public.rh_supervision_area_signatories
+         (area_key, area_name, area_responsible_employee_id, area_responsible_name, updated_by_user_id, updated_at)
        VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (area_key) DO UPDATE
-         SET area_name = EXCLUDED.area_name, supervisor_name = EXCLUDED.supervisor_name,
+         SET area_name = EXCLUDED.area_name, area_responsible_employee_id = EXCLUDED.area_responsible_employee_id,
              area_responsible_name = EXCLUDED.area_responsible_name, updated_by_user_id = EXCLUDED.updated_by_user_id, updated_at = NOW();`,
-      [key, row.area_name.trim(), row.supervisor_name.trim(), row.area_responsible_name.trim(), actorUserId],
+      [code, String(area.rows[0].name), responsibleId, String(responsible?.rows[0]?.full_name ?? ''), actorUserId],
     );
+    await syncDraftSigners({ areaCode: code });
   }
   return listAreaSignatories();
 };
@@ -91,6 +99,8 @@ export interface GenerateDraftsResult {
   failed: number;
   /** Areas sin firmantes configurados que recibieron borradores (se abren con los nombres vacios). */
   areas_without_signatories: string[];
+  /** Puestos sin area del proceso asignada que recibieron borradores (sin firmantes). */
+  positions_without_area: string[];
   details: Array<{ enrollment_id: number; employee_name: string; position_code: string; checklist_id: number | null; message: string }>;
 }
 
@@ -109,34 +119,38 @@ export const generateSupervisionDrafts = async (actorUserId: string | null, empl
     filter = `AND e.employee_id = ANY($1::bigint[])`;
   }
   const pending = await pool.query(
-    `SELECT e.id AS enrollment_id, e.employee_id, emp.full_name, emp.area, rp.code AS position_code
+    `SELECT e.id AS enrollment_id, e.employee_id, emp.full_name, rp.code AS position_code,
+            pa.code AS area_code, pa.name AS area_name
        FROM public.rh_induction_enrollments e
        JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number = 6
        JOIN public.employees emp ON emp.id = e.employee_id AND emp.is_active = TRUE
        JOIN public.rh_positions rp ON rp.id = e.position_id
+       LEFT JOIN public.rh_process_areas pa ON pa.id = rp.process_area_id
        LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
       WHERE e.queue_status = 'ACTIVE' AND (ea.status IS NULL OR ea.status <> 'passed')
         AND NOT EXISTS (
           SELECT 1 FROM public.rh_supervision_checklists c
-           WHERE c.enrollment_id = e.id AND (c.status = 'DRAFT' OR (c.status = 'CLOSED' AND c.is_final = TRUE))
+           WHERE c.enrollment_id = e.id
+             AND (c.status IN ('DRAFT', 'SUPERVISOR_SIGNED') OR (c.status = 'CLOSED' AND c.is_final = TRUE))
         )
         ${filter}
-      ORDER BY emp.area NULLS LAST, emp.full_name, e.position_sequence;`,
+      ORDER BY pa.sort_order NULLS LAST, emp.full_name, e.position_sequence;`,
     params,
   );
   const signatories = new Map((await listAreaSignatories()).filter((s) => s.configured).map((s) => [s.area_key, s]));
-  const result: GenerateDraftsResult = { created: 0, already_had_list: 0, failed: 0, areas_without_signatories: [], details: [] };
+  const result: GenerateDraftsResult = { created: 0, already_had_list: 0, failed: 0, areas_without_signatories: [], positions_without_area: [], details: [] };
   const missingAreas = new Set<string>();
+  const positionsWithoutArea = new Set<string>();
   for (const row of pending.rows) {
     const enrollmentId = Number(row.enrollment_id);
-    const areaKey = normalizeArea(row.area);
-    const signatory = areaKey ? signatories.get(areaKey) : undefined;
-    if (!signatory && row.area) missingAreas.add(String(row.area).trim());
+    const signatory = row.area_code ? signatories.get(String(row.area_code)) : undefined;
+    if (!row.area_code) positionsWithoutArea.add(String(row.position_code));
+    else if (!signatory) missingAreas.add(String(row.area_name));
     try {
       const record = await createSupervisionChecklist({
         enrollmentId,
         supervisionDate: todayInMexico(),
-        supervisorName: signatory?.supervisor_name || null,
+        supervisorName: null,
         areaResponsibleName: signatory?.area_responsible_name || null,
         createdByUserId: actorUserId,
         reuseDraft: true,
@@ -155,6 +169,7 @@ export const generateSupervisionDrafts = async (actorUserId: string | null, empl
   );
   result.already_had_list = Math.max(0, Number(withList.rows[0]?.total ?? 0) - result.created);
   result.areas_without_signatories = [...missingAreas].sort();
+  result.positions_without_area = [...positionsWithoutArea].sort();
   return result;
 };
 

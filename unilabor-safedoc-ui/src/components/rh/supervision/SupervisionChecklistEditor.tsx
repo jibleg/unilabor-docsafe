@@ -58,7 +58,10 @@ const liveSummary = (values: Record<number, SupervisionDraftResult>) => {
  * solo lectura.
  */
 export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onDeleted }: SupervisionChecklistEditorProps) => {
-  const readOnly = checklist.status === 'CLOSED';
+  // Firmada por el supervisor (espera aval) o cerrada: ya no se edita.
+  const readOnly = checklist.status !== 'DRAFT';
+  // En la Fase 6 los firmantes salen de la asignacion (supervisor de la inscripcion y responsable del area).
+  const assignedSigners = checklist.enrollment_id !== null;
   const [date, setDate] = useState(checklist.supervision_date);
   const [type, setType] = useState<SupervisionType>(checklist.supervision_type);
   const [supervisor, setSupervisor] = useState(checklist.supervisor_name);
@@ -225,9 +228,13 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {readOnly ? (
+          {checklist.status === 'CLOSED' ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
               <Lock size={12} /> Cerrada {formatDateOnly(checklist.closed_at)}
+            </span>
+          ) : checklist.status === 'SUPERVISOR_SIGNED' ? (
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
+              Firmada por el supervisor · espera aval de {checklist.area_responsible_name || 'el responsable del área'}
             </span>
           ) : (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">Borrador</span>
@@ -247,6 +254,15 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
                 <Lock size={14} /> Cerrar y firmar
               </button>
             </>
+          ) : checklist.status === 'SUPERVISOR_SIGNED' ? (
+            <button
+              type="button"
+              onClick={() => setShowClose(true)}
+              className={primaryButtonClass}
+              title="El responsable del área firma aquí, en presencia de RH, si no lo hace con su cuenta en Mis supervisiones"
+            >
+              <Lock size={14} /> Recabar aval
+            </button>
           ) : null}
         </div>
       </header>
@@ -277,11 +293,25 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
         </div>
         <div className="md:col-span-2">
           <label className={labelClass}>Supervisor / Auditor</label>
-          <input value={supervisor} disabled={readOnly} onChange={field(setSupervisor)} className={inputClass} placeholder="Nombre de quien supervisa" />
+          <input
+            value={supervisor}
+            disabled={readOnly || assignedSigners}
+            onChange={field(setSupervisor)}
+            className={inputClass}
+            placeholder={assignedSigners ? 'Asígnalo en Pendientes Fase 6' : 'Nombre de quien supervisa'}
+            title={assignedSigners ? 'Se asigna por colaborador y puesto en Pendientes Fase 6' : undefined}
+          />
         </div>
         <div className="md:col-span-2">
           <label className={labelClass}>Responsable del Área</label>
-          <input value={responsible} disabled={readOnly} onChange={field(setResponsible)} className={inputClass} placeholder="Coordinador / responsable del área" />
+          <input
+            value={responsible}
+            disabled={readOnly || assignedSigners}
+            onChange={field(setResponsible)}
+            className={inputClass}
+            placeholder={assignedSigners ? 'Configúralo en Firmantes por área' : 'Coordinador / responsable del área'}
+            title={assignedSigners ? 'Se configura por área del puesto en Firmantes por área' : undefined}
+          />
         </div>
         <div className="md:col-span-3">
           <label className={labelClass}>Área evaluada</label>

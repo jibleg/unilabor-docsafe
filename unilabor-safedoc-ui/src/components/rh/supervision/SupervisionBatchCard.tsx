@@ -11,7 +11,7 @@ import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { SupervisionChecklist, SupervisionChecklistListRow, SupervisionResult } from '../../../types/models';
 import { notifyError, notifyWarning } from '../../../utils/notify';
 import { SupervisionSectionsEditor, type SupervisionDraftResult } from './SupervisionSectionsEditor';
-import { CONCLUSION_UI, formatPct, inputClass } from './supervision-ui';
+import { CONCLUSION_UI, formatPct, inputClass, todayIsoDate } from './supervision-ui';
 
 export interface BatchSession {
   supervisorName: string;
@@ -61,6 +61,7 @@ export const SupervisionBatchCard = ({ row, session, onClosed }: SupervisionBatc
 
   const summary = useMemo(() => summarize(values), [values]);
   const conclusion = summary.conclusion ? CONCLUSION_UI[summary.conclusion] : null;
+  const pendingCount = detail ? summary.pending : row.items_pending;
 
   const toggle = async () => {
     if (open) {
@@ -108,7 +109,7 @@ export const SupervisionBatchCard = ({ row, session, onClosed }: SupervisionBatc
       return;
     }
     if (!session.supervisorName.trim() || !session.responsibleName.trim()) {
-      notifyWarning('Captura los nombres del supervisor y del responsable del área en la sesión.');
+      notifyWarning('Falta el supervisor asignado o el responsable del área de esta lista.');
       return;
     }
     if (summary.pending > 0) {
@@ -125,9 +126,10 @@ export const SupervisionBatchCard = ({ row, session, onClosed }: SupervisionBatc
     }
     setConfirming(true);
     try {
+      // La supervisión ocurre el día en que se revisa y firma, no cuando se generó el borrador.
+      // Los nombres salen de la asignacion (supervisor de la inscripcion y responsable del area).
       await updateSupervisionChecklist(row.id, {
-        supervisor_name: session.supervisorName.trim(),
-        area_responsible_name: session.responsibleName.trim(),
+        supervision_date: todayIsoDate(),
         sgc_follow_up_required: sgcRequired,
         sgc_reference: sgcReference.trim() || null,
         supervisor_comments: comments.trim() || null,
@@ -179,7 +181,7 @@ export const SupervisionBatchCard = ({ row, session, onClosed }: SupervisionBatc
             {row.employee_name} · <span className="text-[var(--color-brand-700)]">{row.position_code}</span> {row.position_name}
           </p>
           <p className="text-[11px] text-[var(--unilabor-neutral)]">
-            {row.folio} · {row.items_pending > 0 ? `${row.items_pending} aspecto(s) sin calificar` : 'calificada, pendiente de firma'}
+            {row.folio} · {pendingCount > 0 ? `${pendingCount} aspecto(s) sin calificar` : 'calificada, pendiente de firma'}
             {row.enrollment_id ? ' · Fase 6' : ' · supervisión de área'}
           </p>
         </div>

@@ -4,7 +4,8 @@
 
 export type SupervisionResult = 'SI' | 'NO' | 'NA';
 export type SupervisionConclusion = 'CONFORME' | 'CONFORME_CON_OBSERVACIONES' | 'REQUIERE_SEGUIMIENTO';
-export type SupervisionChecklistStatus = 'DRAFT' | 'CLOSED';
+/** DRAFT -> (supervisor firma) SUPERVISOR_SIGNED -> (responsable del area avala) CLOSED. */
+export type SupervisionChecklistStatus = 'DRAFT' | 'SUPERVISOR_SIGNED' | 'CLOSED';
 export type SupervisionType = 'PROGRAMADA' | 'NO_PROGRAMADA';
 
 export interface SupervisionFormItem {
@@ -65,9 +66,17 @@ export interface SupervisionChecklistListRow {
   supervision_type: SupervisionType;
   area_name: string | null;
   employee_area: string | null;
+  /** Area del proceso que rige el puesto evaluado (agrupa la firma por area). */
+  process_area_code: string | null;
+  process_area_name: string | null;
   branch_name: string | null;
   supervisor_name: string;
   area_responsible_name: string;
+  /** Supervisor asignado a la inscripcion (colaborador x puesto). */
+  supervisor_employee_id: number | null;
+  /** Responsable configurado para el area del proceso del puesto. */
+  area_responsible_employee_id: number | null;
+  supervisor_signed_at: string | null;
   compliance_pct: number | null;
   conclusion: SupervisionConclusion | null;
   passed: boolean | null;
@@ -102,7 +111,13 @@ export interface SupervisionPendingRow {
   employee_id: number;
   employee_name: string;
   employee_code: string;
+  /** Area del proceso que rige el puesto. */
   area: string | null;
+  /** Seccion / departamento de la ficha del colaborador. */
+  section: string | null;
+  /** Supervisor / Auditor asignado a esta inscripcion. */
+  supervisor_employee_id: number | null;
+  supervisor_name: string | null;
   branch_name: string | null;
   position_id: number;
   position_code: string;
@@ -129,11 +144,13 @@ export interface PositionSupervisionConfig {
 }
 
 export interface SupervisionAreaSignatory {
+  /** Codigo del area del proceso (PRE, ANA, POS, ADM). */
   area_key: string;
   area_name: string;
-  supervisor_name: string;
-  supervisor_user_id: string | null;
+  /** Colaborador que avala como Responsable del Area. */
+  area_responsible_employee_id: number | null;
   area_responsible_name: string;
+  positions: number;
   employees: number;
   phase6_pending: number;
   configured: boolean;
@@ -144,5 +161,6 @@ export interface SupervisionGenerateDraftsResult {
   already_had_list: number;
   failed: number;
   areas_without_signatories: string[];
+  positions_without_area: string[];
   details: Array<{ enrollment_id: number; employee_name: string; position_code: string; checklist_id: number | null; message: string }>;
 }

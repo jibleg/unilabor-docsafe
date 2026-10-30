@@ -1,21 +1,68 @@
-import { useMemo } from 'react';
-import { ClipboardPen, Loader2, PlayCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ClipboardPen, Loader2, PlayCircle, UserCheck } from 'lucide-react';
+import { assignPhase6Supervisor } from '../../../api/service.api-rh-supervision';
+import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { SupervisionPendingRow } from '../../../types/models';
+import { notifyError, notifySuccess } from '../../../utils/notify';
+import { SearchableSelect } from '../../SearchableSelect';
 import { formatPct } from './supervision-ui';
+import { useEmployeeOptions } from './useEmployeeOptions';
 
 interface SupervisionPendingTableProps {
   rows: SupervisionPendingRow[];
   loading: boolean;
   openingEnrollmentId: number | null;
   onOpen: (row: SupervisionPendingRow) => void;
+  /** Tras asignar supervisores (para recargar la bandeja). */
+  onAssigned: () => void;
 }
 
-/** Colaboradores con la Fase 6 en curso, agrupados por área, listos para aplicarles el ANA-REG-060. */
-export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, onOpen }: SupervisionPendingTableProps) => {
+/**
+ * Colaboradores con la Fase 6 en curso, agrupados por área del puesto. RH
+ * asigna el Supervisor / Auditor de cada colaborador en su puesto (uno por
+ * uno o en bloque con la selección) y abre su lista ANA-REG-060.
+ */
+export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, onOpen, onAssigned }: SupervisionPendingTableProps) => {
+  const employeeOptions = useEmployeeOptions();
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [bulkSupervisor, setBulkSupervisor] = useState('');
+  const [assigning, setAssigning] = useState(false);
+
+  const assign = async (enrollmentIds: number[], supervisorId: string) => {
+    setAssigning(true);
+    try {
+      notifySuccess(await assignPhase6Supervisor(enrollmentIds, supervisorId ? Number(supervisorId) : null));
+      setSelectedIds(new Set());
+      setBulkSupervisor('');
+      onAssigned();
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo asignar el supervisor.'));
+    } finally {
+      setAssigning(false);
+    }
+  };
+  const toggle = (id: number) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const toggleGroup = (items: SupervisionPendingRow[], checked: boolean) =>
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const item of items) {
+        if (checked) next.add(item.enrollment_id);
+        else next.delete(item.enrollment_id);
+      }
+      return next;
+    });
+  // El evaluado nunca aparece como su propio supervisor.
+  const optionsFor = (employeeId: number) => employeeOptions.filter((option) => option.value !== String(employeeId));
   const groups = useMemo(() => {
     const map = new Map<string, SupervisionPendingRow[]>();
     for (const row of rows) {
-      const key = row.area?.trim() || 'Sin área registrada';
+      const key = row.area?.trim() || 'Puesto sin área asignada';
       map.set(key, [...(map.get(key) ?? []), row]);
     }
     return [...map.entries()];
@@ -37,6 +84,26 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
   }
   return (
     <div className="space-y-4">
+      {selectedIds.size > 0 ? (
+        <div className="sticky top-2 z-10 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--color-brand-300)] bg-white px-4 py-3 shadow-sm">
+          <UserCheck size={16} className="text-[var(--color-brand-700)]" />
+          <span className="text-sm font-semibold text-[var(--unilabor-ink)]">{selectedIds.size} seleccionado(s)</span>
+          <div className="min-w-[260px] flex-1">
+            <SearchableSelect value={bulkSupervisor} options={employeeOptions} onChange={setBulkSupervisor} placeholder="Supervisor / Auditor" emptyLabel="Quitar supervisor" searchPlaceholder="Buscar colaborador..." />
+          </div>
+          <button
+            type="button"
+            disabled={assigning}
+            onClick={() => void assign([...selectedIds], bulkSupervisor)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-brand-700)] px-3 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {assigning ? <Loader2 size={13} className="animate-spin" /> : <UserCheck size={13} />} {bulkSupervisor ? 'Asignar' : 'Quitar'}
+          </button>
+          <button type="button" onClick={() => setSelectedIds(new Set())} className="text-xs font-semibold text-[var(--unilabor-neutral)] hover:underline">
+            Limpiar
+          </button>
+        </div>
+      ) : null}
       {groups.map(([area, items]) => (
         <section key={area} className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)]">
           <header className="flex items-center justify-between bg-[rgba(238,245,250,0.9)] px-4 py-2">
@@ -46,8 +113,17 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
           <table className="w-full text-left text-sm">
             <thead className="text-[11px] uppercase text-[var(--unilabor-neutral)]">
               <tr>
-                <th className="px-4 py-2">Colaborador</th>
+                <th className="w-8 pl-4 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label={`Seleccionar todos en ${area}`}
+                    checked={items.every((item) => selectedIds.has(item.enrollment_id))}
+                    onChange={(event) => toggleGroup(items, event.target.checked)}
+                  />
+                </th>
+                <th className="px-3 py-2">Colaborador</th>
                 <th className="px-3 py-2">Puesto</th>
+                <th className="w-[24%] px-3 py-2">Supervisor / Auditor</th>
                 <th className="px-3 py-2">Sucursal</th>
                 <th className="px-3 py-2">En fase</th>
                 <th className="px-3 py-2">Estado</th>
@@ -59,13 +135,27 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
                 const opening = openingEnrollmentId === row.enrollment_id;
                 return (
                   <tr key={row.enrollment_id} className="hover:bg-[rgba(248,251,253,0.9)]">
-                    <td className="px-4 py-2">
+                    <td className="pl-4 py-2">
+                      <input type="checkbox" aria-label={`Seleccionar ${row.employee_name}`} checked={selectedIds.has(row.enrollment_id)} onChange={() => toggle(row.enrollment_id)} />
+                    </td>
+                    <td className="px-3 py-2">
                       <p className="font-semibold text-[var(--unilabor-ink)]">{row.employee_name}</p>
-                      <p className="text-[11px] text-[var(--unilabor-neutral)]">{row.employee_code}</p>
+                      <p className="text-[11px] text-[var(--unilabor-neutral)]">{row.employee_code}{row.section ? ` · ${row.section}` : ''}</p>
                     </td>
                     <td className="px-3 py-2">
                       <p className="font-semibold text-[var(--color-brand-700)]">{row.position_code}</p>
                       <p className="text-[11px] text-[var(--unilabor-neutral)]">{row.position_name}</p>
+                    </td>
+                    <td className="px-3 py-2">
+                      <SearchableSelect
+                        value={row.supervisor_employee_id ? String(row.supervisor_employee_id) : ''}
+                        options={optionsFor(row.employee_id)}
+                        onChange={(value) => void assign([row.enrollment_id], value)}
+                        placeholder="Asignar supervisor"
+                        emptyLabel="Sin supervisor"
+                        searchPlaceholder="Buscar colaborador..."
+                        disabled={assigning}
+                      />
                     </td>
                     <td className="px-3 py-2 text-xs">{row.branch_name ?? '—'}</td>
                     <td className="px-3 py-2 text-xs">{row.days_in_phase !== null ? `${row.days_in_phase} d` : '—'}</td>

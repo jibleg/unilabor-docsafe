@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  assignSupervisorController,
   closeSupervisionChecklistController,
   createSupervisionChecklistController,
   deleteSupervisionDraftController,
@@ -19,6 +20,7 @@ import {
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
+  assignSupervisorSchema,
   closeSupervisionChecklistSchema,
   createSupervisionChecklistSchema,
   generateDraftsSchema,
@@ -42,6 +44,7 @@ router.get('/positions/:positionId/na-items', getPositionNaItemsController);
 router.put('/positions/:positionId/na-items', validate(setPositionNaItemsSchema), setPositionNaItemsController);
 router.get('/pending', listSupervisionPendingController);
 router.post('/pending/generate', validate(generateDraftsSchema), generateSupervisionDraftsController);
+router.post('/pending/assign-supervisor', validate(assignSupervisorSchema), assignSupervisorController);
 router.get('/signatories', listAreaSignatoriesController);
 router.put('/signatories', validate(saveAreaSignatoriesSchema), saveAreaSignatoriesController);
 

@@ -17,9 +17,12 @@ interface SupervisionCloseModalProps {
  * Cierre y firma de la lista ANA-REG-060: firmas digitales del supervisor y
  * del responsable del área (obligatorias), la del colaborador (opcional) y,
  * si la lista está ligada a la Fase 6, si es la lista FINAL que decide la fase.
+ * Si el supervisor ya firmó con su cuenta (SUPERVISOR_SIGNED), aquí solo se
+ * recaba el aval del responsable del área en presencia de RH.
  */
 export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: SupervisionCloseModalProps) => {
   const linked = checklist.enrollment_id !== null;
+  const endorsing = checklist.status === 'SUPERVISOR_SIGNED';
   const [isFinal, setIsFinal] = useState(linked);
   const [withEmployee, setWithEmployee] = useState(true);
   const [supervisorSignature, setSupervisorSignature] = useState<string | null>(null);
@@ -30,14 +33,14 @@ export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: Supervis
   const conclusion = summary.conclusion ? CONCLUSION_UI[summary.conclusion] : null;
 
   const handleSubmit = async () => {
-    if (!supervisorSignature || !areaSignature) {
-      notifyWarning('Las firmas del supervisor y del responsable del área son obligatorias.');
+    if ((!endorsing && !supervisorSignature) || !areaSignature) {
+      notifyWarning(endorsing ? 'La firma del responsable del área es obligatoria.' : 'Las firmas del supervisor y del responsable del área son obligatorias.');
       return;
     }
     setSaving(true);
     try {
       const result = await closeSupervisionChecklist(checklist.id, {
-        supervisor_signature: supervisorSignature,
+        supervisor_signature: endorsing ? null : supervisorSignature,
         area_responsible_signature: areaSignature,
         employee_signature: withEmployee ? employeeSignature : null,
         is_final: linked ? isFinal : false,
@@ -59,7 +62,7 @@ export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: Supervis
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
               {checklist.form_code} · {checklist.folio}
             </p>
-            <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">Cerrar y firmar la lista</h2>
+            <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{endorsing ? 'Aval del responsable del área' : 'Cerrar y firmar la lista'}</h2>
             <p className="text-sm text-[var(--unilabor-ink)]">
               {checklist.employee_name} · {checklist.position_code} – {checklist.position_name}
             </p>
@@ -112,7 +115,14 @@ export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: Supervis
           ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
-            <SignaturePad label={`Supervisor / Auditor · ${checklist.supervisor_name || 'sin nombre'}`} hint="Obligatoria" onChange={setSupervisorSignature} />
+            {endorsing ? (
+              <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-800">
+                <strong>{checklist.supervisor_name}</strong> calificó y firmó como Supervisor / Auditor con su cuenta
+                {checklist.supervisor_signed_at ? ` el ${new Date(checklist.supervisor_signed_at).toLocaleString('es-MX')}` : ''}.
+              </p>
+            ) : (
+              <SignaturePad label={`Supervisor / Auditor · ${checklist.supervisor_name || 'sin nombre'}`} hint="Obligatoria" onChange={setSupervisorSignature} />
+            )}
             <SignaturePad label={`Responsable del Área · ${checklist.area_responsible_name || 'sin nombre'}`} hint="Obligatoria" onChange={setAreaSignature} />
           </div>
           <label className="flex items-center gap-2 text-sm text-[var(--unilabor-ink)]">

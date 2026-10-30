@@ -1,5 +1,6 @@
 import pool from '../config/db';
 import { withTransaction } from '../utils/transaction';
+import { syncDraftSigners } from './rh-supervision-signers.service';
 import {
   summarizeSupervisionResults,
   supervisionFolio,
@@ -17,7 +18,8 @@ import {
 // y nota a la practica) vive en rh-supervision-checklist-close.service.ts.
 // -----------------------------------------------------------------------------
 
-export type SupervisionChecklistStatus = 'DRAFT' | 'CLOSED';
+/** DRAFT -> (supervisor firma) SUPERVISOR_SIGNED -> (responsable del area avala) CLOSED. */
+export type SupervisionChecklistStatus = 'DRAFT' | 'SUPERVISOR_SIGNED' | 'CLOSED';
 export type SupervisionType = 'PROGRAMADA' | 'NO_PROGRAMADA';
 
 const throwCoded = (code: string, publicMessage?: string): never => {
@@ -67,9 +69,17 @@ export interface SupervisionChecklistListRow {
   area_name: string | null;
   /** Area de la ficha del colaborador (agrupa la firma por area). */
   employee_area: string | null;
+  /** Area del proceso que rige el puesto evaluado (agrupa la firma por area). */
+  process_area_code: string | null;
+  process_area_name: string | null;
   branch_name: string | null;
   supervisor_name: string;
   area_responsible_name: string;
+  /** Supervisor asignado a la inscripcion (colaborador x puesto). */
+  supervisor_employee_id: number | null;
+  /** Responsable configurado para el area del proceso del puesto. */
+  area_responsible_employee_id: number | null;
+  supervisor_signed_at: string | null;
   compliance_pct: number | null;
   conclusion: SupervisionConclusion | null;
   passed: boolean | null;
@@ -105,13 +115,14 @@ const LIST_SELECT = `
          c.supervision_date, c.supervision_type, c.area_name, c.branch_name, c.supervisor_name, c.supervisor_user_id,
          c.area_responsible_name, c.compliance_pct, c.conclusion, c.passed, c.is_final, c.closed_at, c.document_id,
          c.sgc_follow_up_required, c.sgc_reference, c.supervisor_comments, c.employee_signature_path IS NOT NULL AS employee_signed,
-         c.created_at, c.updated_at,
+         c.created_at, c.updated_at, c.supervisor_employee_id, c.area_responsible_employee_id, c.supervisor_signed_at,
          emp.full_name AS employee_name, emp.employee_code, emp.area AS employee_area,
-         rp.code AS position_code, rp.name AS position_name,
+         rp.code AS position_code, rp.name AS position_name, pa.code AS process_area_code, pa.name AS process_area_name,
          (SELECT count(*) FROM public.rh_supervision_checklist_results r WHERE r.checklist_id = c.id AND r.result IS NULL) AS items_pending
     FROM public.rh_supervision_checklists c
     JOIN public.employees emp ON emp.id = c.employee_id
-    JOIN public.rh_positions rp ON rp.id = c.position_id`;
+    JOIN public.rh_positions rp ON rp.id = c.position_id
+    LEFT JOIN public.rh_process_areas pa ON pa.id = rp.process_area_id`;
 
 const mapListRow = (row: any): SupervisionChecklistListRow => ({
   id: Number(row.id),
@@ -130,9 +141,14 @@ const mapListRow = (row: any): SupervisionChecklistListRow => ({
   supervision_type: String(row.supervision_type) as SupervisionType,
   area_name: row.area_name ? String(row.area_name) : null,
   employee_area: row.employee_area ? String(row.employee_area) : null,
+  process_area_code: row.process_area_code ? String(row.process_area_code) : null,
+  process_area_name: row.process_area_name ? String(row.process_area_name) : null,
   branch_name: row.branch_name ? String(row.branch_name) : null,
   supervisor_name: String(row.supervisor_name ?? ''),
   area_responsible_name: String(row.area_responsible_name ?? ''),
+  supervisor_employee_id: row.supervisor_employee_id ? Number(row.supervisor_employee_id) : null,
+  area_responsible_employee_id: row.area_responsible_employee_id ? Number(row.area_responsible_employee_id) : null,
+  supervisor_signed_at: iso(row.supervisor_signed_at),
   compliance_pct: row.compliance_pct === null || row.compliance_pct === undefined ? null : Number(row.compliance_pct),
   conclusion: row.conclusion ? (String(row.conclusion) as SupervisionConclusion) : null,
   passed: row.passed === null || row.passed === undefined ? null : Boolean(row.passed),
@@ -339,7 +355,9 @@ export const createSupervisionChecklist = async (raw: CreateSupervisionChecklist
 
   if (enrollmentId && input.reuseDraft !== false) {
     const draft = await pool.query(
-      `SELECT id FROM public.rh_supervision_checklists WHERE enrollment_id = $1 AND status = 'DRAFT' ORDER BY id DESC LIMIT 1;`,
+      // Una lista en curso (borrador o firmada por el supervisor) se reutiliza: nunca dos a la vez.
+      `SELECT id FROM public.rh_supervision_checklists
+        WHERE enrollment_id = $1 AND status IN ('DRAFT', 'SUPERVISOR_SIGNED') ORDER BY id DESC LIMIT 1;`,
       [enrollmentId],
     );
     if (draft.rows.length > 0) {
@@ -396,6 +414,8 @@ export const createSupervisionChecklist = async (raw: CreateSupervisionChecklist
     }
     return checklistId;
   });
+  // Supervisor de la inscripcion y responsable del area del puesto.
+  if (enrollmentId) await syncDraftSigners({ enrollmentIds: [enrollmentId] });
   return getSupervisionChecklist(id);
 };
 
@@ -417,7 +437,11 @@ const assertDraft = async (id: number): Promise<void> => {
   if (result.rows.length === 0) {
     throwCoded('RH_SUPERVISION_NOT_FOUND', 'La lista de verificacion no existe.');
   }
-  if (String(result.rows[0].status) !== 'DRAFT') {
+  const status = String(result.rows[0].status);
+  if (status === 'SUPERVISOR_SIGNED') {
+    throwCoded('RH_SUPERVISION_SUPERVISOR_SIGNED', 'El supervisor ya califico y firmo la lista; solo falta el aval del responsable del area.');
+  }
+  if (status !== 'DRAFT') {
     throwCoded('RH_SUPERVISION_ALREADY_CLOSED', 'La lista ya esta cerrada y firmada; no se puede modificar.');
   }
 };
@@ -476,11 +500,13 @@ export const deleteSupervisionDraft = async (id: number): Promise<void> => {
 
 export interface SupervisionChecklistQuery {
   status?: SupervisionChecklistStatus | undefined;
+  /** Listas cuyo supervisor asignado es este colaborador. */
+  supervisorEmployeeId?: number | undefined;
   employeeId?: number | undefined;
   positionId?: number | undefined;
   enrollmentId?: number | undefined;
-  /** Area de la ficha del colaborador (comparacion sin mayusculas ni espacios sobrantes). */
-  employeeArea?: string | undefined;
+  /** Codigo del area del proceso del puesto (PRE, ANA, POS, ADM); "NONE" = puesto sin area. */
+  processArea?: string | undefined;
   search?: string | undefined;
   page: number;
   limit: number;
@@ -503,9 +529,10 @@ export const listSupervisionChecklists = async (query: SupervisionChecklistQuery
   };
   if (query.status) add('c.status = ?', query.status);
   if (query.employeeId) add('c.employee_id = ?', query.employeeId);
+  if (query.supervisorEmployeeId) add('c.supervisor_employee_id = ?', query.supervisorEmployeeId);
   if (query.positionId) add('c.position_id = ?', query.positionId);
   if (query.enrollmentId) add('c.enrollment_id = ?', query.enrollmentId);
-  if (query.employeeArea?.trim()) add(`lower(regexp_replace(trim(COALESCE(emp.area, '')), '\\s+', ' ', 'g')) = ?`, query.employeeArea.trim().toLowerCase().replace(/\s+/g, ' '));
+  if (query.processArea?.trim()) add(`COALESCE(pa.code, 'NONE') = ?`, query.processArea.trim().toUpperCase());
   if (query.search?.trim()) {
     params.push(`%${query.search.trim()}%`);
     const n = `$${params.length}`;
@@ -518,7 +545,8 @@ export const listSupervisionChecklists = async (query: SupervisionChecklistQuery
   const count = await pool.query(
     `SELECT count(*) AS total FROM public.rh_supervision_checklists c
        JOIN public.employees emp ON emp.id = c.employee_id
-       JOIN public.rh_positions rp ON rp.id = c.position_id ${where};`,
+       JOIN public.rh_positions rp ON rp.id = c.position_id
+       LEFT JOIN public.rh_process_areas pa ON pa.id = rp.process_area_id ${where};`,
     params,
   );
   const total = Number(count.rows[0]?.total ?? 0);
