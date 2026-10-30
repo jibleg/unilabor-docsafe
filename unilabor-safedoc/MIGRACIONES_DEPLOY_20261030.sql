@@ -315,9 +315,39 @@ CREATE TABLE IF NOT EXISTS public.rh_assignment_letter_items (
   PRIMARY KEY (letter_id, item_id)
 );
 
+-- Etiqueta orientativa por autorizacion (solo en pantalla): 75-80 = CSI
+-- (Coordinacion de Sistemas de la Informacion).
+ALTER TABLE public.rh_assignment_authorization_items ADD COLUMN IF NOT EXISTS scope_label TEXT NULL;
+UPDATE public.rh_assignment_authorization_items
+   SET scope_label = 'CSI'
+ WHERE form_code = 'REH-REG-008' AND form_revision = 1 AND item_no BETWEEN 75 AND 80 AND scope_label IS NULL;
+
+-- Seccion tematica de cada autorizacion (solo para agrupar en pantalla; el PDF
+-- conserva la tabla continua 1-82 del formato).
+ALTER TABLE public.rh_assignment_authorization_items ADD COLUMN IF NOT EXISTS group_order INTEGER NULL;
+ALTER TABLE public.rh_assignment_authorization_items ADD COLUMN IF NOT EXISTS group_label TEXT NULL;
+UPDATE public.rh_assignment_authorization_items i
+   SET group_order = g.ord, group_label = g.label
+  FROM (VALUES
+    (1, 1, 8, 'Generales'),
+    (2, 9, 14, 'Pacientes y datos'),
+    (3, 15, 23, 'Toma y manejo de muestras'),
+    (4, 24, 30, 'Equipos y reactivos'),
+    (5, 31, 35, 'Métodos analíticos'),
+    (6, 36, 38, 'Control de calidad'),
+    (7, 39, 45, 'Resultados y asesoría clínica'),
+    (8, 46, 54, 'Bioseguridad y equipo de laboratorio'),
+    (9, 55, 60, 'Compras, insumos y almacén'),
+    (10, 61, 68, 'Sistema de Gestión de la Calidad'),
+    (11, 69, 74, 'Personal'),
+    (12, 75, 80, 'Sistemas de información'),
+    (13, 81, 82, 'Firmas y otras')
+  ) AS g(ord, first_no, last_no, label)
+ WHERE i.form_code = 'REH-REG-008' AND i.form_revision = 1 AND i.item_no BETWEEN g.first_no AND g.last_no AND i.group_label IS NULL;
+
 UPDATE public.document_types
    SET name = 'Carta de asignación de puesto (REH-REG-008)'
  WHERE code = 'POSITION_ASSIGNMENT';
 
 COMMIT;
-INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20261030_04_rh_assignment_letters.sql', '7bd76fc27a3c788f32dd11020e663db035ef7495af9321460fd795620aabf107') ON CONFLICT (filename) DO NOTHING;
+INSERT INTO public.schema_migrations (filename, checksum) VALUES ('20261030_04_rh_assignment_letters.sql', 'b49d96d23e80cc2d6d40dcae3f155405dbd6165acb324484610e969c0d8e1c6a') ON CONFLICT (filename) DO NOTHING;

@@ -547,7 +547,7 @@ const CloseModal = ({
           </button>
           <button type="button" onClick={() => void handleSubmit()} disabled={saving} className={buttonClass}>
             {saving ? <Loader2 size={14} className="animate-spin" /> : <FileCheck2 size={14} />}
-            Cerrar y archivar
+            Guardar y archivar
           </button>
         </div>
       </div>

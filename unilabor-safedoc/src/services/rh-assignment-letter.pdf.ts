@@ -255,11 +255,9 @@ export const buildAssignmentLetterPdf = async (input: AssignmentLetterPdfInput):
     vline(tableX + colNo + colText + colYes, y, h);
     centered(String(item.item_no), tableX + colNo / 2, y - 10.5, 9, regular);
     lines.forEach((line, index) => text(line, tableX + colNo + 4, y - 10.5 - index * 11, 9.5, regular));
-    // "a todos" (autorizaciones 1-8) va en la esquina del Si, como en el formato; la X se corre a la derecha.
-    const yesX = tableX + colNo + colText + colYes / 2 + (item.applies_to_all ? 7 : 0);
-    const markX = item.authorized ? yesX : tableX + colNo + colText + colYes + colNoMark / 2;
+    // La nota "a todos" del formato es solo una guia de llenado: no se imprime en el registro.
+    const markX = item.authorized ? tableX + colNo + colText + colYes / 2 : tableX + colNo + colText + colYes + colNoMark / 2;
     centered('X', markX, y - 10.5, 9.5, bold, NAVY);
-    if (item.applies_to_all) text('a todos', tableX + colNo + colText + 2, y - h + 2.5, 4.2, sans, MUTED);
     y -= h;
   }
   y -= 24;

@@ -14,7 +14,7 @@ import { SignaturePad } from '../../helpdesk/SignaturePad';
 import { SearchableSelect } from '../../SearchableSelect';
 import { buttonClass, formatDateOnly, inputClass, labelClass, primaryButtonClass } from '../supervision/supervision-ui';
 import { useEmployeeOptions } from '../supervision/useEmployeeOptions';
-import { AuthorizationToggle } from './AuthorizationToggle';
+import { AuthorizationGroups } from './AuthorizationGroups';
 
 interface AssignmentLetterEditorProps {
   letter: AssignmentLetter;
@@ -176,17 +176,13 @@ export const AssignmentLetterEditor = ({ letter, onBack, onChanged, onDeleted }:
         <h3 className="text-sm font-bold text-[var(--color-brand-700)]">
           Autorizaciones · {authorizedCount} en Sí de {letter.items.length}
         </h3>
-        <div className="grid gap-1 sm:grid-cols-2">
-          {letter.items.map((item) => (
-            <AuthorizationToggle
-              key={item.id}
-              item={item}
-              checked={Boolean(authorized[item.id])}
-              disabled={readOnly}
-              onToggle={() => mark(setAuthorized)({ ...authorized, [item.id]: !authorized[item.id] })}
-            />
-          ))}
-        </div>
+        <AuthorizationGroups
+          items={letter.items}
+          isChecked={(id) => Boolean(authorized[id])}
+          disabled={readOnly}
+          onToggle={(id) => mark(setAuthorized)({ ...authorized, [id]: !authorized[id] })}
+          onToggleGroup={(ids, value) => mark(setAuthorized)({ ...authorized, ...Object.fromEntries(ids.map((id) => [id, value])) })}
+        />
         <div>
           <label className={labelClass}>82. Otras (especificar)</label>
           <input value={other} disabled={readOnly} onChange={(e) => mark(setOther)(e.target.value)} className={inputClass} placeholder="Otras autorizaciones del colaborador en este puesto" maxLength={500} />

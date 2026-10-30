@@ -30,6 +30,11 @@ export interface AssignmentAuthorizationItem {
   item_no: number;
   item_text: string;
   applies_to_all: boolean;
+  /** Etiqueta orientativa en pantalla (p. ej. CSI en 75-80). */
+  scope_label: string | null;
+  /** Seccion tematica para agrupar en pantalla. */
+  group_order: number | null;
+  group_label: string | null;
 }
 
 export interface AssignmentLetterItem extends AssignmentAuthorizationItem {
@@ -72,7 +77,7 @@ const iso = (value: unknown): string | null => (value ? new Date(value as string
 
 export const listAuthorizationItems = async (): Promise<AssignmentAuthorizationItem[]> => {
   const result = await pool.query(
-    `SELECT id, item_no, item_text, applies_to_all
+    `SELECT id, item_no, item_text, applies_to_all, scope_label, group_order, group_label
        FROM public.rh_assignment_authorization_items
       WHERE is_active = TRUE
         AND form_revision = (SELECT max(form_revision) FROM public.rh_assignment_authorization_items WHERE is_active = TRUE)
@@ -83,6 +88,9 @@ export const listAuthorizationItems = async (): Promise<AssignmentAuthorizationI
     item_no: Number(row.item_no),
     item_text: String(row.item_text),
     applies_to_all: Boolean(row.applies_to_all),
+    scope_label: row.scope_label ? String(row.scope_label) : null,
+    group_order: row.group_order !== null && row.group_order !== undefined ? Number(row.group_order) : null,
+    group_label: row.group_label ? String(row.group_label) : null,
   }));
 };
 
@@ -150,7 +158,7 @@ const mapLetter = (row: any, items: AssignmentLetterItem[]): AssignmentLetterRec
 
 const loadItems = async (letterId: number): Promise<AssignmentLetterItem[]> => {
   const result = await pool.query(
-    `SELECT i.id, i.item_no, i.item_text, i.applies_to_all, li.authorized
+    `SELECT i.id, i.item_no, i.item_text, i.applies_to_all, i.scope_label, i.group_order, i.group_label, li.authorized
        FROM public.rh_assignment_letter_items li
        JOIN public.rh_assignment_authorization_items i ON i.id = li.item_id
       WHERE li.letter_id = $1
@@ -162,6 +170,9 @@ const loadItems = async (letterId: number): Promise<AssignmentLetterItem[]> => {
     item_no: Number(row.item_no),
     item_text: String(row.item_text),
     applies_to_all: Boolean(row.applies_to_all),
+    scope_label: row.scope_label ? String(row.scope_label) : null,
+    group_order: row.group_order !== null && row.group_order !== undefined ? Number(row.group_order) : null,
+    group_label: row.group_label ? String(row.group_label) : null,
     authorized: Boolean(row.authorized),
   }));
 };

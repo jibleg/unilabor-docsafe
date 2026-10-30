@@ -5,7 +5,7 @@ import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { AssignmentAuthorizationItem } from '../../../types/models';
 import { notifyError, notifySuccess } from '../../../utils/notify';
 import { buttonClass } from '../supervision/supervision-ui';
-import { AuthorizationToggle } from './AuthorizationToggle';
+import { AuthorizationGroups } from './AuthorizationGroups';
 
 interface PositionAssignmentAuthorizationsPanelProps {
   positionId: number;
@@ -99,11 +99,21 @@ export const PositionAssignmentAuthorizationsPanel = ({ positionId, positionName
       <p className="text-xs font-semibold text-[var(--color-brand-700)]">
         {selected.size} de {items.length} autorizaciones activadas
       </p>
-      <div className="grid gap-1 sm:grid-cols-2">
-        {items.map((item) => (
-          <AuthorizationToggle key={item.id} item={item} checked={selected.has(item.id)} onToggle={() => toggle(item.id)} />
-        ))}
-      </div>
+      <AuthorizationGroups
+        items={items}
+        isChecked={(id) => selected.has(id)}
+        onToggle={toggle}
+        onToggleGroup={(ids, value) =>
+          setSelected((current) => {
+            const next = new Set(current);
+            for (const id of ids) {
+              if (value) next.add(id);
+              else next.delete(id);
+            }
+            return next;
+          })
+        }
+      />
     </div>
   );
 };

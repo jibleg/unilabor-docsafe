@@ -7,6 +7,11 @@ export interface AssignmentAuthorizationItem {
   item_text: string;
   /** Autorizaciones 1-8 del formato: aplican a todos y siempre van en Si. */
   applies_to_all: boolean;
+  /** Etiqueta orientativa en pantalla (p. ej. CSI en 75-80). */
+  scope_label: string | null;
+  /** Seccion tematica para agrupar en pantalla. */
+  group_order: number | null;
+  group_label: string | null;
 }
 
 export interface AssignmentLetterItem extends AssignmentAuthorizationItem {

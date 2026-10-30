@@ -29,6 +29,11 @@ export const AuthorizationToggle = ({ item, checked, disabled = false, onToggle 
           a todos
         </span>
       ) : null}
+      {item.scope_label ? (
+        <span className="ml-1.5 inline-block rounded-full border border-sky-300/60 bg-sky-400/15 px-1.5 py-px align-middle text-[9px] font-semibold uppercase tracking-wide text-sky-700">
+          {item.scope_label}
+        </span>
+      ) : null}
     </span>
   </button>
 );
