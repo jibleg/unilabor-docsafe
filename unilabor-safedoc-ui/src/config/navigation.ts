@@ -37,6 +37,7 @@ import {
   Users,
   Wrench,
   type LucideIcon,
+  FileSignature,
 } from 'lucide-react';
 import type { ModuleCode } from '../types/models';
 
@@ -113,6 +114,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: GraduationCap, label: 'Fases de inducción', path: '/rh/induction', permission: 'RH.INDUCTION.MANAGE' },
         { icon: ClipboardPen, label: 'Supervisión de inducción', path: '/rh/supervision-checklists', permission: 'RH.SUPERVISION.MANAGE' },
         { icon: ClipboardCheck, label: 'Evaluación de competencia', path: '/rh/competency-evaluations', permission: 'RH.COMPETENCY.MANAGE' },
+        { icon: FileSignature, label: 'Cartas de asignación', path: '/rh/assignment-letters', permission: 'RH.COMPETENCY.MANAGE' },
         { icon: Gauge, label: 'Tablero de competencia', path: '/rh/competency-dashboard', permission: 'RH.COMPETENCY.MANAGE' },
       ],
     },

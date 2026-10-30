@@ -171,6 +171,11 @@ const RhInductionDashboardPage = lazy(() =>
     default: module.RhInductionDashboardPage,
   })),
 );
+const RhAssignmentLettersPage = lazy(() =>
+  import('./pages/RhAssignmentLettersPage').then((module) => ({
+    default: module.RhAssignmentLettersPage,
+  })),
+);
 const RhMySupervisionsPage = lazy(() =>
   import('./pages/RhMySupervisionsPage').then((module) => ({
     default: module.RhMySupervisionsPage,
@@ -531,6 +536,14 @@ function App() {
           element={
             <PermissionGate permission="RH.COMPETENCY.MANAGE" redirectTo="/rh">
               <RhCompetencyDashboardPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="assignment-letters"
+          element={
+            <PermissionGate permission="RH.COMPETENCY.MANAGE" redirectTo="/rh">
+              <RhAssignmentLettersPage />
             </PermissionGate>
           }
         />

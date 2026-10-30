@@ -100,15 +100,15 @@ export const PositionSupervisionItemsPanel = ({ positionId, positionName }: Posi
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-sm leading-6 text-[var(--unilabor-ink)]">
-          Deja marcados los aspectos del <strong>ANA-REG-060</strong> que <strong>sí aplican</strong> a este puesto y desmarca los que no (p. ej. control de
-          calidad interno para un puesto administrativo). Los desmarcados salen en N/A al aplicar la lista y no cuentan para el porcentaje; el supervisor
+          Deja activados los aspectos del <strong>ANA-REG-060</strong> que <strong>sí aplican</strong> a este puesto y desactiva los que no (p. ej. control de
+          calidad interno para un puesto administrativo). Los desactivados salen en N/A al aplicar la lista y no cuentan para el porcentaje; el supervisor
           puede cambiarlos caso por caso.{' '}
           <span className="font-semibold text-[var(--color-brand-700)]">
             {applicable} de {items.length} aspectos aplican.
           </span>
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => setNa(new Set())} disabled={na.size === 0} className={buttonClass} title="Marca los 31 aspectos como aplicables">
+          <button type="button" onClick={() => setNa(new Set())} disabled={na.size === 0} className={buttonClass} title="Activa los 31 aspectos (todos aplican)">
             <CheckCheck size={14} /> Todos aplican
           </button>
           <button
@@ -116,7 +116,7 @@ export const PositionSupervisionItemsPanel = ({ positionId, positionName }: Posi
             onClick={() => setNa(new Set(items.map((item) => item.id)))}
             disabled={na.size === items.length}
             className={buttonClass}
-            title="Desmarca los 31 aspectos (todos en N/A); después marca solo los que sí apliquen"
+            title="Desactiva los 31 aspectos (todos en N/A); después activa solo los que sí apliquen"
           >
             <MinusCircle size={14} /> Ninguno aplica
           </button>
@@ -132,20 +132,29 @@ export const PositionSupervisionItemsPanel = ({ positionId, positionName }: Posi
             <header className="flex items-center justify-between bg-[rgba(238,245,250,0.9)] px-4 py-2">
               <p className="text-xs font-bold uppercase tracking-wide text-[var(--color-brand-700)]">{section.title}</p>
               <button type="button" onClick={() => toggleSection(section.items, !allNa)} className="text-[11px] font-semibold text-[var(--color-brand-500)] hover:underline">
-                {allNa ? 'Marcar toda la sección' : 'Desmarcar toda la sección'}
+                {allNa ? 'Activar toda la sección' : 'Desactivar toda la sección'}
               </button>
             </header>
             <ul className="divide-y divide-[rgba(0,65,106,0.08)]">
               {section.items.map((item) => (
                 <li key={item.id}>
-                  <label className={`flex cursor-pointer items-start gap-3 px-4 py-2 text-sm ${na.has(item.id) ? 'bg-slate-50 text-slate-500' : 'text-[var(--unilabor-ink)]'}`}>
-                    <input type="checkbox" checked={!na.has(item.id)} onChange={() => toggle(item.id)} className="mt-1" aria-label={`Aplica: ${item.item_text}`} />
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!na.has(item.id)}
+                    aria-label={`Aplica: ${item.item_text}`}
+                    onClick={() => toggle(item.id)}
+                    className={`flex w-full items-start gap-3 px-4 py-2 text-left text-sm transition hover:bg-[rgba(191,212,230,0.15)] ${na.has(item.id) ? 'bg-slate-50 text-slate-500' : 'text-[var(--unilabor-ink)]'}`}
+                  >
+                    <span className={`mt-0.5 inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition ${na.has(item.id) ? 'bg-slate-300' : 'bg-emerald-500'}`}>
+                      <span className={`h-3 w-3 rounded-full bg-white shadow transition ${na.has(item.id) ? '' : 'translate-x-3'}`} />
+                    </span>
                     <span>
                       <span className="font-bold">{item.item_no}. </span>
                       {item.item_text}
                       {na.has(item.id) ? <span className="ml-2 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold">N/A</span> : null}
                     </span>
-                  </label>
+                  </button>
                 </li>
               ))}
             </ul>

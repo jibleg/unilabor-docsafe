@@ -9,3 +9,4 @@ export * from './rh-induction';
 export * from './rh-competency';
 export * from './rh-supervision';
 export * from './agreements';
+export * from './rh-assignment-letter';

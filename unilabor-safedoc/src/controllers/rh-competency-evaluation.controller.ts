@@ -1,5 +1,6 @@
 import type { Response } from 'express';
 import { getCompetencySuggestedSigners } from '../services/rh-competency-signers.service';
+import { tryCreateLetterForEvaluation } from '../services/rh-assignment-letter.service';
 import { assignCourseKnowledge, assignPhase5Knowledge, listKnowledgeCourseOptions, tryAssignPhase5Knowledge } from '../services/rh-competency-course-knowledge.service';
 import type { AssignCourseKnowledgeInput } from '../schemas/rh-competency-evaluation.schema';
 import type { AuthRequest } from '../types';
@@ -253,7 +254,10 @@ export const authorizeCompetencyEvaluationController = async (req: AuthRequest, 
       await logAudit(req.user.id, `RH_COMP_EVAL_CERTIFICATE_ISSUED:${evaluationId}:${certificateDocumentId}`, evaluationId, req.ip);
     }
     const finalEvaluation = certificateDocumentId ? (await getEvaluationById(evaluationId)) ?? evaluation : evaluation;
+    // Fase 7: carta de asignacion de puesto REH-REG-008 en borrador (solo INICIAL autorizado; best-effort).
+    const letter = decision === 'NO_AUTORIZADO' ? null : await tryCreateLetterForEvaluation(evaluationId, req.user.id);
     return res.json({
+      assignment_letter_id: letter?.id ?? null,
       message:
         decision === 'NO_AUTORIZADO'
           ? 'Decision registrada: NO AUTORIZADO. El registro actualizado quedo en el expediente.'

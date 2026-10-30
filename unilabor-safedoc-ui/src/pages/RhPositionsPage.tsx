@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Briefcase, ClipboardPen, FileText, GraduationCap, ListChecks, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { Briefcase, ClipboardPen, FileSignature, FileText, GraduationCap, ListChecks, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -19,6 +19,7 @@ import { ExpedientTabs } from '../components/rh/ExpedientTabs';
 import { PositionTrainingCoursesPanel } from '../components/rh/PositionTrainingCoursesPanel';
 import { PositionProcessAreaSelect } from '../components/rh/PositionProcessAreaSelect';
 import { PositionSupervisionItemsPanel } from '../components/rh/supervision/PositionSupervisionItemsPanel';
+import { PositionAssignmentAuthorizationsPanel } from '../components/rh/assignment-letter/PositionAssignmentAuthorizationsPanel';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { confirmAction } from '../utils/confirm';
 import type { RhPosition } from '../types/models';
@@ -33,7 +34,7 @@ const buttonClass =
 /** Tamaños de página del listado de puestos y de sus documentos obligatorios. */
 const POSITION_PAGE_SIZES = [10, 20, 30];
 
-type PositionTabKey = 'competencies' | 'documents' | 'courses' | 'supervision';
+type PositionTabKey = 'competencies' | 'documents' | 'courses' | 'supervision' | 'assignment';
 
 export const RhPositionsPage = () => {
   const [positions, setPositions] = useState<RhPosition[]>([]);
@@ -141,6 +142,7 @@ export const RhPositionsPage = () => {
       },
       { key: 'courses', label: 'Capacitaciones del puesto', icon: <GraduationCap size={14} /> },
       { key: 'supervision', label: 'Supervisión', icon: <ClipboardPen size={14} /> },
+      { key: 'assignment', label: 'Carta de asignación', icon: <FileSignature size={14} /> },
     ];
   }, [selectedPosition]);
 
@@ -486,6 +488,9 @@ export const RhPositionsPage = () => {
                 />
               ) : null}
 
+              {activeTab === 'assignment' ? (
+                <PositionAssignmentAuthorizationsPanel key={selectedPosition.id} positionId={selectedPosition.id} positionName={selectedPosition.name} />
+              ) : null}
               {activeTab === 'supervision' ? (
                 <PositionSupervisionItemsPanel key={selectedPosition.id} positionId={selectedPosition.id} positionName={selectedPosition.name} />
               ) : null}
