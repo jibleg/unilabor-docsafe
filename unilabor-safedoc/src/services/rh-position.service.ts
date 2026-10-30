@@ -39,6 +39,10 @@ export interface RhPositionRecord {
   description: string | null;
   is_active: boolean;
   sort_order: number;
+  /** Area del proceso que rige el puesto (Preanalitica, Analitica, Posanalitica, Administracion). */
+  process_area_id: number | null;
+  process_area_code: string | null;
+  process_area_name: string | null;
   competencies: RhPositionCompetency[];
   documents: RhPositionDocument[];
   created_at: string;
@@ -50,7 +54,24 @@ export interface RhPositionPayload {
   name: string;
   description?: string | null;
   sort_order?: number | null;
+  process_area_id?: number | null;
 }
+
+export interface RhProcessArea {
+  id: number;
+  code: string;
+  name: string;
+}
+
+/** Catalogo de las 4 areas del proceso. */
+export const listProcessAreas = async (): Promise<RhProcessArea[]> => {
+  const result = await pool.query(`SELECT id, code, name FROM public.rh_process_areas WHERE is_active = TRUE ORDER BY sort_order ASC, name ASC;`);
+  return result.rows.map((row) => ({ id: Number(row.id), code: String(row.code), name: String(row.name) }));
+};
+
+const POSITION_SELECT = `SELECT p.*, pa.code AS process_area_code, pa.name AS process_area_name
+  FROM public.rh_positions p
+  LEFT JOIN public.rh_process_areas pa ON pa.id = p.process_area_id`;
 
 const mapPosition = (row: any): Omit<RhPositionRecord, 'competencies' | 'documents'> => ({
   id: Number(row.id),
@@ -58,6 +79,9 @@ const mapPosition = (row: any): Omit<RhPositionRecord, 'competencies' | 'documen
   name: String(row.name),
   description: row.description ? String(row.description) : null,
   is_active: Boolean(row.is_active),
+  process_area_id: row.process_area_id ? Number(row.process_area_id) : null,
+  process_area_code: row.process_area_code ? String(row.process_area_code) : null,
+  process_area_name: row.process_area_name ? String(row.process_area_name) : null,
   sort_order: Number(row.sort_order ?? 0),
   created_at: String(row.created_at),
   updated_at: String(row.updated_at),
@@ -105,15 +129,13 @@ const hydrate = async (row: any): Promise<RhPositionRecord> => {
 };
 
 export const listPositions = async (includeInactive = false): Promise<RhPositionRecord[]> => {
-  const whereClause = includeInactive ? '' : 'WHERE is_active = TRUE';
-  const result = await pool.query(
-    `SELECT * FROM public.rh_positions ${whereClause} ORDER BY sort_order ASC, name ASC;`,
-  );
+  const whereClause = includeInactive ? '' : 'WHERE p.is_active = TRUE';
+  const result = await pool.query(`${POSITION_SELECT} ${whereClause} ORDER BY p.sort_order ASC, p.name ASC;`);
   return Promise.all(result.rows.map(hydrate));
 };
 
 export const getPositionById = async (id: number): Promise<RhPositionRecord | null> => {
-  const result = await pool.query(`SELECT * FROM public.rh_positions WHERE id = $1 LIMIT 1;`, [id]);
+  const result = await pool.query(`${POSITION_SELECT} WHERE p.id = $1 LIMIT 1;`, [id]);
   if (result.rows.length === 0) {
     return null;
   }
@@ -128,9 +150,9 @@ export const createPosition = async (payload: RhPositionPayload): Promise<RhPosi
   }
   try {
     const result = await pool.query(
-      `INSERT INTO public.rh_positions (code, name, description, sort_order)
-       VALUES ($1, $2, $3, $4) RETURNING id;`,
-      [code, name, payload.description?.trim() || null, payload.sort_order ?? 0],
+      `INSERT INTO public.rh_positions (code, name, description, sort_order, process_area_id)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id;`,
+      [code, name, payload.description?.trim() || null, payload.sort_order ?? 0, payload.process_area_id ?? null],
     );
     return (await getPositionById(Number(result.rows[0].id)))!;
   } catch (error: any) {
@@ -153,14 +175,15 @@ export const updatePosition = async (
     await pool.query(
       `UPDATE public.rh_positions
           SET code = $1, name = $2, description = $3, sort_order = $4,
-              is_active = $5, updated_at = NOW()
-        WHERE id = $6;`,
+              is_active = $5, process_area_id = $6, updated_at = NOW()
+        WHERE id = $7;`,
       [
         (payload.code ?? existing.code).trim(),
         (payload.name ?? existing.name).trim(),
         payload.description !== undefined ? payload.description?.trim() || null : existing.description,
         payload.sort_order ?? existing.sort_order,
         payload.is_active ?? existing.is_active,
+        payload.process_area_id !== undefined ? payload.process_area_id : existing.process_area_id,
         id,
       ],
     );

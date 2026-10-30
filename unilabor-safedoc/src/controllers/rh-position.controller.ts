@@ -9,6 +9,7 @@ import {
   findDocumentByCode,
   getPositionById,
   listPositions,
+  listProcessAreas,
   removePositionDocument,
   searchDocuments,
   updatePosition,
@@ -53,6 +54,15 @@ export const listPositionsController = async (req: AuthRequest, res: Response) =
     if (mapped) return mapped;
     console.error('Error listando puestos:', error);
     return res.status(500).json({ message: 'No se pudieron cargar los puestos.' });
+  }
+};
+
+export const listProcessAreasController = async (_req: AuthRequest, res: Response) => {
+  try {
+    return res.json({ areas: await listProcessAreas() });
+  } catch (error) {
+    console.error('Error listando areas del proceso:', error);
+    return res.status(500).json({ message: 'No se pudieron cargar las areas.' });
   }
 };
 

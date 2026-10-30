@@ -6,6 +6,7 @@ import type {
   RhPosition,
   RhPositionCompetency,
   RhPositionDocument,
+  RhProcessArea,
   TrainingCourseOption,
 } from '../types/models';
 
@@ -30,7 +31,14 @@ export interface PositionPayload {
   description?: string | null;
   sort_order?: number | null;
   is_active?: boolean;
+  process_area_id?: number | null;
 }
+
+/** Las 4 areas del proceso (las rige el puesto). */
+export const listProcessAreas = async (): Promise<RhProcessArea[]> => {
+  const response = await api.get('/rh/process-areas');
+  return (asRecord(unwrapPayload(response.data))?.areas as RhProcessArea[]) ?? [];
+};
 
 export const createPosition = async (payload: PositionPayload): Promise<RhPosition> => {
   const response = await api.post('/rh/positions', payload);

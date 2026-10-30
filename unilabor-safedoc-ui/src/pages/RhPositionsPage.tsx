@@ -17,6 +17,7 @@ import { CompactListPager } from '../components/CompactListPager';
 import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
 import { ExpedientTabs } from '../components/rh/ExpedientTabs';
 import { PositionTrainingCoursesPanel } from '../components/rh/PositionTrainingCoursesPanel';
+import { PositionProcessAreaSelect } from '../components/rh/PositionProcessAreaSelect';
 import { PositionSupervisionItemsPanel } from '../components/rh/supervision/PositionSupervisionItemsPanel';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { confirmAction } from '../utils/confirm';
@@ -308,7 +309,10 @@ export const RhPositionsPage = () => {
                 >
                   <button type="button" onClick={() => selectPosition(position.id)} className="flex-1 text-left">
                     <p className="text-sm font-bold text-[var(--color-brand-700)]">{position.name}</p>
-                    <p className="text-xs text-[var(--unilabor-neutral)]">{position.code}</p>
+                    <p className="text-xs text-[var(--unilabor-neutral)]">
+                      {position.code}
+                      {position.process_area_name ? ` · ${position.process_area_name}` : ' · sin área'}
+                    </p>
                   </button>
                   <button
                     type="button"
@@ -346,9 +350,15 @@ export const RhPositionsPage = () => {
             </p>
           ) : (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-bold text-[var(--color-brand-700)]">{selectedPosition.name}</h2>
-                <p className="text-xs text-[var(--unilabor-neutral)]">{selectedPosition.code}</p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-brand-700)]">{selectedPosition.name}</h2>
+                  <p className="text-xs text-[var(--unilabor-neutral)]">{selectedPosition.code}</p>
+                </div>
+                <PositionProcessAreaSelect
+                  position={selectedPosition}
+                  onSaved={(updated) => setPositions((current) => current.map((item) => (item.id === updated.id ? updated : item)))}
+                />
               </div>
 
               <ExpedientTabs

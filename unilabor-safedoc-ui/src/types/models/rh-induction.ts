@@ -25,10 +25,20 @@ export interface RhPosition {
   description: string | null;
   is_active: boolean;
   sort_order: number;
+  /** Area del proceso que rige el puesto (Preanalitica, Analitica, Posanalitica, Administracion). */
+  process_area_id: number | null;
+  process_area_code: string | null;
+  process_area_name: string | null;
   competencies: RhPositionCompetency[];
   documents: RhPositionDocument[];
   created_at: string;
   updated_at: string;
+}
+
+export interface RhProcessArea {
+  id: number;
+  code: string;
+  name: string;
 }
 
 export interface RhEmployeePosition {

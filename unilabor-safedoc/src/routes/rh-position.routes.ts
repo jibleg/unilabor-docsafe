@@ -10,6 +10,7 @@ import {
   getPositionByIdController,
   listEmployeePositionsController,
   listPositionsController,
+  listProcessAreasController,
   lookupDocumentByCodeController,
   removePositionDocumentController,
   searchDocumentsController,
@@ -45,6 +46,8 @@ router.get('/documents/lookup', requirePermission('RH.INDUCTION.MANAGE'), lookup
 router.get('/documents/search', requirePermission('RH.INDUCTION.MANAGE'), searchDocumentsController);
 
 // --- Catalogo de puestos -----------------------------------------------------
+// Areas del proceso (Preanalitica, Analitica, Posanalitica, Administracion): las rige el puesto.
+router.get('/process-areas', requirePermission(['RH.INDUCTION.MANAGE', 'RH.SUPERVISION.MANAGE']), listProcessAreasController);
 router.get('/positions', requirePermission('RH.INDUCTION.MANAGE'), listPositionsController);
 router.get('/positions/:id', requirePermission('RH.INDUCTION.MANAGE'), getPositionByIdController);
 router.post('/positions', requirePermission('RH.INDUCTION.MANAGE'), validate(positionSchema), createPositionController);

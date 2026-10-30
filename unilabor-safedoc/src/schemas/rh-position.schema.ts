@@ -6,6 +6,7 @@ export const positionSchema = z.object({
   description: z.string().trim().nullish(),
   sort_order: z.number().int().nullish(),
   is_active: z.boolean().optional(),
+  process_area_id: z.number().int().positive().nullish(),
 });
 
 export type PositionInput = z.infer<typeof positionSchema>;
