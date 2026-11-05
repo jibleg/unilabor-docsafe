@@ -90,9 +90,6 @@ const HelpdeskDashboardPage = lazy(() =>
 const HelpdeskCatalogsPage = lazy(() =>
   import('./pages/HelpdeskCatalogsPage').then((module) => ({ default: module.HelpdeskCatalogsPage })),
 );
-const HelpdeskMaintenancePage = lazy(() =>
-  import('./pages/HelpdeskMaintenancePage').then((module) => ({ default: module.HelpdeskMaintenancePage })),
-);
 const HelpdeskCalibrationPage = lazy(() =>
   import('./pages/HelpdeskCalibrationPage').then((module) => ({ default: module.HelpdeskCalibrationPage })),
 );
@@ -681,14 +678,8 @@ function App() {
             </RoleGate>
           }
         />
-        <Route
-          path="maintenance"
-          element={
-            <RoleGate allowedRoles={['ADMIN', 'EDITOR']} redirectTo="/helpdesk/my-portal">
-              <HelpdeskMaintenancePage />
-            </RoleGate>
-          }
-        />
+        {/* La pagina clasica de planes se retiro: su listado vive en el panel "Planes" del calendario. */}
+        <Route path="maintenance" element={<Navigate to="/helpdesk/maintenance-program" replace />} />
         <Route
           path="calibration"
           element={

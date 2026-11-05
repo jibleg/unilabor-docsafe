@@ -148,40 +148,6 @@ export interface HelpdeskTicketTechnicalReleasePayload {
   equipment_status_after_solution_id?: number | null;
 }
 
-export interface HelpdeskMaintenancePlanPayload {
-  asset_id: number;
-  frequency_id?: number | null;
-  responsible_employee_id?: number | null;
-  quality_document_id?: string | null;
-  title: string;
-  description?: string | null;
-  provider_name?: string | null;
-  starts_on: string;
-  next_due_on: string;
-  tolerance_before_days?: number;
-  tolerance_after_days?: number;
-  checklist_required?: boolean;
-  evidence_required?: boolean;
-  tasks?: string[];
-}
-
-export interface HelpdeskMaintenanceOrderChecklistPayload {
-  plan_task_id?: number | null;
-  task_text: string;
-  result: string;
-  notes?: string | null;
-}
-
-export interface HelpdeskMaintenanceOrderClosePayload {
-  completed_at: string;
-  performed_activities: string;
-  result: string;
-  findings?: string | null;
-  provider_name?: string | null;
-  evidence_notes?: string | null;
-  checklist?: HelpdeskMaintenanceOrderChecklistPayload[];
-}
-
 export interface HelpdeskMaintenanceOrderReschedulePayload {
   scheduled_for: string;
   reschedule_reason: string;

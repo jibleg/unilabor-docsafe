@@ -11,9 +11,7 @@ import type {
   HelpdeskTicketCancelPayload,
   HelpdeskTicketConfirmFunctionalityPayload,
   HelpdeskCatalogAdminPayload,
-  HelpdeskMaintenancePlanPayload,
   HelpdeskMaintenanceOrderReschedulePayload,
-  HelpdeskMaintenanceOrderClosePayload,
   EmployeeDocumentAccessPayload,
   DocumentSectionPayload,
   EmployeeAlertsFilters,
@@ -600,25 +598,6 @@ export const listMaintenanceOrders = async (): Promise<HelpdeskMaintenanceOrder[
     .filter((order): order is HelpdeskMaintenanceOrder => order !== null);
 };
 
-export const createMaintenancePlan = async (
-  payload: HelpdeskMaintenancePlanPayload,
-): Promise<HelpdeskMaintenancePlan> => {
-  const response = await api.post('/helpdesk/maintenance/plans', payload);
-  const parsed = normalizeMaintenancePlan(asRecord(unwrapPayload(response.data))?.plan ?? unwrapPayload(response.data));
-  if (!parsed) {
-    throw new Error('No se pudo interpretar el plan de mantenimiento creado');
-  }
-  return parsed;
-};
-
-export const updateMaintenancePlanById = async (
-  planId: number,
-  payload: HelpdeskMaintenancePlanPayload,
-): Promise<HelpdeskMaintenancePlan | null> => {
-  const response = await api.patch(`/helpdesk/maintenance/plans/${planId}`, payload);
-  return normalizeMaintenancePlan(asRecord(unwrapPayload(response.data))?.plan ?? unwrapPayload(response.data));
-};
-
 export const startMaintenanceOrderById = async (orderId: number): Promise<HelpdeskMaintenanceOrder | null> => {
   const response = await api.post(`/helpdesk/maintenance/orders/${orderId}/start`);
   return normalizeMaintenanceOrder(asRecord(unwrapPayload(response.data))?.order ?? unwrapPayload(response.data));
@@ -629,14 +608,6 @@ export const rescheduleMaintenanceOrderById = async (
   payload: HelpdeskMaintenanceOrderReschedulePayload,
 ): Promise<HelpdeskMaintenanceOrder | null> => {
   const response = await api.post(`/helpdesk/maintenance/orders/${orderId}/reschedule`, payload);
-  return normalizeMaintenanceOrder(asRecord(unwrapPayload(response.data))?.order ?? unwrapPayload(response.data));
-};
-
-export const closeMaintenanceOrderById = async (
-  orderId: number,
-  payload: HelpdeskMaintenanceOrderClosePayload,
-): Promise<HelpdeskMaintenanceOrder | null> => {
-  const response = await api.post(`/helpdesk/maintenance/orders/${orderId}/close`, payload);
   return normalizeMaintenanceOrder(asRecord(unwrapPayload(response.data))?.order ?? unwrapPayload(response.data));
 };
 

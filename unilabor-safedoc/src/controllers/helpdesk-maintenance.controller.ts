@@ -1,23 +1,16 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import {
-  addMaintenanceScheduleDates,
-  createMaintenancePlan,
   listMaintenanceCatalogs,
   listMaintenanceOrders,
   listMaintenancePlans,
   rescheduleMaintenanceOrder,
   startMaintenanceOrder,
-  updateMaintenancePlan,
 } from '../services/helpdesk-maintenance.service';
-import { closeMaintenanceOrder } from '../services/helpdesk-maintenance-execution.service';
 import {
   getNumberId,
   mapHelpdeskError,
-  getMaintenancePlanPayload,
-  getMaintenanceOrderClosePayload,
   getMaintenanceOrderReschedulePayload,
-  getScheduleDatesPayload,
   logHelpdeskAudit,
 } from './helpdesk-controller.shared';
 
@@ -67,99 +60,6 @@ export const listMaintenanceOrdersController = async (req: AuthRequest, res: Res
 
     console.error('Error listando ordenes mantenimiento Helpdesk:', error);
     return res.status(500).json({ message: 'No se pudieron cargar las ordenes de mantenimiento.' });
-  }
-};
-
-export const createMaintenancePlanController = async (req: AuthRequest, res: Response) => {
-  const payload = getMaintenancePlanPayload(req.body);
-  if (!payload) {
-    return res.status(400).json({ message: 'Activo, titulo, inicio y proxima ejecucion son obligatorios.' });
-  }
-
-  try {
-    const plan = await createMaintenancePlan(payload, req.user?.id ?? null);
-    await logHelpdeskAudit(req.user?.id, `HELPDESK_MAINTENANCE_PLAN_CREATE:${plan.id}`, req.ip, plan.id, 'helpdesk_maintenance_plan');
-
-    return res.status(201).json({
-      message: 'Plan de mantenimiento creado correctamente.',
-      plan,
-    });
-  } catch (error: any) {
-    const mappedError = mapHelpdeskError(res, error);
-    if (mappedError) {
-      return mappedError;
-    }
-
-    console.error('Error creando plan mantenimiento Helpdesk:', error);
-    return res.status(500).json({ message: 'No se pudo crear el plan de mantenimiento.' });
-  }
-};
-
-export const updateMaintenancePlanController = async (req: AuthRequest, res: Response) => {
-  const planId = getNumberId(req.params.id);
-  if (!planId) {
-    return res.status(400).json({ message: 'ID de plan invalido.' });
-  }
-
-  const payload = getMaintenancePlanPayload(req.body);
-  if (!payload) {
-    return res.status(400).json({ message: 'Activo, titulo, inicio y proxima ejecucion son obligatorios.' });
-  }
-
-  try {
-    const plan = await updateMaintenancePlan(planId, payload, req.user?.id ?? null);
-    if (!plan) {
-      return res.status(404).json({ message: 'Plan de mantenimiento no encontrado.' });
-    }
-
-    await logHelpdeskAudit(req.user?.id, `HELPDESK_MAINTENANCE_PLAN_UPDATE:${planId}`, req.ip, planId, 'helpdesk_maintenance_plan');
-
-    return res.json({
-      message: 'Plan de mantenimiento actualizado correctamente.',
-      plan,
-    });
-  } catch (error: any) {
-    const mappedError = mapHelpdeskError(res, error);
-    if (mappedError) {
-      return mappedError;
-    }
-
-    console.error('Error actualizando plan mantenimiento Helpdesk:', error);
-    return res.status(500).json({ message: 'No se pudo actualizar el plan de mantenimiento.' });
-  }
-};
-
-export const addMaintenanceScheduleController = async (req: AuthRequest, res: Response) => {
-  const planId = getNumberId(req.params.id);
-  if (!planId) {
-    return res.status(400).json({ message: 'ID de plan invalido.' });
-  }
-
-  const dates = getScheduleDatesPayload(req.body);
-  if (!dates) {
-    return res.status(400).json({ message: 'Agrega al menos una fecha del cronograma.' });
-  }
-
-  try {
-    const plan = await addMaintenanceScheduleDates(planId, dates, req.user?.id ?? null);
-    if (!plan) {
-      return res.status(404).json({ message: 'Plan de mantenimiento no encontrado.' });
-    }
-
-    await logHelpdeskAudit(req.user?.id, `HELPDESK_MAINTENANCE_SCHEDULE_LOAD:${planId}`, req.ip, planId, 'helpdesk_maintenance_plan');
-
-    return res.json({
-      message: 'Cronograma cargado correctamente.',
-      plan,
-    });
-  } catch (error: any) {
-    const mappedError = mapHelpdeskError(res, error);
-    if (mappedError) {
-      return mappedError;
-    }
-
-    console.error('Error cargando cronograma mantenimiento Helpdesk:', error);
-    return res.status(500).json({ message: 'No se pudo cargar el cronograma de mantenimiento.' });
   }
 };
 
@@ -225,38 +125,3 @@ export const rescheduleMaintenanceOrderController = async (req: AuthRequest, res
     return res.status(500).json({ message: 'No se pudo reprogramar la orden de mantenimiento.' });
   }
 };
-
-export const closeMaintenanceOrderController = async (req: AuthRequest, res: Response) => {
-  const orderId = getNumberId(req.params.id);
-  if (!orderId) {
-    return res.status(400).json({ message: 'ID de orden invalido.' });
-  }
-
-  const payload = getMaintenanceOrderClosePayload(req.body);
-  if (!payload) {
-    return res.status(400).json({ message: 'Fecha de cierre, actividades realizadas y resultado son obligatorios.' });
-  }
-
-  try {
-    const order = await closeMaintenanceOrder(orderId, payload, req.user?.id ?? null);
-    if (!order) {
-      return res.status(404).json({ message: 'Orden de mantenimiento no encontrada.' });
-    }
-
-    await logHelpdeskAudit(req.user?.id, `HELPDESK_MAINTENANCE_ORDER_CLOSE:${orderId}`, req.ip, orderId, 'helpdesk_maintenance_order');
-
-    return res.json({
-      message: 'Orden de mantenimiento cerrada correctamente.',
-      order,
-    });
-  } catch (error: any) {
-    const mappedError = mapHelpdeskError(res, error);
-    if (mappedError) {
-      return mappedError;
-    }
-
-    console.error('Error cerrando orden mantenimiento Helpdesk:', error);
-    return res.status(500).json({ message: 'No se pudo cerrar la orden de mantenimiento.' });
-  }
-};
-

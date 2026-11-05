@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Plus } from 'lucide-react';
 import { downloadProgramReportPdf, fetchProgramCalendar, getApiErrorMessage, getHelpdeskOrgStructure, listEmployees, listHelpdeskCatalogs } from '../api/service';
 import { CoveragePanel } from '../components/helpdesk/program/CoveragePanel';
+import { CreateProgramFlow } from '../components/helpdesk/program/CreateProgramFlow';
 import { KpiPanel } from '../components/helpdesk/program/KpiPanel';
+import { PlansPanel } from '../components/helpdesk/program/PlansPanel';
 import { ProgramAgendaView } from '../components/helpdesk/program/ProgramAgendaView';
 import { ProgramEventDrawer } from '../components/helpdesk/program/ProgramEventDrawer';
 import { ProgramFilterBar } from '../components/helpdesk/program/ProgramFilterBar';
@@ -16,6 +18,7 @@ import type { CalendarEvent, CalendarFilters, CalendarResponse, CalendarViewMode
 import type { Employee, HelpdeskCatalogs, HelpdeskOrgStructure } from '../types/models';
 import { addDays, addMonths, buildIcs, downloadTextFile, formatDateShort, formatMonthTitle, parseIsoDate, startOfMonth, startOfWeek, todayIso } from '../utils/maintenanceProgram';
 import { notifyError, notifyInfo } from '../utils/notify';
+import { useHasPermission } from '../utils/permissions';
 
 type KpiPick = 'overdue' | 'due_soon' | 'in_progress' | 'pending_validation' | 'closed' | 'all';
 
@@ -61,9 +64,12 @@ export const HelpdeskProgramCalendarPage = () => {
   const [catalogs, setCatalogs] = useState<HelpdeskCatalogs | null>(null);
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
   const [pendingDropDate, setPendingDropDate] = useState<string | null>(null);
+  const [showPlans, setShowPlans] = useState(false);
   const [showCoverage, setShowCoverage] = useState(false);
   const [showKpis, setShowKpis] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [showCreateProgram, setShowCreateProgram] = useState(false);
+  const canWrite = useHasPermission('HELPDESK.MAINTENANCE.WRITE');
 
   const range = useMemo(() => rangeFor(viewMode, anchor), [viewMode, anchor]);
 
@@ -185,6 +191,16 @@ export const HelpdeskProgramCalendarPage = () => {
           </h1>
           <p className="text-sm text-[var(--unilabor-neutral)]">Preventivos, verificaciones, seguridad eléctrica, calibraciones y correctivos de todos los activos, por unidad, área y responsable.</p>
         </div>
+        {canWrite ? (
+          <button
+            type="button"
+            onClick={() => setShowCreateProgram(true)}
+            title="Crear el programa de mantenimiento de un activo"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-brand-700)] px-4 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-[var(--color-brand-600)]"
+          >
+            <Plus size={16} /> Crear programa
+          </button>
+        ) : null}
       </div>
 
       <div className="print:hidden">
@@ -199,7 +215,7 @@ export const HelpdeskProgramCalendarPage = () => {
           onToggleMine={() => setFilters({ ...filters, mine: !filters.mine })}
           onReload={() => void load()}
           onExportIcs={exportIcs}
-          onPrint={() => window.print()}
+          onOpenPlans={() => setShowPlans(true)}
           onOpenCoverage={() => setShowCoverage(true)}
           onOpenKpis={() => setShowKpis(true)}
           onDownloadPdf={() => void downloadPdf()}
@@ -259,6 +275,30 @@ export const HelpdeskProgramCalendarPage = () => {
         ) : null}
       </div>
 
+      {showCreateProgram ? (
+        <CreateProgramFlow
+          suppliers={catalogs?.suppliers ?? []}
+          employees={employees}
+          onClose={() => setShowCreateProgram(false)}
+          onCreated={() => {
+            setShowCreateProgram(false);
+            void load();
+          }}
+        />
+      ) : null}
+      <PlansPanel
+        open={showPlans}
+        onClose={() => setShowPlans(false)}
+        onShowInCalendar={(plan) => {
+          // Agenda desde la proxima ejecucion del plan. El activo se filtra con la busqueda
+          // (visible y borrable), no con asset_id, que no tiene control en la barra de filtros.
+          setFilters({ search: plan.asset?.asset_code ?? '' });
+          setKpi('all');
+          setAnchor(plan.next_due_on.slice(0, 10));
+          setViewMode('agenda');
+          setShowPlans(false);
+        }}
+      />
       <CoveragePanel open={showCoverage} filters={filters} onClose={() => setShowCoverage(false)} />
       <KpiPanel open={showKpis} from={range.from} to={range.to} filters={filters} onClose={() => setShowKpis(false)} />
     </div>

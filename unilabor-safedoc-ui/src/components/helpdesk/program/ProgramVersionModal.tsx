@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BookOpen, Loader2, Pencil, Plus, Save, Sparkles, Trash2, Wand2, X } from 'lucide-react';
 import { getApiErrorMessage, listAssetDocuments, listMaintenanceTemplates, proposeRoutinesFromTemplate } from '../../../api/service';
 import { SearchableSelect } from '../../SearchableSelect';
 import type { AssetProgramOverview, MaintenanceProgramSourceKind, MaintenanceTemplate, ProgramPayload } from '../../../types/helpdesk-program';
 import type { Employee, HelpdeskAssetDocument, HelpdeskCatalogItem, HelpdeskMaintenanceFrequency } from '../../../types/models';
 import { EXECUTOR_LABELS, KIND_LABELS, SOURCE_LABELS, describeDraftInterval, newRoutineDraft, stripDraftKey, todayIso, type RoutineDraft } from '../../../utils/maintenanceProgram';
-import { notifyError, notifyWarning } from '../../../utils/notify';
+import { notifyError, notifyInfo, notifyWarning } from '../../../utils/notify';
 import { RoutineEditorModal } from './RoutineEditorModal';
 
 interface ProgramVersionModalProps {
   open: boolean;
-  overview: AssetProgramOverview;
+  // null = aun no se elige el activo (solo cuando el modal trae su propio selector): el
+  // formulario se muestra deshabilitado. Quien lo use asi debe pasar `key` por activo
+  // para reiniciar el formulario al cambiar de activo.
+  overview: AssetProgramOverview | null;
+  // Selector de activo que se muestra arriba del formulario (crear programa desde el calendario).
+  assetPicker?: ReactNode;
   frequencies: HelpdeskMaintenanceFrequency[];
   suppliers: HelpdeskCatalogItem[];
   employees: Employee[];
@@ -22,18 +27,19 @@ interface ProgramVersionModalProps {
 const inputClass = 'mt-1 w-full rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-sm text-[var(--unilabor-ink)] focus:border-[var(--color-brand-500)] focus:outline-none';
 const labelClass = 'block text-xs font-semibold text-[var(--unilabor-ink)]';
 
-export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, employees, saving, onClose, onSubmit }: ProgramVersionModalProps) => {
-  const isNewVersion = Boolean(overview.program);
+export const ProgramVersionModal = ({ open, overview, assetPicker, frequencies, suppliers, employees, saving, onClose, onSubmit }: ProgramVersionModalProps) => {
+  const program = overview?.program ?? null;
+  const isNewVersion = Boolean(program);
   const [templates, setTemplates] = useState<MaintenanceTemplate[]>([]);
   const [assetDocs, setAssetDocs] = useState<HelpdeskAssetDocument[]>([]);
   const [templateId, setTemplateId] = useState('');
-  const [sourceKind, setSourceKind] = useState<MaintenanceProgramSourceKind>(overview.program?.source_kind ?? 'MANUFACTURER_MANUAL');
-  const [sourceReference, setSourceReference] = useState(overview.program?.source_reference ?? '');
+  const [sourceKind, setSourceKind] = useState<MaintenanceProgramSourceKind>(program?.source_kind ?? 'MANUFACTURER_MANUAL');
+  const [sourceReference, setSourceReference] = useState(program?.source_reference ?? '');
   const [sourceNotes, setSourceNotes] = useState('');
-  const [sourceAssetDocId, setSourceAssetDocId] = useState(overview.program?.source_asset_document_id ? String(overview.program.source_asset_document_id) : '');
+  const [sourceAssetDocId, setSourceAssetDocId] = useState(program?.source_asset_document_id ? String(program.source_asset_document_id) : '');
   const [effectiveFrom, setEffectiveFrom] = useState(todayIso());
   const [changeReason, setChangeReason] = useState('');
-  const [projectionMonths, setProjectionMonths] = useState(overview.program?.projection_months ?? 12);
+  const [projectionMonths, setProjectionMonths] = useState(program?.projection_months ?? 12);
   const [routines, setRoutines] = useState<RoutineDraft[]>([]);
   const [editing, setEditing] = useState<RoutineDraft | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -42,6 +48,7 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
   useEffect(() => {
     if (!open) return;
     listMaintenanceTemplates().then(setTemplates).catch(() => setTemplates([]));
+    if (!overview) return;
     listAssetDocuments(overview.asset.id).then(setAssetDocs).catch(() => setAssetDocs([]));
     // Nueva version: arranca con las rutinas vigentes (plan_id) para conservarlas o ajustarlas.
     setRoutines(
@@ -80,12 +87,21 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
     setEffectiveFrom(todayIso());
   }, [open, overview]);
 
+  const categoryId = overview?.asset.category_id ?? null;
   const templateOptions = useMemo(() => {
-    const own = templates.filter((t) => !overview.asset.category_id || t.category_id === overview.asset.category_id || t.category_id === null);
+    const own = templates.filter((t) => !categoryId || t.category_id === categoryId || t.category_id === null);
     const rest = templates.filter((t) => !own.includes(t));
     return [...own, ...rest].map((t) => ({ value: String(t.id), label: t.name, hint: t.category_name ? `${t.category_name} · ${t.routines.length} rutinas` : `${t.routines.length} rutinas` }));
-  }, [templates, overview.asset.category_id]);
+  }, [templates, categoryId]);
   const docOptions = useMemo(() => assetDocs.map((d) => ({ value: String(d.id), label: d.title, hint: d.document_kind_name ?? undefined })), [assetDocs]);
+  // Incluye el valor vigente aunque no sea uno de los horizontes estandar, para no
+  // dejar el campo en blanco al editar un programa con un horizonte distinto.
+  const projectionOptions = useMemo(
+    () => [...new Set([3, 6, 12, 18, 24, 36, projectionMonths])]
+      .sort((a, b) => a - b)
+      .map((m) => ({ value: String(m), label: `${m} meses` })),
+    [projectionMonths],
+  );
 
   if (!open) return null;
 
@@ -94,7 +110,19 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
     setProposing(true);
     try {
       const proposal = await proposeRoutinesFromTemplate(Number(templateId), effectiveFrom);
-      setRoutines((current) => [...current, ...proposal.map((r) => newRoutineDraft(r))]);
+      // Un programa admite varias rutinas, pero cada rutina de plantilla entra una sola vez:
+      // cargar dos veces la misma plantilla duplicaba las rutinas y, al activar, sus ordenes.
+      const alreadyLoaded = new Set(routines.map((r) => r.template_routine_id).filter((id) => id != null));
+      const fresh = proposal.filter((r) => r.template_routine_id == null || !alreadyLoaded.has(r.template_routine_id));
+      const skipped = proposal.length - fresh.length;
+      if (fresh.length > 0) {
+        setRoutines((current) => [...current, ...fresh.map((r) => newRoutineDraft(r))]);
+      }
+      if (skipped > 0 && fresh.length === 0) {
+        notifyWarning('Las rutinas de esta plantilla ya están en el programa.');
+      } else if (skipped > 0) {
+        notifyInfo(`Se agregaron ${fresh.length} rutinas; ${skipped} ya estaban en el programa y se omitieron.`);
+      }
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo cargar la propuesta de la plantilla.'));
     } finally {
@@ -109,6 +137,7 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
   };
 
   const submit = () => {
+    if (!overview) return notifyWarning('Elige el activo del programa.');
     if (routines.length === 0) return notifyWarning('Agrega al menos una rutina (desde una plantilla o manualmente).');
     if (isNewVersion && changeReason.trim().length < 5) return notifyWarning('Indica el motivo del cambio para la nueva versión.');
     const deviates = routines.some((r) => r.deviates_from_template);
@@ -132,9 +161,15 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
       <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.1)] bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-[rgba(0,65,106,0.08)] px-6 py-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">{isNewVersion ? `Nueva versión (v${(overview.program?.version ?? 0) + 1})` : 'Crear programa de mantenimiento'}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">{isNewVersion ? `Nueva versión (v${(program?.version ?? 0) + 1})` : 'Crear programa de mantenimiento'}</p>
             <h3 className="text-lg font-bold text-[var(--color-brand-700)]">
-              {overview.asset.asset_code} <span className="font-medium text-[var(--unilabor-ink)]">{overview.asset.name}</span>
+              {overview ? (
+                <>
+                  {overview.asset.asset_code} <span className="font-medium text-[var(--unilabor-ink)]">{overview.asset.name}</span>
+                </>
+              ) : (
+                'Nuevo programa'
+              )}
             </h3>
             <p className="text-xs text-[var(--unilabor-neutral)]">La plantilla solo pre-llena: ajusta cada rutina al plan del fabricante o del proveedor del servicio.</p>
           </div>
@@ -144,6 +179,9 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+          {assetPicker}
+          {/* Sin activo elegido el formulario queda visible pero deshabilitado. */}
+          <fieldset disabled={!overview} className={`min-w-0 ${overview ? '' : 'opacity-50'}`}>
           <section className="grid gap-3 rounded-2xl border border-[rgba(0,65,106,0.1)] p-3 sm:grid-cols-2">
             <label className={labelClass}>
               Fuente del programa
@@ -181,27 +219,38 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
             ) : null}
             <label className={labelClass}>
               Horizonte de proyección
-              <select value={projectionMonths} onChange={(e) => setProjectionMonths(Number(e.target.value))} className={inputClass}>
-                {[3, 6, 12, 18, 24, 36].map((m) => (
-                  <option key={m} value={m}>
-                    {m} meses
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <SearchableSelect
+                  value={String(projectionMonths)}
+                  options={projectionOptions}
+                  onChange={(v) => setProjectionMonths(Number(v))}
+                  placeholder="Horizonte"
+                  searchPlaceholder="Buscar meses..."
+                  clearable={false}
+                />
+              </div>
             </label>
+            {/* Leyenda en la columna libre a la derecha del campo, para no alargar el modal. */}
+            <p className="self-end text-[11px] leading-4 text-[var(--unilabor-neutral)]">
+              Meses hacia adelante para los que se generan las órdenes de cada rutina, de modo que ya aparezcan en el calendario. No cambia la frecuencia ni las fechas.
+            </p>
           </section>
 
           <section className="mt-4 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(248,251,253,0.9)] p-3">
-            <div className="flex flex-wrap items-end gap-2">
-              <label className={`${labelClass} min-w-[260px] flex-1`}>
-                <span className="inline-flex items-center gap-1">
-                  <BookOpen size={13} /> Plantilla por categoría
-                </span>
-                <div className="mt-1">
-                  <SearchableSelect value={templateId} options={templateOptions} onChange={setTemplateId} placeholder="Plantilla" emptyLabel="Sin plantilla" />
-                </div>
-              </label>
-              <button type="button" onClick={() => void applyTemplate()} disabled={proposing} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)] disabled:opacity-50">
+            {/* Titulo y leyenda en el mismo renglon, para no alargar el modal. */}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <span className={`${labelClass} inline-flex items-center gap-1`}>
+                <BookOpen size={13} /> Plantilla por categoría
+              </span>
+              <span className="text-[11px] leading-4 text-[var(--unilabor-neutral)]">
+                Las rutinas se cargan con primera ejecución en «Vigente desde». Editarlas afecta solo a este activo.
+              </span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-end gap-2">
+              <div className="min-w-[260px] flex-1">
+                <SearchableSelect value={templateId} options={templateOptions} onChange={setTemplateId} placeholder="Plantilla" emptyLabel="Sin plantilla" />
+              </div>
+              <button type="button" onClick={() => void applyTemplate()} disabled={proposing} title="Agrega las rutinas de la plantilla con su primera ejecución en la fecha de «Vigente desde»; la plantilla no se modifica" className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)] disabled:opacity-50">
                 {proposing ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />} Cargar propuesta
               </button>
               <button
@@ -256,6 +305,7 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
               </ul>
             )}
           </section>
+          </fieldset>
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-[rgba(0,65,106,0.08)] px-6 py-3">
@@ -266,7 +316,7 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
             <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-semibold text-[var(--unilabor-neutral)] hover:bg-[rgba(191,212,230,0.25)]">
               Cancelar
             </button>
-            <button type="button" onClick={submit} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[var(--color-brand-600)] disabled:opacity-60">
+            <button type="button" onClick={submit} disabled={saving || !overview} className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-brand-700)] px-4 py-2 text-sm font-semibold text-white shadow hover:bg-[var(--color-brand-600)] disabled:opacity-60">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} {isNewVersion ? 'Activar nueva versión' : 'Activar programa'}
             </button>
           </div>
@@ -280,7 +330,7 @@ export const ProgramVersionModal = ({ open, overview, frequencies, suppliers, em
         frequencies={frequencies}
         suppliers={suppliers}
         employees={employees}
-        criticalityCode={overview.asset.criticality_code}
+        criticalityCode={overview?.asset.criticality_code}
         onClose={() => {
           setEditorOpen(false);
           setEditing(null);

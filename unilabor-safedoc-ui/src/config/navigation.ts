@@ -14,7 +14,6 @@ import {
   BookOpen,
   Briefcase,
   Building2,
-  CalendarClock,
   CalendarDays,
   ClipboardCheck,
   ClipboardPen,
@@ -157,15 +156,22 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       ],
     },
     {
-      title: 'Inventario y Equipos (ISO 15189)',
+      title: 'Inventario',
       items: [
         { icon: Laptop, label: 'Activos', path: '/helpdesk/assets', permission: 'HELPDESK.ASSETS.WRITE' },
         { icon: ClipboardCheck, label: 'Entrega-Recepción', path: '/helpdesk/handovers', permission: 'HELPDESK.HANDOVERS.READ' },
         { icon: Move, label: 'Movimientos', path: '/helpdesk/movements', permission: 'HELPDESK.MOVEMENTS.WRITE' },
-        { icon: CalendarClock, label: 'Mantenimiento', path: '/helpdesk/maintenance', permission: 'HELPDESK.MAINTENANCE.WRITE' },
+      ],
+    },
+    {
+      // Todo el ciclo de servicio de los equipos en un solo grupo. Las etiquetas se
+      // mantienen completas porque el navbar movil las lista sin titulo de seccion.
+      title: 'Mantenimiento',
+      items: [
+        { icon: CalendarRange, label: 'Programa de mantenimiento', path: '/helpdesk/maintenance-program', permission: 'HELPDESK.MAINTENANCE.READ' },
         { icon: ShieldCheck, label: 'Calibración', path: '/helpdesk/calibration', permission: 'HELPDESK.CALIBRATION.WRITE' },
-        { icon: CalendarDays, label: 'Programa de mantenimiento', path: '/helpdesk/maintenance-program', permission: 'HELPDESK.MAINTENANCE.READ' },
         { icon: CalendarDays, label: 'Calendario de servicios', path: '/helpdesk/service-calendar', permission: ['HELPDESK.MAINTENANCE.WRITE', 'HELPDESK.CALIBRATION.WRITE'] },
+        { icon: BookOpen, label: 'Plantillas de mantenimiento', path: '/helpdesk/maintenance-templates', permission: 'HELPDESK.CATALOGS.MANAGE' },
       ],
     },
     {
@@ -178,7 +184,6 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
       title: 'Configuración',
       items: [
         { icon: Wrench, label: 'Catálogos', path: '/helpdesk/catalogs', permission: 'HELPDESK.CATALOGS.MANAGE' },
-        { icon: BookOpen, label: 'Plantillas de mantenimiento', path: '/helpdesk/maintenance-templates', permission: 'HELPDESK.CATALOGS.MANAGE' },
         { icon: Building2, label: 'Estructura', path: '/helpdesk/org-structure', permission: 'HELPDESK.ORG.MANAGE' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/helpdesk/profile' },
       ],

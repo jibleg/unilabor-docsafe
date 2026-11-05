@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GripVertical, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
+import { ClipboardList, FileText, GripVertical, Loader2, Plus, Repeat, Save, Trash2, Wrench, X } from 'lucide-react';
 import { SearchableSelect } from '../../SearchableSelect';
 import type { MaintenanceAnchorMode, MaintenanceExecutorKind, MaintenanceIntervalUnit, MaintenanceServiceKind } from '../../../types/helpdesk-program';
 import { newRoutineDraft, type RoutineDraft } from '../../../utils/maintenanceProgram';
@@ -27,6 +27,15 @@ interface RoutineEditorModalProps {
 
 const WINDOW_CAP: Record<string, number> = { CRITICAL: 0, HIGH: 7, MEDIUM: 15, LOW: 30 };
 
+type RoutineTab = 'general' | 'recurrence' | 'execution' | 'checklist';
+
+const TABS: Array<{ key: RoutineTab; label: string; icon: typeof FileText }> = [
+  { key: 'general', label: 'General', icon: FileText },
+  { key: 'recurrence', label: 'Recurrencia', icon: Repeat },
+  { key: 'execution', label: 'Ventana y ejecución', icon: Wrench },
+  { key: 'checklist', label: 'Checklist', icon: ClipboardList },
+];
+
 const inputClass = 'mt-1 w-full rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-sm text-[var(--unilabor-ink)] focus:border-[var(--color-brand-500)] focus:outline-none';
 const labelClass = 'block text-xs font-semibold text-[var(--unilabor-ink)]';
 
@@ -40,6 +49,7 @@ const RoutineEditorForm = ({ mode, initial, frequencies, suppliers, employees, c
   const [draft, setDraft] = useState<RoutineDraft>(() => initial ?? newRoutineDraft());
   const [intervalMode, setIntervalMode] = useState<'CATALOG' | 'CUSTOM'>(() => (initial?.custom_interval_value && initial?.custom_interval_unit ? 'CUSTOM' : 'CATALOG'));
   const [newTask, setNewTask] = useState('');
+  const [tab, setTab] = useState<RoutineTab>('general');
 
   const patch = (partial: Partial<RoutineDraft>) => setDraft((current) => ({ ...current, ...partial }));
   const cap = criticalityCode ? WINDOW_CAP[criticalityCode.toUpperCase()] : undefined;
@@ -54,18 +64,25 @@ const RoutineEditorForm = ({ mode, initial, frequencies, suppliers, employees, c
     setNewTask('');
   };
 
+  // Al fallar una validacion se abre la pestaña donde esta el dato que falta.
+  const reject = (target: RoutineTab, message: string) => {
+    setTab(target);
+    notifyWarning(message);
+  };
+
   const submit = () => {
-    if (!draft.title.trim()) return notifyWarning('Escribe el título de la rutina.');
-    if (draft.schedule_mode !== 'CALENDAR') {
-      if (intervalMode === 'CATALOG' && !draft.frequency_id) return notifyWarning('Selecciona la frecuencia.');
-      if (intervalMode === 'CUSTOM' && (!draft.custom_interval_value || !draft.custom_interval_unit)) return notifyWarning('Indica el intervalo personalizado (valor y unidad).');
-    }
-    if (draft.executor_kind === 'EXTERNAL_PROVIDER' && mode === 'program' && !draft.supplier_id) return notifyWarning('Selecciona el proveedor del catálogo.');
-    if (mode === 'program' && draft.next_due_on < draft.starts_on) return notifyWarning('La próxima ejecución no puede ser anterior al inicio.');
-    if (draft.deviates_from_template && !draft.deviation_reason?.trim()) return notifyWarning('Justifica la desviación respecto a la plantilla.');
+    if (!draft.title.trim()) return reject('general', 'Escribe el título de la rutina.');
+    if (intervalMode === 'CATALOG' && !draft.frequency_id) return reject('recurrence', 'Selecciona la frecuencia.');
+    if (intervalMode === 'CUSTOM' && (!draft.custom_interval_value || !draft.custom_interval_unit)) return reject('recurrence', 'Indica el intervalo personalizado (valor y unidad).');
+    if (mode === 'program' && draft.next_due_on < draft.starts_on) return reject('recurrence', 'La próxima ejecución no puede ser anterior al inicio.');
+    if (draft.executor_kind === 'EXTERNAL_PROVIDER' && mode === 'program' && !draft.supplier_id) return reject('execution', 'Selecciona el proveedor del catálogo.');
+    if (draft.deviates_from_template && !draft.deviation_reason?.trim()) return reject('execution', 'Justifica la desviación respecto a la plantilla.');
     onSave({
       ...draft,
       title: draft.title.trim(),
+      // Las rutinas son siempre por frecuencia: el modo "cronograma provisto" se retiro porque
+      // no habia donde cargarle fechas. Una rutina antigua en ese modo se regulariza al guardar.
+      schedule_mode: 'FREQUENCY',
       frequency_id: intervalMode === 'CATALOG' ? draft.frequency_id : null,
       custom_interval_value: intervalMode === 'CUSTOM' ? draft.custom_interval_value : null,
       custom_interval_unit: intervalMode === 'CUSTOM' ? draft.custom_interval_unit : null,
@@ -86,107 +103,122 @@ const RoutineEditorForm = ({ mode, initial, frequencies, suppliers, employees, c
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className={labelClass}>
-              Tipo de servicio
-              <select value={draft.service_kind} onChange={(e) => patch({ service_kind: e.target.value as MaintenanceServiceKind })} className={inputClass}>
-                {SERVICE_KIND_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={labelClass}>
-              Título
-              <input value={draft.title} onChange={(e) => patch({ title: e.target.value })} className={inputClass} placeholder="Ej. Mantenimiento preventivo semestral" />
-            </label>
-            <label className={`${labelClass} sm:col-span-2`}>
-              Descripción / referencia del manual
-              <textarea value={draft.description ?? ''} onChange={(e) => patch({ description: e.target.value || null })} rows={2} className={inputClass} placeholder="Sección del manual del fabricante o del programa del proveedor" />
-            </label>
-          </div>
+        <div className="flex flex-wrap gap-1.5 border-b border-[rgba(0,65,106,0.08)] px-6 py-2.5" role="tablist" aria-label="Secciones de la rutina">
+          {TABS.map(({ key, label, icon: Icon }) => {
+            const selected = tab === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setTab(key)}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                  selected
+                    ? 'border-[var(--color-brand-700)] bg-[var(--color-brand-700)] text-white shadow'
+                    : 'border-[rgba(0,65,106,0.12)] bg-white text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]'
+                }`}
+              >
+                <Icon size={13} />
+                {label}
+                {key === 'checklist' ? (
+                  <span className={`rounded-full px-1.5 text-[10px] font-bold tabular-nums ${selected ? 'bg-white/20' : 'bg-[rgba(0,65,106,0.06)]'}`}>{draft.tasks.length}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
 
-          <fieldset className="mt-4 rounded-2xl border border-[rgba(0,65,106,0.1)] p-3">
-            <legend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Recurrencia</legend>
-            {mode === 'program' ? (
-              <div className="mb-2 inline-flex rounded-xl border border-[rgba(0,65,106,0.12)] p-0.5 text-xs font-semibold">
-                {(['FREQUENCY', 'CALENDAR'] as const).map((m) => (
-                  <button key={m} type="button" onClick={() => patch({ schedule_mode: m })} className={`rounded-lg px-3 py-1.5 ${draft.schedule_mode === m ? 'bg-[var(--color-brand-700)] text-white' : 'text-[var(--color-brand-700)]'}`}>
-                    {m === 'FREQUENCY' ? 'Por frecuencia' : 'Cronograma provisto'}
+        {/* Alto fijo: el modal no cambia de tamaño al pasar de una pestaña a otra. El scroll
+            interno solo aparece en pantallas bajas o con un checklist largo. */}
+        <div className="h-[27rem] min-h-0 shrink overflow-y-auto px-6 py-4">
+          {tab === 'general' ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className={labelClass}>
+                Tipo de servicio
+                <select value={draft.service_kind} onChange={(e) => patch({ service_kind: e.target.value as MaintenanceServiceKind })} className={inputClass}>
+                  {SERVICE_KIND_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={labelClass}>
+                Título
+                <input value={draft.title} onChange={(e) => patch({ title: e.target.value })} className={inputClass} placeholder="Ej. Mantenimiento preventivo semestral" />
+              </label>
+              <label className={`${labelClass} sm:col-span-2`}>
+                Descripción / referencia del manual
+                <textarea value={draft.description ?? ''} onChange={(e) => patch({ description: e.target.value || null })} rows={6} className={inputClass} placeholder="Sección del manual del fabricante o del programa del proveedor" />
+              </label>
+            </div>
+          ) : null}
+
+          {tab === 'recurrence' ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2 inline-flex rounded-xl border border-[rgba(0,65,106,0.12)] p-0.5 text-xs font-semibold">
+                {(['CATALOG', 'CUSTOM'] as const).map((m) => (
+                  <button key={m} type="button" onClick={() => setIntervalMode(m)} className={`rounded-lg px-3 py-1.5 ${intervalMode === m ? 'bg-[var(--color-brand-700)] text-white' : 'text-[var(--color-brand-700)]'}`}>
+                    {m === 'CATALOG' ? 'Mensual · Bimestral · Trimestral · Semestral · Anual' : 'Personalizada'}
                   </button>
                 ))}
               </div>
-            ) : null}
-            {draft.schedule_mode === 'CALENDAR' ? (
-              <p className="text-xs text-[var(--unilabor-neutral)]">Las fechas las carga Help Desk desde el cronograma del proveedor (página de Mantenimiento → Cargar cronograma). No se proyectan ocurrencias.</p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2 inline-flex rounded-xl border border-[rgba(0,65,106,0.12)] p-0.5 text-xs font-semibold">
-                  {(['CATALOG', 'CUSTOM'] as const).map((m) => (
-                    <button key={m} type="button" onClick={() => setIntervalMode(m)} className={`rounded-lg px-3 py-1.5 ${intervalMode === m ? 'bg-[var(--color-brand-700)] text-white' : 'text-[var(--color-brand-700)]'}`}>
-                      {m === 'CATALOG' ? 'Mensual · Bimestral · Trimestral · Semestral · Anual' : 'Personalizada'}
-                    </button>
-                  ))}
-                </div>
-                {intervalMode === 'CATALOG' ? (
-                  <label className={`${labelClass} sm:col-span-2`}>
-                    Frecuencia
-                    <div className="mt-1">
-                      <SearchableSelect value={draft.frequency_id ? String(draft.frequency_id) : ''} options={frequencyOptions} onChange={(v) => patch({ frequency_id: v ? Number(v) : null })} placeholder="Frecuencia" emptyLabel="Selecciona" />
-                    </div>
+              {intervalMode === 'CATALOG' ? (
+                <label className={`${labelClass} sm:col-span-2`}>
+                  Frecuencia
+                  <div className="mt-1">
+                    <SearchableSelect value={draft.frequency_id ? String(draft.frequency_id) : ''} options={frequencyOptions} onChange={(v) => patch({ frequency_id: v ? Number(v) : null })} placeholder="Frecuencia" emptyLabel="Selecciona" />
+                  </div>
+                </label>
+              ) : (
+                <>
+                  <label className={labelClass}>
+                    Cada
+                    <input type="number" min={1} value={draft.custom_interval_value ?? ''} onChange={(e) => patch({ custom_interval_value: e.target.value ? Number(e.target.value) : null })} className={inputClass} />
                   </label>
-                ) : (
-                  <>
-                    <label className={labelClass}>
-                      Cada
-                      <input type="number" min={1} value={draft.custom_interval_value ?? ''} onChange={(e) => patch({ custom_interval_value: e.target.value ? Number(e.target.value) : null })} className={inputClass} />
-                    </label>
-                    <label className={labelClass}>
-                      Unidad
-                      <select value={draft.custom_interval_unit ?? ''} onChange={(e) => patch({ custom_interval_unit: (e.target.value || null) as MaintenanceIntervalUnit | null })} className={inputClass}>
-                        <option value="">Selecciona</option>
-                        <option value="DAY">Días</option>
-                        <option value="WEEK">Semanas</option>
-                        <option value="MONTH">Meses</option>
-                      </select>
-                    </label>
-                  </>
-                )}
-                {mode === 'program' ? (
-                  <>
-                    <label className={labelClass}>
-                      Anclaje
-                      <select value={draft.anchor_mode ?? 'FIXED'} onChange={(e) => patch({ anchor_mode: e.target.value as MaintenanceAnchorMode })} className={inputClass}>
-                        <option value="FIXED">Fijo: desde la fecha programada</option>
-                        <option value="FLOATING">Flotante: desde la fecha real de ejecución</option>
-                      </select>
-                    </label>
-                    <label className={labelClass}>
-                      Inicio del programa
-                      <input type="date" value={draft.starts_on} onChange={(e) => patch({ starts_on: e.target.value, next_due_on: draft.next_due_on < e.target.value ? e.target.value : draft.next_due_on })} className={inputClass} />
-                    </label>
-                    <label className={labelClass}>
-                      Primera / próxima ejecución
-                      <input type="date" value={draft.next_due_on} onChange={(e) => patch({ next_due_on: e.target.value })} className={inputClass} />
-                    </label>
-                    <label className={labelClass}>
-                      Termina el (opcional)
-                      <input type="date" value={draft.recurrence_end_on ?? ''} onChange={(e) => patch({ recurrence_end_on: e.target.value || null })} className={inputClass} />
-                    </label>
-                    <label className={labelClass}>
-                      Máximo de ocurrencias (opcional)
-                      <input type="number" min={1} value={draft.recurrence_max_occurrences ?? ''} onChange={(e) => patch({ recurrence_max_occurrences: e.target.value ? Number(e.target.value) : null })} className={inputClass} />
-                    </label>
-                  </>
-                ) : null}
-              </div>
-            )}
-          </fieldset>
+                  <label className={labelClass}>
+                    Unidad
+                    <select value={draft.custom_interval_unit ?? ''} onChange={(e) => patch({ custom_interval_unit: (e.target.value || null) as MaintenanceIntervalUnit | null })} className={inputClass}>
+                      <option value="">Selecciona</option>
+                      <option value="DAY">Días</option>
+                      <option value="WEEK">Semanas</option>
+                      <option value="MONTH">Meses</option>
+                    </select>
+                  </label>
+                </>
+              )}
+              {mode === 'program' ? (
+                <>
+                  <label className={labelClass}>
+                    Anclaje
+                    <select value={draft.anchor_mode ?? 'FIXED'} onChange={(e) => patch({ anchor_mode: e.target.value as MaintenanceAnchorMode })} className={inputClass}>
+                      <option value="FIXED">Fijo: desde la fecha programada</option>
+                      <option value="FLOATING">Flotante: desde la fecha real de ejecución</option>
+                    </select>
+                  </label>
+                  <label className={labelClass}>
+                    Inicio del programa
+                    <input type="date" value={draft.starts_on} onChange={(e) => patch({ starts_on: e.target.value, next_due_on: draft.next_due_on < e.target.value ? e.target.value : draft.next_due_on })} className={inputClass} />
+                  </label>
+                  <label className={labelClass}>
+                    Primera / próxima ejecución
+                    <input type="date" value={draft.next_due_on} onChange={(e) => patch({ next_due_on: e.target.value })} className={inputClass} />
+                  </label>
+                  <label className={labelClass}>
+                    Termina el (opcional)
+                    <input type="date" value={draft.recurrence_end_on ?? ''} onChange={(e) => patch({ recurrence_end_on: e.target.value || null })} className={inputClass} />
+                  </label>
+                  <label className={labelClass}>
+                    Máximo de ocurrencias (opcional)
+                    <input type="number" min={1} value={draft.recurrence_max_occurrences ?? ''} onChange={(e) => patch({ recurrence_max_occurrences: e.target.value ? Number(e.target.value) : null })} className={inputClass} />
+                  </label>
+                </>
+              ) : null}
+            </div>
+          ) : null}
 
-          <fieldset className="mt-4 rounded-2xl border border-[rgba(0,65,106,0.1)] p-3">
-            <legend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Ventana y ejecución</legend>
+          {tab === 'execution' ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <label className={labelClass}>
                 Días antes (desde)
@@ -242,46 +274,48 @@ const RoutineEditorForm = ({ mode, initial, frequencies, suppliers, employees, c
                 </label>
               ) : null}
             </div>
-          </fieldset>
+          ) : null}
 
-          <fieldset className="mt-4 rounded-2xl border border-[rgba(0,65,106,0.1)] p-3">
-            <legend className="px-1 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Checklist ({draft.tasks.length})</legend>
-            <ul className="space-y-1.5">
-              {draft.tasks.map((task, index) => (
-                <li key={`${task.id ?? 'n'}-${index}`} className="flex items-center gap-2 rounded-xl bg-[rgba(248,251,253,0.9)] px-2 py-1.5">
-                  <GripVertical size={14} className="shrink-0 text-[var(--unilabor-neutral)]" />
-                  <input
-                    value={task.task_text}
-                    onChange={(e) => patch({ tasks: draft.tasks.map((t, i) => (i === index ? { ...t, task_text: e.target.value } : t)) })}
-                    className="h-8 flex-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 text-sm"
-                  />
-                  <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--unilabor-neutral)]">
-                    <input type="checkbox" checked={task.is_required ?? true} onChange={(e) => patch({ tasks: draft.tasks.map((t, i) => (i === index ? { ...t, is_required: e.target.checked } : t)) })} /> Oblig.
-                  </label>
-                  <button type="button" onClick={() => patch({ tasks: draft.tasks.filter((_, i) => i !== index) })} className="rounded-lg p-1 text-[#b02a2a] hover:bg-[rgba(190,40,40,0.1)]">
-                    <Trash2 size={14} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addTask();
-                  }
-                }}
-                placeholder="Nueva tarea del checklist (Enter para agregar)"
-                className="h-9 flex-1 rounded-xl border border-[rgba(0,65,106,0.14)] px-3 text-sm"
-              />
-              <button type="button" onClick={addTask} className="inline-flex h-9 items-center gap-1 rounded-xl border border-[rgba(0,65,106,0.14)] px-3 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]">
-                <Plus size={14} /> Agregar
-              </button>
+          {tab === 'checklist' ? (
+            <div>
+              {draft.tasks.length === 0 ? <p className="mb-2 text-xs text-[var(--unilabor-neutral)]">Sin tareas. Agrega las actividades que se revisan en cada ejecución.</p> : null}
+              <ul className="space-y-1.5">
+                {draft.tasks.map((task, index) => (
+                  <li key={`${task.id ?? 'n'}-${index}`} className="flex items-center gap-2 rounded-xl bg-[rgba(248,251,253,0.9)] px-2 py-1.5">
+                    <GripVertical size={14} className="shrink-0 text-[var(--unilabor-neutral)]" />
+                    <input
+                      value={task.task_text}
+                      onChange={(e) => patch({ tasks: draft.tasks.map((t, i) => (i === index ? { ...t, task_text: e.target.value } : t)) })}
+                      className="h-8 flex-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 text-sm"
+                    />
+                    <label className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--unilabor-neutral)]">
+                      <input type="checkbox" checked={task.is_required ?? true} onChange={(e) => patch({ tasks: draft.tasks.map((t, i) => (i === index ? { ...t, is_required: e.target.checked } : t)) })} /> Oblig.
+                    </label>
+                    <button type="button" onClick={() => patch({ tasks: draft.tasks.filter((_, i) => i !== index) })} className="rounded-lg p-1 text-[#b02a2a] hover:bg-[rgba(190,40,40,0.1)]">
+                      <Trash2 size={14} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={newTask}
+                  onChange={(e) => setNewTask(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addTask();
+                    }
+                  }}
+                  placeholder="Nueva tarea del checklist (Enter para agregar)"
+                  className="h-9 flex-1 rounded-xl border border-[rgba(0,65,106,0.14)] px-3 text-sm"
+                />
+                <button type="button" onClick={addTask} className="inline-flex h-9 items-center gap-1 rounded-xl border border-[rgba(0,65,106,0.14)] px-3 text-xs font-semibold text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]">
+                  <Plus size={14} /> Agregar
+                </button>
+              </div>
             </div>
-          </fieldset>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-6 py-3">

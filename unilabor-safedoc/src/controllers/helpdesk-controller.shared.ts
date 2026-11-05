@@ -15,8 +15,6 @@ import type {
   HelpdeskTicketConfirmFunctionalityPayload,
 } from '../services/helpdesk-ticket.service';
 import type {
-  HelpdeskMaintenancePlanPayload,
-  HelpdeskMaintenanceOrderClosePayload,
   HelpdeskMaintenanceOrderReschedulePayload,
 } from '../services/helpdesk-maintenance.service';
 import type {
@@ -461,39 +459,6 @@ export const getTicketTechnicalReleasePayload = (body: any): HelpdeskTicketTechn
   };
 };
 
-export const getMaintenancePlanPayload = (body: any): HelpdeskMaintenancePlanPayload | null => {
-  const assetId = getNumberId(body?.asset_id);
-  const title = getText(body?.title);
-  const startsOn = getText(body?.starts_on);
-  const nextDueOn = getText(body?.next_due_on);
-
-  if (!assetId || !title || !startsOn || !nextDueOn) {
-    return null;
-  }
-
-  const taskValues = Array.isArray(body?.tasks)
-    ? body.tasks.map((task: unknown) => getText(task)).filter((task: string | null): task is string => Boolean(task))
-    : [];
-
-  return {
-    asset_id: assetId,
-    frequency_id: getNumberId(body?.frequency_id),
-    schedule_mode: body?.schedule_mode === 'CALENDAR' ? 'CALENDAR' : 'FREQUENCY',
-    responsible_employee_id: getNumberId(body?.responsible_employee_id),
-    quality_document_id: getText(body?.quality_document_id),
-    title,
-    description: getText(body?.description),
-    provider_name: getText(body?.provider_name),
-    starts_on: startsOn,
-    next_due_on: nextDueOn,
-    tolerance_before_days: Number(body?.tolerance_before_days ?? 0),
-    tolerance_after_days: Number(body?.tolerance_after_days ?? 0),
-    checklist_required: body?.checklist_required === undefined ? true : getBoolean(body?.checklist_required),
-    evidence_required: body?.evidence_required === undefined ? true : getBoolean(body?.evidence_required),
-    tasks: taskValues,
-  };
-};
-
 // Cronograma provisto (modo CALENDAR): normaliza la lista de fechas a strings
 // no vacios. Devuelve null si no hay ninguna valida.
 export const getScheduleDatesPayload = (body: any): string[] | null => {
@@ -501,37 +466,6 @@ export const getScheduleDatesPayload = (body: any): string[] | null => {
     ? body.dates.map((d: unknown) => getText(d)).filter((d: string | null): d is string => Boolean(d))
     : [];
   return dates.length > 0 ? dates : null;
-};
-
-export const getMaintenanceOrderClosePayload = (body: any): HelpdeskMaintenanceOrderClosePayload | null => {
-  const completedAt = getText(body?.completed_at);
-  const performedActivities = getText(body?.performed_activities);
-  const result = getText(body?.result);
-
-  if (!completedAt || !performedActivities || !result) {
-    return null;
-  }
-
-  const checklist = Array.isArray(body?.checklist)
-    ? body.checklist
-        .map((item: any) => ({
-          plan_task_id: getNumberId(item?.plan_task_id),
-          task_text: getText(item?.task_text) ?? '',
-          result: getText(item?.result) ?? 'PENDING',
-          notes: getText(item?.notes),
-        }))
-        .filter((item: { task_text: string }) => item.task_text.length > 0)
-    : [];
-
-  return {
-    completed_at: completedAt,
-    performed_activities: performedActivities,
-    result,
-    findings: getText(body?.findings),
-    provider_name: getText(body?.provider_name),
-    evidence_notes: getText(body?.evidence_notes),
-    checklist,
-  };
 };
 
 export const getMaintenanceOrderReschedulePayload = (body: any): HelpdeskMaintenanceOrderReschedulePayload | null => {

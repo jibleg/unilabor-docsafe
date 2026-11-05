@@ -10,6 +10,7 @@ import {
   updateMaintenanceTemplate,
 } from '../api/service';
 import { RoutineEditorModal } from '../components/helpdesk/program/RoutineEditorModal';
+import { Pagination } from '../components/Pagination';
 import { SearchableSelect } from '../components/SearchableSelect';
 import type { MaintenanceTemplate, MaintenanceTemplatePayload } from '../types/helpdesk-program';
 import type { HelpdeskCatalogs, HelpdeskMaintenanceFrequency } from '../types/models';
@@ -19,7 +20,11 @@ import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 
 const actionClass = 'inline-flex items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.3)] disabled:opacity-50';
 const primaryClass = 'inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-brand-700)] px-3 py-2 text-xs font-semibold text-white shadow transition hover:bg-[var(--color-brand-600)] disabled:opacity-60';
+const headClass = 'px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]';
+const rowActionClass = 'inline-flex items-center rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/90 p-1.5 transition hover:bg-[rgba(191,212,230,0.28)]';
 const inputClass = 'mt-1 w-full rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-sm text-[var(--unilabor-ink)] focus:border-[var(--color-brand-500)] focus:outline-none';
+
+const PAGE_SIZE_OPTIONS = [20, 30, 50];
 
 interface TemplateDraft {
   id: number | null;
@@ -63,6 +68,8 @@ export const HelpdeskMaintenanceTemplatesPage = () => {
   const [editingRoutine, setEditingRoutine] = useState<RoutineDraft | null>(null);
   const [routineOpen, setRoutineOpen] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,14 +94,19 @@ export const HelpdeskMaintenanceTemplatesPage = () => {
   }, []);
 
   const categoryOptions = useMemo(() => (catalogs?.categories ?? []).map((c) => ({ value: String(c.id), label: c.name })), [catalogs]);
-  const grouped = useMemo(() => {
-    const map = new Map<string, MaintenanceTemplate[]>();
-    for (const template of templates) {
-      const key = template.category_name ?? 'Sin categoría';
-      map.set(key, [...(map.get(key) ?? []), template]);
-    }
-    return [...map.entries()];
-  }, [templates]);
+  // Orden estable por categoría y nombre; las plantillas sin categoría van al final.
+  const sorted = useMemo(
+    () =>
+      [...templates].sort((a, b) => {
+        if (!a.category_name !== !b.category_name) return a.category_name ? -1 : 1;
+        return (a.category_name ?? '').localeCompare(b.category_name ?? '', 'es') || a.name.localeCompare(b.name, 'es') || a.id - b.id;
+      }),
+    [templates],
+  );
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  // Se acota al vuelo: si la lista se acorta (p. ej. al desactivar sin "Ver inactivas") la página no queda fuera de rango.
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const saveTemplate = async () => {
     if (!draft) return;
@@ -167,7 +179,15 @@ export const HelpdeskMaintenanceTemplatesPage = () => {
         </div>
         <div className="flex flex-wrap gap-2">
           <label className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--unilabor-neutral)]">
-            <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} /> Ver inactivas
+            <input
+              type="checkbox"
+              checked={includeInactive}
+              onChange={(e) => {
+                setIncludeInactive(e.target.checked);
+                setPage(1);
+              }}
+            />
+            Ver inactivas
           </label>
           <button type="button" className={actionClass} onClick={() => void load()} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Recargar
@@ -182,51 +202,85 @@ export const HelpdeskMaintenanceTemplatesPage = () => {
         <p className="flex items-center gap-2 text-sm text-[var(--unilabor-neutral)]">
           <Loader2 size={16} className="animate-spin" /> Cargando plantillas...
         </p>
-      ) : grouped.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-[rgba(0,65,106,0.2)] p-10 text-center">
           <p className="text-sm font-semibold text-[var(--color-brand-700)]">Aún no hay plantillas.</p>
           <p className="text-xs text-[var(--unilabor-neutral)]">Crea una por categoría (equipo de laboratorio, refrigeración, cómputo...) con sus rutinas y checklist base.</p>
         </div>
       ) : (
-        grouped.map(([category, items]) => (
-          <section key={category} className="space-y-2">
-            <h2 className="text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">{category}</h2>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {items.map((template) => (
-                <article key={template.id} className={`rounded-3xl border bg-white p-4 shadow-sm ${template.is_active ? 'border-[rgba(0,65,106,0.1)]' : 'border-dashed border-[rgba(0,65,106,0.2)] opacity-70'}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-base font-bold text-[var(--color-brand-700)]">{template.name}</h3>
-                      <p className="text-[11px] text-[var(--unilabor-neutral)]">
-                        {template.routines.length} rutina(s) · {template.assets_using} activo(s) la usan{!template.is_active ? ' · inactiva' : ''}
+        <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
+                <tr>
+                  <th className={headClass}>Plantilla</th>
+                  <th className={headClass}>Categoría</th>
+                  <th className={headClass}>Rutinas</th>
+                  <th className={`${headClass} text-right`}>Activos</th>
+                  <th className={`${headClass} text-right`}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[rgba(0,65,106,0.08)]">
+                {pageRows.map((template) => (
+                  <tr key={template.id} className={`align-top transition-colors hover:bg-[rgba(191,212,230,0.22)] ${template.is_active ? '' : 'opacity-70'}`}>
+                    <td className="px-5 py-4">
+                      <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
+                        {template.name}
+                        {!template.is_active ? <span className="rounded-full border border-dashed border-[rgba(0,65,106,0.3)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Inactiva</span> : null}
                       </p>
-                    </div>
-                    <div className="flex gap-1">
-                      <button type="button" onClick={() => setDraft(toDraft(template))} className="rounded-lg p-1.5 text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]" title="Editar">
-                        <Pencil size={15} />
-                      </button>
-                      <button type="button" onClick={() => void toggleActive(template)} className={`rounded-lg p-1.5 hover:bg-[rgba(191,212,230,0.3)] ${template.is_active ? 'text-[#b02a2a]' : 'text-[#1c7a4a]'}`} title={template.is_active ? 'Desactivar' : 'Activar'}>
-                        <Power size={15} />
-                      </button>
-                    </div>
-                  </div>
-                  {template.description ? <p className="mt-1 text-xs text-[var(--unilabor-ink)]">{template.description}</p> : null}
-                  <ul className="mt-3 space-y-1.5">
-                    {template.routines.map((routine) => (
-                      <li key={routine.id} className="flex items-center gap-2 text-xs">
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${KIND_STYLES[routine.service_kind].dot}`} />
-                        <span className="min-w-0 flex-1 truncate">
-                          <span className="font-semibold text-[var(--unilabor-ink)]">{routine.title}</span>
-                          <span className="text-[var(--unilabor-neutral)]"> · {routine.interval_label} · {EXECUTOR_LABELS[routine.executor_kind]} · {routine.tasks.length} tareas</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
-          </section>
-        ))
+                      {template.description ? <p className="mt-0.5 text-xs text-[var(--unilabor-ink)]">{template.description}</p> : null}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">{template.category_name ?? <span className="text-[var(--unilabor-neutral)]">Sin categoría</span>}</td>
+                    <td className="px-5 py-4">
+                      {template.routines.length === 0 ? (
+                        <span className="text-xs text-[var(--unilabor-neutral)]">Sin rutinas</span>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {template.routines.map((routine) => (
+                            <li key={routine.id} className="flex items-center gap-2 text-xs">
+                              <span className={`h-2 w-2 shrink-0 rounded-full ${KIND_STYLES[routine.service_kind].dot}`} title={KIND_LABELS[routine.service_kind]} />
+                              <span>
+                                <span className="font-semibold text-[var(--unilabor-ink)]">{routine.title}</span>
+                                <span className="text-[var(--unilabor-neutral)]"> · {routine.interval_label} · {EXECUTOR_LABELS[routine.executor_kind]} · {routine.tasks.length} tareas</span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-right text-sm font-semibold text-[var(--unilabor-ink)]" title={`${template.assets_using} activo(s) la usan`}>
+                      {template.assets_using}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setDraft(toDraft(template))} className={`${rowActionClass} text-[var(--color-brand-700)]`} title="Editar">
+                          <Pencil size={14} />
+                        </button>
+                        <button type="button" onClick={() => void toggleActive(template)} className={`${rowActionClass} ${template.is_active ? 'text-[#b02a2a]' : 'text-[#1c7a4a]'}`} title={template.is_active ? 'Desactivar' : 'Activar'}>
+                          <Power size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="border-t border-[rgba(0,65,106,0.08)]">
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              total={sorted.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {draft ? (
@@ -234,7 +288,7 @@ export const HelpdeskMaintenanceTemplatesPage = () => {
           <div className="flex max-h-[95vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-[rgba(0,65,106,0.1)] bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[rgba(0,65,106,0.08)] px-6 py-4">
               <h3 className="text-lg font-bold text-[var(--color-brand-700)]">{draft.id ? 'Editar plantilla' : 'Nueva plantilla'}</h3>
-              <button type="button" onClick={() => setDraft(null)} className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:bg-[rgba(191,212,230,0.3)]">
+              <button type="button" onClick={() => setDraft(null)} className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:bg-[rgba(191,212,230,0.3)]" title="Cerrar">
                 <X size={18} />
               </button>
             </div>
@@ -287,10 +341,11 @@ export const HelpdeskMaintenanceTemplatesPage = () => {
                         setRoutineOpen(true);
                       }}
                       className="rounded-lg p-1.5 text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]"
+                      title="Editar rutina"
                     >
                       <Pencil size={15} />
                     </button>
-                    <button type="button" onClick={() => setDraft({ ...draft, routines: draft.routines.filter((r) => r._key !== routine._key) })} className="rounded-lg p-1.5 text-[#b02a2a] hover:bg-[rgba(190,40,40,0.1)]">
+                    <button type="button" onClick={() => setDraft({ ...draft, routines: draft.routines.filter((r) => r._key !== routine._key) })} className="rounded-lg p-1.5 text-[#b02a2a] hover:bg-[rgba(190,40,40,0.1)]" title="Quitar rutina">
                       <Trash2 size={15} />
                     </button>
                   </li>

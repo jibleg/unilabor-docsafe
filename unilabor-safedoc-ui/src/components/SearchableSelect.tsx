@@ -16,6 +16,8 @@ interface SearchableSelectProps {
   emptyLabel?: string;
   searchPlaceholder?: string;
   disabled?: boolean;
+  // false oculta la opcion vacia: para campos obligatorios que siempre tienen valor.
+  clearable?: boolean;
 }
 
 const COMBINING_MARKS = /[̀-ͯ]/g;
@@ -31,6 +33,7 @@ export const SearchableSelect = ({
   emptyLabel = 'Sin seleccion',
   searchPlaceholder = 'Escribe para filtrar...',
   disabled = false,
+  clearable = true,
 }: SearchableSelectProps) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -119,7 +122,9 @@ export const SearchableSelect = ({
         disabled={disabled}
         className="flex w-full items-center justify-between gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-left text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)] disabled:opacity-60"
       >
-        <span className={selected ? '' : 'text-[var(--unilabor-neutral)]'}>
+        {/* Una sola linea con puntos suspensivos: una etiqueta larga no debe hacer crecer el control
+            (el texto completo queda en el tooltip). */}
+        <span className={`min-w-0 truncate ${selected ? '' : 'text-[var(--unilabor-neutral)]'}`} title={selected?.label}>
           {selected ? selected.label : placeholder}
         </span>
         <ChevronDown size={16} className="shrink-0 text-[var(--unilabor-neutral)]" />
@@ -143,14 +148,16 @@ export const SearchableSelect = ({
                 />
               </div>
               <div className="max-h-60 overflow-y-auto py-1">
-                <button
-                  type="button"
-                  onClick={() => select('')}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                >
-                  <span className="inline-flex items-center gap-2"><X size={14} /> {emptyLabel}</span>
-                  {value === '' ? <Check size={14} className="text-[var(--color-brand-700)]" /> : null}
-                </button>
+                {clearable ? (
+                  <button
+                    type="button"
+                    onClick={() => select('')}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-[var(--unilabor-neutral)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                  >
+                    <span className="inline-flex items-center gap-2"><X size={14} /> {emptyLabel}</span>
+                    {value === '' ? <Check size={14} className="text-[var(--color-brand-700)]" /> : null}
+                  </button>
+                ) : null}
                 {filtered.length === 0 ? (
                   <p className="px-3 py-3 text-sm text-[var(--unilabor-neutral)]">Sin coincidencias.</p>
                 ) : (

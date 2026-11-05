@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Download, FileDown, List, Loader2, Printer, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
+import { BarChart3, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, ClipboardList, Download, FileDown, List, Loader2, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
 import type { CalendarViewMode } from '../../../types/helpdesk-program';
 
 interface ProgramToolbarProps {
@@ -12,7 +12,7 @@ interface ProgramToolbarProps {
   onToggleMine: () => void;
   onReload: () => void;
   onExportIcs: () => void;
-  onPrint: () => void;
+  onOpenPlans: () => void;
   onOpenCoverage: () => void;
   onOpenKpis: () => void;
   onDownloadPdf: () => void;
@@ -41,14 +41,16 @@ export const ProgramToolbar = ({
   onToggleMine,
   onReload,
   onExportIcs,
-  onPrint,
+  onOpenPlans,
   onOpenCoverage,
   onOpenKpis,
   onDownloadPdf,
   downloadingPdf,
   loading,
 }: ProgramToolbarProps) => (
-  <div className="flex flex-wrap items-center justify-between gap-3">
+  // Dos renglones fijos: la navegacion con la fecha arriba y los controles abajo. En un
+  // solo renglon los controles saltaban de linea segun el largo de la etiqueta de fecha.
+  <div className="flex flex-col gap-2">
     <div className="flex items-center gap-2">
       <button type="button" onClick={onPrev} className={`${iconButton} w-9 px-0`} aria-label="Periodo anterior">
         <ChevronLeft size={16} />
@@ -92,6 +94,10 @@ export const ProgramToolbar = ({
         <UserRound size={14} />
         Mi calendario
       </button>
+      <button type="button" onClick={onOpenPlans} className={iconButton} title="Planes (rutinas) de todos los activos">
+        <ClipboardList size={14} />
+        Planes
+      </button>
       <button type="button" onClick={onOpenCoverage} className={iconButton} title="Activos que deberían tener programa y no lo tienen">
         <ShieldCheck size={14} />
         Cobertura
@@ -107,9 +113,6 @@ export const ProgramToolbar = ({
       <button type="button" onClick={onExportIcs} className={iconButton} title="Exportar a Outlook / Google Calendar (.ics)">
         <Download size={14} />
         ICS
-      </button>
-      <button type="button" onClick={onPrint} className={iconButton} title="Imprimir programa del periodo">
-        <Printer size={14} />
       </button>
       <button type="button" onClick={onReload} className={`${iconButton} w-9 px-0`} aria-label="Recargar" disabled={loading}>
         <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />

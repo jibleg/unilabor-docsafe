@@ -10,8 +10,6 @@ import {
 import {
   helpdeskAssetSchema,
   helpdeskTicketSchema,
-  maintenanceOrderCloseSchema,
-  maintenancePlanSchema,
 } from './helpdesk.schema';
 import { assetDocumentMetadataSchema, helpdeskDeactivateReasonSchema } from './helpdesk.schema';
 import {
@@ -78,35 +76,6 @@ describe('user.schema', () => {
       category_ids: [],
     });
     expect(r.success).toBe(true);
-  });
-});
-
-describe('helpdesk.schema (maintenancePlanSchema)', () => {
-  it('coerciona asset_id, normaliza vacios a null y aplica defaults', () => {
-    const r = maintenancePlanSchema.safeParse({
-      asset_id: '7',
-      title: 'Plan',
-      starts_on: '2026-06-12',
-      next_due_on: '2026-07-12',
-      description: '',
-      tasks: ['Revisar'],
-    });
-    expect(r.success).toBe(true);
-    if (r.success) {
-      expect(r.data.asset_id).toBe(7);
-      expect(r.data.description).toBeNull();
-      expect(r.data.tolerance_before_days).toBe(0);
-      expect(r.data.checklist_required).toBe(true);
-    }
-  });
-
-  it('rechaza cuando falta el activo o el titulo', () => {
-    expect(
-      maintenancePlanSchema.safeParse({ title: 'P', starts_on: '2026-06-12', next_due_on: '2026-07-12' }).success,
-    ).toBe(false);
-    expect(
-      maintenancePlanSchema.safeParse({ asset_id: 1, starts_on: '2026-06-12', next_due_on: '2026-07-12' }).success,
-    ).toBe(false);
   });
 });
 
@@ -253,18 +222,6 @@ describe('helpdesk.schema (resto)', () => {
     expect(helpdeskTicketSchema.safeParse({ title: 'Falla', description: 'No enciende' }).success).toBe(true);
   });
 
-  it('maintenanceOrderCloseSchema exige completed_at, actividades y resultado', () => {
-    expect(
-      maintenanceOrderCloseSchema.safeParse({ completed_at: '2026-06-12', performed_activities: 'Limpieza' }).success,
-    ).toBe(false);
-    expect(
-      maintenanceOrderCloseSchema.safeParse({
-        completed_at: '2026-06-12',
-        performed_activities: 'Limpieza',
-        result: 'COMPLETED',
-      }).success,
-    ).toBe(true);
-  });
 });
 
 describe('helpdesk.schema (evidencias y bajas del expediente)', () => {

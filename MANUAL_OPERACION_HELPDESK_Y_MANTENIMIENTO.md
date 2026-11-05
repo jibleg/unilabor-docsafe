@@ -127,39 +127,50 @@ Regla de control:
 
 Si el ticket tiene impacto a resultados, riesgo alto/critico o bloqueo operativo, el retorno a operacion requiere liberacion tecnica documentada.
 
-## Flujo 4 - Planes de mantenimiento preventivo
+## Flujo 4 - Programa y planes de mantenimiento preventivo
 
-Ruta: `/helpdesk/maintenance`
+Rutas:
+
+- `/helpdesk/maintenance-program`: calendario del programa de mantenimiento.
+- `/helpdesk/assets/:id/program`: programa del activo (se abre desde la ficha o el expediente del activo).
+
+Cada plan (rutina) pertenece al programa de su activo. Los planes solo se crean y
+modifican desde el programa del activo; no existe una pantalla aparte de planes.
 
 Proceso:
 
-1. Crear plan por activo.
-2. Definir frecuencia: mensual, trimestral, semestral, anual o personalizada.
-3. Definir responsable, proveedor externo y tolerancia.
-4. Registrar checklist base.
-5. Generar orden programada.
+1. En el calendario, boton "Crear programa", o abrir el programa desde la ficha del activo.
+2. Documentar la fuente del programa (manual del fabricante, proveedor, contrato o criterio interno) y su vigencia.
+3. Agregar las rutinas, a mano o a partir de una plantilla por categoria.
+4. Por rutina: frecuencia, responsable o proveedor, tolerancia y checklist.
+5. Activar el programa: se generan las ordenes programadas y su proyeccion.
 
-Cada plan mantiene ordenes programadas para ejecucion y seguimiento.
+Cambiar las rutinas de un activo que ya tiene programa crea una nueva version del programa.
+
+Consulta: en el calendario, el boton "Planes" lista las rutinas de todos los activos,
+con buscador y acceso al programa del activo o a su proxima orden en el calendario.
 
 ## Flujo 5 - Ejecucion de mantenimiento
 
-Ruta: `/helpdesk/maintenance`
+Ruta: `/helpdesk/maintenance-program`
+
+Las ordenes se atienden desde el calendario: al elegir un servicio se abre su panel lateral.
 
 Acciones de orden:
 
 - iniciar orden
 - reprogramar con justificacion
-- cerrar orden
+- ejecutar y cerrar orden
 
 Al cerrar orden se registra:
 
-- fecha de cierre
-- actividades realizadas
-- hallazgos
-- proveedor externo
-- evidencia o certificado referenciado
-- resultado: conforme, no conforme o requiere seguimiento
+- actividades realizadas y resultado
+- quien ejecuto (colaborador o proveedor)
+- tiempo fuera de servicio
+- evidencia adjunta y notas de evidencia
 - checklist ejecutado
+- firma de quien ejecuto y, cuando aplica, del responsable del activo
+- solicitud correctiva, si hubo hallazgos
 
 Cuando la orden se cierra, el sistema calcula la siguiente fecha segun frecuencia del plan y genera la siguiente orden programada.
 

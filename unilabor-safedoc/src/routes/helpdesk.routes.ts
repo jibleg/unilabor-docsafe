@@ -1,21 +1,18 @@
 import { Router } from 'express';
 import {
   addHelpdeskTicketCommentController,
-  addMaintenanceScheduleController,
   addMyHelpdeskTicketCommentController,
   assignHelpdeskTicketController,
   cancelHelpdeskTicketController,
   changeHelpdeskTicketWorkingStatusController,
   closeHelpdeskTicketController,
   viewHelpdeskTicketSignatureController,
-  closeMaintenanceOrderController,
   confirmMyHelpdeskTicketFunctionalityController,
   createHelpdeskAssetController,
   createAssetComponentController,
   attachAssetComponentController,
   detachAssetComponentController,
   createHelpdeskCatalogItemController,
-  createMaintenancePlanController,
   createHelpdeskTicketController,
   createMyHelpdeskTicketController,
   deactivateHelpdeskCatalogItemController,
@@ -50,7 +47,6 @@ import {
   startMaintenanceOrderController,
   updateHelpdeskAssetController,
   updateHelpdeskCatalogItemController,
-  updateMaintenancePlanController,
   updateHelpdeskTicketController,
   validateHelpdeskTicketReturnController,
 } from '../controllers/helpdesk.controller';
@@ -72,9 +68,7 @@ import {
   helpdeskTicketCloseSchema,
   helpdeskTicketCancelSchema,
   helpdeskTicketConfirmFunctionalitySchema,
-  maintenanceOrderCloseSchema,
   maintenanceOrderRescheduleSchema,
-  maintenancePlanSchema,
   calibrationOrderCloseSchema,
   calibrationOrderRescheduleSchema,
   calibrationPlanSchema,
@@ -381,18 +375,6 @@ router.get(
   listMaintenanceOrdersController,
 );
 router.post(
-  '/maintenance/plans',
-  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
-  validate(maintenancePlanSchema),
-  createMaintenancePlanController,
-);
-router.patch(
-  '/maintenance/plans/:id',
-  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
-  validate(maintenancePlanSchema),
-  updateMaintenancePlanController,
-);
-router.post(
   '/maintenance/orders/:id/start',
   requirePermission('HELPDESK.MAINTENANCE.WRITE'),
   startMaintenanceOrderController,
@@ -402,18 +384,6 @@ router.post(
   requirePermission('HELPDESK.MAINTENANCE.WRITE'),
   validate(maintenanceOrderRescheduleSchema),
   rescheduleMaintenanceOrderController,
-);
-router.post(
-  '/maintenance/orders/:id/close',
-  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
-  validate(maintenanceOrderCloseSchema),
-  closeMaintenanceOrderController,
-);
-router.post(
-  '/maintenance/plans/:id/schedule',
-  requirePermission('HELPDESK.MAINTENANCE.WRITE'),
-  validate(scheduleDatesSchema),
-  addMaintenanceScheduleController,
 );
 
 // --- Calibracion (ISO 15189:2022, control metrologico 6.5) ---
