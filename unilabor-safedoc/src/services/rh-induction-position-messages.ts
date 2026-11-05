@@ -1,10 +1,12 @@
 // -----------------------------------------------------------------------------
 // Textos de los SMS al colaborador en la ruta por puesto (Fases 5-7), puros y
-// testeables. Un SMS por puesto al iniciarlo (decision RH 2026-10-07):
-//   F5: sus lecturas del puesto (solo las pendientes) o, si ya las tenia
-//       firmadas por otro puesto, que ya puede presentar la evaluacion;
-//   F6: inicia la practica supervisada del puesto;
-//   F7: se abrio su evaluacion de competencia (REH-REG-003) del puesto.
+// testeables.
+//   F5: un SMS por puesto al iniciarlo (decision RH 2026-10-07): sus lecturas
+//       del puesto (solo las pendientes) o, si ya las tenia firmadas por otro
+//       puesto, que ya puede presentar la evaluacion;
+//   F6 y F7: UN solo SMS al iniciar la fase, no uno por puesto (decision
+//       2026-11-05: con varios puestos resultaba intrusivo). Dice cuantos
+//       puestos son y con cual empieza.
 // Limite 160 caracteres: si el nombre del puesto no cabe se usa su codigo.
 // -----------------------------------------------------------------------------
 
@@ -67,12 +69,35 @@ export const buildPositionReadingsSms = (
   };
 };
 
+/**
+ * Aviso de inicio de fase (F6 y F7): con varios puestos dice cuantos son y con
+ * cual empieza; con uno solo conserva el texto por puesto. `ctx` es el primer
+ * puesto de la fase.
+ */
+const phaseStartBody = (ctx: PositionStepContext, single: (label: string) => string, several: (position: string) => string): string => {
+  if (ctx.total <= 1) {
+    return fit(single, ctx);
+  }
+  const full = several(ctx.positionName);
+  return full.length <= SMS_MAX_LENGTH ? full : several(ctx.positionCode);
+};
+
 export const buildPracticalStartedSms = (ctx: PositionStepContext): { subject: string; body: string } => ({
-  subject: `Induccion - ${stepLabel(ctx, false)}: inicia practica supervisada`,
-  body: fit((label) => `SafeDoc: ${label}: inicia tu practica supervisada. El responsable de tu area te evaluara en sitio.`, ctx),
+  subject: `Induccion - Fase ${ctx.phaseNumber}: inicia practica supervisada`,
+  body: phaseStartBody(
+    ctx,
+    (label) => `SafeDoc: ${label}: inicia tu practica supervisada. El responsable de tu area te evaluara en sitio.`,
+    (position) =>
+      `SafeDoc: Fase ${ctx.phaseNumber}: inicia tu practica supervisada, puesto por puesto (${ctx.total} en total); empiezas con ${position}. Te evaluaran en sitio.`,
+  ),
 });
 
 export const buildCompetencyOpenedSms = (ctx: PositionStepContext): { subject: string; body: string } => ({
-  subject: `Induccion - ${stepLabel(ctx, false)}: evaluacion de competencia abierta`,
-  body: fit((label) => `SafeDoc: ${label}: se abrio tu evaluacion de competencia (REH-REG-003). Tu evaluador te indicara fecha y hora.`, ctx),
+  subject: `Induccion - Fase ${ctx.phaseNumber}: evaluacion de competencia abierta`,
+  body: phaseStartBody(
+    ctx,
+    (label) => `SafeDoc: ${label}: se abrio tu evaluacion de competencia (REH-REG-003). Tu evaluador te indicara fecha y hora.`,
+    (position) =>
+      `SafeDoc: Fase ${ctx.phaseNumber}: inicia tu evaluacion de competencia, puesto por puesto (${ctx.total} en total); empiezas con ${position}. Tu evaluador te dira fecha y hora.`,
+  ),
 });

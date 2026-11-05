@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, FileText, Loader2, Lock, Save, Trash2 } from 'lucide-react';
+import { ExternalLink, FileText, Loader2, Lock, RefreshCw, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
+  cancelSupervisionSignature,
   deleteSupervisionDraft,
+  getSupervisionChecklist,
   getSupervisionChecklistPdfUrl,
+  retrySupervisionClose,
   saveSupervisionResults,
   updateSupervisionChecklist,
   type CloseSupervisionChecklistResult,
@@ -12,16 +15,45 @@ import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { SupervisionChecklist, SupervisionResult, SupervisionType } from '../../../types/models';
 import { confirmAction } from '../../../utils/confirm';
 import { notifyError, notifyInfo, notifySuccess } from '../../../utils/notify';
+import { SearchableSelect } from '../../SearchableSelect';
 import { SupervisionCloseModal } from './SupervisionCloseModal';
 import { SupervisionSectionsEditor, type SupervisionDraftResult } from './SupervisionSectionsEditor';
-import { CONCLUSION_UI, buttonClass, formatDateOnly, formatPct, inputClass, labelClass, primaryButtonClass, todayIsoDate } from './supervision-ui';
+import { SupervisionSignatureProgress } from './SupervisionSignatureProgress';
+import {
+  CONCLUSION_UI,
+  SIGNERS_TOTAL,
+  buttonClass,
+  formatDateOnly,
+  formatDateTime,
+  formatPct,
+  inputClass,
+  labelClass,
+  primaryButtonClass,
+  todayIsoDate,
+} from './supervision-ui';
+import { useEmployeeOptions } from './useEmployeeOptions';
 
 interface SupervisionChecklistEditorProps {
   checklist: SupervisionChecklist;
   onChanged: (updated: SupervisionChecklist) => void;
+  /** La lista se cerró al reintentar el cierre automático (ya tenía sus tres firmas). */
   onClosed: (result: CloseSupervisionChecklistResult) => void;
   onDeleted: () => void;
 }
+
+interface SignerSelectProps {
+  value: string;
+  /** El evaluado nunca es su propio supervisor ni responsable. */
+  excludeEmployeeId: number;
+  placeholder: string;
+  onChange: (value: string) => void;
+}
+
+/** Firmante elegido entre los colaboradores activos (solo supervisión de área; en la Fase 6 sale de la asignación). */
+const SignerSelect = ({ value, excludeEmployeeId, placeholder, onChange }: SignerSelectProps) => {
+  const options = useEmployeeOptions().filter((option) => option.value !== String(excludeEmployeeId));
+  return <SearchableSelect value={value} options={options} onChange={onChange} placeholder={placeholder} emptyLabel="Sin asignar" searchPlaceholder="Buscar colaborador..." />;
+};
 
 const toValues = (checklist: SupervisionChecklist): Record<number, SupervisionDraftResult> => {
   const values: Record<number, SupervisionDraftResult> = {};
@@ -54,18 +86,19 @@ const liveSummary = (values: Record<number, SupervisionDraftResult>) => {
 /**
  * Editor de una lista ANA-REG-060: cabecera (fecha, tipo, supervisor,
  * responsable, área), 31 aspectos por sección, resultado en vivo, pregunta del
- * SGC, comentarios, PDF, borrado del borrador y cierre con firmas. Cerrada =
- * solo lectura.
+ * SGC, comentarios, PDF, borrado del borrador y envío a firma. En firma o
+ * cerrada = solo lectura; en firma RH ve el avance y puede cancelar el envío.
  */
 export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onDeleted }: SupervisionChecklistEditorProps) => {
-  // Firmada por el supervisor (espera aval) o cerrada: ya no se edita.
+  // En firma o cerrada: ya no se edita.
   const readOnly = checklist.status !== 'DRAFT';
+  const inSignature = checklist.status === 'PENDING_SIGNATURES';
   // En la Fase 6 los firmantes salen de la asignacion (supervisor de la inscripcion y responsable del area).
   const assignedSigners = checklist.enrollment_id !== null;
   const [date, setDate] = useState(checklist.supervision_date);
   const [type, setType] = useState<SupervisionType>(checklist.supervision_type);
-  const [supervisor, setSupervisor] = useState(checklist.supervisor_name);
-  const [responsible, setResponsible] = useState(checklist.area_responsible_name);
+  const [supervisorId, setSupervisorId] = useState(checklist.supervisor_employee_id ? String(checklist.supervisor_employee_id) : '');
+  const [responsibleId, setResponsibleId] = useState(checklist.area_responsible_employee_id ? String(checklist.area_responsible_employee_id) : '');
   const [area, setArea] = useState(checklist.area_name ?? '');
   const [sgcRequired, setSgcRequired] = useState(checklist.sgc_follow_up_required);
   const [sgcReference, setSgcReference] = useState(checklist.sgc_reference ?? '');
@@ -73,14 +106,14 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
   const [values, setValues] = useState<Record<number, SupervisionDraftResult>>(() => toValues(checklist));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [busy, setBusy] = useState<'pdf' | 'delete' | null>(null);
+  const [busy, setBusy] = useState<'pdf' | 'delete' | 'cancel' | 'retry' | 'refresh' | null>(null);
   const [showClose, setShowClose] = useState(false);
 
   useEffect(() => {
     setDate(checklist.supervision_date);
     setType(checklist.supervision_type);
-    setSupervisor(checklist.supervisor_name);
-    setResponsible(checklist.area_responsible_name);
+    setSupervisorId(checklist.supervisor_employee_id ? String(checklist.supervisor_employee_id) : '');
+    setResponsibleId(checklist.area_responsible_employee_id ? String(checklist.area_responsible_employee_id) : '');
     setArea(checklist.area_name ?? '');
     setSgcRequired(checklist.sgc_follow_up_required);
     setSgcReference(checklist.sgc_reference ?? '');
@@ -114,8 +147,9 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
         supervision_date: date,
         supervision_type: type,
         area_name: area.trim() || null,
-        ...(supervisor.trim() ? { supervisor_name: supervisor.trim() } : {}),
-        area_responsible_name: responsible.trim(),
+        ...(assignedSigners
+          ? {}
+          : { supervisor_employee_id: supervisorId ? Number(supervisorId) : null, area_responsible_employee_id: responsibleId ? Number(responsibleId) : null }),
         sgc_follow_up_required: sgcRequired,
         sgc_reference: sgcReference.trim() || null,
         supervisor_comments: comments.trim() || null,
@@ -172,11 +206,53 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
     }
   };
 
-  const openClose = async () => {
-    if (!supervisor.trim() || !responsible.trim()) {
-      notifyError('Captura el nombre del supervisor / auditor y del responsable del área antes de cerrar.');
-      return;
+  const handleCancelSignature = async () => {
+    const ok = await confirmAction(
+      'Cancelar envío a firma',
+      `La lista ${checklist.folio} regresará a borrador para corregirla.` +
+        (checklist.signatures_done > 0
+          ? ` Las ${checklist.signatures_done} firma(s) ya recabada(s) quedarán invalidadas (se conserva su rastro) y los tres deberán firmar de nuevo cuando la reenvíes.`
+          : ' Aún no tiene firmas recabadas.'),
+      'Cancelar envío',
+      'danger',
+    );
+    if (!ok) return;
+    setBusy('cancel');
+    try {
+      const result = await cancelSupervisionSignature(checklist.id);
+      notifyInfo(result.message);
+      onChanged(result.checklist);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cancelar el envío a firma.'));
+    } finally {
+      setBusy(null);
     }
+  };
+
+  /** Vuelve a leer la lista para ver las firmas que hayan llegado (o si ya se cerró sola). */
+  const refreshSignatures = async () => {
+    setBusy('refresh');
+    try {
+      onChanged(await getSupervisionChecklist(checklist.id));
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo actualizar la lista.'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleRetryClose = async () => {
+    setBusy('retry');
+    try {
+      onClosed(await retrySupervisionClose(checklist.id));
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cerrar la lista.'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openClose = async () => {
     if (summary.pending > 0) {
       notifyError(`Faltan ${summary.pending} aspecto(s) por calificar.`);
       return;
@@ -195,6 +271,10 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
 
   const field = (setter: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setter(event.target.value);
+    markDirty();
+  };
+  const signer = (setter: (value: string) => void) => (value: string) => {
+    setter(value);
     markDirty();
   };
 
@@ -232,9 +312,9 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
               <Lock size={12} /> Cerrada {formatDateOnly(checklist.closed_at)}
             </span>
-          ) : checklist.status === 'SUPERVISOR_SIGNED' ? (
-            <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
-              Firmada por el supervisor · espera aval de {checklist.area_responsible_name || 'el responsable del área'}
+          ) : inSignature ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
+              <Send size={12} /> En firma ({checklist.signatures_done}/{SIGNERS_TOTAL})
             </span>
           ) : (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">Borrador</span>
@@ -250,22 +330,66 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
               <button type="button" onClick={handleDelete} disabled={busy !== null} className={`${buttonClass} text-rose-700`} title="Eliminar borrador">
                 <Trash2 size={14} />
               </button>
-              <button type="button" onClick={openClose} disabled={saving} className={primaryButtonClass}>
+              <button
+                type="button"
+                onClick={openClose}
+                disabled={saving}
+                className={primaryButtonClass}
+                title="Envía la lista a firma: cada persona firma desde su Buzón y la lista se cierra sola con las tres firmas"
+              >
                 <Lock size={14} /> Cerrar y firmar
               </button>
             </>
-          ) : checklist.status === 'SUPERVISOR_SIGNED' ? (
-            <button
-              type="button"
-              onClick={() => setShowClose(true)}
-              className={primaryButtonClass}
-              title="El responsable del área firma aquí, en presencia de RH, si no lo hace con su cuenta en Mis supervisiones"
-            >
-              <Lock size={14} /> Recabar aval
-            </button>
+          ) : inSignature ? (
+            <>
+              {checklist.signatures_done >= SIGNERS_TOTAL ? (
+                <button
+                  type="button"
+                  onClick={() => void handleRetryClose()}
+                  disabled={busy !== null}
+                  className={primaryButtonClass}
+                  title="Ya están las tres firmas pero el cierre automático falló: vuelve a intentarlo"
+                >
+                  {busy === 'retry' ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Reintentar cierre
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void handleCancelSignature()}
+                disabled={busy !== null}
+                className={`${buttonClass} text-rose-700`}
+                title="Regresa la lista a borrador para corregirla; las firmas recabadas se invalidan"
+              >
+                {busy === 'cancel' ? <Loader2 size={14} className="animate-spin" /> : <Undo2 size={14} />} Cancelar envío
+              </button>
+            </>
           ) : null}
         </div>
       </header>
+
+      {inSignature ? (
+        <section className="space-y-2 rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-xs leading-5 text-sky-900">
+              <strong>En firma.</strong> Enviada{checklist.signature_requested_by_name ? ` por ${checklist.signature_requested_by_name}` : ''} el{' '}
+              {formatDateTime(checklist.signature_requested_at)}
+              {checklist.enrollment_id ? (checklist.is_final ? ' como lista final de la Fase 6 del puesto' : ' como supervisión intermedia') : ''}. Cada
+              persona firma desde su Buzón de firmas; con la tercera firma la lista se cierra sola.
+            </p>
+            <button
+              type="button"
+              onClick={() => void refreshSignatures()}
+              disabled={busy !== null}
+              className="rounded-lg p-1.5 text-sky-800 hover:bg-white/70 disabled:opacity-50"
+              title="Actualizar avance de firmas"
+              aria-label="Actualizar avance de firmas"
+            >
+              {busy === 'refresh' ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+            </button>
+          </div>
+          <SupervisionSignatureProgress signers={checklist.signers} inSignature />
+        </section>
+      ) : null}
 
       <section className="grid gap-3 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white p-4 md:grid-cols-6">
         <div>
@@ -293,25 +417,31 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
         </div>
         <div className="md:col-span-2">
           <label className={labelClass}>Supervisor / Auditor</label>
-          <input
-            value={supervisor}
-            disabled={readOnly || assignedSigners}
-            onChange={field(setSupervisor)}
-            className={inputClass}
-            placeholder={assignedSigners ? 'Asígnalo en Pendientes Fase 6' : 'Nombre de quien supervisa'}
-            title={assignedSigners ? 'Se asigna por colaborador y puesto en Pendientes Fase 6' : undefined}
-          />
+          {assignedSigners || readOnly ? (
+            <input
+              value={checklist.supervisor_name}
+              disabled
+              className={inputClass}
+              placeholder={assignedSigners ? 'Asígnalo en Pendientes Fase 6' : 'Sin asignar'}
+              title={assignedSigners ? 'Se asigna por colaborador y puesto en Pendientes Fase 6' : undefined}
+            />
+          ) : (
+            <SignerSelect value={supervisorId} excludeEmployeeId={checklist.employee_id} placeholder="Quien supervisa" onChange={signer(setSupervisorId)} />
+          )}
         </div>
         <div className="md:col-span-2">
           <label className={labelClass}>Responsable del Área</label>
-          <input
-            value={responsible}
-            disabled={readOnly || assignedSigners}
-            onChange={field(setResponsible)}
-            className={inputClass}
-            placeholder={assignedSigners ? 'Configúralo en Firmantes por área' : 'Coordinador / responsable del área'}
-            title={assignedSigners ? 'Se configura por área del puesto en Firmantes por área' : undefined}
-          />
+          {assignedSigners || readOnly ? (
+            <input
+              value={checklist.area_responsible_name}
+              disabled
+              className={inputClass}
+              placeholder={assignedSigners ? 'Configúralo en Firmantes por área' : 'Sin asignar'}
+              title={assignedSigners ? 'Se configura por área del puesto en Firmantes por área' : undefined}
+            />
+          ) : (
+            <SignerSelect value={responsibleId} excludeEmployeeId={checklist.employee_id} placeholder="Coordinador / responsable del área" onChange={signer(setResponsibleId)} />
+          )}
         </div>
         <div className="md:col-span-3">
           <label className={labelClass}>Área evaluada</label>
@@ -374,7 +504,16 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
         </div>
       </section>
 
-      {showClose ? <SupervisionCloseModal checklist={checklist} onClose={() => setShowClose(false)} onClosed={onClosed} /> : null}
+      {showClose ? (
+        <SupervisionCloseModal
+          checklist={checklist}
+          onClose={() => setShowClose(false)}
+          onSent={(result) => {
+            notifySuccess(result.message);
+            onChanged(result.checklist);
+          }}
+        />
+      ) : null}
     </div>
   );
 };

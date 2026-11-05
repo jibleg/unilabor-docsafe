@@ -174,7 +174,7 @@ export const TRANSITION_TARGETS: InductionTransitionTarget[] = [5, 6, 7];
 export const TRANSITION_TARGET_META: Record<InductionTransitionTarget, { label: string; action: string; hint: string }> = {
   5: { label: 'Fase 4 → 5', action: 'Inscribir en Fase 5', hint: 'Aprobaron la Fase 4 y esperan su inducción técnica por puesto.' },
   6: { label: 'Fase 5 → 6', action: 'Inscribir en Fase 6', hint: 'Aprobaron la Fase 5 y esperan su práctica supervisada.' },
-  7: { label: 'Fase 6 → 7', action: 'Abrir evaluación de competencia', hint: 'Aprobaron la Fase 6 y esperan su evaluación de competencia inicial (REH-REG-003).' },
+  7: { label: 'Fase 6 → 7', action: 'Abrir evaluación de competencia', hint: 'La evaluación de competencia inicial (REH-REG-003) se abre sola al acreditar la Fase 6 de todos los puestos; aquí quedan los casos que el sistema no pudo abrir, con su motivo.' },
 };
 
 export const TRANSITION_STATE_META: Record<InductionTransitionState, { label: string; className: string }> = {

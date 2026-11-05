@@ -23,7 +23,7 @@ export const InductionPhase7Card = ({ phase7, onOpen }: InductionPhase7CardProps
       </div>
       <Award size={18} className="shrink-0 text-[var(--color-brand-500)]" />
     </div>
-    <p className="mt-2 text-[11px] text-[var(--unilabor-neutral)]">Sin inscripción: se abre el REH-REG-003 inicial a quien aprobó la Fase 6.</p>
+    <p className="mt-2 text-[11px] text-[var(--unilabor-neutral)]">Sin inscripción: el REH-REG-003 inicial se abre solo al acreditar la Fase 6 de todos los puestos; «Esperan» son los que RH debe abrir a mano.</p>
     <dl className="mt-3 grid grid-cols-3 gap-2">
       <Stat label="Esperan" value={phase7.waiting} tone={phase7.waiting > 0 ? 'text-rose-600' : 'text-[var(--color-brand-700)]'} />
       <Stat label="En proceso" value={phase7.in_process} tone="text-amber-700" />

@@ -42,11 +42,31 @@ describe('SMS de la ruta por puesto', () => {
     expect(sms.body.length).toBeLessThanOrEqual(SMS_MAX_LENGTH);
   });
 
-  it('Fase 6 y Fase 7', () => {
+  it('Fase 6 y Fase 7: un aviso de inicio de fase con el total de puestos y el primero', () => {
     const f6 = buildPracticalStartedSms(ctx({ phaseNumber: 6, ordinal: 1 }));
-    const f7 = buildCompetencyOpenedSms(ctx({ phaseNumber: 7, ordinal: 3, positionName: 'Flebotomista', positionCode: 'FLEB' }));
-    expect(f6.body).toBe('SafeDoc: Fase 6, puesto 1 de 3 (Almacén): inicia tu practica supervisada. El responsable de tu area te evaluara en sitio.');
-    expect(f7.body).toContain('Fase 7, puesto 3 de 3 (Flebotomista): se abrio tu evaluacion de competencia');
+    const f7 = buildCompetencyOpenedSms(ctx({ phaseNumber: 7, ordinal: 1, positionName: 'Flebotomista', positionCode: 'FLEB' }));
+    expect(f6.body).toBe('SafeDoc: Fase 6: inicia tu practica supervisada, puesto por puesto (3 en total); empiezas con Almacén. Te evaluaran en sitio.');
+    expect(f7.body).toBe(
+      'SafeDoc: Fase 7: inicia tu evaluacion de competencia, puesto por puesto (3 en total); empiezas con Flebotomista. Tu evaluador te dira fecha y hora.',
+    );
+    expect(f6.body.length).toBeLessThanOrEqual(SMS_MAX_LENGTH);
+    expect(f7.body.length).toBeLessThanOrEqual(SMS_MAX_LENGTH);
+  });
+
+  it('Fase 6 y Fase 7 con un solo puesto: texto por puesto, sin conteo', () => {
+    const one = { total: 1, ordinal: 1 };
+    expect(buildPracticalStartedSms(ctx({ phaseNumber: 6, ...one })).body).toBe(
+      'SafeDoc: Fase 6 (Almacén): inicia tu practica supervisada. El responsable de tu area te evaluara en sitio.',
+    );
+    expect(buildCompetencyOpenedSms(ctx({ phaseNumber: 7, ...one })).body).toContain('Fase 7 (Almacén): se abrio tu evaluacion de competencia');
+  });
+
+  it('Fase 6 y Fase 7 con nombre de puesto largo: usa el codigo', () => {
+    const long = { positionName: 'Coordinador de Procedimientos Preanalíticos y Postanalíticos', positionCode: 'CPP', ordinal: 1 };
+    const f6 = buildPracticalStartedSms(ctx({ phaseNumber: 6, ...long }));
+    const f7 = buildCompetencyOpenedSms(ctx({ phaseNumber: 7, ...long }));
+    expect(f6.body).toContain('empiezas con CPP.');
+    expect(f7.body).toContain('empiezas con CPP.');
     expect(f6.body.length).toBeLessThanOrEqual(SMS_MAX_LENGTH);
     expect(f7.body.length).toBeLessThanOrEqual(SMS_MAX_LENGTH);
   });

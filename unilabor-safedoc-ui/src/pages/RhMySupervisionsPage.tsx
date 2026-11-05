@@ -1,32 +1,32 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ClipboardCheck, Loader2, RefreshCw } from 'lucide-react';
-import { getMySupervision, listMySupervisions, type MySupervisionRole, type MySupervisionsOverview } from '../api/service.api-my-supervision';
+import { ClipboardCheck, Inbox, Loader2, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { getMySupervision, listMySupervisions, type MySupervisionsOverview } from '../api/service.api-my-supervision';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { MySupervisionDetail } from '../components/rh/supervision/MySupervisionDetail';
-import { buttonClass, cardClass, formatDateOnly } from '../components/rh/supervision/supervision-ui';
+import { SIGNERS_TOTAL, buttonClass, cardClass, formatDateOnly } from '../components/rh/supervision/supervision-ui';
 import type { SupervisionChecklist, SupervisionChecklistListRow } from '../types/models';
 import { notifyError } from '../utils/notify';
 
-type Tab = 'to_supervise' | 'to_endorse' | 'waiting_endorsement';
+type Tab = 'to_supervise' | 'in_signature';
 
 const TABS: Array<[Tab, string, string]> = [
-  ['to_supervise', 'Por supervisar', 'Listas de los colaboradores que tienes asignados: califícalas y fírmalas.'],
-  ['to_endorse', 'Por avalar', 'Listas de tu área ya firmadas por su supervisor: revísalas y avala para cerrarlas.'],
-  ['waiting_endorsement', 'Firmadas por mí', 'Listas que firmaste y esperan el aval del responsable del área.'],
+  ['to_supervise', 'Por supervisar', 'Listas de los colaboradores que tienes asignados: califícalas y envíalas a firma.'],
+  ['in_signature', 'En firma', 'Listas que ya calificaste y esperan las tres firmas; se cierran solas al reunirlas.'],
 ];
 
-const EMPTY: MySupervisionsOverview = { to_supervise: [], to_endorse: [], waiting_endorsement: [] };
+const EMPTY: MySupervisionsOverview = { to_supervise: [], in_signature: [] };
 
 /**
- * Mis supervisiones (ANA-REG-060, Fase 6 de Inducción): cada quien firma con
- * su propia cuenta. El supervisor asignado califica y firma; el responsable
- * del área avala y la lista se cierra y archiva.
+ * Mis supervisiones (ANA-REG-060, Fase 6 de Inducción): el supervisor asignado
+ * califica sus listas y las envía a firma. La firma de todos (incluida la
+ * suya) se coloca en el Buzón de firmas.
  */
 export const RhMySupervisionsPage = () => {
   const [overview, setOverview] = useState<MySupervisionsOverview>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('to_supervise');
-  const [detail, setDetail] = useState<{ checklist: SupervisionChecklist; roles: MySupervisionRole[] } | null>(null);
+  const [detail, setDetail] = useState<SupervisionChecklist | null>(null);
   const [opening, setOpening] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -34,7 +34,7 @@ export const RhMySupervisionsPage = () => {
     try {
       const next = await listMySupervisions();
       setOverview(next);
-      setTab((current) => (next[current].length > 0 ? current : next.to_endorse.length > 0 && next.to_supervise.length === 0 ? 'to_endorse' : current));
+      setTab((current) => (next.to_supervise.length === 0 && next.in_signature.length > 0 ? 'in_signature' : current));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron cargar tus supervisiones.'));
     } finally {
@@ -61,8 +61,8 @@ export const RhMySupervisionsPage = () => {
       <div className="mx-auto max-w-6xl px-4 py-6">
         <section className={cardClass}>
           <MySupervisionDetail
-            checklist={detail.checklist}
-            roles={detail.roles}
+            key={detail.id}
+            checklist={detail}
             onBack={() => setDetail(null)}
             onDone={() => {
               setDetail(null);
@@ -82,9 +82,14 @@ export const RhMySupervisionsPage = () => {
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">Inducción · Fase 6 · ANA-REG-060</p>
           <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Mis supervisiones</h1>
         </div>
-        <button type="button" onClick={() => void load()} className={buttonClass}>
-          <RefreshCw size={14} /> Actualizar
-        </button>
+        <div className="flex gap-2">
+          <Link to="/rh/signature-inbox" className={buttonClass} title="Aquí se firma: tus listas enviadas a firma te esperan en el Buzón">
+            <Inbox size={14} /> Buzón de firmas
+          </Link>
+          <button type="button" onClick={() => void load()} className={buttonClass}>
+            <RefreshCw size={14} /> Actualizar
+          </button>
+        </div>
       </header>
 
       <div className="inline-flex overflow-hidden rounded-xl border border-[rgba(0,65,106,0.14)] bg-white">
@@ -124,7 +129,7 @@ export const RhMySupervisionsPage = () => {
                   </p>
                   <p className="text-[11px] text-[var(--unilabor-neutral)]">
                     {row.folio} · {row.process_area_name ?? 'Puesto sin área'} · {formatDateOnly(row.supervision_date)}
-                    {tab === 'to_endorse' ? ` · firmó ${row.supervisor_name}` : ''}
+                    {tab === 'in_signature' ? ` · ${row.signatures_done} de ${SIGNERS_TOTAL} firmas` : ''}
                     {tab === 'to_supervise' && row.items_pending > 0 ? ` · ${row.items_pending} aspecto(s) sin calificar` : ''}
                   </p>
                 </div>

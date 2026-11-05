@@ -25,8 +25,11 @@ interface InductionTransitionModalProps {
 const TARGET_EXPLANATION: Record<InductionTransitionTarget, string> = {
   5: 'Quedan inscritos en la Fase 5 con una inscripción por cada puesto, uno tras otro: inicia el primero (lecturas, plazo y SMS) y, al acreditar su cuestionario, se abre el siguiente sin descanso. Pasan a la Fase 6 solo con TODOS sus puestos acreditados.',
   6: 'Quedan inscritos en la Fase 6 (práctica supervisada, sin lectura) por cada puesto, en el orden de la Fase 5: RH captura la práctica del puesto en curso y al acreditarla se abre la del siguiente.',
-  7: 'Se abre en borrador la evaluación de competencia inicial (REH-REG-003) del siguiente puesto de su ruta, con sus competencias precargadas. Al autorizarla, el colaborador vuelve a la bandeja con su siguiente puesto.',
+  7: 'Normalmente esta evaluación se abre sola al acreditar la Fase 6 de todos los puestos; aquí abres las que el sistema no pudo abrir. Se abre en borrador la evaluación de competencia inicial (REH-REG-003) del siguiente puesto de su ruta, con sus competencias precargadas. Al autorizarla, se abre sola la del siguiente puesto.',
 };
+
+/** Regla de la Fase 7: el evaluador no puede ser quien supervisó la Fase 6 de ese puesto. */
+const EVALUATOR_RULE_ERROR = 'RH_COMP_EVAL_EVALUATOR_IS_PHASE6_SUPERVISOR';
 
 /**
  * Confirmación del avance de fase desde la bandeja (o desde la fila de una
@@ -34,19 +37,17 @@ const TARGET_EXPLANATION: Record<InductionTransitionTarget, string> = {
  * devuelve el motivo de los que no; el resultado se muestra uno por uno.
  */
 export const InductionTransitionModal = ({ target, candidates, onClose, onDone }: InductionTransitionModalProps) => {
-  const [evaluatorName, setEvaluatorName] = useState('');
+  const [evaluatorId, setEvaluatorId] = useState('');
   const [evaluationDate, setEvaluationDate] = useState(todayIsoDate());
   const [saving, setSaving] = useState(false);
   const [results, setResults] = useState<InductionTransitionResult[] | null>(null);
   const [progress, setProgress] = useState<{ done: number; current: string } | null>(null);
   const meta = TRANSITION_TARGET_META[target];
   const needsEvaluator = target === 7;
-  // Evaluador: colaborador activo elegido de la lista (el REH-REG-003 guarda su nombre); nunca uno de los evaluados.
+  // Evaluador: colaborador activo elegido de la lista (se envía su id); nunca uno de los evaluados.
+  // Sin elegir, el servidor propone al coordinador del área de cada puesto.
   const employeeOptions = useEmployeeOptions();
-  const evaluatorOptions = employeeOptions
-    .filter((option) => !candidates.some((candidate) => String(candidate.employee_id) === option.value))
-    .map((option) => ({ ...option, value: option.label }));
-  const canConfirm = !needsEvaluator || evaluatorName.trim().length >= 3;
+  const evaluatorOptions = employeeOptions.filter((option) => !candidates.some((candidate) => String(candidate.employee_id) === option.value));
 
   // Uno por uno: cada inscripcion de Fase 5 asigna todos los documentos del
   // puesto (hasta ~250) y puede tardar minutos; en un solo request el proxy
@@ -61,7 +62,7 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
           const response = await executeInductionTransition({
             target,
             employee_ids: [candidate.employee_id],
-            ...(needsEvaluator ? { evaluator_name: evaluatorName.trim(), evaluation_date: evaluationDate } : {}),
+            ...(needsEvaluator ? { ...(evaluatorId ? { evaluator_employee_id: Number(evaluatorId) } : {}), evaluation_date: evaluationDate } : {}),
           });
           collected.push(...response.results);
         } catch (error) {
@@ -80,6 +81,8 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
       const summary = `${okCount} de ${candidates.length} colaborador(es) avanzados.`;
       if (okCount > 0) notifySuccess(summary);
       else notifyError(summary);
+      const ruleError = collected.find((result) => result.error_code === EVALUATOR_RULE_ERROR);
+      if (ruleError) notifyError(ruleError.message);
       onDone();
     } finally {
       setProgress(null);
@@ -133,14 +136,17 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
                     Evaluador (quien aplicará la evaluación)
                     <div className="mt-1 font-normal">
                       <SearchableSelect
-                        value={evaluatorName}
+                        value={evaluatorId}
                         options={evaluatorOptions}
-                        onChange={setEvaluatorName}
-                        placeholder="Elige al evaluador"
-                        emptyLabel="Sin elegir"
+                        onChange={setEvaluatorId}
+                        placeholder="Coordinador del área (propuesto)"
+                        emptyLabel="Coordinador del área (propuesto)"
                         searchPlaceholder="Buscar colaborador..."
                       />
                     </div>
+                    <p className="mt-1 text-[11px] font-normal leading-4 text-[var(--unilabor-neutral)]">
+                      Sin elegir, se propone al coordinador del área de cada puesto. No puede ser quien supervisó la Fase 6 de ese puesto.
+                    </p>
                   </div>
                   <label className="block text-xs font-semibold">
                     Fecha
@@ -178,7 +184,7 @@ export const InductionTransitionModal = ({ target, candidates, onClose, onDone }
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={saving || !canConfirm}
+                disabled={saving}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <StepForward size={14} />}

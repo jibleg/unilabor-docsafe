@@ -234,15 +234,8 @@ export const createLetterForEvaluation = async (evaluationId: number, actorUserI
       'La carta de asignacion se emite cuando el REH-REG-003 inicial del puesto esta autorizado.',
     );
   }
+  // Responsable del area (id y nombre) y Director General salen de la misma sugerencia del REH-REG-003.
   const signers = await getCompetencySuggestedSigners(evaluationId);
-  const responsible = await pool.query(
-    `SELECT s.area_responsible_employee_id
-       FROM public.rh_positions rp
-       JOIN public.rh_process_areas pa ON pa.id = rp.process_area_id
-       JOIN public.rh_supervision_area_signatories s ON s.area_key = pa.code
-      WHERE rp.id = $1 AND s.area_responsible_employee_id <> $2 LIMIT 1;`,
-    [row.position_id, row.employee_id],
-  );
   const items = await listAuthorizationItems();
   const positionItems = new Set(await getPositionAuthorizations(Number(row.position_id)));
   const id = await withTransaction(async (client) => {
@@ -258,7 +251,7 @@ export const createLetterForEvaluation = async (evaluationId: number, actorUserI
         todayInMexico(),
         row.area_name ? String(row.area_name) : null,
         String(row.position_name),
-        responsible.rows[0]?.area_responsible_employee_id ?? null,
+        signers?.area_employee_id ?? null,
         signers?.area ?? '',
         signers?.director ?? '',
         actorUserId,

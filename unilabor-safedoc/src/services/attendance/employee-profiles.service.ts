@@ -8,6 +8,7 @@ import type {
 import { buildPaginatedResult, resolvePagination } from '../../utils/pagination';
 import { withTransaction, type Queryable } from '../../utils/transaction';
 import { registerAuditEvent } from '../audit.service';
+import { resyncDraftSignersQuietly } from '../rh-supervision-signers.service';
 import { conflict, invalid, notFound } from './attendance-errors';
 import { triggerEmployeeDeviceSync } from './device-reconcile.service';
 import { isDeviceNumber } from './device-number';
@@ -387,6 +388,8 @@ export const updateAttendanceEmployee = async (
     throw error;
   }
   await auditEmployee(userId, 'attendance_employee_updated', employeeId, { ...input });
+  // La sucursal de la ficha decide el Responsable del Area de sus listas ANA-REG-060 en borrador.
+  if (input.branch_id !== undefined) await resyncDraftSignersQuietly({ employeeIds: [employeeId] });
   // Lo que afecta al reloj (alta, baja, numero, sucursal) se encola solo; no espera a que alguien pulse Sincronizar.
   await triggerEmployeeDeviceSync([employeeId], userId);
   return getAttendanceEmployee(employeeId);
@@ -473,6 +476,9 @@ export const bulkEnableEmployees = async (input: BulkEnableInput, userId: string
       });
     }
     await triggerEmployeeDeviceSync(planned.map((item) => item.id), userId);
+    // El alta en lote puede fijar la sucursal de la ficha (ver updateEmployeeProfile).
+    const moved = planned.filter((item) => item.before.branch_id !== item.after.branch_id).map((item) => item.id);
+    if (moved.length > 0) await resyncDraftSignersQuietly({ employeeIds: moved });
     return { enabled: planned.length, employee_ids: planned.map((item) => item.id) };
   } catch (error) {
     if (error instanceof BulkValidationAbort) {

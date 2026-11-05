@@ -40,8 +40,9 @@ const headerSchema = z.object({
   supervision_date: isoDate.optional(),
   supervision_type: supervisionType.optional(),
   area_name: optionalText,
-  supervisor_name: z.string().trim().min(1, 'El supervisor es obligatorio').max(200).optional(),
-  area_responsible_name: z.string().trim().max(200).optional(),
+  // Solo supervision de area (sin inscripcion): en la Fase 6 los firmantes salen de la asignacion.
+  supervisor_employee_id: positiveId.nullable().optional(),
+  area_responsible_employee_id: positiveId.nullable().optional(),
   sgc_follow_up_required: z.boolean().optional(),
   sgc_reference: optionalText,
   supervisor_comments: optionalText,
@@ -68,17 +69,18 @@ export type SaveSupervisionResultsBody = z.infer<typeof saveSupervisionResultsSc
 
 const signature = z.string().trim().min(1, 'Firma vacia').max(2_000_000, 'Firma demasiado grande');
 
-export const closeSupervisionChecklistSchema = z
+/** Enviar a firma (RH): decide si la lista es la final de la Fase 6 y admite ultimos cambios de cabecera. */
+export const sendToSignatureSchema = z
   .object({
-    // Opcional cuando el supervisor ya firmo con su cuenta (SUPERVISOR_SIGNED).
-    supervisor_signature: signature.optional().nullable(),
-    area_responsible_signature: signature,
-    employee_signature: signature.optional().nullable(),
     is_final: z.boolean().optional(),
     header: headerSchema.optional(),
   })
   .passthrough();
-export type CloseSupervisionChecklistBody = z.infer<typeof closeSupervisionChecklistSchema>;
+export type SendToSignatureBody = z.infer<typeof sendToSignatureSchema>;
+
+/** Buzon de firmas: el firmante solo manda su firma; el rol se deduce de su sesion. */
+export const signatureInboxSignSchema = z.object({ signature }).passthrough();
+export type SignatureInboxSignBody = z.infer<typeof signatureInboxSignSchema>;
 
 export const setPositionNaItemsSchema = z
   .object({
@@ -88,7 +90,7 @@ export const setPositionNaItemsSchema = z
 export type SetPositionNaItemsBody = z.infer<typeof setPositionNaItemsSchema>;
 
 export const supervisionListQuerySchema = z.object({
-  status: z.enum(['DRAFT', 'SUPERVISOR_SIGNED', 'CLOSED']).optional(),
+  status: z.enum(['DRAFT', 'PENDING_SIGNATURES', 'CLOSED']).optional(),
   employee_id: positiveId.optional(),
   position_id: positiveId.optional(),
   enrollment_id: positiveId.optional(),
@@ -107,21 +109,6 @@ export const supervisionPendingQuerySchema = z.object({
     .transform((value) => value === true || value === 'true' || value === '1'),
 });
 
-export const saveAreaSignatoriesSchema = z
-  .object({
-    rows: z
-      .array(
-        z.object({
-          area_key: z.string().trim().min(1, 'Area vacia').max(10),
-          area_responsible_employee_id: z.coerce.number().int().positive().nullable().default(null),
-        }),
-      )
-      .min(1)
-      .max(200),
-  })
-  .passthrough();
-export type SaveAreaSignatoriesBody = z.infer<typeof saveAreaSignatoriesSchema>;
-
 export const assignSupervisorSchema = z
   .object({
     enrollment_ids: z.array(positiveId).min(1, 'Elige al menos una inscripcion').max(500),
@@ -130,20 +117,15 @@ export const assignSupervisorSchema = z
   .passthrough();
 export type AssignSupervisorBody = z.infer<typeof assignSupervisorSchema>;
 
-/** Mis supervisiones: el supervisor firma (con ultimos ajustes de SGC y comentarios). */
-export const mySupervisionSignSchema = z
+/** Mis supervisiones: el supervisor envia su lista a firma (con ultimos ajustes de SGC y comentarios). */
+export const mySupervisionSendSchema = z
   .object({
-    signature,
     sgc_follow_up_required: z.boolean().optional(),
     sgc_reference: z.string().trim().max(500).nullable().optional(),
     supervisor_comments: z.string().trim().max(2000).nullable().optional(),
   })
   .passthrough();
-export type MySupervisionSignBody = z.infer<typeof mySupervisionSignSchema>;
-
-/** Mis supervisiones: el responsable del area avala y cierra. */
-export const mySupervisionEndorseSchema = z.object({ signature }).passthrough();
-export type MySupervisionEndorseBody = z.infer<typeof mySupervisionEndorseSchema>;
+export type MySupervisionSendBody = z.infer<typeof mySupervisionSendSchema>;
 
 export const generateDraftsSchema = z
   .object({

@@ -1,9 +1,11 @@
 import pool from '../config/db';
+import { resolveAreaResponsibleFor } from './rh-supervision-area-responsible.service';
 
 // -----------------------------------------------------------------------------
 // Firmantes institucionales sugeridos para cerrar un REH-REG-003:
-//   * Coordinador del area: el Responsable del Area configurado para el area
-//     del proceso del puesto evaluado (Firmantes por area, mismo dato de la Fase 6).
+//   * Coordinador del area: el Responsable del Area que resuelve "Firmantes por
+//     area" para el puesto evaluado y la unidad del colaborador (propio de la
+//     unidad, general del area o su suplente; la misma regla de la Fase 6).
 //   * Coordinador de RH: quien ocupa el puesto CRH.
 //   * Director General: quien ocupa el puesto DG.
 // Son sugerencias: RH puede cambiarlas al cerrar. Nunca se sugiere al evaluado.
@@ -25,6 +27,8 @@ export const authorizationSignerLabel = (record: { director_signatory_name: stri
 
 export interface CompetencySuggestedSigners {
   area: string | null;
+  /** Colaborador sugerido como Coordinador del area (misma resolucion que `area`). */
+  area_employee_id: number | null;
   rh: string | null;
   director: string | null;
 }
@@ -44,20 +48,14 @@ const holderOf = async (positionCode: string, excludeEmployeeId: number): Promis
 };
 
 export const getCompetencySuggestedSigners = async (evaluationId: number): Promise<CompetencySuggestedSigners | null> => {
-  const evaluation = await pool.query(
-    `SELECT ce.employee_id, resp.id AS responsible_id, resp.full_name AS responsible_name
-       FROM public.rh_competency_evaluations ce
-       JOIN public.rh_positions rp ON rp.id = ce.position_id
-       LEFT JOIN public.rh_process_areas pa ON pa.id = rp.process_area_id
-       LEFT JOIN public.rh_supervision_area_signatories s ON s.area_key = pa.code
-       LEFT JOIN public.employees resp ON resp.id = s.area_responsible_employee_id AND resp.is_active = TRUE
-      WHERE ce.id = $1 LIMIT 1;`,
-    [evaluationId],
-  );
+  const evaluation = await pool.query(`SELECT employee_id, position_id FROM public.rh_competency_evaluations WHERE id = $1 LIMIT 1;`, [evaluationId]);
   const row = evaluation.rows[0];
   if (!row) return null;
   const employeeId = Number(row.employee_id);
-  const area = row.responsible_id && Number(row.responsible_id) !== employeeId ? String(row.responsible_name) : null;
-  const [rh, director] = await Promise.all([holderOf('CRH', employeeId), holderOf('DG', employeeId)]);
-  return { area, rh, director };
+  const [responsible, rh, director] = await Promise.all([
+    resolveAreaResponsibleFor(Number(row.position_id), employeeId),
+    holderOf('CRH', employeeId),
+    holderOf('DG', employeeId),
+  ]);
+  return { area: responsible?.candidate.name ?? null, area_employee_id: responsible?.candidate.employee_id ?? null, rh, director };
 };

@@ -4,6 +4,7 @@ import {
   assignCourseKnowledgeController,
   assignPhase5KnowledgeController,
   getCompetencySuggestedSignersController,
+  getCompetencyProposedEvaluatorController,
   listKnowledgeCourseOptionsController,
   cancelKnowledgeQuizController,
   issueCompetencyCertificateController,
@@ -80,6 +81,7 @@ router.get('/:id/knowledge-courses', listKnowledgeCourseOptionsController);
 router.post('/:id/knowledge-course', validate(assignCourseKnowledgeSchema), assignCourseKnowledgeController);
 router.post('/:id/knowledge-phase5', assignPhase5KnowledgeController);
 router.get('/:id/suggested-signers', getCompetencySuggestedSignersController);
+router.get('/:id/proposed-evaluator', getCompetencyProposedEvaluatorController);
 router.post('/:id/certificate', issueCompetencyCertificateController);
 // Autorizar: solo RH o Direccion General (permiso propio, ademas del MANAGE del router).
 router.post(

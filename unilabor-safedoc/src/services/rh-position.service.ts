@@ -1,4 +1,5 @@
 import pool from '../config/db';
+import { resyncDraftSignersQuietly } from './rh-supervision-signers.service';
 
 /**
  * Catalogo minimo de puesto/categoria (REH-MAN-001) para el modulo de
@@ -187,6 +188,10 @@ export const updatePosition = async (
         id,
       ],
     );
+    // El area del proceso del puesto decide el Responsable del Area de sus listas ANA-REG-060 en borrador.
+    if (payload.process_area_id !== undefined && payload.process_area_id !== existing.process_area_id) {
+      await resyncDraftSignersQuietly();
+    }
     return getPositionById(id);
   } catch (error: any) {
     if (error?.code === '23505') {

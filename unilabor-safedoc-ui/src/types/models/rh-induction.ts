@@ -400,6 +400,8 @@ export interface InductionTransitionResult {
   message: string;
   created_id: number | null;
   previous_enrollment_id: number | null;
+  /** Código del error cuando no avanzó (p. ej. la regla del evaluador de la Fase 7). */
+  error_code?: string;
 }
 
 export interface InductionPositionPhaseReadiness {

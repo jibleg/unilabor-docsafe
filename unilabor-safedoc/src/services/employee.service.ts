@@ -4,6 +4,7 @@ import pool from '../config/db';
 import { getUserAccessibleModules, invalidateUserPermissions } from './permission.service';
 import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
 import { resolveEmployeeAreaName } from './rh-employee-area.service';
+import { resyncDraftSignersQuietly } from './rh-supervision-signers.service';
 import type { EmployeeRecord, EmployeeSummary, LinkableUser } from '../types';
 import {
   PaginatedResult,
@@ -414,6 +415,7 @@ export const updateEmployee = async (
   await assertEmployeesTable();
 
   const client = await pool.connect();
+  let branchChanged = false;
 
   try {
     await client.query('BEGIN');
@@ -449,6 +451,9 @@ export const updateEmployee = async (
       payload.area !== undefined
         ? await resolveEmployeeAreaName(client, payload.area, currentEmployee.area ? String(currentEmployee.area) : null)
         : currentEmployee.area;
+    const currentBranchId = currentEmployee.branch_id ? Number(currentEmployee.branch_id) : null;
+    const resolvedBranchId = payload.branch_id !== undefined ? payload.branch_id : currentBranchId;
+    branchChanged = resolvedBranchId !== currentBranchId;
 
     await client.query(
       `
@@ -473,7 +478,7 @@ export const updateEmployee = async (
         payload.phone !== undefined ? normalizeOptionalText(payload.phone) : currentEmployee.phone,
         resolvedArea,
         payload.position !== undefined ? normalizeOptionalText(payload.position) : currentEmployee.position,
-        payload.branch_id !== undefined ? payload.branch_id : currentEmployee.branch_id,
+        resolvedBranchId,
         employeeId,
       ],
     );
@@ -483,13 +488,18 @@ export const updateEmployee = async (
     }
 
     await client.query('COMMIT');
-    return getEmployeeById(employeeId);
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
     client.release();
   }
+
+  // La unidad de la ficha decide el Responsable del Area de sus listas ANA-REG-060 en borrador.
+  if (branchChanged) {
+    await resyncDraftSignersQuietly({ employeeIds: [employeeId] });
+  }
+  return getEmployeeById(employeeId);
 };
 
 export const deactivateEmployee = async (employeeId: number): Promise<EmployeeRecord | null> => {
@@ -509,6 +519,8 @@ export const deactivateEmployee = async (employeeId: number): Promise<EmployeeRe
     return null;
   }
 
+  // Un colaborador dado de baja ya no avala: sus borradores ANA-REG-060 pasan al siguiente responsable de la cadena.
+  await resyncDraftSignersQuietly();
   return getEmployeeById(employeeId);
 };
 

@@ -1,7 +1,11 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
-import { closeSupervisionChecklist, renderSupervisionChecklistPdf } from '../services/rh-supervision-checklist-close.service';
+import {
+  closeFullySignedChecklist,
+  renderSupervisionChecklistPdf,
+  type CloseSupervisionChecklistResult,
+} from '../services/rh-supervision-checklist-close.service';
 import {
   createSupervisionChecklist,
   deleteSupervisionDraft,
@@ -16,21 +20,18 @@ import {
   listSupervisionPending,
   setPositionSupervisionConfig,
 } from '../services/rh-supervision-position.service';
+import { describeRoles, pendingSignerRoles } from '../services/rh-supervision-signature.rules';
+import { cancelSignatureRequest, sendChecklistToSignature } from '../services/rh-supervision-signature.service';
 import { assignPhase6Supervisor } from '../services/rh-supervision-signers.service';
-import {
-  generateSupervisionDrafts,
-  listAreaSignatories,
-  saveAreaSignatories,
-} from '../services/rh-supervision-draft-generator.service';
+import { generateSupervisionDrafts } from '../services/rh-supervision-draft-generator.service';
 import {
   supervisionListQuerySchema,
   supervisionPendingQuerySchema,
   type AssignSupervisorBody,
-  type CloseSupervisionChecklistBody,
   type GenerateDraftsBody,
-  type SaveAreaSignatoriesBody,
   type CreateSupervisionChecklistBody,
   type SaveSupervisionResultsBody,
+  type SendToSignatureBody,
   type SetPositionNaItemsBody,
   type UpdateSupervisionChecklistBody,
 } from '../schemas/rh-supervision-checklist.schema';
@@ -63,8 +64,17 @@ const ERROR_STATUS: Record<string, number> = {
   RH_SUPERVISION_PHASE_NOT_PUBLISHED: 409,
   RH_SUPERVISION_PRACTICAL_NOT_AVAILABLE: 409,
   RH_SUPERVISION_INVALID_SIGNATURE: 400,
-  RH_SUPERVISION_USER_NOT_FOUND: 409,
-  RH_SUPERVISION_SUPERVISOR_SIGNED: 409,
+  RH_SUPERVISION_IN_SIGNATURE: 409,
+  RH_SUPERVISION_NOT_IN_SIGNATURE: 409,
+  RH_SUPERVISION_SIGNERS_NOT_READY: 409,
+  RH_SUPERVISION_SIGNERS_ASSIGNED: 409,
+  RH_SUPERVISION_SIGNER_INVALID: 400,
+  RH_SUPERVISION_AREA_NOT_FOUND: 400,
+  RH_SUPERVISION_UNIT_NOT_FOUND: 400,
+  RH_SUPERVISION_ALTERNATE_SAME: 400,
+  RH_SUPERVISION_ALREADY_SIGNED: 409,
+  RH_SUPERVISION_SIGNATURE_FILE_MISSING: 409,
+  RH_SUPERVISION_HAS_SIGNATURE_HISTORY: 409,
   RH_SUPERVISION_SUPERVISOR_NOT_ASSIGNED: 409,
   RH_SUPERVISION_SUPERVISOR_INVALID: 400,
   RH_SUPERVISION_SELF_SUPERVISION: 409,
@@ -97,6 +107,20 @@ export const audit = async (req: AuthRequest, action: string, checklistId: numbe
     metadata: metadata ?? null,
   }).catch((error) => console.error('Auditoria ANA-REG-060:', error));
 };
+
+/** Respuesta comun de una lista que se cerro sola (ultima firma o reintento de RH). */
+export const closedMessage = (result: CloseSupervisionChecklistResult): string =>
+  result.practical
+    ? `Lista ${result.record.folio} cerrada y archivada en el expediente. ${result.practical.message}`
+    : `Lista ${result.record.folio} cerrada y archivada en el expediente.`;
+
+export const closedAuditMetadata = (result: CloseSupervisionChecklistResult): Record<string, unknown> => ({
+  compliance_pct: result.record.compliance_pct,
+  conclusion: result.record.conclusion,
+  is_final: result.record.is_final,
+  enrollment_id: result.record.enrollment_id,
+  practical: result.practical,
+});
 
 const invalidQuery = (res: Response, issues: Array<{ path: PropertyKey[]; message: string }>) =>
   res.status(400).json({ message: 'Filtros invalidos', errors: issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message })) });
@@ -235,8 +259,8 @@ export const updateSupervisionChecklistController = async (req: AuthRequest, res
       supervisionDate: body.supervision_date,
       supervisionType: body.supervision_type,
       areaName: body.area_name,
-      supervisorName: body.supervisor_name,
-      areaResponsibleName: body.area_responsible_name,
+      supervisorEmployeeId: body.supervisor_employee_id,
+      areaResponsibleEmployeeId: body.area_responsible_employee_id,
       sgcFollowUpRequired: body.sgc_follow_up_required,
       sgcReference: body.sgc_reference,
       supervisorComments: body.supervisor_comments,
@@ -263,45 +287,92 @@ export const saveSupervisionResultsController = async (req: AuthRequest, res: Re
   }
 };
 
-/** POST /rh/supervision-checklists/:id/close */
-export const closeSupervisionChecklistController = async (req: AuthRequest, res: Response) => {
+/** POST /rh/supervision-checklists/:id/send-to-signature {is_final?, header?} */
+export const sendToSignatureController = async (req: AuthRequest, res: Response) => {
   const id = parseId(req.params.id);
   if (!id) return res.status(400).json({ message: 'ID invalido.' });
   const actorUserId = req.user?.id;
   if (!actorUserId) return res.status(401).json({ message: 'Sesion invalida o expirada' });
-  const body = req.body as CloseSupervisionChecklistBody;
+  const body = req.body as SendToSignatureBody;
   try {
-    const result = await closeSupervisionChecklist({
+    const checklist = await sendChecklistToSignature({
       id,
-      supervisorSignature: body.supervisor_signature ?? null,
-      areaResponsibleSignature: body.area_responsible_signature,
-      employeeSignature: body.employee_signature ?? null,
       isFinal: body.is_final,
       header: body.header
         ? {
             supervisionDate: body.header.supervision_date,
             supervisionType: body.header.supervision_type,
             areaName: body.header.area_name,
-            supervisorName: body.header.supervisor_name,
-            areaResponsibleName: body.header.area_responsible_name,
+            supervisorEmployeeId: body.header.supervisor_employee_id,
+            areaResponsibleEmployeeId: body.header.area_responsible_employee_id,
             sgcFollowUpRequired: body.header.sgc_follow_up_required,
             sgcReference: body.header.sgc_reference,
             supervisorComments: body.header.supervisor_comments,
           }
         : undefined,
-      closedByUserId: actorUserId,
+      userId: actorUserId,
     });
-    await audit(req, `RH_SUPERVISION_CLOSED:${id}`, id, result.record.employee_id, {
-      compliance_pct: result.record.compliance_pct,
-      conclusion: result.record.conclusion,
-      is_final: result.record.is_final,
-      enrollment_id: result.record.enrollment_id,
-      practical: result.practical,
+    await audit(req, `RH_SUPERVISION_SENT_TO_SIGNATURE:${id}`, id, checklist.employee_id, {
+      is_final: checklist.is_final,
+      enrollment_id: checklist.enrollment_id,
+      compliance_pct: checklist.summary.compliance_pct,
+      signers: checklist.signers.map((signer) => ({ role: signer.role, employee_id: signer.employee_id })),
+      sent_by: 'rh',
     });
-    const message = result.practical
-      ? `Lista ${result.record.folio} cerrada y archivada. ${result.practical.message}`
-      : `Lista ${result.record.folio} cerrada y archivada en el expediente.`;
-    return res.status(201).json({ message, checklist: result.record, practical: result.practical });
+    return res.json({
+      // Sin repetir a quien ocupa dos roles.
+      message: `Lista ${checklist.folio} enviada a firma: se cerrara sola cuando firmen ${[...new Set(checklist.signers.map((signer) => signer.name))].join(', ')}.`,
+      checklist,
+    });
+  } catch (error) {
+    return fail(res, error, 'Error enviando lista de supervision a firma', 'No se pudo enviar la lista a firma.');
+  }
+};
+
+/** POST /rh/supervision-checklists/:id/cancel-signature  (regresa a borrador e invalida las firmas recabadas) */
+export const cancelSignatureController = async (req: AuthRequest, res: Response) => {
+  const id = parseId(req.params.id);
+  if (!id) return res.status(400).json({ message: 'ID invalido.' });
+  const actorUserId = req.user?.id;
+  if (!actorUserId) return res.status(401).json({ message: 'Sesion invalida o expirada' });
+  try {
+    const { record, invalidated } = await cancelSignatureRequest(id, actorUserId);
+    await audit(req, `RH_SUPERVISION_SIGNATURE_CANCELLED:${id}`, id, record.employee_id, {
+      enrollment_id: record.enrollment_id,
+      invalidated_signatures: invalidated,
+    });
+    const message =
+      invalidated.length > 0
+        ? `Envio a firma cancelado: la lista ${record.folio} regreso a borrador y ${invalidated.length} firma(s) recabada(s) quedaron invalidadas.`
+        : `Envio a firma cancelado: la lista ${record.folio} regreso a borrador.`;
+    return res.json({ message, checklist: record });
+  } catch (error) {
+    return fail(res, error, 'Error cancelando el envio a firma', 'No se pudo cancelar el envio a firma.');
+  }
+};
+
+/**
+ * POST /rh/supervision-checklists/:id/close
+ * Reintento del cierre automatico: solo procede con las tres firmas ya
+ * recabadas (cuando el cierre fallo al firmar el ultimo, p. ej. por la
+ * practica del puesto sin publicar). No recibe firmas: nadie firma desde RH.
+ */
+export const retryCloseController = async (req: AuthRequest, res: Response) => {
+  const id = parseId(req.params.id);
+  if (!id) return res.status(400).json({ message: 'ID invalido.' });
+  const actorUserId = req.user?.id;
+  if (!actorUserId) return res.status(401).json({ message: 'Sesion invalida o expirada' });
+  try {
+    const result = await closeFullySignedChecklist(id, actorUserId);
+    if (!result) {
+      const record = await getSupervisionChecklist(id);
+      if (record.status === 'CLOSED') return res.status(409).json({ message: 'La lista ya esta cerrada y firmada.' });
+      if (record.status === 'DRAFT') return res.status(409).json({ message: 'La lista esta en borrador: enviala a firma.' });
+      const missing = pendingSignerRoles(record.signers.filter((signer) => signer.signed_at).map((signer) => signer.role));
+      return res.status(409).json({ message: `Aun falta la firma de ${describeRoles(missing)}; la lista se cerrara sola al reunirlas.` });
+    }
+    await audit(req, `RH_SUPERVISION_CLOSED:${id}`, id, result.record.employee_id, { ...closedAuditMetadata(result), closed_via: 'rh_retry' });
+    return res.status(201).json({ message: closedMessage(result), checklist: result.record, practical: result.practical });
   } catch (error) {
     return fail(res, error, 'Error cerrando lista de supervision', 'No se pudo cerrar la lista.');
   }
@@ -332,26 +403,6 @@ export const getSupervisionChecklistPdfController = async (req: AuthRequest, res
     return res.send(pdf);
   } catch (error) {
     return fail(res, error, 'Error generando PDF de supervision', 'No se pudo generar el PDF.');
-  }
-};
-
-/** GET /rh/supervision-checklists/signatories */
-export const listAreaSignatoriesController = async (_req: AuthRequest, res: Response) => {
-  try {
-    return res.json({ rows: await listAreaSignatories() });
-  } catch (error) {
-    return fail(res, error, 'Error listando firmantes por area', 'No se pudieron cargar los firmantes por area.');
-  }
-};
-
-/** PUT /rh/supervision-checklists/signatories {rows} */
-export const saveAreaSignatoriesController = async (req: AuthRequest, res: Response) => {
-  const body = req.body as SaveAreaSignatoriesBody;
-  try {
-    const rows = await saveAreaSignatories(body.rows, req.user?.id ?? null);
-    return res.json({ message: 'Firmantes por area guardados.', rows });
-  } catch (error) {
-    return fail(res, error, 'Error guardando firmantes por area', 'No se pudieron guardar los firmantes.');
   }
 };
 

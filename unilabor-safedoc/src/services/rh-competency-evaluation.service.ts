@@ -1,9 +1,9 @@
 import fs from 'fs';
-import path from 'path';
 import pool from '../config/db';
 import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image';
 import { archiveGeneratedPdfToExpedient } from './employee-document-archive.service';
 import { buildCompetencyEvaluationPdf } from './rh-competency-evaluation.pdf';
+import { assertEvaluatorAllowed, resolveEvaluatorIdentity } from './rh-competency-evaluator.service';
 import {
   PaginatedResult,
   PaginationInput,
@@ -187,6 +187,8 @@ export interface CompetencyEvaluationRecord {
   evaluation_type: CompetencyEvaluationType;
   evaluation_date: string;
   evaluator_name: string;
+  /** Colaborador que evalua (null en evaluaciones antiguas o sin evaluador asignado). */
+  evaluator_employee_id: number | null;
   reference_course_id: number | null;
   reference_course_title: string | null;
   reference_course_date: string | null;
@@ -247,6 +249,7 @@ const mapRow = (row: any): CompetencyEvaluationRecord => ({
   evaluation_type: String(row.evaluation_type) as CompetencyEvaluationType,
   evaluation_date: toDateString(row.evaluation_date) ?? '',
   evaluator_name: String(row.evaluator_name),
+  evaluator_employee_id: row.evaluator_employee_id ? Number(row.evaluator_employee_id) : null,
   reference_course_id: row.reference_course_id ? Number(row.reference_course_id) : null,
   reference_course_title: row.reference_course_title ? String(row.reference_course_title) : null,
   reference_course_date: toDateString(row.reference_course_date),
@@ -335,11 +338,26 @@ export interface CreateEvaluationInput {
   positionId: number;
   evaluationType: CompetencyEvaluationType;
   evaluationDate: string;
-  evaluatorName: string;
+  /** Evaluador: colaborador de la lista (preferente) o nombre en texto. Puede ir vacio: RH lo asigna despues. */
+  evaluatorEmployeeId?: number | null | undefined;
+  evaluatorName?: string | undefined;
   referenceCourseId?: number | null;
   referenceCourseDate?: string | null;
   createdByUserId: string | null;
 }
+
+const INICIAL_OPEN_INDEX = 'ux_rh_comp_eval_inicial_open';
+
+/** El indice unico impide dos INICIAL en proceso del mismo colaborador y puesto: se traduce a un mensaje claro. */
+const rethrowInicialAlreadyOpen = (error: any): never => {
+  if (error?.code === '23505' && error?.constraint === INICIAL_OPEN_INDEX) {
+    return throwCoded(
+      'RH_COMP_EVAL_INICIAL_ALREADY_OPEN',
+      'El colaborador ya tiene una evaluacion INICIAL en proceso para este puesto; continua con ella en lugar de abrir otra.',
+    );
+  }
+  throw error;
+};
 
 /**
  * Crea el borrador y PRECARGA los items: las competencias del puesto (con su
@@ -359,6 +377,8 @@ export const createEvaluation = async (input: CreateEvaluationInput): Promise<Co
   if (position.rows.length === 0) {
     throwCoded('RH_COMP_EVAL_POSITION_NOT_FOUND', 'El puesto indicado no existe o esta inactivo.');
   }
+  const evaluator = await resolveEvaluatorIdentity({ employeeId: input.evaluatorEmployeeId, name: input.evaluatorName });
+  await assertEvaluatorAllowed({ evaluationType: input.evaluationType, employeeId: input.employeeId, positionId: input.positionId, evaluator });
 
   const client = await pool.connect();
   try {
@@ -366,16 +386,17 @@ export const createEvaluation = async (input: CreateEvaluationInput): Promise<Co
 
     const inserted = await client.query(
       `INSERT INTO public.rh_competency_evaluations
-         (employee_id, position_id, evaluation_type, evaluation_date, evaluator_name,
+         (employee_id, position_id, evaluation_type, evaluation_date, evaluator_name, evaluator_employee_id,
           reference_course_id, reference_course_date, created_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id;`,
       [
         input.employeeId,
         input.positionId,
         input.evaluationType,
         input.evaluationDate,
-        input.evaluatorName.trim(),
+        evaluator.name,
+        evaluator.employee_id,
         input.referenceCourseId ?? null,
         input.referenceCourseDate ?? null,
         input.createdByUserId,
@@ -408,7 +429,7 @@ export const createEvaluation = async (input: CreateEvaluationInput): Promise<Co
     return created as CompetencyEvaluationRecord;
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
-    throw error;
+    return rethrowInicialAlreadyOpen(error);
   } finally {
     client.release();
   }
@@ -565,6 +586,8 @@ const loadDraft = async (evaluationId: number): Promise<CompetencyEvaluationReco
 export interface UpdateEvaluationInput {
   evaluationType?: CompetencyEvaluationType;
   evaluationDate?: string;
+  /** Colaborador de la lista (su nombre sale de la ficha) o, sin el, un nombre en texto. Omitidos = no cambia. */
+  evaluatorEmployeeId?: number | null | undefined;
   evaluatorName?: string;
   referenceCourseId?: number | null;
   referenceCourseDate?: string | null;
@@ -575,20 +598,32 @@ export const updateEvaluation = async (
   input: UpdateEvaluationInput,
 ): Promise<CompetencyEvaluationRecord> => {
   const current = await loadDraft(evaluationId);
-  await pool.query(
-    `UPDATE public.rh_competency_evaluations
-        SET evaluation_type = $1, evaluation_date = $2, evaluator_name = $3,
-            reference_course_id = $4, reference_course_date = $5, updated_at = NOW()
-      WHERE id = $6;`,
-    [
-      input.evaluationType ?? current.evaluation_type,
-      input.evaluationDate ?? current.evaluation_date,
-      input.evaluatorName?.trim() || current.evaluator_name,
-      input.referenceCourseId !== undefined ? input.referenceCourseId : current.reference_course_id,
-      input.referenceCourseDate !== undefined ? input.referenceCourseDate : current.reference_course_date,
-      evaluationId,
-    ],
-  );
+  const evaluationType = input.evaluationType ?? current.evaluation_type;
+  const newName = input.evaluatorName?.trim();
+  const evaluatorChanges = typeof input.evaluatorEmployeeId === 'number' || (Boolean(newName) && newName !== current.evaluator_name);
+  const evaluator = evaluatorChanges
+    ? await resolveEvaluatorIdentity({ employeeId: input.evaluatorEmployeeId, name: newName })
+    : { employee_id: current.evaluator_employee_id, name: current.evaluator_name };
+  // Se valida el evaluador que QUEDA (aunque no cambie): un borrador antiguo cuyo
+  // evaluador fue el supervisor de la Fase 6 no se puede seguir editando sin corregirlo.
+  await assertEvaluatorAllowed({ evaluationType, employeeId: current.employee_id, positionId: current.position_id, evaluator });
+  await pool
+    .query(
+      `UPDATE public.rh_competency_evaluations
+          SET evaluation_type = $1, evaluation_date = $2, evaluator_name = $3, evaluator_employee_id = $4,
+              reference_course_id = $5, reference_course_date = $6, updated_at = NOW()
+        WHERE id = $7;`,
+      [
+        evaluationType,
+        input.evaluationDate ?? current.evaluation_date,
+        evaluator.name,
+        evaluator.employee_id,
+        input.referenceCourseId !== undefined ? input.referenceCourseId : current.reference_course_id,
+        input.referenceCourseDate !== undefined ? input.referenceCourseDate : current.reference_course_date,
+        evaluationId,
+      ],
+    )
+    .catch(rethrowInicialAlreadyOpen);
   return (await getEvaluationById(evaluationId)) as CompetencyEvaluationRecord;
 };
 
@@ -715,12 +750,6 @@ export interface CloseEvaluationInput {
   closedByUserId: string | null;
 }
 
-const addMonths = (date: Date, months: number): Date => {
-  const copy = new Date(date.getTime());
-  copy.setMonth(copy.getMonth() + months);
-  return copy;
-};
-
 /**
  * Cierra la evaluacion: valida completitud, sella resultados, embebe las 5
  * firmas en el PDF oficial y lo archiva en el expediente (seccion Competencias
@@ -730,6 +759,17 @@ const addMonths = (date: Date, months: number): Date => {
 export const closeEvaluation = async (input: CloseEvaluationInput): Promise<CompetencyEvaluationRecord> => {
   const record = await loadDraft(input.evaluationId);
   const items = record.items ?? [];
+
+  // Una evaluacion abierta automaticamente puede nacer sin evaluador: no se cierra sin el.
+  if (!record.evaluator_name.trim()) {
+    throwCoded('RH_COMP_EVAL_EVALUATOR_REQUIRED', 'La evaluacion no tiene evaluador; asignalo antes de cerrarla.');
+  }
+  await assertEvaluatorAllowed({
+    evaluationType: record.evaluation_type,
+    employeeId: record.employee_id,
+    positionId: record.position_id,
+    evaluator: { employee_id: record.evaluator_employee_id, name: record.evaluator_name },
+  });
 
   if (record.knowledge_quiz && !KNOWLEDGE_ANSWERED_STATUSES.includes(record.knowledge_quiz.status)) {
     throwCoded(
@@ -881,105 +921,6 @@ export const closeEvaluation = async (input: CloseEvaluationInput): Promise<Comp
     }
     throw error;
   }
-
-  return (await getEvaluationById(record.id)) as CompetencyEvaluationRecord;
-};
-
-// --- Autorizacion (paso propio de RH / Direccion General) -----------------------
-
-export type CompetencyAuthorizationDecision = 'AUTORIZADO' | 'AUTORIZADO_CON_SEGUIMIENTO' | 'NO_AUTORIZADO';
-
-export interface AuthorizeEvaluationInput {
-  evaluationId: number;
-  decision: CompetencyAuthorizationDecision;
-  note: string | null;
-  decidedByUserId: string;
-}
-
-const readSignatureFile = (storedPath: string | null): Buffer => {
-  if (!storedPath) return throwCoded('RH_COMP_EVAL_SIGNATURE_FILE_MISSING', 'No se encontro una firma del cierre para regenerar el registro.');
-  const absolute = path.isAbsolute(storedPath) ? storedPath : path.resolve(process.cwd(), storedPath);
-  if (!fs.existsSync(absolute)) return throwCoded('RH_COMP_EVAL_SIGNATURE_FILE_MISSING', 'No se encontro una firma del cierre para regenerar el registro.');
-  return fs.readFileSync(absolute);
-};
-
-/**
- * Ejecuta la autorizacion de una evaluacion cerrada con dictamen competente
- * (authorization_result = PENDIENTE). Sella decision, quien y cuando, fija la
- * vigencia de 12 meses (si se autoriza), regenera el PDF oficial como nueva
- * version en el expediente (la version del cierre queda en historial) y deja
- * la evaluacion lista para emitir la constancia.
- */
-export const authorizeEvaluation = async (input: AuthorizeEvaluationInput): Promise<CompetencyEvaluationRecord> => {
-  const record = await getEvaluationById(input.evaluationId);
-  if (!record) return throwCoded('RH_COMP_EVAL_NOT_FOUND', 'La evaluacion indicada no existe.');
-  if (record.status !== 'CLOSED') return throwCoded('RH_COMP_EVAL_NOT_CLOSED', 'La autorizacion se ejecuta sobre una evaluacion cerrada.');
-  if (record.results.authorization_result !== 'PENDIENTE') {
-    return throwCoded('RH_COMP_EVAL_AUTH_NOT_PENDING', 'Esta evaluacion no esta pendiente de autorizacion.');
-  }
-
-  const paths = await pool.query(
-    `SELECT collaborator_signature_path, evaluator_signature_path, area_signature_path, rh_signature_path, director_signature_path
-       FROM public.rh_competency_evaluations WHERE id = $1;`,
-    [record.id],
-  );
-  const row = paths.rows[0] ?? {};
-  const decidedAt = new Date();
-  const authorized = input.decision !== 'NO_AUTORIZADO';
-  const validUntil = authorized ? addMonths(decidedAt, 12) : null;
-  const decidedBy = await pool.query(`SELECT full_name FROM public.users WHERE id = $1;`, [input.decidedByUserId]);
-  const decidedByName = decidedBy.rows[0]?.full_name ? String(decidedBy.rows[0].full_name) : null;
-
-  const sealedResults: CompetencyEvaluationResults = { ...record.results, authorization_result: input.decision };
-  const items = record.items ?? (await listEvaluationItems(record.id));
-  const pdf = await buildCompetencyEvaluationPdf({
-    record: {
-      ...record,
-      results: sealedResults,
-      authorized_at: decidedAt.toISOString().slice(0, 10),
-      valid_until: validUntil ? validUntil.toISOString().slice(0, 10) : null,
-      authorized_by_name: decidedByName,
-      authorization_note: input.note,
-    },
-    items,
-    actions: record.actions ?? [],
-    closedAt: record.closed_at ? new Date(record.closed_at) : decidedAt,
-    authorizedAt: decidedAt,
-    validUntil,
-    signatories: {
-      collaboratorName: record.employee_name,
-      evaluatorName: record.evaluator_name,
-      areaName: record.area_signatory_name ?? '',
-      rhName: record.rh_signatory_name ?? '',
-      directorName: record.director_signatory_name ?? '',
-    },
-    signaturePngs: {
-      collaborator: readSignatureFile(row.collaborator_signature_path ?? null),
-      evaluator: readSignatureFile(row.evaluator_signature_path ?? null),
-      area: readSignatureFile(row.area_signature_path ?? null),
-      rh: readSignatureFile(row.rh_signature_path ?? null),
-      director: readSignatureFile(row.director_signature_path ?? null),
-    },
-  });
-
-  const documentId = await archiveGeneratedPdfToExpedient({
-    employeeId: record.employee_id,
-    documentTypeCode: 'COMPETENCY_EVALUATION',
-    referenceKey: `competency_evaluation:${record.id}`,
-    title: `REH-REG-003 Evaluación de competencia - ${record.results.dictamen ? DICTAMEN_LABELS[record.results.dictamen] : ''} · ${AUTHORIZATION_LABELS[input.decision]}`,
-    description: `Puesto: ${record.position_name}. Resultado final: ${record.results.final_pct}%. ${AUTHORIZATION_LABELS[input.decision]} por ${decidedByName ?? 'RH'} el ${decidedAt.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' })}.${input.note ? ` Nota: ${input.note}` : ''}`,
-    pdf,
-    uploadedByUserId: input.decidedByUserId,
-    expiryDate: validUntil ? validUntil.toISOString().slice(0, 10) : null,
-  });
-
-  await pool.query(
-    `UPDATE public.rh_competency_evaluations
-        SET authorization_result = $2, authorized_at = $3, valid_until = $4,
-            authorized_by_user_id = $5, authorization_note = $6, document_id = $7, updated_at = NOW()
-      WHERE id = $1 AND status = 'CLOSED' AND authorization_result = 'PENDIENTE';`,
-    [record.id, input.decision, decidedAt, validUntil, input.decidedByUserId, input.note, documentId],
-  );
 
   return (await getEvaluationById(record.id)) as CompetencyEvaluationRecord;
 };

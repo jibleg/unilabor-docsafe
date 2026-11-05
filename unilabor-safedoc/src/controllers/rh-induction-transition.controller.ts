@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
+import { describePhase7AutoStart } from '../services/rh-induction-phase7-auto.service';
 import { getPositionReadiness } from '../services/rh-induction-position-readiness.service';
 import { captureEnrollmentPractical } from '../services/rh-induction-practical.service';
 import { executeTransition, queryTransitionQueue } from '../services/rh-induction-transition.service';
@@ -71,7 +72,7 @@ export const getTransitionQueueController = async (req: AuthRequest, res: Respon
   }
 };
 
-/** POST /rh/induction/dashboard/transitions {target, employee_ids, evaluator_name?, evaluation_date?} */
+/** POST /rh/induction/dashboard/transitions {target, employee_ids, evaluator_employee_id?, evaluator_name?, evaluation_date?} */
 export const executeTransitionController = async (req: AuthRequest, res: Response) => {
   const body = req.body as ExecuteTransitionInputBody;
   const actorUserId = req.user?.id;
@@ -83,6 +84,7 @@ export const executeTransitionController = async (req: AuthRequest, res: Respons
       target: body.target,
       employeeIds: body.employee_ids,
       actorUserId,
+      evaluatorEmployeeId: body.evaluator_employee_id,
       evaluatorName: body.evaluator_name,
       evaluationDate: body.evaluation_date,
     });
@@ -148,12 +150,12 @@ export const captureEnrollmentPracticalController = async (req: AuthRequest, res
       entity_type: 'induction_enrollment',
       entity_id: enrollmentId,
       employee_id: result.employee_id,
-      metadata: { assignment_id: result.assignment_id, score: result.score, status: result.status },
+      metadata: { assignment_id: result.assignment_id, score: result.score, status: result.status, phase7_status: result.phase7?.status ?? null },
     });
     return res.status(201).json({
       message:
         result.status === 'passed'
-          ? `${result.employee_name} acredito la Fase 6 (${result.score}/10).`
+          ? `${result.employee_name} acredito la Fase 6 (${result.score}/10). ${describePhase7AutoStart(result.phase7)}`.trim()
           : `${result.employee_name} no acredito la Fase 6 (${result.score}/10; minimo ${result.passing_score / 10}).`,
       result,
     });

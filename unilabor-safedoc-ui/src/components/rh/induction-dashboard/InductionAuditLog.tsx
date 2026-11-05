@@ -14,6 +14,7 @@ const AUDIT_LABEL: Array<[string, string]> = [
   ['RH_EVAL_MANUAL_CLOSE', 'Cierre manual de evaluación'],
   ['RH_INDUCTION_GRACE_ENDED', 'Descanso terminado por RH'],
   ['RH_INDUCTION_COMPETENCY_STARTED', 'Evaluación de competencia (Fase 7) abierta'],
+  ['RH_INDUCTION_COMPETENCY_AUTO_STARTED', 'Evaluación de competencia (Fase 7) abierta automáticamente'],
   ['RH_INDUCTION_PRACTICAL_CAPTURED', 'Evaluación práctica capturada'],
 ];
 

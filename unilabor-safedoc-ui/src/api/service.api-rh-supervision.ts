@@ -2,7 +2,6 @@ import api from './axios';
 import { asRecord, unwrapPayload } from './service.shared';
 import type {
   PositionSupervisionConfig,
-  SupervisionAreaSignatory,
   SupervisionChecklist,
   SupervisionGenerateDraftsResult,
   SupervisionChecklistPage,
@@ -11,7 +10,9 @@ import type {
   SupervisionPendingRow,
   SupervisionPracticalOutcome,
   SupervisionResult,
+  SupervisionSignatoriesOverview,
   SupervisionType,
+  UnitSignatoryImpact,
 } from '../types/models';
 
 /** API de la Lista de verificacion de Supervision ANA-REG-060. */
@@ -107,8 +108,9 @@ export interface SupervisionHeaderPayload {
   supervision_date?: string;
   supervision_type?: SupervisionType;
   area_name?: string | null;
-  supervisor_name?: string;
-  area_responsible_name?: string;
+  /** Solo supervisión de área (sin inscripción): en la Fase 6 los firmantes salen de la asignación. */
+  supervisor_employee_id?: number | null;
+  area_responsible_employee_id?: number | null;
   sgc_follow_up_required?: boolean;
   sgc_reference?: string | null;
   supervisor_comments?: string | null;
@@ -130,14 +132,27 @@ export const saveSupervisionResults = async (id: number, results: SupervisionRes
   return asRecord(unwrapPayload(response.data))?.checklist as SupervisionChecklist;
 };
 
-export interface CloseSupervisionChecklistPayload {
-  /** Se omite cuando el supervisor ya firmo con su cuenta. */
-  supervisor_signature?: string | null;
-  area_responsible_signature: string;
-  employee_signature?: string | null;
-  is_final?: boolean;
-  header?: SupervisionHeaderPayload;
+export interface SupervisionSignatureResult {
+  message: string;
+  checklist: SupervisionChecklist;
 }
+
+const signatureResult = (payload: unknown): SupervisionSignatureResult => {
+  const data = asRecord(unwrapPayload(payload)) ?? {};
+  return { message: String(data.message ?? ''), checklist: data.checklist as SupervisionChecklist };
+};
+
+/** Envía la lista a firma: queda bloqueada y se cierra sola cuando firman los tres desde su Buzón. */
+export const sendSupervisionToSignature = async (id: number, isFinal: boolean): Promise<SupervisionSignatureResult> => {
+  const response = await api.post(`${BASE}/${id}/send-to-signature`, { is_final: isFinal });
+  return signatureResult(response.data);
+};
+
+/** Regresa la lista a borrador; las firmas ya recabadas quedan invalidadas. */
+export const cancelSupervisionSignature = async (id: number): Promise<SupervisionSignatureResult> => {
+  const response = await api.post(`${BASE}/${id}/cancel-signature`);
+  return signatureResult(response.data);
+};
 
 export interface CloseSupervisionChecklistResult {
   message: string;
@@ -145,8 +160,9 @@ export interface CloseSupervisionChecklistResult {
   practical: SupervisionPracticalOutcome | null;
 }
 
-export const closeSupervisionChecklist = async (id: number, payload: CloseSupervisionChecklistPayload): Promise<CloseSupervisionChecklistResult> => {
-  const response = await api.post(`${BASE}/${id}/close`, payload);
+/** Reintenta el cierre automático de una lista que ya tiene sus tres firmas (no recibe firmas). */
+export const retrySupervisionClose = async (id: number): Promise<CloseSupervisionChecklistResult> => {
+  const response = await api.post(`${BASE}/${id}/close`);
   const data = asRecord(unwrapPayload(response.data)) ?? {};
   return {
     message: String(data.message ?? ''),
@@ -159,21 +175,49 @@ export const deleteSupervisionDraft = async (id: number): Promise<void> => {
   await api.delete(`${BASE}/${id}`);
 };
 
-/** PDF (borrador con marca de agua o cerrado con firmas) como URL de blob para abrir en pestaña nueva. */
+/** PDF (borrador o en firma con marca de agua; cerrado con firmas) como URL de blob para abrir en pestaña nueva. */
 export const getSupervisionChecklistPdfUrl = async (id: number): Promise<string> => {
   const response = await api.get(`${BASE}/${id}/pdf`, { responseType: 'blob' });
   return URL.createObjectURL(response.data as Blob);
 };
 
-export const listAreaSignatories = async (): Promise<SupervisionAreaSignatory[]> => {
+const signatoriesOverview = (payload: unknown): SupervisionSignatoriesOverview => {
+  const data = asRecord(unwrapPayload(payload)) ?? {};
+  return {
+    rows: (data.rows as SupervisionSignatoriesOverview['rows']) ?? [],
+    units: (data.units as SupervisionSignatoriesOverview['units']) ?? [],
+    employees_without_unit: Number(data.employees_without_unit ?? 0),
+  };
+};
+
+/** Firmantes por área: responsable general (y suplente) por área y responsables por unidad. */
+export const getSignatoriesOverview = async (): Promise<SupervisionSignatoriesOverview> => {
   const response = await api.get(`${BASE}/signatories`);
-  return (asRecord(unwrapPayload(response.data))?.rows as SupervisionAreaSignatory[]) ?? [];
+  return signatoriesOverview(response.data);
 };
 
 export interface AreaSignatoryPayload {
   area_key: string;
   area_responsible_employee_id: number | null;
+  alternate_employee_id: number | null;
 }
+
+export interface UnitSignatoryPayload {
+  unit_id: number;
+  area_key: string;
+  /** null = la unidad hereda el responsable general del área. */
+  area_responsible_employee_id: number | null;
+}
+
+export interface SaveSignatoriesResult {
+  message: string;
+  overview: SupervisionSignatoriesOverview;
+}
+
+const saveSignatoriesResult = (payload: unknown): SaveSignatoriesResult => ({
+  message: String(asRecord(unwrapPayload(payload))?.message ?? ''),
+  overview: signatoriesOverview(payload),
+});
 
 /** Asigna (o quita con null) el Supervisor / Auditor de una o varias inscripciones de la Fase 6. */
 export const assignPhase6Supervisor = async (enrollmentIds: number[], supervisorEmployeeId: number | null): Promise<string> => {
@@ -181,9 +225,22 @@ export const assignPhase6Supervisor = async (enrollmentIds: number[], supervisor
   return String(asRecord(unwrapPayload(response.data))?.message ?? '');
 };
 
-export const saveAreaSignatories = async (rows: AreaSignatoryPayload[]): Promise<SupervisionAreaSignatory[]> => {
+export const saveAreaSignatories = async (rows: AreaSignatoryPayload[]): Promise<SaveSignatoriesResult> => {
   const response = await api.put(`${BASE}/signatories`, { rows });
-  return (asRecord(unwrapPayload(response.data))?.rows as SupervisionAreaSignatory[]) ?? [];
+  return saveSignatoriesResult(response.data);
+};
+
+export const saveUnitSignatories = async (rows: UnitSignatoryPayload[]): Promise<SaveSignatoriesResult> => {
+  const response = await api.put(`${BASE}/signatories/units`, { rows });
+  return saveSignatoriesResult(response.data);
+};
+
+/** Previsualiza cuántos borradores cambiarían de responsable (employeeId null = heredar el general). */
+export const getUnitSignatoryImpact = async (areaKey: string, unitIds: number[], employeeId: number | null): Promise<UnitSignatoryImpact> => {
+  const params: Record<string, string | number> = { area_key: areaKey, unit_ids: unitIds.join(',') };
+  if (employeeId) params.employee_id = employeeId;
+  const response = await api.get(`${BASE}/signatories/impact`, { params });
+  return asRecord(unwrapPayload(response.data))?.impact as UnitSignatoryImpact;
 };
 
 export const generateSupervisionDrafts = async (employeeIds?: number[]): Promise<{ message: string; result: SupervisionGenerateDraftsResult }> => {

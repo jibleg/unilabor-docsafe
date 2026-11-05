@@ -144,14 +144,17 @@ export const executeTransitionSchema = z
       .min(1, 'Selecciona al menos un colaborador.')
       .max(200, 'Maximo 200 colaboradores por operacion.')
       .transform((ids) => [...new Set(ids)]),
+    // Fase 7: evaluador elegido de la lista de colaboradores (preferente) o nombre en texto. Sin
+    // ninguno, el sistema propone al coordinador del area de cada puesto.
+    evaluator_employee_id: z.coerce.number().int().positive('Evaluador invalido.').optional(),
     evaluator_name: z.string().trim().max(160).optional(),
     evaluation_date: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha invalida (AAAA-MM-DD).')
       .optional(),
   })
-  .refine((value) => value.target !== 7 || (value.evaluator_name ?? '').length >= 3, {
-    message: 'Indica quien aplicara la evaluacion de competencia (minimo 3 caracteres).',
+  .refine((value) => !value.evaluator_name || value.evaluator_name.length >= 3, {
+    message: 'El nombre del evaluador debe tener al menos 3 caracteres.',
     path: ['evaluator_name'],
   });
 export type ExecuteTransitionInputBody = z.infer<typeof executeTransitionSchema>;

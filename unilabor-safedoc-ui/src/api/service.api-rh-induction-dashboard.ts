@@ -205,7 +205,8 @@ export const getInductionTransitionQueue = async (query: InductionTransitionQueu
 export interface ExecuteInductionTransitionPayload {
   target: InductionTransitionTarget;
   employee_ids: number[];
-  evaluator_name?: string;
+  /** Fase 7: evaluador elegido; sin él, el servidor propone al coordinador del área de cada puesto. */
+  evaluator_employee_id?: number;
   evaluation_date?: string;
 }
 

@@ -244,7 +244,8 @@ export const closeInductionRecord = async (input: CloseInductionRecordInput): Pr
   }
 };
 
-const resolveFallbackUserId = async (): Promise<string | null> => {
+/** Usuario de respaldo para acciones automaticas sin sesion: el administrador activo mas antiguo. */
+export const resolveFallbackUserId = async (): Promise<string | null> => {
   const admin = await pool.query(
     `SELECT id FROM public.users WHERE is_active = TRUE ORDER BY (role = 'ADMIN') DESC, created_at ASC LIMIT 1;`,
   );

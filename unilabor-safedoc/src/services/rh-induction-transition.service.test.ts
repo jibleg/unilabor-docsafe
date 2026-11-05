@@ -132,10 +132,16 @@ describe('deriveInductionStage en la Fase 6 (práctica)', () => {
 });
 
 describe('esquemas de la bandeja', () => {
-  it('valida destino y exige evaluador para la Fase 7', () => {
+  it('valida destino y deduplica colaboradores', () => {
     expect(transitionQuerySchema.safeParse({ target: '4' }).success).toBe(false);
     expect(transitionQuerySchema.parse({ target: '6' }).target).toBe(6);
-    expect(executeTransitionSchema.safeParse({ target: 7, employee_ids: [1] }).success).toBe(false);
     expect(executeTransitionSchema.parse({ target: 5, employee_ids: [1, 1, '2'] }).employee_ids).toEqual([1, 2]);
+  });
+  it('Fase 7: el evaluador es opcional (sin el, el sistema propone al coordinador del area)', () => {
+    expect(executeTransitionSchema.safeParse({ target: 7, employee_ids: [1] }).success).toBe(true);
+    expect(executeTransitionSchema.parse({ target: 7, employee_ids: [1], evaluator_employee_id: '86' }).evaluator_employee_id).toBe(86);
+    expect(executeTransitionSchema.safeParse({ target: 7, employee_ids: [1], evaluator_employee_id: 0 }).success).toBe(false);
+    expect(executeTransitionSchema.safeParse({ target: 7, employee_ids: [1], evaluator_name: 'ab' }).success).toBe(false);
+    expect(executeTransitionSchema.safeParse({ target: 7, employee_ids: [1], evaluator_name: 'Evaluador externo' }).success).toBe(true);
   });
 });

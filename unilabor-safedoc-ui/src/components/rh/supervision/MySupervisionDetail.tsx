@@ -1,25 +1,19 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, CheckCheck, FileText, Loader2, Lock, Save, ShieldCheck } from 'lucide-react';
-import {
-  endorseMySupervision,
-  getMySupervisionPdfUrl,
-  saveMySupervisionResults,
-  signMySupervision,
-  type MySupervisionRole,
-} from '../../../api/service.api-my-supervision';
+import { ArrowLeft, CheckCheck, FileText, Inbox, Loader2, Save, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { getMySupervisionPdfUrl, saveMySupervisionResults, sendMySupervisionToSignature } from '../../../api/service.api-my-supervision';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { SupervisionChecklist, SupervisionResult } from '../../../types/models';
 import { confirmAction } from '../../../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../../../utils/notify';
-import { SignaturePad } from '../../helpdesk/SignaturePad';
 import { SupervisionSectionsEditor, type SupervisionDraftResult } from './SupervisionSectionsEditor';
-import { buttonClass, CONCLUSION_UI, formatDateOnly, formatPct, inputClass, primaryButtonClass } from './supervision-ui';
+import { SupervisionSignatureProgress } from './SupervisionSignatureProgress';
+import { buttonClass, CONCLUSION_UI, formatDateOnly, formatPct, inputClass, primaryButtonClass, signerIssue } from './supervision-ui';
 
 interface MySupervisionDetailProps {
   checklist: SupervisionChecklist;
-  roles: MySupervisionRole[];
   onBack: () => void;
-  /** La lista cambio de estado (firmada o cerrada): recargar el panorama. */
+  /** La lista se envió a firma: recargar el panorama. */
   onDone: () => void;
 }
 
@@ -37,27 +31,27 @@ const summarize = (values: Record<number, SupervisionDraftResult>) => {
   const pending = all.length - si - no - na;
   const pct = si + no > 0 ? Math.round((si / (si + no)) * 10000) / 100 : null;
   const conclusion = pct === null ? null : pct >= 85 ? 'CONFORME' : pct >= 80 ? 'CONFORME_CON_OBSERVACIONES' : 'REQUIERE_SEGUIMIENTO';
-  return { si, no, na, pending, pct, conclusion } as const;
+  return { si, no, na, pending, evaluated: si + no, pct, conclusion } as const;
 };
 
 /**
- * Una lista ANA-REG-060 en "Mis supervisiones". Como supervisor (borrador):
- * califica, guarda y firma con su cuenta. Como responsable del área (ya
- * firmada por el supervisor): revisa y avala; el aval cierra la lista.
+ * Una lista ANA-REG-060 en "Mis supervisiones". En borrador el supervisor la
+ * califica, la guarda y la envía a firma. Aquí no se firma: su firma (y las del
+ * responsable del área y del colaborador) se coloca en el Buzón de firmas. Una
+ * lista ya enviada se ve en solo lectura con el avance de firmas.
  */
-export const MySupervisionDetail = ({ checklist, roles, onBack, onDone }: MySupervisionDetailProps) => {
+export const MySupervisionDetail = ({ checklist, onBack, onDone }: MySupervisionDetailProps) => {
   const [values, setValues] = useState(() => toValues(checklist));
   const [comments, setComments] = useState(checklist.supervisor_comments ?? '');
   const [sgcRequired, setSgcRequired] = useState(checklist.sgc_follow_up_required);
   const [sgcReference, setSgcReference] = useState(checklist.sgc_reference ?? '');
-  const [signature, setSignature] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'save' | 'sign' | 'endorse' | 'pdf' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'send' | 'pdf' | null>(null);
   const [dirty, setDirty] = useState(false);
 
-  const canSupervise = roles.includes('supervisor') && checklist.status === 'DRAFT';
-  const canEndorse = roles.includes('responsible') && checklist.status === 'SUPERVISOR_SIGNED';
+  const canSupervise = checklist.status === 'DRAFT';
   const summary = useMemo(() => summarize(values), [values]);
   const conclusion = summary.conclusion ? CONCLUSION_UI[summary.conclusion] : null;
+  const signerProblem = checklist.signers.find((signer) => signerIssue(signer) !== null);
 
   const change = (itemId: number, patch: Partial<SupervisionDraftResult>) => {
     setValues((current) => ({ ...current, [itemId]: { ...(current[itemId] ?? { result: null, observations: '' }), ...patch } }));
@@ -98,22 +92,23 @@ export const MySupervisionDetail = ({ checklist, roles, onBack, onDone }: MySupe
     }
   };
 
-  const sign = async () => {
+  const send = async () => {
     if (summary.pending > 0) return notifyWarning(`Faltan ${summary.pending} aspecto(s) por calificar.`);
+    if (summary.evaluated === 0) return notifyWarning('Todos los aspectos quedaron en N/A; evalúa al menos uno.');
     if (sgcRequired && !sgcReference.trim()) return notifyWarning('Indica la referencia de la situación que requiere gestión del SGC.');
-    if (!signature) return notifyWarning('Traza tu firma.');
     const ok = await confirmAction(
-      'Firmar como supervisor',
-      `Firmarás la lista ${checklist.folio} de ${checklist.employee_name} (${checklist.position_code}) con ${formatPct(summary.pct)}. Después ya no podrás cambiar las calificaciones; quedará en espera del aval de ${checklist.area_responsible_name || 'el responsable del área'}.`,
-      'Firmar',
+      'Enviar a firma',
+      `Enviarás a firma la lista ${checklist.folio} de ${checklist.employee_name} (${checklist.position_code}) con ${formatPct(summary.pct)}` +
+        `${checklist.enrollment_id ? ', como lista final de la Fase 6 de este puesto' : ''}. Ya no podrás cambiar las calificaciones. ` +
+        'Firman desde su Buzón de firmas: tú, el responsable del área y el colaborador; con la tercera firma la lista se cierra sola.',
+      'Enviar a firma',
       'primary',
     );
     if (!ok) return;
     if (!(await saveResults(true))) return;
-    setBusy('sign');
+    setBusy('send');
     try {
-      const result = await signMySupervision(checklist.id, {
-        signature,
+      const result = await sendMySupervisionToSignature(checklist.id, {
         sgc_follow_up_required: sgcRequired,
         sgc_reference: sgcReference.trim() || null,
         supervisor_comments: comments.trim() || null,
@@ -121,29 +116,7 @@ export const MySupervisionDetail = ({ checklist, roles, onBack, onDone }: MySupe
       notifySuccess(result.message);
       onDone();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo firmar la lista.'));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const endorse = async () => {
-    if (!signature) return notifyWarning('Traza tu firma.');
-    const ok = await confirmAction(
-      'Avalar y cerrar',
-      `Avalarás la lista ${checklist.folio} de ${checklist.employee_name} (${checklist.position_code}) firmada por ${checklist.supervisor_name}. Se cierra, se archiva el PDF en su expediente y, si es la Fase 6, se registra su calificación.`,
-      'Avalar y cerrar',
-      'primary',
-    );
-    if (!ok) return;
-    setBusy('endorse');
-    try {
-      const result = await endorseMySupervision(checklist.id, signature);
-      if (result.practical && !result.practical.captured) notifyWarning(result.message);
-      else notifySuccess(result.message);
-      onDone();
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo avalar la lista.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo enviar la lista a firma.'));
     } finally {
       setBusy(null);
     }
@@ -206,7 +179,7 @@ export const MySupervisionDetail = ({ checklist, roles, onBack, onDone }: MySupe
             <button type="button" onClick={allYes} disabled={summary.pending === 0} className={`${buttonClass} text-emerald-700`} title="Marca SÍ en los aspectos aún sin calificar">
               <CheckCheck size={14} /> Todo SÍ
             </button>
-            <button type="button" onClick={() => void saveResults()} disabled={!dirty || busy !== null} className={buttonClass}>
+            <button type="button" onClick={() => void saveResults()} disabled={!dirty || busy !== null} className={buttonClass} title="Guardar calificaciones">
               {busy === 'save' ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
             </button>
           </div>
@@ -228,37 +201,28 @@ export const MySupervisionDetail = ({ checklist, roles, onBack, onDone }: MySupe
         <textarea value={comments} disabled={!canSupervise} onChange={(e) => setComments(e.target.value)} rows={2} className={inputClass} placeholder="Comentarios del supervisor" />
       </section>
 
-      {canSupervise || canEndorse ? (
-        <section className="grid gap-4 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(248,251,253,0.9)] p-4 md:grid-cols-2">
-          <SignaturePad
-            label={canSupervise ? `Tu firma · Supervisor / Auditor` : `Tu firma · Responsable del Área`}
-            hint="Firma con el dedo, lápiz o mouse"
-            onChange={setSignature}
-          />
-          <div className="flex flex-col justify-end gap-2 text-xs text-[var(--unilabor-neutral)]">
-            {canSupervise ? (
-              <p>Al firmar, las calificaciones quedan bloqueadas y la lista pasa a {checklist.area_responsible_name || 'el responsable del área'} para su aval.</p>
-            ) : (
-              <p>El supervisor {checklist.supervisor_name} ya calificó y firmó. Tu aval cierra la lista y la archiva en el expediente.</p>
-            )}
-            <button
-              type="button"
-              onClick={() => void (canSupervise ? sign() : endorse())}
-              disabled={busy !== null}
-              className={`${primaryButtonClass} justify-center`}
-            >
-              {busy === 'sign' || busy === 'endorse' ? <Loader2 size={14} className="animate-spin" /> : canSupervise ? <Lock size={14} /> : <ShieldCheck size={14} />}
-              {canSupervise ? 'Firmar como supervisor' : 'Avalar y cerrar'}
+      <section className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(248,251,253,0.9)] p-4">
+        <SupervisionSignatureProgress signers={checklist.signers} inSignature={!canSupervise} />
+        {canSupervise ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-2xl text-xs leading-5 text-[var(--unilabor-neutral)]">
+              {signerProblem
+                ? 'Falta un firmante asignado o con usuario de sistema; pide a Recursos Humanos que lo complete para poder enviar la lista a firma.'
+                : 'Al enviarla, las calificaciones quedan bloqueadas. Aquí no se firma: cada quien firma desde su Buzón de firmas y la lista se cierra sola con las tres firmas.'}
+            </p>
+            <button type="button" onClick={() => void send()} disabled={busy !== null || Boolean(signerProblem)} className={primaryButtonClass}>
+              {busy === 'send' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Enviar a firma
             </button>
           </div>
-        </section>
-      ) : (
-        <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-800">
-          {checklist.status === 'SUPERVISOR_SIGNED'
-            ? `Firmaste esta lista; espera el aval de ${checklist.area_responsible_name || 'el responsable del área'}.`
-            : 'Solo consulta.'}
-        </p>
-      )}
+        ) : (
+          <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">
+            {checklist.status === 'CLOSED' ? 'Lista cerrada con sus tres firmas.' : 'Lista en firma: se cerrará sola al reunirse las tres firmas.'}{' '}
+            <Link to="/rh/signature-inbox" className="inline-flex items-center gap-1 font-semibold text-[var(--color-brand-500)] hover:underline">
+              <Inbox size={12} /> Ir a mi Buzón de firmas
+            </Link>
+          </p>
+        )}
+      </section>
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { capturePracticalResults } from './evaluation-practical.service';
 import type { PracticalCaptureRow } from './evaluation-practical.service';
 import { autoCompleteChecklistForPassedAssignment } from './rh-induction-checklist.service';
 import { refreshEnrollmentReadingStatus } from './rh-induction.service';
+import { tryAutoStartPhase7, type Phase7AutoStartOutcome } from './rh-induction-phase7-auto.service';
 import { queuePositionTrackSync } from './rh-induction-position-track.service';
 
 // -----------------------------------------------------------------------------
@@ -30,6 +31,8 @@ export interface CaptureEnrollmentPracticalResult extends PracticalCaptureRow {
   enrollment_id: number;
   employee_name: string;
   passing_score: number;
+  /** Si acredito: que paso con su Fase 7 (se abre sola al acreditar la Fase 6 de todos sus puestos). Null si no acredito. */
+  phase7: Phase7AutoStartOutcome | null;
 }
 
 export const captureEnrollmentPractical = async (input: CaptureEnrollmentPracticalInput): Promise<CaptureEnrollmentPracticalResult> => {
@@ -74,15 +77,20 @@ export const captureEnrollmentPractical = async (input: CaptureEnrollmentPractic
   // Liga la asignacion a la inscripcion (auto-vinculo) y, si acredito, corre
   // el checklist automatico que la emision no alcanzo a ver sin el vinculo.
   await refreshEnrollmentReadingStatus(input.enrollmentId);
+  let phase7: Phase7AutoStartOutcome | null = null;
   if (captured.status === 'passed') {
     await autoCompleteChecklistForPassedAssignment(captured.assignment_id).catch((error) => {
       console.error(`Checklist automatico de la Fase 6 (asignacion ${captured.assignment_id}):`, error);
     });
     // Ruta por puesto: la constancia se emitio antes del vinculo; activa aqui el siguiente puesto.
     queuePositionTrackSync(Number(row.employee_id), input.actorUserId);
+    // Fase 7 automatica: si con este puesto acredito la Fase 6 de TODOS, se abre sola la
+    // REH-REG-003 INICIAL del primero. Best-effort (nunca lanza): la nota ya quedo capturada.
+    phase7 = await tryAutoStartPhase7(Number(row.employee_id), input.actorUserId, 'PHASE6_COMPLETED');
   }
   return {
     ...captured,
+    phase7,
     enrollment_id: input.enrollmentId,
     employee_name: String(row.full_name),
     passing_score: Number(row.passing_score),

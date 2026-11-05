@@ -17,6 +17,7 @@ const optionalText = z
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha invalida (YYYY-MM-DD)');
 
 const evaluationType = z.enum(['INICIAL', 'PERIODICA', 'REEVALUACION', 'CAMBIO_PUESTO', 'POST_CAPACITACION']);
+const evaluatorEmployeeId = z.coerce.number().int().positive('Evaluador invalido');
 
 export const createCompetencyEvaluationSchema = z
   .object({
@@ -24,16 +25,23 @@ export const createCompetencyEvaluationSchema = z
     position_id: z.coerce.number().int().positive('Puesto invalido'),
     evaluation_type: evaluationType,
     evaluation_date: isoDate,
-    evaluator_name: requiredText('El nombre del evaluador es obligatorio'),
+    // Evaluador: colaborador elegido de la lista (su nombre sale de la ficha) o, sin el, el nombre en texto.
+    evaluator_employee_id: evaluatorEmployeeId.optional(),
+    evaluator_name: optionalText,
     reference_course_id: z.coerce.number().int().positive().optional().nullable(),
     reference_course_date: isoDate.optional().nullable(),
   })
-  .passthrough();
+  .passthrough()
+  .refine((data) => typeof data.evaluator_employee_id === 'number' || Boolean(data.evaluator_name), {
+    message: 'El evaluador es obligatorio',
+    path: ['evaluator_employee_id'],
+  });
 
 export const updateCompetencyEvaluationSchema = z
   .object({
     evaluation_type: evaluationType.optional(),
     evaluation_date: isoDate.optional(),
+    evaluator_employee_id: evaluatorEmployeeId.optional(),
     evaluator_name: requiredText('El nombre del evaluador no puede quedar vacio').optional(),
     reference_course_id: z.coerce.number().int().positive().optional().nullable(),
     reference_course_date: isoDate.optional().nullable(),

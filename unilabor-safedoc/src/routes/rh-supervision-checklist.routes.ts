@@ -1,34 +1,40 @@
 import { Router } from 'express';
 import {
   assignSupervisorController,
-  closeSupervisionChecklistController,
+  cancelSignatureController,
   createSupervisionChecklistController,
   deleteSupervisionDraftController,
   generateSupervisionDraftsController,
   getPositionNaItemsController,
-  listAreaSignatoriesController,
-  saveAreaSignatoriesController,
   getSupervisionChecklistController,
   getSupervisionChecklistPdfController,
   listSupervisionChecklistsController,
   listSupervisionFormItemsController,
   listSupervisionPendingController,
+  retryCloseController,
   saveSupervisionResultsController,
+  sendToSignatureController,
   setPositionNaItemsController,
   updateSupervisionChecklistController,
 } from '../controllers/rh-supervision-checklist.controller';
+import {
+  getSignatoriesOverviewController,
+  getUnitSignatoryImpactController,
+  saveAreaSignatoriesController,
+  saveUnitSignatoriesController,
+} from '../controllers/rh-supervision-signatories.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   assignSupervisorSchema,
-  closeSupervisionChecklistSchema,
   createSupervisionChecklistSchema,
   generateDraftsSchema,
-  saveAreaSignatoriesSchema,
   saveSupervisionResultsSchema,
+  sendToSignatureSchema,
   setPositionNaItemsSchema,
   updateSupervisionChecklistSchema,
 } from '../schemas/rh-supervision-checklist.schema';
+import { saveAreaSignatoriesSchema, saveUnitSignatoriesSchema } from '../schemas/rh-supervision-signatories.schema';
 
 /**
  * Rutas de la Lista de verificacion de Supervision ANA-REG-060 (Fase 6 de
@@ -45,8 +51,11 @@ router.put('/positions/:positionId/na-items', validate(setPositionNaItemsSchema)
 router.get('/pending', listSupervisionPendingController);
 router.post('/pending/generate', validate(generateDraftsSchema), generateSupervisionDraftsController);
 router.post('/pending/assign-supervisor', validate(assignSupervisorSchema), assignSupervisorController);
-router.get('/signatories', listAreaSignatoriesController);
+// Firmantes por area: responsable general (y suplente), responsables por unidad e impacto de un cambio.
+router.get('/signatories', getSignatoriesOverviewController);
 router.put('/signatories', validate(saveAreaSignatoriesSchema), saveAreaSignatoriesController);
+router.get('/signatories/impact', getUnitSignatoryImpactController);
+router.put('/signatories/units', validate(saveUnitSignatoriesSchema), saveUnitSignatoriesController);
 
 router.get('/', listSupervisionChecklistsController);
 router.post('/', validate(createSupervisionChecklistSchema), createSupervisionChecklistController);
@@ -54,7 +63,9 @@ router.get('/:id', getSupervisionChecklistController);
 router.get('/:id/pdf', getSupervisionChecklistPdfController);
 router.patch('/:id', validate(updateSupervisionChecklistSchema), updateSupervisionChecklistController);
 router.put('/:id/results', validate(saveSupervisionResultsSchema), saveSupervisionResultsController);
-router.post('/:id/close', validate(closeSupervisionChecklistSchema), closeSupervisionChecklistController);
+router.post('/:id/send-to-signature', validate(sendToSignatureSchema), sendToSignatureController);
+router.post('/:id/cancel-signature', cancelSignatureController);
+router.post('/:id/close', retryCloseController);
 router.delete('/:id', deleteSupervisionDraftController);
 
 export default router;

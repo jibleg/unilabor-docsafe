@@ -17,19 +17,31 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import { SupervisionChecklistEditor } from '../components/rh/supervision/SupervisionChecklistEditor';
 import { SupervisionPendingTable } from '../components/rh/supervision/SupervisionPendingTable';
 import { SupervisionSignatoriesPanel } from '../components/rh/supervision/SupervisionSignatoriesPanel';
-import { SupervisionBatchSignPanel } from '../components/rh/supervision/SupervisionBatchSignPanel';
-import { CONCLUSION_UI, buttonClass, cardClass, formatDateOnly, formatPct, inputClass, labelClass, primaryButtonClass, todayIsoDate } from '../components/rh/supervision/supervision-ui';
+import {
+  CONCLUSION_UI,
+  SIGNERS_TOTAL,
+  buttonClass,
+  cardClass,
+  formatDateOnly,
+  formatPct,
+  inputClass,
+  labelClass,
+  primaryButtonClass,
+  todayIsoDate,
+} from '../components/rh/supervision/supervision-ui';
 import type { Employee, RhPosition, SupervisionChecklist, SupervisionChecklistListRow, SupervisionChecklistStatus, SupervisionPendingRow } from '../types/models';
 import { notifyError, notifyInfo, notifySuccess, notifyWarning } from '../utils/notify';
 
-type Tab = 'pending' | 'batch' | 'records' | 'signatories';
+type Tab = 'pending' | 'records' | 'signatories';
 const PAGE_SIZE = 20;
 
 /**
  * Supervisión (ANA-REG-060): bandeja de la Fase 6 por área para aplicar la
- * lista a cada colaborador y puesto, registros (borradores y cerradas) y alta
- * libre para supervisiones de área. Enlaces directos: ?checklist=ID abre una
- * lista; ?enrollment=ID abre (o crea) la de esa inscripción de la Fase 6.
+ * lista a cada colaborador y puesto, registros (borradores, en firma y
+ * cerradas) y alta libre para supervisiones de área. Aquí no se firma: "Cerrar
+ * y firmar" envía la lista al Buzón de firmas de cada persona. Enlaces
+ * directos: ?checklist=ID abre una lista; ?enrollment=ID abre (o crea) la de
+ * esa inscripción de la Fase 6.
  */
 export const RhSupervisionChecklistsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -227,8 +239,9 @@ export const RhSupervisionChecklistsPage = () => {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">Recursos Humanos · Inducción Fase 6</p>
           <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Supervisión (ANA-REG-060)</h1>
           <p className="max-w-3xl text-sm leading-6 text-[var(--unilabor-ink)]">
-            Lista de verificación de Supervisión por colaborador y puesto. Ligada a la Fase 6, su porcentaje (≥ 80 %) acredita la fase, emite la
-            constancia y abre el siguiente puesto o la Fase 7. El PDF se archiva en el expediente con el diseño del formato controlado.
+            Lista de verificación de Supervisión por colaborador y puesto. Al enviarla a firma, el supervisor, el responsable del área y el
+            colaborador firman desde su Buzón de firmas y la lista se cierra sola. Ligada a la Fase 6, su porcentaje (≥ 80 %) acredita la fase,
+            emite la constancia y activa el siguiente puesto. El PDF se archiva en el expediente con el diseño del formato controlado.
           </p>
         </div>
         <button type="button" onClick={() => setShowCreate((value) => !value)} className={primaryButtonClass}>
@@ -278,7 +291,6 @@ export const RhSupervisionChecklistsPage = () => {
         {(
           [
             ['pending', `Pendientes Fase 6 (${pending.length})`],
-            ['batch', 'Firmar como supervisor'],
             ['records', `Registros (${total})`],
             ['signatories', 'Firmantes por área'],
           ] as Array<[Tab, string]>
@@ -297,10 +309,6 @@ export const RhSupervisionChecklistsPage = () => {
       {tab === 'signatories' ? (
         <section className={cardClass}>
           <SupervisionSignatoriesPanel />
-        </section>
-      ) : tab === 'batch' ? (
-        <section className={cardClass}>
-          <SupervisionBatchSignPanel key={tab} />
         </section>
       ) : tab === 'pending' ? (
         <section className={`${cardClass} space-y-4`}>
@@ -340,7 +348,7 @@ export const RhSupervisionChecklistsPage = () => {
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as SupervisionChecklistStatus | ''); setPage(1); }} className={`${inputClass} w-auto`}>
               <option value="">Todas</option>
               <option value="DRAFT">Borradores</option>
-              <option value="SUPERVISOR_SIGNED">Esperan aval</option>
+              <option value="PENDING_SIGNATURES">En firma</option>
               <option value="CLOSED">Cerradas</option>
             </select>
           </div>
@@ -392,9 +400,12 @@ export const RhSupervisionChecklistsPage = () => {
                       <td className="px-3 py-2 text-xs">
                         {row.status === 'CLOSED' ? (
                           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700">Cerrada</span>
-                        ) : row.status === 'SUPERVISOR_SIGNED' ? (
-                          <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-bold text-sky-700" title="Firmada por el supervisor; falta el aval del responsable del área">
-                            Espera aval
+                        ) : row.status === 'PENDING_SIGNATURES' ? (
+                          <span
+                            className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-bold text-sky-700"
+                            title="Enviada a firma: se cierra sola cuando firmen el supervisor, el responsable del área y el colaborador"
+                          >
+                            En firma ({row.signatures_done}/{SIGNERS_TOTAL})
                           </span>
                         ) : (
                           <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-bold text-amber-700">Borrador</span>

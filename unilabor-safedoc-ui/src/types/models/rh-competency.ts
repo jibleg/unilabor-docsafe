@@ -67,7 +67,10 @@ export interface RhCompetencyEvaluation {
   position_name: string;
   evaluation_type: RhCompetencyEvaluationType;
   evaluation_date: string;
+  /** Vacío si la evaluación se abrió sola y no había coordinador del área disponible. */
   evaluator_name: string;
+  /** Colaborador que evalúa (null en evaluaciones antiguas o sin evaluador asignado). */
+  evaluator_employee_id?: number | null;
   reference_course_id: number | null;
   reference_course_title: string | null;
   reference_course_date: string | null;

@@ -178,6 +178,11 @@ const RhMySupervisionsPage = lazy(() =>
     default: module.RhMySupervisionsPage,
   })),
 );
+const RhSignatureInboxPage = lazy(() =>
+  import('./pages/RhSignatureInboxPage').then((module) => ({
+    default: module.RhSignatureInboxPage,
+  })),
+);
 const RhMyInductionPage = lazy(() =>
   import('./pages/RhMyInductionPage').then((module) => ({
     default: module.RhMyInductionPage,
@@ -581,6 +586,14 @@ function App() {
           element={
             <PermissionGate permission="RH.SELF.INDUCTION" redirectTo="/rh">
               <RhMySupervisionsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="signature-inbox"
+          element={
+            <PermissionGate permission="RH.SELF.INDUCTION" redirectTo="/rh">
+              <RhSignatureInboxPage />
             </PermissionGate>
           }
         />

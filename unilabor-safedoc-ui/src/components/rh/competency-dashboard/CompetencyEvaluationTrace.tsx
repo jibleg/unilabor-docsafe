@@ -117,7 +117,7 @@ export const EvaluationTraceCard = ({ evaluation, trace, documents, onView }: Ev
             REH-REG-003 #{evaluation.id} · {EVALUATION_TYPE_LABELS[evaluation.evaluation_type] ?? evaluation.evaluation_type}
           </p>
           <p className="text-[11px] text-[var(--unilabor-neutral)]">
-            {evaluation.position_name} · {formatDateOnly(evaluation.evaluation_date)} · Evaluador: {evaluation.evaluator_name}
+            {evaluation.position_name} · {formatDateOnly(evaluation.evaluation_date)} · Evaluador: {evaluation.evaluator_name || 'sin asignar'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">

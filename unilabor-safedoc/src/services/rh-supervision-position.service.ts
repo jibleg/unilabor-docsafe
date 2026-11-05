@@ -60,8 +60,11 @@ export interface SupervisionPendingRow {
   /** Estado de la evaluacion practica de la inscripcion (null = sin capturar). */
   evaluation_status: string | null;
   evaluation_percentage: number | null;
-  /** Borrador abierto de esta inscripcion (para "continuar"). */
+  /** Lista en curso de esta inscripcion: borrador (para "continuar") o en firma. */
   draft_checklist_id: number | null;
+  draft_status: 'DRAFT' | 'PENDING_SIGNATURES' | null;
+  /** Firmas vigentes recabadas de la lista en curso (de 3). */
+  draft_signatures_done: number;
   /** Listas cerradas de la inscripcion y % de la ultima. */
   closed_count: number;
   last_closed_pct: number | null;
@@ -95,7 +98,8 @@ export const listSupervisionPending = async (query: SupervisionPendingQuery = {}
             e.supervisor_employee_id, sup.full_name AS supervisor_name,
             e.position_id, rp.code AS position_code, rp.name AS position_name, e.activated_at,
             ea.status AS evaluation_status, ea.percentage AS evaluation_percentage,
-            d.id AS draft_checklist_id, COALESCE(cl.closed_count, 0) AS closed_count, cl.last_closed_pct,
+            d.id AS draft_checklist_id, d.status AS draft_status, COALESCE(d.signatures_done, 0) AS draft_signatures_done,
+            COALESCE(cl.closed_count, 0) AS closed_count, cl.last_closed_pct,
             EXTRACT(EPOCH FROM (NOW() - COALESCE(e.activated_at, e.created_at))) / 86400 AS days_in_phase
        FROM public.rh_induction_enrollments e
        JOIN public.rh_induction_phases p ON p.id = e.phase_id AND p.phase_number = 6
@@ -106,8 +110,11 @@ export const listSupervisionPending = async (query: SupervisionPendingQuery = {}
        LEFT JOIN public.helpdesk_asset_units bu ON bu.id = emp.branch_id
        LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
        LEFT JOIN LATERAL (
-         SELECT id FROM public.rh_supervision_checklists
-          WHERE enrollment_id = e.id AND status IN ('DRAFT', 'SUPERVISOR_SIGNED') ORDER BY id DESC LIMIT 1
+         SELECT c.id, c.status,
+                (SELECT count(*) FROM public.rh_supervision_checklist_signatures sg
+                  WHERE sg.checklist_id = c.id AND sg.invalidated_at IS NULL) AS signatures_done
+           FROM public.rh_supervision_checklists c
+          WHERE c.enrollment_id = e.id AND c.status IN ('DRAFT', 'PENDING_SIGNATURES') ORDER BY c.id DESC LIMIT 1
        ) d ON TRUE
        LEFT JOIN LATERAL (
          SELECT count(*) AS closed_count,
@@ -135,6 +142,8 @@ export const listSupervisionPending = async (query: SupervisionPendingQuery = {}
     evaluation_status: row.evaluation_status ? String(row.evaluation_status) : null,
     evaluation_percentage: row.evaluation_percentage === null || row.evaluation_percentage === undefined ? null : Number(row.evaluation_percentage),
     draft_checklist_id: row.draft_checklist_id ? Number(row.draft_checklist_id) : null,
+    draft_status: row.draft_status ? (String(row.draft_status) as 'DRAFT' | 'PENDING_SIGNATURES') : null,
+    draft_signatures_done: Number(row.draft_signatures_done ?? 0),
     closed_count: Number(row.closed_count ?? 0),
     last_closed_pct: row.last_closed_pct === null || row.last_closed_pct === undefined ? null : Number(row.last_closed_pct),
     days_in_phase: row.days_in_phase === null || row.days_in_phase === undefined ? null : Math.round(Number(row.days_in_phase) * 10) / 10,

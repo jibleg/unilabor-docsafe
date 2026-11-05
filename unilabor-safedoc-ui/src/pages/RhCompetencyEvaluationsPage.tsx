@@ -13,6 +13,7 @@ import {
 import { getApiErrorMessage } from '../api/service.parsers';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { CompetencyEvaluationEditor } from '../components/rh/CompetencyEvaluationEditor';
+import { CompetencyEvaluatorField } from '../components/rh/CompetencyEvaluatorField';
 import { AUTHORIZATION_UI, DICTAMEN_UI, formatDateOnly } from '../utils/competency';
 import { useHasPermission } from '../utils/permissions';
 import type { Employee, RhCompetencyEvaluation, RhCompetencyEvaluationType, RhPosition } from '../types/models';
@@ -132,7 +133,7 @@ export const RhCompetencyEvaluationsPage = () => {
   };
 
   const handleCreate = async () => {
-    if (!createEmployeeId || !createPositionId || !createEvaluator.trim() || !createDate) {
+    if (!createEmployeeId || !createPositionId || !createEvaluator || !createDate) {
       toast.warning('Colaborador, puesto, fecha y evaluador son obligatorios.');
       return;
     }
@@ -143,7 +144,7 @@ export const RhCompetencyEvaluationsPage = () => {
         position_id: Number(createPositionId),
         evaluation_type: createType,
         evaluation_date: createDate,
-        evaluator_name: createEvaluator.trim(),
+        evaluator_employee_id: Number(createEvaluator),
       });
       toast.success('Evaluación creada; las competencias del puesto y los criterios de desempeño quedaron precargados.');
       setShowCreate(false);
@@ -199,9 +200,9 @@ export const RhCompetencyEvaluationsPage = () => {
                   {selected.employee_name} · {selected.position_name}
                 </h2>
                 <p className="text-xs text-[var(--unilabor-neutral)]">
-                  {TYPE_LABELS[selected.evaluation_type]} · {formatDateOnly(selected.evaluation_date)} ·
-                  Evaluador: {selected.evaluator_name}
+                  {TYPE_LABELS[selected.evaluation_type]} · {formatDateOnly(selected.evaluation_date)}
                 </p>
+                <CompetencyEvaluatorField evaluation={selected} onChanged={handleChanged} />
               </div>
             </div>
             <span
@@ -482,7 +483,7 @@ export const RhCompetencyEvaluationsPage = () => {
                 onChange={setCreateEvaluator}
                 options={employees
                   .filter((employee) => employee.is_active && String(employee.id) !== createEmployeeId)
-                  .map((employee) => ({ value: employee.full_name, label: employee.full_name, hint: employee.employee_code }))}
+                  .map((employee) => ({ value: String(employee.id), label: employee.full_name, hint: employee.employee_code }))}
                 placeholder="Selecciona al evaluador"
                 searchPlaceholder="Buscar colaborador..."
               />

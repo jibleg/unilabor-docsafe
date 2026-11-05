@@ -1,4 +1,4 @@
-import type { SupervisionConclusion, SupervisionResult } from '../../../types/models';
+import type { SupervisionConclusion, SupervisionResult, SupervisionSigner, SupervisionSignerRole } from '../../../types/models';
 
 /** Estilos y etiquetas compartidos de la Lista de verificacion ANA-REG-060. */
 
@@ -32,3 +32,28 @@ export const formatDateOnly = (value: string | null | undefined): string => {
 };
 
 export const todayIsoDate = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+
+export const SIGNERS_TOTAL = 3;
+
+export const SIGNER_ROLE_LABELS: Record<SupervisionSignerRole, string> = {
+  SUPERVISOR: 'Supervisor / Auditor',
+  AREA_RESPONSIBLE: 'Responsable del Área',
+  EMPLOYEE: 'Colaborador evaluado',
+};
+
+/** "Supervisor / Auditor y Responsable del Área". */
+export const describeSignerRoles = (roles: SupervisionSignerRole[]): string => {
+  const labels = roles.map((role) => SIGNER_ROLE_LABELS[role]);
+  return labels.length <= 1 ? (labels[0] ?? '') : `${labels.slice(0, -1).join(', ')} y ${labels[labels.length - 1]}`;
+};
+
+/** Por qué un firmante aún no puede firmar en su Buzón (null = listo). Misma regla que valida el backend al enviar. */
+export const signerIssue = (signer: SupervisionSigner): string | null => {
+  if (!signer.employee_id) return 'Sin asignar';
+  if (!signer.is_active) return 'Dado de baja';
+  if (!signer.has_user) return 'Sin usuario vinculado';
+  return null;
+};
+
+export const formatDateTime = (value: string | null | undefined): string =>
+  value ? new Date(value).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—';

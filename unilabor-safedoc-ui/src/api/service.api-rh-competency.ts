@@ -23,7 +23,8 @@ export interface CreateCompetencyEvaluationPayload {
   position_id: number;
   evaluation_type: RhCompetencyEvaluationType;
   evaluation_date: string;
-  evaluator_name: string;
+  /** Evaluador elegido de la lista de colaboradores (el servidor toma su nombre de la ficha). */
+  evaluator_employee_id: number;
   reference_course_id?: number | null;
   reference_course_date?: string | null;
 }
@@ -61,7 +62,7 @@ export const getCompetencyEvaluation = async (id: number): Promise<RhCompetencyE
 export interface UpdateCompetencyEvaluationPayload {
   evaluation_type?: RhCompetencyEvaluationType;
   evaluation_date?: string;
-  evaluator_name?: string;
+  evaluator_employee_id?: number;
   reference_course_id?: number | null;
   reference_course_date?: string | null;
 }
@@ -194,6 +195,19 @@ export const getCompetencySuggestedSigners = async (
   const response = await api.get(`/rh/competency-evaluations/${id}/suggested-signers`);
   const data = asRecord(unwrapPayload(response.data));
   return (data?.signers as { area: string | null; rh: string | null; director: string | null }) ?? { area: null, rh: null, director: null };
+};
+
+export interface CompetencyProposedEvaluator {
+  /** null = no hay coordinador del área disponible (o fue el supervisor de la Fase 6 y no hay relevo). */
+  evaluator: { employee_id: number | null; name: string } | null;
+  coordinator_was_supervisor: boolean;
+}
+
+/** Evaluador que el sistema propone para el borrador: el coordinador del área, nunca el supervisor de la Fase 6. */
+export const getCompetencyProposedEvaluator = async (id: number): Promise<CompetencyProposedEvaluator> => {
+  const response = await api.get(`/rh/competency-evaluations/${id}/proposed-evaluator`);
+  const data = asRecord(unwrapPayload(response.data));
+  return (data?.proposed as CompetencyProposedEvaluator) ?? { evaluator: null, coordinator_was_supervisor: false };
 };
 
 /** Sección 3 desde el cuestionario de la Fase 5 que el colaborador ya acreditó en el puesto (Fase 7). */

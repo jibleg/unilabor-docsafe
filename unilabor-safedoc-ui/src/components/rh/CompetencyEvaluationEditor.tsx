@@ -536,7 +536,7 @@ const CloseModal = ({
             </div>
           </div>
           <SignaturePad label={`Colaborador evaluado — ${evaluation.employee_name}`} onChange={setSignature('collaborator')} />
-          <SignaturePad label={`Evaluador técnico — ${evaluation.evaluator_name}`} onChange={setSignature('evaluator')} />
+          <SignaturePad label={`Evaluador técnico — ${evaluation.evaluator_name || 'sin asignar'}`} onChange={setSignature('evaluator')} />
           <SignaturePad label={`Coordinador del área — ${areaName || 'sin elegir'}`} onChange={setSignature('area')} />
           <SignaturePad label={`Coordinador de RH — ${rhName || 'sin elegir'}`} onChange={setSignature('rh')} />
           <SignaturePad label={`Director General — ${directorName || 'sin elegir'}`} onChange={setSignature('director')} />
@@ -586,6 +586,15 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo abrir el documento.'));
     }
+  };
+
+  // Una evaluación abierta automáticamente puede no tener evaluador: se asigna antes de recabar firmas.
+  const handleOpenClose = () => {
+    if (!evaluation.evaluator_name.trim()) {
+      toast.warning('Asigna al evaluador (cabecera de la evaluación) antes de cerrarla.');
+      return;
+    }
+    setShowCloseModal(true);
   };
 
   const handleIssueCertificate = async () => {
@@ -679,7 +688,7 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
                 </div>
               </>
             ) : (
-              <button type="button" onClick={() => setShowCloseModal(true)} className={buttonClass}>
+              <button type="button" onClick={handleOpenClose} className={buttonClass}>
                 <FileCheck2 size={14} /> Cerrar evaluación
               </button>
             )}

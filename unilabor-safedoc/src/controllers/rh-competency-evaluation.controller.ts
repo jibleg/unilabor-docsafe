@@ -14,8 +14,11 @@ import {
   replaceActions,
   replaceSectionItems,
   updateEvaluation,
-  authorizeEvaluation,
 } from '../services/rh-competency-evaluation.service';
+import { authorizeEvaluation } from '../services/rh-competency-authorization.service';
+import { EVALUATOR_IS_PHASE6_SUPERVISOR_CODE } from '../services/rh-competency-evaluator.rules';
+import { proposePhase7Evaluator } from '../services/rh-competency-evaluator.service';
+import { describePhase7AutoStart, tryAutoStartPhase7, type Phase7AutoStartOutcome } from '../services/rh-induction-phase7-auto.service';
 import {
   assignKnowledgeQuiz,
   cancelKnowledgeQuiz,
@@ -62,6 +65,10 @@ const ERROR_STATUS: Record<string, number> = {
   RH_COMP_EVAL_COURSE_NO_QUIZ: 409,
   RH_COMP_EVAL_COURSE_NO_ATTEMPT: 409,
   RH_COMP_EVAL_PHASE5_NOT_FOUND: 409,
+  [EVALUATOR_IS_PHASE6_SUPERVISOR_CODE]: 409,
+  RH_COMP_EVAL_EVALUATOR_NOT_FOUND: 409,
+  RH_COMP_EVAL_EVALUATOR_REQUIRED: 409,
+  RH_COMP_EVAL_INICIAL_ALREADY_OPEN: 409,
 };
 
 const mapError = (res: Response, error: any): Response | null => {
@@ -91,7 +98,8 @@ export const createCompetencyEvaluationController = async (req: AuthRequest, res
       positionId: Number(req.body.position_id),
       evaluationType: req.body.evaluation_type,
       evaluationDate: req.body.evaluation_date,
-      evaluatorName: req.body.evaluator_name,
+      evaluatorEmployeeId: req.body.evaluator_employee_id,
+      evaluatorName: req.body.evaluator_name ?? undefined,
       referenceCourseId: req.body.reference_course_id ?? null,
       referenceCourseDate: req.body.reference_course_date ?? null,
       createdByUserId: req.user?.id ?? null,
@@ -151,10 +159,12 @@ export const updateCompetencyEvaluationController = async (req: AuthRequest, res
     const evaluation = await updateEvaluation(evaluationId, {
       evaluationType: req.body.evaluation_type,
       evaluationDate: req.body.evaluation_date,
+      evaluatorEmployeeId: req.body.evaluator_employee_id,
       evaluatorName: req.body.evaluator_name,
       referenceCourseId: req.body.reference_course_id,
       referenceCourseDate: req.body.reference_course_date,
     });
+    await logAudit(req.user?.id, `RH_COMP_EVAL_UPDATE:${evaluationId}`, evaluationId, req.ip);
     return res.json({ message: 'Evaluacion actualizada.', evaluation });
   } catch (error: any) {
     const mapped = mapError(res, error);
@@ -235,6 +245,12 @@ export const closeCompetencyEvaluationController = async (req: AuthRequest, res:
   }
 };
 
+/** Que paso con el siguiente puesto de la ruta al autorizar (vacio si no habia nada que informar). */
+const nextPositionMessage = (next: Phase7AutoStartOutcome | null): string => {
+  if (!next || next.status === 'NOT_DUE' || next.status === 'ALREADY_OPEN') return '';
+  return `Siguiente puesto: ${describePhase7AutoStart(next)}`;
+};
+
 export const authorizeCompetencyEvaluationController = async (req: AuthRequest, res: Response) => {
   const evaluationId = parseId(req.params.id);
   if (!evaluationId) {
@@ -256,14 +272,22 @@ export const authorizeCompetencyEvaluationController = async (req: AuthRequest, 
     const finalEvaluation = certificateDocumentId ? (await getEvaluationById(evaluationId)) ?? evaluation : evaluation;
     // Fase 7: carta de asignacion de puesto REH-REG-008 en borrador (solo INICIAL autorizado; best-effort).
     const letter = decision === 'NO_AUTORIZADO' ? null : await tryCreateLetterForEvaluation(evaluationId, req.user.id);
+    // Fase 7 encadenada: al autorizar la INICIAL de un puesto se abre sola la del siguiente
+    // puesto de la ruta (best-effort, nunca lanza: no deshace la autorizacion).
+    const nextPosition =
+      decision !== 'NO_AUTORIZADO' && evaluation.evaluation_type === 'INICIAL'
+        ? await tryAutoStartPhase7(evaluation.employee_id, req.user.id, 'COMPETENCY_AUTHORIZED')
+        : null;
+    const baseMessage =
+      decision === 'NO_AUTORIZADO'
+        ? 'Decision registrada: NO AUTORIZADO. El registro actualizado quedo en el expediente.'
+        : certificateDocumentId
+          ? 'Evaluacion autorizada; registro actualizado y constancia de competencia archivados en el expediente.'
+          : 'Evaluacion autorizada; registro actualizado en el expediente.';
     return res.json({
       assignment_letter_id: letter?.id ?? null,
-      message:
-        decision === 'NO_AUTORIZADO'
-          ? 'Decision registrada: NO AUTORIZADO. El registro actualizado quedo en el expediente.'
-          : certificateDocumentId
-            ? 'Evaluacion autorizada; registro actualizado y constancia de competencia archivados en el expediente.'
-            : 'Evaluacion autorizada; registro actualizado en el expediente.',
+      next_evaluation_id: nextPosition?.status === 'OPENED' ? nextPosition.evaluation_id : null,
+      message: `${baseMessage} ${nextPositionMessage(nextPosition)}`.trim(),
       evaluation: finalEvaluation,
     });
   } catch (error: any) {
@@ -412,6 +436,30 @@ export const getCompetencySuggestedSignersController = async (req: AuthRequest, 
   } catch (error) {
     console.error('Error sugiriendo firmantes del REH-REG-003:', error);
     return res.status(500).json({ message: 'No se pudieron sugerir los firmantes.' });
+  }
+};
+
+/**
+ * GET /rh/competency-evaluations/:id/proposed-evaluator — evaluador que el sistema propone para el
+ * borrador: el coordinador del area del puesto, descartando al supervisor de la Fase 6 (solo INICIAL).
+ */
+export const getCompetencyProposedEvaluatorController = async (req: AuthRequest, res: Response) => {
+  const evaluationId = parseId(req.params.id);
+  if (!evaluationId) {
+    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
+  }
+  try {
+    const evaluation = await getEvaluationById(evaluationId);
+    if (!evaluation) return res.status(404).json({ message: 'La evaluacion indicada no existe.' });
+    if (evaluation.evaluation_type !== 'INICIAL') {
+      const signers = await getCompetencySuggestedSigners(evaluationId);
+      const evaluator = signers?.area_employee_id ? { employee_id: signers.area_employee_id, name: signers.area ?? '' } : null;
+      return res.json({ proposed: { evaluator, source: null, coordinator_was_supervisor: false } });
+    }
+    return res.json({ proposed: await proposePhase7Evaluator(evaluation.employee_id, evaluation.position_id) });
+  } catch (error) {
+    console.error('Error proponiendo evaluador del REH-REG-003:', error);
+    return res.status(500).json({ message: 'No se pudo proponer al evaluador.' });
   }
 };
 

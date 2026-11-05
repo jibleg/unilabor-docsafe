@@ -1,54 +1,39 @@
 import { useState } from 'react';
-import { FileCheck2, Loader2, X } from 'lucide-react';
-import { closeSupervisionChecklist, type CloseSupervisionChecklistResult } from '../../../api/service.api-rh-supervision';
+import { Loader2, Send, X } from 'lucide-react';
+import { sendSupervisionToSignature, type SupervisionSignatureResult } from '../../../api/service.api-rh-supervision';
 import { getApiErrorMessage } from '../../../api/service.parsers';
-import { SignaturePad } from '../../helpdesk/SignaturePad';
 import type { SupervisionChecklist } from '../../../types/models';
-import { notifyError, notifyWarning } from '../../../utils/notify';
-import { CONCLUSION_UI, formatPct, primaryButtonClass } from './supervision-ui';
+import { notifyError } from '../../../utils/notify';
+import { SupervisionSignatureProgress } from './SupervisionSignatureProgress';
+import { CONCLUSION_UI, formatPct, primaryButtonClass, signerIssue } from './supervision-ui';
 
 interface SupervisionCloseModalProps {
   checklist: SupervisionChecklist;
   onClose: () => void;
-  onClosed: (result: CloseSupervisionChecklistResult) => void;
+  onSent: (result: SupervisionSignatureResult) => void;
 }
 
 /**
- * Cierre y firma de la lista ANA-REG-060: firmas digitales del supervisor y
- * del responsable del área (obligatorias), la del colaborador (opcional) y,
- * si la lista está ligada a la Fase 6, si es la lista FINAL que decide la fase.
- * Si el supervisor ya firmó con su cuenta (SUPERVISOR_SIGNED), aquí solo se
- * recaba el aval del responsable del área en presencia de RH.
+ * "Cerrar y firmar" ya no recaba firmas en pantalla: confirma el ENVÍO A FIRMA.
+ * Muestra el resultado, los tres firmantes (y si pueden firmar en su Buzón) y,
+ * si la lista está ligada a la Fase 6, la decisión de si es la lista FINAL del
+ * puesto. La lista queda bloqueada y se cierra sola al reunirse las tres firmas.
  */
-export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: SupervisionCloseModalProps) => {
+export const SupervisionCloseModal = ({ checklist, onClose, onSent }: SupervisionCloseModalProps) => {
   const linked = checklist.enrollment_id !== null;
-  const endorsing = checklist.status === 'SUPERVISOR_SIGNED';
   const [isFinal, setIsFinal] = useState(linked);
-  const [withEmployee, setWithEmployee] = useState(true);
-  const [supervisorSignature, setSupervisorSignature] = useState<string | null>(null);
-  const [areaSignature, setAreaSignature] = useState<string | null>(null);
-  const [employeeSignature, setEmployeeSignature] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const summary = checklist.summary;
   const conclusion = summary.conclusion ? CONCLUSION_UI[summary.conclusion] : null;
+  const blocked = checklist.signers.some((signer) => signerIssue(signer) !== null);
 
   const handleSubmit = async () => {
-    if ((!endorsing && !supervisorSignature) || !areaSignature) {
-      notifyWarning(endorsing ? 'La firma del responsable del área es obligatoria.' : 'Las firmas del supervisor y del responsable del área son obligatorias.');
-      return;
-    }
     setSaving(true);
     try {
-      const result = await closeSupervisionChecklist(checklist.id, {
-        supervisor_signature: endorsing ? null : supervisorSignature,
-        area_responsible_signature: areaSignature,
-        employee_signature: withEmployee ? employeeSignature : null,
-        is_final: linked ? isFinal : false,
-      });
-      onClosed(result);
+      onSent(await sendSupervisionToSignature(checklist.id, linked ? isFinal : false));
       onClose();
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo cerrar la lista.'));
+      notifyError(getApiErrorMessage(error, 'No se pudo enviar la lista a firma.'));
     } finally {
       setSaving(false);
     }
@@ -62,12 +47,12 @@ export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: Supervis
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
               {checklist.form_code} · {checklist.folio}
             </p>
-            <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{endorsing ? 'Aval del responsable del área' : 'Cerrar y firmar la lista'}</h2>
+            <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">Enviar a firma</h2>
             <p className="text-sm text-[var(--unilabor-ink)]">
               {checklist.employee_name} · {checklist.position_code} – {checklist.position_name}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:bg-slate-100" aria-label="Cerrar">
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:bg-slate-100" title="Cerrar" aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
@@ -98,15 +83,28 @@ export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: Supervis
             </div>
           </div>
 
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Firman desde su Buzón de firmas</p>
+            <SupervisionSignatureProgress signers={checklist.signers} inSignature={false} />
+            {blocked ? (
+              <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-800">
+                No se puede enviar todavía: los tres firmantes deben estar asignados, activos y con usuario de sistema vinculado.{' '}
+                {linked
+                  ? 'El supervisor se asigna en Pendientes Fase 6 y el responsable en Firmantes por área; el usuario se vincula en el expediente del colaborador.'
+                  : 'Elige al supervisor y al responsable en la lista; el usuario se vincula en el expediente del colaborador.'}
+              </p>
+            ) : null}
+          </div>
+
           {linked ? (
             <label className="flex items-start gap-3 rounded-xl border border-[rgba(0,65,106,0.1)] bg-white px-3 py-2 text-sm">
               <input type="checkbox" checked={isFinal} onChange={(e) => setIsFinal(e.target.checked)} className="mt-1" />
               <span>
                 <span className="block font-semibold text-[var(--unilabor-ink)]">Lista final de la Fase 6 de este puesto</span>
                 <span className="block text-xs leading-5 text-[var(--unilabor-neutral)]">
-                  Al cerrarla, el porcentaje se registra como calificación de la práctica del puesto:{' '}
+                  Al cerrarse, el porcentaje se registra como calificación de la práctica del puesto:{' '}
                   {summary.passed
-                    ? 'acredita la Fase 6 (≥ 80 %), se emite su constancia y se abre el siguiente puesto o la Fase 7.'
+                    ? 'acredita la Fase 6 (≥ 80 %), se emite su constancia y se activa el siguiente puesto de su ruta.'
                     : 'NO acredita (< 80 %); RH deberá programar una nueva supervisión.'}{' '}
                   Desmárcala si es una supervisión intermedia.
                 </span>
@@ -114,25 +112,10 @@ export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: Supervis
             </label>
           ) : null}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {endorsing ? (
-              <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-800">
-                <strong>{checklist.supervisor_name}</strong> calificó y firmó como Supervisor / Auditor con su cuenta
-                {checklist.supervisor_signed_at ? ` el ${new Date(checklist.supervisor_signed_at).toLocaleString('es-MX')}` : ''}.
-              </p>
-            ) : (
-              <SignaturePad label={`Supervisor / Auditor · ${checklist.supervisor_name || 'sin nombre'}`} hint="Obligatoria" onChange={setSupervisorSignature} />
-            )}
-            <SignaturePad label={`Responsable del Área · ${checklist.area_responsible_name || 'sin nombre'}`} hint="Obligatoria" onChange={setAreaSignature} />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-[var(--unilabor-ink)]">
-            <input type="checkbox" checked={withEmployee} onChange={(e) => setWithEmployee(e.target.checked)} />
-            Recabar también la firma del colaborador supervisado (acuse; no forma parte del formato controlado)
-          </label>
-          {withEmployee ? <SignaturePad label={`Colaborador · ${checklist.employee_name}`} hint="Opcional" onChange={setEmployeeSignature} /> : null}
           <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">
-            Al confirmar, la lista queda sellada (no se puede editar), se genera el PDF con el diseño del ANA-REG-060 y se archiva en el expediente del
-            colaborador.
+            Al enviarla, la lista queda bloqueada (no se pueden cambiar resultados ni cabecera) y aparece en el Buzón de firmas de los tres, que firman
+            en cualquier orden. Con la tercera firma se cierra sola: se genera el PDF con el diseño del ANA-REG-060 y se archiva en el expediente del
+            colaborador. Mientras no esté cerrada puedes cancelar el envío para corregirla.
           </p>
         </div>
 
@@ -140,9 +123,9 @@ export const SupervisionCloseModal = ({ checklist, onClose, onClosed }: Supervis
           <button type="button" onClick={onClose} disabled={saving} className="rounded-xl px-3 py-2 text-sm font-semibold text-[var(--unilabor-neutral)] hover:bg-slate-100">
             Cancelar
           </button>
-          <button type="button" onClick={handleSubmit} disabled={saving} className={primaryButtonClass}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <FileCheck2 size={14} />}
-            Cerrar y firmar
+          <button type="button" onClick={handleSubmit} disabled={saving || blocked} className={primaryButtonClass}>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            Enviar a firma
           </button>
         </div>
       </div>

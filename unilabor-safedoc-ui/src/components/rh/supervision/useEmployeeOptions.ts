@@ -14,7 +14,8 @@ const loadOptions = (): Promise<SearchableOption[]> => {
         .map((employee) => ({
           value: String(employee.id),
           label: employee.full_name,
-          hint: [employee.employee_code, employee.area].filter(Boolean).join(' · ') || undefined,
+          // Código · sección · unidad: distingue homónimos y deja ver de qué unidad es cada quien.
+          hint: [employee.employee_code, employee.area, employee.branch_name].filter(Boolean).join(' · ') || undefined,
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     )

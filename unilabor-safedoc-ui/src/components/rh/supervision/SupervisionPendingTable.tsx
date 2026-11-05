@@ -4,8 +4,8 @@ import { assignPhase6Supervisor } from '../../../api/service.api-rh-supervision'
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { SupervisionPendingRow } from '../../../types/models';
 import { notifyError, notifySuccess } from '../../../utils/notify';
-import { SearchableSelect } from '../../SearchableSelect';
-import { formatPct } from './supervision-ui';
+import { SearchableSelect, type SearchableOption } from '../../SearchableSelect';
+import { SIGNERS_TOTAL, formatPct } from './supervision-ui';
 import { useEmployeeOptions } from './useEmployeeOptions';
 
 interface SupervisionPendingTableProps {
@@ -17,16 +17,38 @@ interface SupervisionPendingTableProps {
   onAssigned: () => void;
 }
 
+// Valor del filtro para los colaboradores sin sucursal en su ficha.
+const NO_UNIT = '__sin_sucursal__';
+
 /**
  * Colaboradores con la Fase 6 en curso, agrupados por área del puesto. RH
  * asigna el Supervisor / Auditor de cada colaborador en su puesto (uno por
- * uno o en bloque con la selección) y abre su lista ANA-REG-060.
+ * uno o en bloque con la selección, filtrando por unidad si conviene) y abre
+ * su lista ANA-REG-060.
  */
 export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, onOpen, onAssigned }: SupervisionPendingTableProps) => {
   const employeeOptions = useEmployeeOptions();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [bulkSupervisor, setBulkSupervisor] = useState('');
   const [assigning, setAssigning] = useState(false);
+  const [unitFilter, setUnitFilter] = useState('');
+
+  const unitOptions = useMemo<SearchableOption[]>(() => {
+    const names = [...new Set(rows.map((row) => row.branch_name).filter((name): name is string => Boolean(name)))].sort((a, b) => a.localeCompare(b));
+    const options = names.map((name) => ({ value: name, label: name }));
+    return rows.some((row) => !row.branch_name) ? [...options, { value: NO_UNIT, label: 'Sin sucursal' }] : options;
+  }, [rows]);
+  // Una unidad que ya no tiene pendientes (tras recargar la bandeja) deja de filtrar.
+  const activeUnit = unitOptions.some((option) => option.value === unitFilter) ? unitFilter : '';
+  const visibleRows = useMemo(
+    () => (activeUnit ? rows.filter((row) => (row.branch_name ?? NO_UNIT) === activeUnit) : rows),
+    [rows, activeUnit],
+  );
+  const changeUnit = (value: string) => {
+    setUnitFilter(value);
+    // La seleccion en bloque solo debe abarcar lo que se ve.
+    setSelectedIds(new Set());
+  };
 
   const assign = async (enrollmentIds: number[], supervisorId: string) => {
     setAssigning(true);
@@ -61,12 +83,12 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
   const optionsFor = (employeeId: number) => employeeOptions.filter((option) => option.value !== String(employeeId));
   const groups = useMemo(() => {
     const map = new Map<string, SupervisionPendingRow[]>();
-    for (const row of rows) {
+    for (const row of visibleRows) {
       const key = row.area?.trim() || 'Puesto sin área asignada';
       map.set(key, [...(map.get(key) ?? []), row]);
     }
     return [...map.entries()];
-  }, [rows]);
+  }, [visibleRows]);
 
   if (loading) {
     return (
@@ -84,6 +106,18 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
   }
   return (
     <div className="space-y-4">
+      {unitOptions.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-full max-w-xs">
+            <SearchableSelect value={activeUnit} options={unitOptions} onChange={changeUnit} placeholder="Todas las unidades" emptyLabel="Todas las unidades" searchPlaceholder="Buscar unidad..." />
+          </div>
+          {activeUnit ? (
+            <span className="text-xs text-[var(--unilabor-neutral)]">
+              {visibleRows.length} de {rows.length} pendiente(s)
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {selectedIds.size > 0 ? (
         <div className="sticky top-2 z-10 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--color-brand-300)] bg-white px-4 py-3 shadow-sm">
           <UserCheck size={16} className="text-[var(--color-brand-700)]" />
@@ -160,7 +194,11 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
                     <td className="px-3 py-2 text-xs">{row.branch_name ?? '—'}</td>
                     <td className="px-3 py-2 text-xs">{row.days_in_phase !== null ? `${row.days_in_phase} d` : '—'}</td>
                     <td className="px-3 py-2 text-xs">
-                      {row.draft_checklist_id ? (
+                      {row.draft_status === 'PENDING_SIGNATURES' ? (
+                        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-semibold text-sky-700">
+                          En firma ({row.draft_signatures_done}/{SIGNERS_TOTAL})
+                        </span>
+                      ) : row.draft_checklist_id ? (
                         <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">Borrador abierto</span>
                       ) : row.evaluation_status === 'passed' ? (
                         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
@@ -182,10 +220,10 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
                         onClick={() => onOpen(row)}
                         disabled={opening}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-brand-700)] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-60"
-                        title={row.draft_checklist_id ? 'Continuar el borrador' : 'Abrir lista ANA-REG-060'}
+                        title={row.draft_status === 'PENDING_SIGNATURES' ? 'Ver el avance de firmas' : row.draft_checklist_id ? 'Continuar el borrador' : 'Abrir lista ANA-REG-060'}
                       >
                         {opening ? <Loader2 size={13} className="animate-spin" /> : row.draft_checklist_id ? <PlayCircle size={13} /> : <ClipboardPen size={13} />}
-                        {row.draft_checklist_id ? 'Continuar' : 'Aplicar lista'}
+                        {row.draft_status === 'PENDING_SIGNATURES' ? 'Ver firmas' : row.draft_checklist_id ? 'Continuar' : 'Aplicar lista'}
                       </button>
                     </td>
                   </tr>

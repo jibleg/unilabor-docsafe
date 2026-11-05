@@ -180,7 +180,8 @@ export const buildSupervisionChecklistPdf = async (input: SupervisionChecklistPd
   const drawFooters = () => {
     const pages = doc.getPages();
     pages.forEach((p, index) => {
-      const footerLeft = `${record.form_code} · Rev. ${record.form_revision} · Folio ${record.folio}${input.draft ? ' · BORRADOR (sin firmas)' : ''}`;
+      const draftNote = !input.draft ? '' : record.status === 'PENDING_SIGNATURES' ? ' · EN FIRMA (no es el registro final)' : ' · BORRADOR (sin firmas)';
+      const footerLeft = `${record.form_code} · Rev. ${record.form_revision} · Folio ${record.folio}${draftNote}`;
       p.drawText(safe(footerLeft), { x: MARGIN, y: MARGIN - 4, size: 6.5, font: regular, color: MUTED });
       const label = `Página ${index + 1} de ${pages.length}`;
       p.drawText(safe(label), { x: PAGE_W - MARGIN - regular.widthOfTextAtSize(safe(label), 7), y: MARGIN - 4, size: 7, font: regular, color: INK });
@@ -370,7 +371,8 @@ export const buildSupervisionChecklistPdf = async (input: SupervisionChecklistPd
     { role: 'Supervisor / Auditor', name: record.supervisor_name, image: signatureImages.supervisor },
     { role: 'Responsable del Área', name: record.area_responsible_name, image: signatureImages.areaResponsible },
   ];
-  if (signatureImages.employee) {
+  // En firma se muestran los tres firmantes (el evaluado aparece como pendiente hasta que firma).
+  if (signatureImages.employee || record.status === 'PENDING_SIGNATURES') {
     columns.push({ role: 'Colaborador supervisado', name: record.employee_name, image: signatureImages.employee });
   }
   const sigH = 86;

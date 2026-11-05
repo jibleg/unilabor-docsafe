@@ -4,6 +4,7 @@ import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { hasPermission } from '../utils/permissions';
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations';
+import { usePendingSignatures } from '../hooks/usePendingSignatures';
 import { NAV_CONFIG, type NavItem } from '../config/navigation';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
@@ -17,6 +18,8 @@ interface AppSidebarProps {
 export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSidebarProps) => {
   const permissions = useAuthStore((state) => state.permissions);
   const { count: pendingEvaluations } = usePendingEvaluations(moduleCode === 'RH');
+  const pendingSignatures = usePendingSignatures(moduleCode === 'RH');
+  const badgeCounts: Record<NonNullable<NavItem['badge']>, number> = { pendingEvaluations, pendingSignatures };
 
   // Secciones colapsadas (persistidas por usuario). Clave: `${modulo}:${titulo}`.
   const COLLAPSE_KEY = 'safedoc.sidebar.collapsed';
@@ -48,7 +51,7 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
   const menuSections = NAV_CONFIG[moduleCode] ?? [];
 
   const renderItem = (item: NavItem) => {
-    const badgeCount = item.badge === 'pendingEvaluations' ? pendingEvaluations : undefined;
+    const badgeCount = item.badge ? badgeCounts[item.badge] : undefined;
     return (
       <NavLink
         key={item.path}

@@ -198,12 +198,26 @@ export const queueNotifyInductionReadingsAssigned = (enrollmentId: number): void
   });
 };
 
-/** SMS al colaborador al iniciar la practica supervisada de un puesto (Fase 6). */
+/**
+ * SMS al colaborador al iniciar la Fase 6 (practica supervisada). Un solo aviso
+ * por fase: se envia con el primer puesto que se activa y se omite en los
+ * siguientes, para no saturar a quien tiene varios puestos.
+ */
 export const queueNotifyPracticalStarted = (enrollmentId: number): void => {
   notificationChain = notificationChain.then(async () => {
     try {
       const step = await loadPositionStep(enrollmentId);
       if (!step) return;
+      // Otro puesto de la misma fase ya activado (aunque despues se diera de baja) = la fase ya se aviso.
+      const started = await pool.query(
+        `SELECT EXISTS (
+           SELECT 1 FROM public.rh_induction_enrollments e
+             JOIN public.rh_induction_enrollments x ON x.employee_id = e.employee_id AND x.phase_id = e.phase_id AND x.id <> e.id
+            WHERE e.id = $1 AND x.activated_at IS NOT NULL
+         ) AS already_started;`,
+        [enrollmentId],
+      );
+      if (started.rows[0]?.already_started) return;
       const sms = buildPracticalStartedSms(step);
       await sendSmsNotification(step.phone, sms.subject, sms.body, 'induction_practical_started');
     } catch (error) {
@@ -213,12 +227,19 @@ export const queueNotifyPracticalStarted = (enrollmentId: number): void => {
 };
 
 /**
- * SMS al colaborador al abrirse su REH-REG-003 INICIAL de un puesto (Fase 7).
- * "Puesto N de M" = lugar del puesto entre los que acredito la Fase 6.
+ * SMS al colaborador al iniciar la Fase 7: se abrio su primera REH-REG-003
+ * INICIAL. Un solo aviso por fase: las evaluaciones de sus siguientes puestos
+ * se abren sin SMS. El total de puestos es el de los que acredito la Fase 6.
  */
 export const queueNotifyCompetencyOpened = (employeeId: number, positionId: number): void => {
   notificationChain = notificationChain.then(async () => {
     try {
+      // La evaluacion recien abierta ya esta guardada: si hay mas de una INICIAL, la fase ya se aviso.
+      const opened = await pool.query(
+        `SELECT COUNT(*)::int AS total FROM public.rh_competency_evaluations WHERE employee_id = $1 AND evaluation_type = 'INICIAL';`,
+        [employeeId],
+      );
+      if (Number(opened.rows[0]?.total ?? 0) > 1) return;
       const result = await pool.query(
         `SELECT emp.phone, rp.name AS position_name, rp.code AS position_code, f6.ordinal, f6.total
            FROM public.employees emp

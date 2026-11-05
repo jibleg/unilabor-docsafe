@@ -96,7 +96,7 @@ export const InductionPracticalCaptureModal = ({ row, onClose, onDone }: Inducti
           </div>
           <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">
             Se califica contra la evaluación práctica del puesto (competencias del puesto en sus instrucciones). Si acredita, la Fase 6 queda
-            aprobada, se emite su constancia y queda listo para la evaluación de competencia (Fase 7).
+            aprobada, se emite su constancia y, si con este puesto acredita todos los suyos, se abre sola su evaluación de competencia (Fase 7).
             {isCorrection ? ' La captura anterior se corrige en el mismo registro.' : ''}
           </p>
         </div>

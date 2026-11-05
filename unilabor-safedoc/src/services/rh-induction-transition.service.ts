@@ -1,6 +1,7 @@
 import pool from '../config/db';
 import { toIsoDateTime } from '../utils/date-serialization';
 import { createEvaluation } from './rh-competency-evaluation.service';
+import { hasEvaluatorInput, proposePhase7Evaluator } from './rh-competency-evaluator.service';
 import { tryAssignPhase5Knowledge } from './rh-competency-course-knowledge.service';
 import { normalizeSearchText } from './rh-induction-dashboard.service';
 import { enrollEmployeeInPhase } from './rh-induction.service';
@@ -21,6 +22,10 @@ import type { CompetencySnapshot } from './rh-induction-phase7';
 // estado visible: LISTO (cumple todo), BLOQUEADO (con el motivo exacto) o, para
 // la Fase 7, EN_EVALUACION (ya tiene su REH-REG-003 inicial). Nadie queda en el
 // limbo: RH lo ve, sabe que lo detiene y lo mueve desde aqui.
+//
+// La Fase 7 se abre sola (rh-induction-phase7-auto.service.ts) con esta misma
+// regla y esta misma apertura (openPhase7Evaluation); la bandeja queda para los
+// casos que el sistema no pudo abrir, con su motivo.
 // -----------------------------------------------------------------------------
 
 export type TransitionTarget = 5 | 6 | 7;
@@ -572,7 +577,12 @@ export interface ExecuteTransitionInput {
   target: TransitionTarget;
   employeeIds: number[];
   actorUserId: string;
-  /** Solo Fase 7: quien aplica la evaluacion de competencia inicial (REH-REG-003). */
+  /**
+   * Solo Fase 7: quien aplica la evaluacion de competencia inicial (REH-REG-003).
+   * Colaborador de la lista (preferente) o nombre en texto; vacio = el sistema
+   * propone al coordinador del area del puesto.
+   */
+  evaluatorEmployeeId?: number | null | undefined;
   evaluatorName?: string | undefined;
   evaluationDate?: string | undefined;
 }
@@ -585,6 +595,8 @@ export interface TransitionResult {
   /** Inscripcion creada (Fases 5-6) o evaluacion de competencia creada (Fase 7). */
   created_id: number | null;
   previous_enrollment_id: number | null;
+  /** Codigo del error cuando no se pudo avanzar (p. ej. la regla del evaluador de la Fase 7). */
+  error_code?: string;
 }
 
 const todayInMexico = (): string => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
@@ -599,6 +611,74 @@ const loadPositionCourse = async (phaseNumber: number, positionId: number): Prom
   return result.rows[0]?.training_course_id ? Number(result.rows[0].training_course_id) : null;
 };
 
+export interface OpenPhase7Input {
+  actorUserId: string;
+  /** Evaluador elegido por RH. Sin colaborador ni nombre, el sistema propone al coordinador del area. */
+  evaluatorEmployeeId?: number | null | undefined;
+  evaluatorName?: string | undefined;
+  evaluationDate?: string | undefined;
+}
+
+export interface OpenedPhase7Evaluation {
+  evaluation_id: number;
+  position_code: string;
+  /** '' = se abrio sin evaluador (RH debe asignarlo). */
+  evaluator_name: string;
+  evaluator_employee_id: number | null;
+  /** MANUAL: lo eligio RH. PROPOSED: coordinador del area propuesto por el sistema. NONE: sin evaluador. */
+  evaluator_origin: 'MANUAL' | 'PROPOSED' | 'NONE';
+  /** El coordinador del area que correspondia fue el supervisor de la Fase 6 del puesto y se descarto. */
+  coordinator_was_supervisor: boolean;
+}
+
+/**
+ * Abre en borrador la REH-REG-003 INICIAL del puesto de la fila (que debe estar
+ * LISTA). Es la UNICA apertura de la Fase 7: la usan RH desde la bandeja y el
+ * arranque automatico. Toma el Conocimiento de la Fase 5 y avisa al colaborador.
+ */
+export const openPhase7Evaluation = async (row: TransitionRow, input: OpenPhase7Input): Promise<OpenedPhase7Evaluation> => {
+  const positionId = row.position_id as number;
+  const manual = hasEvaluatorInput({ employeeId: input.evaluatorEmployeeId, name: input.evaluatorName });
+  const proposal = manual ? null : await proposePhase7Evaluator(row.employee_id, positionId);
+  const evaluation = await createEvaluation({
+    employeeId: row.employee_id,
+    positionId,
+    evaluationType: 'INICIAL',
+    evaluationDate: input.evaluationDate ?? todayInMexico(),
+    evaluatorEmployeeId: manual ? input.evaluatorEmployeeId : (proposal?.evaluator?.employee_id ?? null),
+    evaluatorName: manual ? input.evaluatorName : undefined,
+    referenceCourseId: await loadPositionCourse(6, positionId),
+    createdByUserId: input.actorUserId,
+  });
+  // Seccion 3 "Conocimiento": el cuestionario de la Fase 5 que acredito en este puesto.
+  await tryAssignPhase5Knowledge(evaluation.id);
+  // Aviso al colaborador (SMS): se abrio su evaluacion de competencia de este puesto.
+  queueNotifyCompetencyOpened(row.employee_id, positionId);
+  return {
+    evaluation_id: evaluation.id,
+    position_code: String(row.position_code ?? ''),
+    evaluator_name: evaluation.evaluator_name,
+    evaluator_employee_id: evaluation.evaluator_employee_id,
+    evaluator_origin: manual ? 'MANUAL' : evaluation.evaluator_name ? 'PROPOSED' : 'NONE',
+    coordinator_was_supervisor: proposal?.coordinator_was_supervisor ?? false,
+  };
+};
+
+/** Con que evaluador quedo la evaluacion recien abierta (texto para RH y para el aviso del Buzon). */
+export const describePhase7Evaluator = (opened: OpenedPhase7Evaluation): string => {
+  if (opened.evaluator_origin === 'MANUAL') {
+    return `Evaluador: ${opened.evaluator_name}.`;
+  }
+  if (opened.evaluator_origin === 'PROPOSED') {
+    return opened.coordinator_was_supervisor
+      ? `Evaluador propuesto: ${opened.evaluator_name} (el coordinador del area que correspondia superviso la Fase 6 de este puesto, asi que se tomo al siguiente).`
+      : `Evaluador propuesto: ${opened.evaluator_name} (coordinador del area).`;
+  }
+  return opened.coordinator_was_supervisor
+    ? 'Quedo SIN evaluador: el coordinador del area superviso la Fase 6 de este puesto y no hay otro disponible; RH debe asignarlo en la evaluacion.'
+    : 'Quedo SIN evaluador: el area del puesto no tiene coordinador configurado; RH debe asignarlo en la evaluacion.';
+};
+
 const runOne = async (row: TransitionRow, phase: TransitionPhaseInfo, input: ExecuteTransitionInput): Promise<TransitionResult> => {
   const base = { employee_id: row.employee_id, employee_name: row.employee_name, previous_enrollment_id: row.previous_enrollment_id };
   if (row.state === 'STARTED') {
@@ -609,24 +689,12 @@ const runOne = async (row: TransitionRow, phase: TransitionPhaseInfo, input: Exe
   }
   try {
     if (input.target === 7) {
-      const evaluation = await createEvaluation({
-        employeeId: row.employee_id,
-        positionId: row.position_id as number,
-        evaluationType: 'INICIAL',
-        evaluationDate: input.evaluationDate ?? todayInMexico(),
-        evaluatorName: input.evaluatorName ?? '',
-        referenceCourseId: await loadPositionCourse(6, row.position_id as number),
-        createdByUserId: input.actorUserId,
-      });
-      // Seccion 3 "Conocimiento": el cuestionario de la Fase 5 que acredito en este puesto.
-      await tryAssignPhase5Knowledge(evaluation.id);
-      // Aviso al colaborador (SMS): se abrio su evaluacion de competencia de este puesto.
-      queueNotifyCompetencyOpened(row.employee_id, row.position_id as number);
+      const opened = await openPhase7Evaluation(row, input);
       return {
         ...base,
         ok: true,
-        created_id: evaluation.id,
-        message: `Evaluacion de competencia inicial (Fase 7) del puesto ${row.position_code} abierta en borrador.`,
+        created_id: opened.evaluation_id,
+        message: `Evaluacion de competencia inicial (Fase 7) del puesto ${row.position_code} abierta en borrador. ${describePhase7Evaluator(opened)}`,
       };
     }
     const enrollment = await enrollEmployeeInPhase(row.employee_id, phase.phase_id, input.actorUserId, null, {
@@ -646,7 +714,13 @@ const runOne = async (row: TransitionRow, phase: TransitionPhaseInfo, input: Exe
     };
   } catch (error: any) {
     console.error(`Induccion: fallo el avance a la Fase ${input.target} de ${row.employee_name} (#${row.employee_id}):`, error);
-    return { ...base, ok: false, created_id: null, message: error?.publicMessage || 'No se pudo completar el avance.' };
+    return {
+      ...base,
+      ok: false,
+      created_id: null,
+      message: error?.publicMessage || 'No se pudo completar el avance.',
+      ...(typeof error?.code === 'string' ? { error_code: error.code } : {}),
+    };
   }
 };
 

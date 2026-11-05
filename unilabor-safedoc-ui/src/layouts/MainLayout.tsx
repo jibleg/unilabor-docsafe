@@ -6,6 +6,7 @@ import { PendingEvaluationsBanner } from '../components/PendingEvaluationsBanner
 import { UserMenu } from '../components/UserMenu';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePendingEvaluationsStore } from '../store/usePendingEvaluationsStore';
+import { usePendingSignaturesStore } from '../store/usePendingSignaturesStore';
 import { getCurrentUserProfile, getMyAccess } from '../api/service';
 import { tokenRequiresPasswordChange } from '../utils/auth';
 import { ChevronRight, Loader2 } from 'lucide-react';
@@ -20,6 +21,8 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const setActiveModule = useAuthStore((state) => state.setActiveModule);
   const refreshPendingEvaluations = usePendingEvaluationsStore((state) => state.refresh);
   const resetPendingEvaluations = usePendingEvaluationsStore((state) => state.reset);
+  const refreshPendingSignatures = usePendingSignaturesStore((state) => state.refresh);
+  const resetPendingSignatures = usePendingSignaturesStore((state) => state.reset);
   const { pathname } = useLocation();
   const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(true);
 
@@ -30,18 +33,20 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
     setActiveModule(moduleCode);
   }, [moduleCode, setActiveModule]);
 
-  // Recalcula los pendientes de capacitacion en cada navegacion del modulo RH,
-  // para que el badge y el banner reflejen las evaluaciones ya realizadas.
+  // Recalcula los pendientes de capacitacion y las firmas pendientes del Buzon en
+  // cada navegacion del modulo RH, para que los badges y el banner esten al dia.
   useEffect(() => {
     if (!token || mustChangePassword) {
       return;
     }
     if (moduleCode === 'RH') {
       void refreshPendingEvaluations();
+      void refreshPendingSignatures();
     } else {
       resetPendingEvaluations();
+      resetPendingSignatures();
     }
-  }, [token, mustChangePassword, moduleCode, pathname, refreshPendingEvaluations, resetPendingEvaluations]);
+  }, [token, mustChangePassword, moduleCode, pathname, refreshPendingEvaluations, resetPendingEvaluations, refreshPendingSignatures, resetPendingSignatures]);
 
   useEffect(() => {
     if (!token || mustChangePassword) {
