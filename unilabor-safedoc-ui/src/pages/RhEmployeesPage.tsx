@@ -1,17 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  CheckSquare,
-  Edit3,
-  Eye,
-  FileCog,
-  Loader2,
-  Plus,
-  RefreshCw,
-  Square,
-  Trash2,
-  UserCog,
-  UserRound,
-} from 'lucide-react';
+import { CheckSquare, FileCog, Loader2, Plus, RefreshCw, Square, UserCog, UserRound } from 'lucide-react';
 import {
   createEmployee,
   deleteEmployeeById,
@@ -29,6 +17,7 @@ import type { Employee, EmployeeBranch, EmployeeDocumentAccessMatrix, LinkableUs
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { EmployeeAreaSelect } from '../components/rh/EmployeeAreaSelect';
+import { EmployeeRowActions } from '../components/rh/EmployeeRowActions';
 import { Pagination } from '../components/Pagination';
 
 interface EmployeeFormState {
@@ -509,41 +498,13 @@ export const RhEmployeesPage = () => {
                         <p className="text-xs text-[var(--unilabor-neutral)]">{employee.position || 'Sin puesto'}</p>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void openDetail(employee.id)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] bg-white/90 px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-                          >
-                            <Eye size={14} />
-                            Ver
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(employee)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
-                          >
-                            <Edit3 size={14} />
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void openDocumentAccess(employee)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(239,245,250,0.95)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.32)]"
-                          >
-                            <FileCog size={14} />
-                            Permisos
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDelete(employee)}
-                            disabled={deletingId === employee.id}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[rgba(151,163,172,0.28)] bg-[rgba(151,163,172,0.16)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(151,163,172,0.24)] disabled:opacity-60"
-                          >
-                            <Trash2 size={14} />
-                            {deletingId === employee.id ? 'Inactivando...' : 'Inactivar'}
-                          </button>
-                        </div>
+                        <EmployeeRowActions
+                          onView={() => void openDetail(employee.id)}
+                          onEdit={() => openEdit(employee)}
+                          onPermissions={() => void openDocumentAccess(employee)}
+                          onDeactivate={() => void handleDelete(employee)}
+                          deactivating={deletingId === employee.id}
+                        />
                       </td>
                     </tr>
                   ))
