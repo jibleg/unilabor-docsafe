@@ -197,6 +197,7 @@ export const normalizeEmployee = (input: unknown): Employee | null => {
     created_at: getString(source, ['created_at', 'createdAt']),
     updated_at: getString(source, ['updated_at', 'updatedAt']),
     linked_user: normalizeLinkableUser(source.linked_user ?? source.linkedUser),
+    xlab_linked: getBoolean(source, ['xlab_linked'], false),
   };
 };
 

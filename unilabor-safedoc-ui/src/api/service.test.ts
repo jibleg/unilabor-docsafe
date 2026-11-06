@@ -86,4 +86,14 @@ describe('listEmployeesPaginated (contrato de paginacion)', () => {
     expect(result.data).toHaveLength(1);
     expect(result.pagination).toEqual({ page: 1, limit: 1, total: 1, totalPages: 1 });
   });
+
+  it('conserva xlab_linked para la etiqueta del listado; sin el dato queda en false', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: { data: [{ ...validEmployee, xlab_linked: true }, { ...validEmployee, id: 6 }] },
+    } as never);
+
+    const result = await listEmployeesPaginated();
+
+    expect(result.data.map((employee) => employee.xlab_linked)).toEqual([true, false]);
+  });
 });

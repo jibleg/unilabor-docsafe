@@ -12,7 +12,7 @@ const baseClass =
   'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-[var(--color-brand-700)] transition disabled:opacity-60';
 
 // Acciones de una fila del listado de colaboradores. Solo ícono con tooltip: con
-// etiqueta, los cuatro botones no cabían junto al panel lateral y se desbordaban.
+// etiqueta, los cuatro botones ocupan demasiado y pueden desbordarse.
 export const EmployeeRowActions = ({ onView, onEdit, onPermissions, onDeactivate, deactivating }: EmployeeRowActionsProps) => (
   <div className="flex justify-end gap-1.5">
     <button type="button" onClick={onView} title="Ver ficha" className={`${baseClass} border-[rgba(0,65,106,0.12)] bg-white/90 hover:bg-[rgba(191,212,230,0.28)]`}>
