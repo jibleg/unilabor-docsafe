@@ -13,7 +13,10 @@
 -- El rol queda con:
 --   USAGE en los esquemas public y contigo
 --   contigo.staff_notifications: SELECT y UPDATE solo de read_at
---   public.usuarios: SELECT solo de cve_usuario, nombre, activo_usuario, cve_tipo_usuario
+--   public.usuarios: SELECT solo de cve_usuario, nombre, login, activo_usuario, cve_tipo_usuario
+--
+-- Si el rol ya existe y solo falta `login` (lo pide el selector de RH), basta con:
+--   GRANT SELECT (login) ON public.usuarios TO docsafe_notificaciones;
 -- Al final se comprueba y, si le sobra o le falta algo, se revierte todo.
 BEGIN;
 
@@ -44,11 +47,11 @@ GRANT USAGE ON SCHEMA public, contigo TO docsafe_notificaciones;
 
 -- Se parte de cero en ambas tablas por si el rol ya existia con otros permisos.
 REVOKE ALL ON contigo.staff_notifications, public.usuarios FROM docsafe_notificaciones;
-REVOKE ALL (cve_usuario, nombre, activo_usuario, cve_tipo_usuario) ON public.usuarios FROM docsafe_notificaciones;
+REVOKE ALL (cve_usuario, nombre, login, activo_usuario, cve_tipo_usuario) ON public.usuarios FROM docsafe_notificaciones;
 
 GRANT SELECT ON contigo.staff_notifications TO docsafe_notificaciones;
 GRANT UPDATE (read_at) ON contigo.staff_notifications TO docsafe_notificaciones;
-GRANT SELECT (cve_usuario, nombre, activo_usuario, cve_tipo_usuario) ON public.usuarios TO docsafe_notificaciones;
+GRANT SELECT (cve_usuario, nombre, login, activo_usuario, cve_tipo_usuario) ON public.usuarios TO docsafe_notificaciones;
 
 -- Comprobacion dentro de la transaccion: incluye lo que el rol hereda de PUBLIC.
 DO $$
@@ -58,7 +61,7 @@ BEGIN
   SELECT string_agg(a.attname, ', ') INTO extra
     FROM pg_attribute a
    WHERE a.attrelid = 'public.usuarios'::regclass AND a.attnum > 0 AND NOT a.attisdropped
-     AND a.attname NOT IN ('cve_usuario', 'nombre', 'activo_usuario', 'cve_tipo_usuario')
+     AND a.attname NOT IN ('cve_usuario', 'nombre', 'login', 'activo_usuario', 'cve_tipo_usuario')
      AND has_column_privilege('docsafe_notificaciones', a.attrelid, a.attnum, 'SELECT');
   IF extra IS NOT NULL THEN
     RAISE EXCEPTION 'El rol puede leer columnas de public.usuarios que no debe: %', extra;
@@ -83,6 +86,7 @@ BEGIN
      OR NOT has_column_privilege('docsafe_notificaciones', 'contigo.staff_notifications', 'read_at', 'UPDATE')
      OR NOT has_column_privilege('docsafe_notificaciones', 'public.usuarios', 'cve_usuario', 'SELECT')
      OR NOT has_column_privilege('docsafe_notificaciones', 'public.usuarios', 'nombre', 'SELECT')
+     OR NOT has_column_privilege('docsafe_notificaciones', 'public.usuarios', 'login', 'SELECT')
      OR NOT has_column_privilege('docsafe_notificaciones', 'public.usuarios', 'activo_usuario', 'SELECT')
      OR NOT has_column_privilege('docsafe_notificaciones', 'public.usuarios', 'cve_tipo_usuario', 'SELECT') THEN
     RAISE EXCEPTION 'Al rol le falta algun permiso necesario.';

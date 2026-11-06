@@ -83,6 +83,8 @@ export interface Employee {
   created_at?: string;
   updated_at?: string;
   linked_user?: LinkableUser | null;
+  /** Solo lo trae el listado: tiene usuario de XLab vinculado. */
+  xlab_linked?: boolean;
 }
 
 export interface EmployeeBranch {

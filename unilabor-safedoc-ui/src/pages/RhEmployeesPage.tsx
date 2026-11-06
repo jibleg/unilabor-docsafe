@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckSquare, FileCog, Loader2, Plus, RefreshCw, Square, UserCog, UserRound } from 'lucide-react';
+import { CheckSquare, FileCog, Link2, Loader2, Plus, RefreshCw, Square, UserRound } from 'lucide-react';
 import {
   createEmployee,
   deleteEmployeeById,
@@ -13,7 +13,7 @@ import {
   updateEmployeeDocumentAccess,
   updateEmployeeById,
 } from '../api/service';
-import { EmployeeXlabLinkCard } from '../components/rh/EmployeeXlabLinkCard';
+import { EmployeeDetailDrawer } from '../components/rh/EmployeeDetailDrawer';
 import type { Employee, EmployeeBranch, EmployeeDocumentAccessMatrix, LinkableUser } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { usePaginatedList } from '../hooks/usePaginatedList';
@@ -390,6 +390,7 @@ export const RhEmployeesPage = () => {
       setIsEditOpen(false);
       resetForm();
       await reloadEmployees();
+      // Si se editó desde la ficha, esta vuelve a mostrarse con los datos guardados.
       if (detailEmployee?.id === selectedEmployee.id) {
         await openDetail(selectedEmployee.id);
       }
@@ -405,9 +406,6 @@ export const RhEmployeesPage = () => {
     try {
       await deleteEmployeeById(employee.id);
       notifySuccess('Colaborador inactivado correctamente.');
-      if (detailEmployee?.id === employee.id) {
-        setDetailEmployee(null);
-      }
       await reloadEmployees();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo inactivar el colaborador.'));
@@ -452,165 +450,97 @@ export const RhEmployeesPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.9fr)]">
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar por código, nombre, correo, área o puesto..."
-              className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 p-4 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar por código, nombre, correo, área o puesto..."
+            className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
+          />
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
+          <table className="w-full text-left">
+            <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
+              <tr>
+                <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Código</th>
+                <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Colaborador</th>
+                <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Sección / Puesto</th>
+                <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[rgba(0,65,106,0.08)]">
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
+                    Cargando colaboradores...
+                  </td>
+                </tr>
+              ) : employees.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
+                    No hay colaboradores para mostrar.
+                  </td>
+                </tr>
+              ) : (
+                employees.map((employee) => (
+                  <tr key={employee.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
+                    <td className="px-5 py-4 text-sm font-semibold text-[var(--color-brand-700)]">{employee.employee_code}</td>
+                    <td className="px-5 py-4">
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-[var(--color-brand-700)]">
+                        {employee.full_name}
+                        {employee.xlab_linked ? (
+                          <span
+                            title="Vinculado a XLab: recibe sus notificaciones de Contigo+"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700"
+                          >
+                            <Link2 size={11} aria-hidden="true" /> XLab
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-xs text-[var(--unilabor-neutral)]">{employee.email}</p>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">
+                      <p>{employee.area || 'Sin sección'}</p>
+                      <p className="text-xs text-[var(--unilabor-neutral)]">{employee.position || 'Sin puesto'}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <EmployeeRowActions
+                        onView={() => void openDetail(employee.id)}
+                        onEdit={() => openEdit(employee)}
+                        onPermissions={() => void openDocumentAccess(employee)}
+                        onDeactivate={() => void handleDelete(employee)}
+                        deactivating={deletingId === employee.id}
+                      />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          <div className="border-t border-[rgba(0,65,106,0.08)]">
+            <Pagination
+              page={page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              pageSize={pagination.limit}
+              onPageChange={setPage}
+              loading={loading}
             />
           </div>
-
-          <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
-            <table className="w-full text-left">
-              <thead className="border-b border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.96)]">
-                <tr>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Código</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Colaborador</th>
-                  <th className="px-5 py-4 text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Sección / Puesto</th>
-                  <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-[var(--unilabor-neutral)]">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[rgba(0,65,106,0.08)]">
-                {loading ? (
-                  <tr>
-                    <td colSpan={4} className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
-                      Cargando colaboradores...
-                    </td>
-                  </tr>
-                ) : employees.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="p-10 text-center text-sm text-[var(--unilabor-neutral)]">
-                      No hay colaboradores para mostrar.
-                    </td>
-                  </tr>
-                ) : (
-                  employees.map((employee) => (
-                    <tr key={employee.id} className="transition-colors hover:bg-[rgba(191,212,230,0.22)]">
-                      <td className="px-5 py-4 text-sm font-semibold text-[var(--color-brand-700)]">{employee.employee_code}</td>
-                      <td className="px-5 py-4">
-                        <p className="text-sm font-semibold text-[var(--color-brand-700)]">{employee.full_name}</p>
-                        <p className="text-xs text-[var(--unilabor-neutral)]">{employee.email}</p>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-[var(--unilabor-ink)]">
-                        <p>{employee.area || 'Sin sección'}</p>
-                        <p className="text-xs text-[var(--unilabor-neutral)]">{employee.position || 'Sin puesto'}</p>
-                      </td>
-                      <td className="px-5 py-4">
-                        <EmployeeRowActions
-                          onView={() => void openDetail(employee.id)}
-                          onEdit={() => openEdit(employee)}
-                          onPermissions={() => void openDocumentAccess(employee)}
-                          onDeactivate={() => void handleDelete(employee)}
-                          deactivating={deletingId === employee.id}
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <div className="border-t border-[rgba(0,65,106,0.08)]">
-              <Pagination
-                page={page}
-                totalPages={pagination.totalPages}
-                total={pagination.total}
-                pageSize={pagination.limit}
-                onPageChange={setPage}
-                loading={loading}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(239,245,250,0.96))] p-5 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(191,212,230,0.32)] text-[var(--color-brand-700)]">
-              <UserCog size={22} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-                Detalle
-              </p>
-              <h2 className="text-lg font-bold text-[var(--color-brand-700)]">Ficha del colaborador</h2>
-            </div>
-          </div>
-
-          {loadingDetail ? (
-            <div className="mt-6 flex items-center gap-3 text-sm text-[var(--unilabor-neutral)]">
-              <Loader2 size={16} className="animate-spin" />
-              Cargando detalle...
-            </div>
-          ) : detailEmployee ? (
-            <div className="mt-6 space-y-4">
-              <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Código</p>
-                <p className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">{detailEmployee.employee_code}</p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Nombre</p>
-                  <p className="mt-1 text-sm font-semibold text-[var(--color-brand-700)]">{detailEmployee.full_name}</p>
-                </div>
-                <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Correo</p>
-                  <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.email}</p>
-                </div>
-                <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Sección / Departamento</p>
-                  <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.area || 'Sin sección'}</p>
-                </div>
-                <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Puesto</p>
-                  <p className="mt-1 text-sm text-[var(--unilabor-ink)]">{detailEmployee.position || 'Sin puesto'}</p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Usuario vinculado</p>
-                {detailEmployee.linked_user ? (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-sm font-semibold text-[var(--color-brand-700)]">
-                      {detailEmployee.linked_user.full_name}
-                    </p>
-                    <p className="text-xs text-[var(--unilabor-neutral)]">{detailEmployee.linked_user.email}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {detailEmployee.linked_user.modules.map((moduleAccess) => (
-                        <span
-                          key={`${detailEmployee.linked_user?.id}-${moduleAccess.code}`}
-                          className="rounded-full border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.34)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]"
-                        >
-                          {moduleAccess.code}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">Aún no tiene usuario del sistema asociado.</p>
-                )}
-              </div>
-
-              {detailEmployee.user_id ? <EmployeeXlabLinkCard key={detailEmployee.id} employeeId={detailEmployee.id} /> : null}
-
-              <button
-                type="button"
-                onClick={() => void openDocumentAccess(detailEmployee)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.34)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
-              >
-                <FileCog size={16} />
-                Configurar expediente documental
-              </button>
-            </div>
-          ) : (
-            <div className="mt-6 rounded-2xl border border-dashed border-[rgba(0,65,106,0.14)] bg-white/80 p-6 text-sm text-[var(--unilabor-neutral)]">
-              Selecciona un colaborador para revisar su información base y el usuario vinculado.
-            </div>
-          )}
         </div>
       </div>
+
+      <EmployeeDetailDrawer
+        open={loadingDetail || detailEmployee !== null}
+        loading={loadingDetail}
+        employee={detailEmployee}
+        onClose={() => setDetailEmployee(null)}
+        onEdit={openEdit}
+        onConfigureAccess={(employee) => void openDocumentAccess(employee)}
+        onXlabLinkChange={() => void reloadEmployees()}
+      />
 
       {(isCreateOpen || isEditOpen) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">

@@ -25,7 +25,7 @@ const primaryButton =
  * el colaborador recibe en DocSafe sus notificaciones de Contigo+. Solo edita quien
  * puede editar colaboradores; se monta solo si el colaborador ya tiene usuario.
  */
-export const EmployeeXlabLinkCard = ({ employeeId }: { employeeId: number }) => {
+export const EmployeeXlabLinkCard = ({ employeeId, onChange }: { employeeId: number; onChange?: () => void }) => {
   const permissions = useAuthStore((state) => state.permissions);
   const canEdit = hasPermission(permissions, 'RH.EMPLOYEES.WRITE');
   const [link, setLink] = useState<EmployeeXlabLink | null>(null);
@@ -68,7 +68,8 @@ export const EmployeeXlabLinkCard = ({ employeeId }: { employeeId: number }) => 
     () =>
       users.map((user) => ({
         value: String(user.cve_usuario),
-        label: user.nombre,
+        // El login va en la etiqueta para distinguir homónimos también ya elegido.
+        label: user.login ? `${user.nombre} (${user.login})` : user.nombre,
         hint: `Clave ${user.cve_usuario}${user.tipo !== null ? ` · Tipo ${user.tipo}` : ''}`,
       })),
     [users],
@@ -80,6 +81,7 @@ export const EmployeeXlabLinkCard = ({ employeeId }: { employeeId: number }) => 
       const cve = Number(selected);
       setLink(link?.cve_usuario != null ? await updateEmployeeXlabLink(employeeId, cve) : await createEmployeeXlabLink(employeeId, cve));
       setEditing(false);
+      onChange?.();
       notifySuccess('Vínculo con XLab guardado.');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo guardar el vínculo con XLab.'));
@@ -101,6 +103,7 @@ export const EmployeeXlabLinkCard = ({ employeeId }: { employeeId: number }) => 
     try {
       await deleteEmployeeXlabLink(employeeId);
       setLink(await getEmployeeXlabLink(employeeId));
+      onChange?.();
       notifySuccess('Vínculo con XLab quitado.');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo quitar el vínculo con XLab.'));
@@ -129,7 +132,7 @@ export const EmployeeXlabLinkCard = ({ employeeId }: { employeeId: number }) => 
                 {link.xlab_user?.nombre ?? `Usuario ${link.cve_usuario}`}
               </p>
               <p className="text-xs text-[var(--unilabor-neutral)]">
-                Clave {link.cve_usuario}
+                {link.xlab_user?.login ? `Usuario ${link.xlab_user.login} · ` : ''}Clave {link.cve_usuario}
                 {link.xlab_user?.tipo != null ? ` · Tipo ${link.xlab_user.tipo}` : ''}
                 {link.xlab_user && !link.xlab_user.activo ? ' · Inactivo en XLab' : ''}
                 {link.xlab_available ? '' : ' · XLab no disponible por el momento'}
@@ -148,7 +151,7 @@ export const EmployeeXlabLinkCard = ({ employeeId }: { employeeId: number }) => 
                 disabled={loadingUsers || saving}
                 clearable={false}
                 placeholder={loadingUsers ? 'Cargando usuarios de XLab…' : 'Elige un usuario de XLab'}
-                searchPlaceholder="Busca por nombre o clave..."
+                searchPlaceholder="Busca por nombre, usuario o clave..."
               />
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setEditing(false)} disabled={saving} className={secondaryButton}>

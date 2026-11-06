@@ -6,10 +6,10 @@ let xlabDown = false;
 
 const EMPLOYEES: Record<number, string | null> = { 1: 'user-maria', 2: 'user-jose', 3: null };
 const XLAB = [
-  { cve_usuario: 101, nombre: 'MARÍA PEÑA', activo_usuario: 1, cve_tipo_usuario: 2 },
-  { cve_usuario: 102, nombre: 'JOSÉ NÚÑEZ', activo_usuario: 1, cve_tipo_usuario: 4 },
-  { cve_usuario: 103, nombre: 'LUCÍA GÓMEZ', activo_usuario: 0, cve_tipo_usuario: 2 },
-  { cve_usuario: 105, nombre: 'SOFÍA IBÁÑEZ', activo_usuario: 1, cve_tipo_usuario: 2 },
+  { cve_usuario: 101, nombre: 'MARÍA PEÑA', login: 'mpena', activo_usuario: 1, cve_tipo_usuario: 2 },
+  { cve_usuario: 102, nombre: 'JOSÉ NÚÑEZ', login: 'jnunez', activo_usuario: 1, cve_tipo_usuario: 4 },
+  { cve_usuario: 103, nombre: 'LUCÍA GÓMEZ', login: 'lgomez', activo_usuario: 0, cve_tipo_usuario: 2 },
+  { cve_usuario: 105, nombre: 'SOFÍA IBÁÑEZ', login: null, activo_usuario: 1, cve_tipo_usuario: 2 },
 ];
 
 const uniqueViolation = (constraint: string) => Object.assign(new Error('duplicate key'), { code: '23505', constraint });
@@ -136,7 +136,7 @@ describe('busqueda de usuarios libres', () => {
     await createEmployeeXlabLink(1, 101, 'rh');
     const users = await listAvailableXlabUsers('');
     expect(users.map((user) => user.cve_usuario)).toEqual([102, 105]);
-    expect(Object.keys(users[0]!).sort()).toEqual(['activo', 'cve_usuario', 'nombre', 'tipo']);
+    expect(Object.keys(users[0]!).sort()).toEqual(['activo', 'cve_usuario', 'login', 'nombre', 'tipo']);
   });
 
   it('ignora acentos y mayusculas; tambien busca por clave', async () => {
@@ -157,5 +157,13 @@ describe('xlab caido', () => {
     xlabDown = true;
     expect(await getEmployeeXlabLink(1)).toMatchObject({ cve_usuario: 101, xlab_user: null, xlab_available: false });
     expect(await deleteEmployeeXlabLink(1)).toMatchObject({ cve_usuario: 101 });
+  });
+
+  it('devuelve el login y busca por el, y tolera que falte', async () => {
+    const encontrados = await listAvailableXlabUsers('JNUNEZ');
+    expect(encontrados.map((user) => user.cve_usuario)).toEqual([102]);
+    expect(encontrados[0]!.login).toBe('jnunez');
+    const sinLogin = await listAvailableXlabUsers('ibañez');
+    expect(sinLogin[0]!.login).toBeNull();
   });
 });

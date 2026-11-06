@@ -239,6 +239,18 @@ export const listEmployees = async (
   );
   const data = await Promise.all(dataResult.rows.map((row) => mapEmployeeRow(row)));
 
+  // Solo aqui y no en la consulta base: esta usada por toda la app y el listado es
+  // lo unico que necesita saber si el colaborador esta vinculado a XLab.
+  const userIds = data.flatMap((employee) => (employee.user_id ? [employee.user_id] : []));
+  const linksResult = await pool.query<{ user_id: string }>(
+    'SELECT user_id FROM public.xlab_user_links WHERE user_id = ANY($1::uuid[])',
+    [userIds],
+  );
+  const linkedUserIds = new Set(linksResult.rows.map((row) => String(row.user_id)));
+  for (const employee of data) {
+    employee.xlab_linked = employee.user_id !== null && linkedUserIds.has(employee.user_id);
+  }
+
   if (!paginate) {
     return buildPaginatedResult(data, data.length, 1, data.length || 1);
   }

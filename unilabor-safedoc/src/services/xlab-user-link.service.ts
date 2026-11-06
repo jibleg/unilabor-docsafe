@@ -3,12 +3,14 @@ import { lisText, xlabQuery, XlabUnavailableError } from '../config/xlab-db';
 
 /**
  * Vinculo 1 a 1 usuario de DocSafe <-> usuario de XLab (RH, ficha del colaborador).
- * De public.usuarios solo se leen clave, nombre, estado y tipo: el rol de `xlab` no
+ * De public.usuarios solo se leen clave, nombre, login, estado y tipo: el rol de `xlab` no
  * tiene acceso a ninguna otra columna (contrasenas, firmas).
  */
 export interface XlabUser {
   cve_usuario: number;
   nombre: string;
+  /** Distingue a los homónimos: es único entre los usuarios activos. */
+  login: string | null;
   activo: boolean;
   tipo: number | null;
 }
@@ -32,11 +34,12 @@ export interface XlabLinkMutation {
 interface XlabUserRow {
   cve_usuario: number;
   nombre: string | null;
+  login: string | null;
   activo_usuario: number | null;
   cve_tipo_usuario: number | null;
 }
 
-const USER_COLUMNS = `cve_usuario, ${lisText('nombre')} AS nombre, activo_usuario, cve_tipo_usuario`;
+const USER_COLUMNS = `cve_usuario, ${lisText('nombre')} AS nombre, ${lisText('login')} AS login, activo_usuario, cve_tipo_usuario`;
 const COMBINING_MARKS = /[̀-ͯ]/g;
 const CVE_UNIQUE_CONSTRAINT = 'ux_xlab_user_links_cve_usuario';
 
@@ -47,6 +50,7 @@ const normalize = (value: string): string => value.normalize('NFD').replace(COMB
 const toXlabUser = (row: XlabUserRow): XlabUser => ({
   cve_usuario: row.cve_usuario,
   nombre: (row.nombre ?? '').trim() || `Usuario ${row.cve_usuario}`,
+  login: row.login?.trim() || null,
   activo: row.activo_usuario === 1,
   tipo: row.cve_tipo_usuario,
 });
@@ -148,7 +152,7 @@ export const listAvailableXlabUsers = async (search: string): Promise<XlabUser[]
   const needle = normalize(search);
   return rows
     .map(toXlabUser)
-    .filter((user) => !needle || normalize(user.nombre).includes(needle) || String(user.cve_usuario) === needle)
+    .filter((user) => !needle || normalize(user.nombre).includes(needle) || normalize(user.login ?? '').includes(needle) || String(user.cve_usuario) === needle)
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 };
 

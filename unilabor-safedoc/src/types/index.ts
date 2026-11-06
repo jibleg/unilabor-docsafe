@@ -37,6 +37,7 @@ export interface EmployeeRecord {
   created_at?: string;
   updated_at?: string;
   linked_user?: LinkableUser | null;
+  xlab_linked?: boolean;
 }
 
 // --- Modulo de Evaluaciones de capacitacion y constancias (ISO 15189) ---

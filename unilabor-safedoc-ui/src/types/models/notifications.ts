@@ -23,6 +23,7 @@ export interface MyNotificationsPage {
 export interface XlabUser {
   cve_usuario: number;
   nombre: string;
+  login: string | null;
   activo: boolean;
   tipo: number | null;
 }
