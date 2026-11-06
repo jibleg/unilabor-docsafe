@@ -3,10 +3,12 @@ import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { AppNavbar } from '../components/AppNavbar';
 import { AppSidebar } from '../components/AppSidebar';
 import { PendingEvaluationsBanner } from '../components/PendingEvaluationsBanner';
+import { NotificationsBell } from '../components/NotificationsBell';
 import { UserMenu } from '../components/UserMenu';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePendingEvaluationsStore } from '../store/usePendingEvaluationsStore';
 import { usePendingSignaturesStore } from '../store/usePendingSignaturesStore';
+import { useMyNotificationsStore } from '../store/useMyNotificationsStore';
 import { getCurrentUserProfile, getMyAccess } from '../api/service';
 import { tokenRequiresPasswordChange } from '../utils/auth';
 import { ChevronRight, Loader2 } from 'lucide-react';
@@ -23,6 +25,8 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
   const resetPendingEvaluations = usePendingEvaluationsStore((state) => state.reset);
   const refreshPendingSignatures = usePendingSignaturesStore((state) => state.refresh);
   const resetPendingSignatures = usePendingSignaturesStore((state) => state.reset);
+  const refreshMyNotifications = useMyNotificationsStore((state) => state.refresh);
+  const setUnreadNotifications = useMyNotificationsStore((state) => state.setUnread);
   const { pathname } = useLocation();
   const [isDesktopSidebarVisible, setIsDesktopSidebarVisible] = useState(true);
 
@@ -47,6 +51,15 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
       resetPendingSignatures();
     }
   }, [token, mustChangePassword, moduleCode, pathname, refreshPendingEvaluations, resetPendingEvaluations, refreshPendingSignatures, resetPendingSignatures]);
+
+  // La campana de notificaciones de Contigo+ vive en todos los modulos.
+  useEffect(() => {
+    if (token && !mustChangePassword) {
+      void refreshMyNotifications();
+    } else {
+      setUnreadNotifications(0);
+    }
+  }, [token, mustChangePassword, pathname, refreshMyNotifications, setUnreadNotifications]);
 
   useEffect(() => {
     if (!token || mustChangePassword) {
@@ -118,7 +131,8 @@ export const MainLayout = ({ moduleCode }: { moduleCode: ModuleCode }) => {
           isDesktopSidebarVisible ? 'lg:ml-64' : 'lg:ml-0'
         }`}
       >
-        <header className="sticky top-0 z-30 hidden items-center justify-end border-b border-[rgba(0,65,106,0.08)] bg-white/80 px-6 py-2.5 backdrop-blur-xl lg:flex">
+        <header className="sticky top-0 z-30 hidden items-center justify-end border-b border-[rgba(0,65,106,0.08)] bg-white/80 px-6 py-2.5 backdrop-blur-xl lg:flex lg:gap-2">
+          <NotificationsBell />
           <UserMenu moduleCode={moduleCode} />
         </header>
         <div className="px-4 py-5 md:px-6 md:py-6 lg:px-8 lg:py-8">

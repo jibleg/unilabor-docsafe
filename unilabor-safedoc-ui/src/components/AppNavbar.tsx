@@ -7,6 +7,7 @@ import { getModuleRole } from '../utils/modules';
 import { confirmAction } from '../utils/confirm';
 import { useUserAvatar } from '../hooks/useUserAvatar';
 import { NAV_CONFIG } from '../config/navigation';
+import { NotificationsBell } from './NotificationsBell';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
 
@@ -68,6 +69,7 @@ export const AppNavbar = ({ moduleCode }: { moduleCode: ModuleCode }) => {
         </div>
 
         <div className="navbar-end gap-2">
+          <NotificationsBell />
           <div className="flex items-center gap-2 rounded-full border border-[rgba(0,65,106,0.08)] bg-[rgba(239,245,250,0.92)] px-2 py-1">
             <div className="h-7 w-7 overflow-hidden rounded-full border border-[rgba(0,65,106,0.08)] bg-[rgba(124,173,211,0.24)]">
               {avatarUrl ? (

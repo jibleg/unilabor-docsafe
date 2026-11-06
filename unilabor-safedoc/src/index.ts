@@ -17,6 +17,7 @@ import rhCompetencyEvaluationRoutes from './routes/rh-competency-evaluation.rout
 import rhSupervisionChecklistRoutes from './routes/rh-supervision-checklist.routes';
 import mySupervisionRoutes from './routes/my-supervision.routes';
 import signatureInboxRoutes from './routes/signature-inbox.routes';
+import myNotificationsRoutes from './routes/my-notifications.routes';
 import rhAssignmentLetterRoutes from './routes/rh-assignment-letter.routes';
 import trainingRoutes from './routes/training.routes';
 import evaluationAssignmentRoutes from './routes/evaluation-assignment.routes';
@@ -80,6 +81,7 @@ app.use('/api/rh/competency-evaluations', rhCompetencyEvaluationRoutes);
 app.use('/api/rh/supervision-checklists', rhSupervisionChecklistRoutes);
 app.use('/api/my/supervisions', mySupervisionRoutes);
 app.use('/api/my/signature-inbox', signatureInboxRoutes);
+app.use('/api/my/notifications', myNotificationsRoutes);
 app.use('/api/rh/assignment-letters', rhAssignmentLetterRoutes);
 app.use('/api/rh/trainings', trainingRoutes);
 app.use('/api/rh/evaluations', evaluationGradingRoutes);

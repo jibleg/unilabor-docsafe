@@ -83,3 +83,14 @@ El frontend no requiere reinicio (lo sirve nginx desde `dist/`); si hace falta, 
 - **Migraciones obligatorias**: módulo Evaluaciones (`20260617_*`, `20260618_01`), Help Desk ISO (`20260620_01`, `20260622_*`), endurecimiento (`20260623_01`). Sin ellas, prod truena con `no existe la columna e.phone`.
 - Verificar en `.env` antes de prod: `NOTIFY_RH_EMAIL` real, credenciales SparkPost/LabsMobile rotadas, `JWT_SECRET` real, `SCHEDULER_ENABLED`.
 - WhatsApp cachea el preview por URL → compartir con `?v=2` para forzar refresco.
+
+---
+
+## Notas para el deploy de notificaciones de Contigo+ (2026-11-06)
+
+Vinculo 1 a 1 DocSafe <-> XLab y campana. Sin dependencias nuevas (no hace falta `npm ci`). Todo es opcional en el arranque: sin las variables `XLAB_DB_*`, o con `xlab` caido, la campana queda vacia y el resto sigue.
+
+1. En `xlab-extended`: `MIGRACIONES_DEPLOY_20261106.sql` (pgAdmin), como siempre antes del backend.
+2. En `xlab` (otra BD): `SCRIPT_PROD_20261106_XLAB_ROL_NOTIFICACIONES.sql` con la contrasena ya reemplazada. No lo guardes con la contrasena puesta. Lo que va en la BD `xlab` NO lo aplica `migrate.js`.
+3. En el `.env` del VPS: `XLAB_DB_HOST`, `XLAB_DB_PORT`, `XLAB_DB_NAME=xlab`, `XLAB_DB_USER=docsafe_notificaciones`, `XLAB_DB_PASSWORD`, `XLAB_DB_SSL=false` (el servidor tiene `ssl=off`). Revisar que `pg_hba.conf` deje entrar al rol nuevo desde el VPS.
+4. Subir `dist/` de backend y frontend; `pm2 restart unilabor-safedoc-api` (nombre en `ecosystem.config.js`).

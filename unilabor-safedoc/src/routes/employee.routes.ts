@@ -13,6 +13,13 @@ import {
   updateEmployeeDocumentAccessController,
   updateEmployeeController,
 } from '../controllers/employee.controller';
+import {
+  createEmployeeXlabLinkController,
+  deleteEmployeeXlabLinkController,
+  getEmployeeXlabLinkController,
+  listAvailableXlabUsersController,
+  updateEmployeeXlabLinkController,
+} from '../controllers/xlab-user-link.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
@@ -21,6 +28,7 @@ import {
   updateEmployeeDocumentAccessSchema,
   updateEmployeeSchema,
 } from '../schemas/employee.schema';
+import { xlabUserLinkSchema } from '../schemas/xlab-user-link.schema';
 
 const router = Router();
 
@@ -45,6 +53,9 @@ router.get('/branches', requirePermission('RH.EMPLOYEES.READ'), listBranchesCont
 // (evita variantes como Validacion / VALIDACIÓN). Alta con el permiso de edicion.
 router.get('/areas', requirePermission('RH.EMPLOYEES.READ'), listEmployeeAreasController);
 router.post('/areas', requirePermission('RH.EMPLOYEES.WRITE'), validate(createEmployeeAreaSchema), createEmployeeAreaController);
+// Usuarios de XLab activos que siguen libres, para vincularlos (antes de /:id).
+// Mismo criterio que vincular el usuario de DocSafe: edicion del colaborador.
+router.get('/xlab-users', requirePermission('RH.EMPLOYEES.WRITE'), listAvailableXlabUsersController);
 // La LISTA de empleados es directorio de referencia que el modulo de Activos
 // (HELPDESK) necesita para asignar responsables en activos, movimientos,
 // mantenimiento y calibracion. Se permite tambien a quien puede ver activos
@@ -58,6 +69,10 @@ router.get(
   requirePermission('RH.EMPLOYEES.READ'),
   getEmployeeDocumentAccessController,
 );
+router.get('/:id/xlab-link', requirePermission('RH.EMPLOYEES.READ'), getEmployeeXlabLinkController);
+router.post('/:id/xlab-link', requirePermission('RH.EMPLOYEES.WRITE'), validate(xlabUserLinkSchema), createEmployeeXlabLinkController);
+router.put('/:id/xlab-link', requirePermission('RH.EMPLOYEES.WRITE'), validate(xlabUserLinkSchema), updateEmployeeXlabLinkController);
+router.delete('/:id/xlab-link', requirePermission('RH.EMPLOYEES.WRITE'), deleteEmployeeXlabLinkController);
 router.post('/', requirePermission('RH.EMPLOYEES.WRITE'), validate(createEmployeeSchema), createEmployeeController);
 router.patch('/:id', requirePermission('RH.EMPLOYEES.WRITE'), validate(updateEmployeeSchema), updateEmployeeController);
 router.put(

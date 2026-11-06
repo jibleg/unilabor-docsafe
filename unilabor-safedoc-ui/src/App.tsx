@@ -183,6 +183,11 @@ const RhSignatureInboxPage = lazy(() =>
     default: module.RhSignatureInboxPage,
   })),
 );
+const RhMyNotificationsPage = lazy(() =>
+  import('./pages/RhMyNotificationsPage').then((module) => ({
+    default: module.RhMyNotificationsPage,
+  })),
+);
 const RhMyInductionPage = lazy(() =>
   import('./pages/RhMyInductionPage').then((module) => ({
     default: module.RhMyInductionPage,
@@ -597,6 +602,7 @@ function App() {
             </PermissionGate>
           }
         />
+        <Route path="my-notifications" element={<RhMyNotificationsPage />} />
         <Route
           path="my-induction"
           element={

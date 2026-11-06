@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { hasPermission } from '../utils/permissions';
 import { usePendingEvaluations } from '../hooks/usePendingEvaluations';
 import { usePendingSignatures } from '../hooks/usePendingSignatures';
+import { useMyNotificationsStore } from '../store/useMyNotificationsStore';
 import { NAV_CONFIG, type NavItem } from '../config/navigation';
 import unilaborIcon from '../assets/icono-UNILABOR.png';
 import type { ModuleCode } from '../types/models';
@@ -19,7 +20,8 @@ export const AppSidebar = ({ moduleCode, isVisible, onToggleVisibility }: AppSid
   const permissions = useAuthStore((state) => state.permissions);
   const { count: pendingEvaluations } = usePendingEvaluations(moduleCode === 'RH');
   const pendingSignatures = usePendingSignatures(moduleCode === 'RH');
-  const badgeCounts: Record<NonNullable<NavItem['badge']>, number> = { pendingEvaluations, pendingSignatures };
+  const unreadNotifications = useMyNotificationsStore((state) => state.unread);
+  const badgeCounts: Record<NonNullable<NavItem['badge']>, number> = { pendingEvaluations, pendingSignatures, unreadNotifications };
 
   // Secciones colapsadas (persistidas por usuario). Clave: `${modulo}:${titulo}`.
   const COLLAPSE_KEY = 'safedoc.sidebar.collapsed';

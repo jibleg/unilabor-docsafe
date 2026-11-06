@@ -13,6 +13,7 @@ import {
   updateEmployeeDocumentAccess,
   updateEmployeeById,
 } from '../api/service';
+import { EmployeeXlabLinkCard } from '../components/rh/EmployeeXlabLinkCard';
 import type { Employee, EmployeeBranch, EmployeeDocumentAccessMatrix, LinkableUser } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { usePaginatedList } from '../hooks/usePaginatedList';
@@ -591,6 +592,8 @@ export const RhEmployeesPage = () => {
                   <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">Aún no tiene usuario del sistema asociado.</p>
                 )}
               </div>
+
+              {detailEmployee.user_id ? <EmployeeXlabLinkCard key={detailEmployee.id} employeeId={detailEmployee.id} /> : null}
 
               <button
                 type="button"

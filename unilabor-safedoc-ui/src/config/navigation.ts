@@ -49,7 +49,7 @@ export interface NavItem {
   label: string;
   path: string;
   permission?: string | string[];
-  badge?: 'pendingEvaluations' | 'pendingSignatures';
+  badge?: 'pendingEvaluations' | 'pendingSignatures' | 'unreadNotifications';
 }
 
 export interface NavSection {
@@ -145,6 +145,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: Briefcase, label: 'Mi inducción', path: '/rh/my-induction', permission: 'RH.SELF.INDUCTION' },
         { icon: ClipboardCheck, label: 'Mis supervisiones', path: '/rh/my-supervisions', permission: 'RH.SELF.INDUCTION' },
         { icon: Inbox, label: 'Buzón de firmas', path: '/rh/signature-inbox', permission: 'RH.SELF.INDUCTION', badge: 'pendingSignatures' },
+        { icon: Bell, label: 'Mis notificaciones', path: '/rh/my-notifications', badge: 'unreadNotifications' },
         { icon: UserCircle2, label: 'Mi perfil', path: '/rh/profile' },
       ],
     },

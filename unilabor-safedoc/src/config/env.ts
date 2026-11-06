@@ -91,6 +91,33 @@ export const getAnthropicConfig = (): { apiKey: string; model: string; workspace
 };
 
 /**
+ * Conexion a `xlab` (BD del LIS, donde Contigo+ guarda las notificaciones del
+ * personal). Opcional: si falta host, base o usuario, la campana queda vacia y el
+ * resto de DocSafe sigue igual. Usar un rol de minimo privilegio, nunca el de la app.
+ */
+export const getXlabDbConfig = ():
+  | { host: string; port: number; database: string; user: string; password: string; ssl: false | { rejectUnauthorized: boolean } }
+  | null => {
+  const host = process.env.XLAB_DB_HOST?.trim();
+  const database = process.env.XLAB_DB_NAME?.trim();
+  const user = process.env.XLAB_DB_USER?.trim();
+  if (!host || !database || !user) {
+    return null;
+  }
+  const useSsl = process.env.XLAB_DB_SSL?.trim().toLowerCase() === 'true';
+  return {
+    host,
+    port: Number.parseInt(process.env.XLAB_DB_PORT ?? '', 10) || 5432,
+    database,
+    user,
+    password: process.env.XLAB_DB_PASSWORD ?? '',
+    ssl: useSsl
+      ? { rejectUnauthorized: process.env.XLAB_DB_SSL_REJECT_UNAUTHORIZED?.trim().toLowerCase() !== 'false' }
+      : false,
+  };
+};
+
+/**
  * Apagador global de mensajeria saliente (correo, SMS y WhatsApp). Con
  * NOTIFY_ENABLED=false el sistema calcula y BITACOREA cada aviso como
  * 'skipped' pero no envia nada real — pensado para ambientes de prueba con
