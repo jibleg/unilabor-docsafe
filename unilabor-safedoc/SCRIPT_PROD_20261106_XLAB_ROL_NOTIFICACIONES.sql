@@ -23,7 +23,7 @@ BEGIN;
 DO $$
 DECLARE
   -- Reemplazar solo el valor de esta linea.
-  new_password CONSTANT text := '80a455c99caec4e64bd40c7f27132a0c674a54c0e6d17d6ecb8d84072f496a83';
+  new_password CONSTANT text := 'REEMPLAZAR_CONTRASENA';
 BEGIN
   IF current_database() <> 'xlab' THEN
     RAISE EXCEPTION 'Este script se aplica en la BD xlab, no en %.', current_database();
