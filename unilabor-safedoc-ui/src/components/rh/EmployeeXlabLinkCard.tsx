@@ -25,7 +25,7 @@ const primaryButton =
  * el colaborador recibe en DocSafe sus notificaciones de Contigo+. Solo edita quien
  * puede editar colaboradores; se monta solo si el colaborador ya tiene usuario.
  */
-export const EmployeeXlabLinkCard = ({ employeeId, onChange }: { employeeId: number; onChange?: () => void }) => {
+export const EmployeeXlabLinkCard = ({ employeeId, onChange }: { employeeId: number; onChange?: (linked: boolean) => void }) => {
   const permissions = useAuthStore((state) => state.permissions);
   const canEdit = hasPermission(permissions, 'RH.EMPLOYEES.WRITE');
   const [link, setLink] = useState<EmployeeXlabLink | null>(null);
@@ -81,7 +81,7 @@ export const EmployeeXlabLinkCard = ({ employeeId, onChange }: { employeeId: num
       const cve = Number(selected);
       setLink(link?.cve_usuario != null ? await updateEmployeeXlabLink(employeeId, cve) : await createEmployeeXlabLink(employeeId, cve));
       setEditing(false);
-      onChange?.();
+      onChange?.(true);
       notifySuccess('Vínculo con XLab guardado.');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo guardar el vínculo con XLab.'));
@@ -102,8 +102,8 @@ export const EmployeeXlabLinkCard = ({ employeeId, onChange }: { employeeId: num
     setSaving(true);
     try {
       await deleteEmployeeXlabLink(employeeId);
+      onChange?.(false);
       setLink(await getEmployeeXlabLink(employeeId));
-      onChange?.();
       notifySuccess('Vínculo con XLab quitado.');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo quitar el vínculo con XLab.'));

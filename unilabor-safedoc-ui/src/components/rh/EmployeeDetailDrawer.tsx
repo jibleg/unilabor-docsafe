@@ -11,7 +11,7 @@ interface EmployeeDetailDrawerProps {
   onClose: () => void;
   onEdit: (employee: Employee) => void;
   onConfigureAccess: (employee: Employee) => void;
-  onXlabLinkChange: () => void;
+  onXlabLinkChange: (linked: boolean) => void;
 }
 
 const cardClass = 'rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/90 p-4';
@@ -117,7 +117,7 @@ export const EmployeeDetailDrawer = ({ open, loading, employee, onClose, onEdit,
                   )}
                 </div>
 
-                {employee.user_id ? <EmployeeXlabLinkCard key={employee.id} employeeId={employee.id} onChange={onXlabLinkChange} /> : null}
+                {employee.user_id ? <EmployeeXlabLinkCard key={`${employee.id}-${employee.user_id}`} employeeId={employee.id} onChange={onXlabLinkChange} /> : null}
 
                 <button
                   type="button"

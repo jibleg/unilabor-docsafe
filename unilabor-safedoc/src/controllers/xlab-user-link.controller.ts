@@ -2,14 +2,13 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { XlabUnavailableError } from '../config/xlab-db';
 import type { XlabUserLinkBody } from '../schemas/xlab-user-link.schema';
-import { registerAuditEvent } from '../services/audit.service';
 import {
+  auditXlabLinkChange,
   createEmployeeXlabLink,
   deleteEmployeeXlabLink,
   getEmployeeXlabLink,
   listAvailableXlabUsers,
   updateEmployeeXlabLink,
-  type XlabLinkMutation,
 } from '../services/xlab-user-link.service';
 
 /** Administracion de RH del vinculo DocSafe <-> XLab desde la ficha del colaborador. */
@@ -41,18 +40,6 @@ const fail = (res: Response, error: any, context: string, message: string) => {
   return res.status(500).json({ message });
 };
 
-const auditLink = (req: AuthRequest, action: string, link: XlabLinkMutation) =>
-  registerAuditEvent({
-    user_id: req.user?.id ?? null,
-    action: `${action}:${link.employee_id}`,
-    ip_address: req.ip ?? null,
-    module_code: 'RH',
-    entity_type: 'xlab_user_link',
-    entity_id: link.employee_id,
-    employee_id: link.employee_id,
-    metadata: { user_id: link.user_id, cve_usuario: link.cve_usuario, previous_cve_usuario: link.previous_cve_usuario },
-  });
-
 /** GET /employees/xlab-users?q= */
 export const listAvailableXlabUsersController = async (req: AuthRequest, res: Response) => {
   try {
@@ -82,7 +69,7 @@ export const createEmployeeXlabLinkController = async (req: AuthRequest, res: Re
   const { cve_usuario } = req.body as XlabUserLinkBody;
   try {
     const link = await createEmployeeXlabLink(employeeId, cve_usuario, actorId);
-    await auditLink(req, 'RH_XLAB_LINK_CREATE', link);
+    await auditXlabLinkChange(req, 'RH_XLAB_LINK_CREATE', link);
     return res.status(201).json({ link: await getEmployeeXlabLink(employeeId) });
   } catch (error) {
     return fail(res, error, 'Error creando vinculo con XLab:', 'No se pudo crear el vinculo con XLab.');
@@ -98,7 +85,7 @@ export const updateEmployeeXlabLinkController = async (req: AuthRequest, res: Re
   const { cve_usuario } = req.body as XlabUserLinkBody;
   try {
     const link = await updateEmployeeXlabLink(employeeId, cve_usuario, actorId);
-    await auditLink(req, 'RH_XLAB_LINK_UPDATE', link);
+    await auditXlabLinkChange(req, 'RH_XLAB_LINK_UPDATE', link);
     return res.json({ link: await getEmployeeXlabLink(employeeId) });
   } catch (error) {
     return fail(res, error, 'Error cambiando vinculo con XLab:', 'No se pudo cambiar el vinculo con XLab.');
@@ -110,7 +97,7 @@ export const deleteEmployeeXlabLinkController = async (req: AuthRequest, res: Re
   const employeeId = parseEmployeeId(req.params.id);
   if (!employeeId) return res.status(400).json({ message: 'ID invalido.' });
   try {
-    await auditLink(req, 'RH_XLAB_LINK_DELETE', await deleteEmployeeXlabLink(employeeId));
+    await auditXlabLinkChange(req, 'RH_XLAB_LINK_DELETE', await deleteEmployeeXlabLink(employeeId));
     return res.json({ ok: true });
   } catch (error) {
     return fail(res, error, 'Error quitando vinculo con XLab:', 'No se pudo quitar el vinculo con XLab.');

@@ -1,5 +1,8 @@
+import type { Pool, PoolClient } from 'pg';
 import pool from '../config/db';
 import { lisText, xlabQuery, XlabUnavailableError } from '../config/xlab-db';
+import type { AuthRequest } from '../types';
+import { registerAuditEvent } from './audit.service';
 
 /**
  * Vinculo 1 a 1 usuario de DocSafe <-> usuario de XLab (RH, ficha del colaborador).
@@ -188,14 +191,33 @@ export const updateEmployeeXlabLink = async (employeeId: number, cveUsuario: num
   }
 };
 
-export const deleteEmployeeXlabLink = async (employeeId: number): Promise<XlabLinkMutation> => {
-  const userId = await requireEmployeeUserId(employeeId);
-  const { rows } = await pool.query<{ cve_usuario: number }>(
+/** Borra el vinculo de la cuenta dentro de la transaccion de quien llama; null si no tenia. */
+export const removeXlabLinkOfEmployee = async (db: Pool | PoolClient, employeeId: number, userId: string): Promise<XlabLinkMutation | null> => {
+  const { rows } = await db.query<{ cve_usuario: number }>(
     'DELETE FROM public.xlab_user_links WHERE user_id = $1 RETURNING cve_usuario',
     [userId],
   );
-  if (rows.length === 0) {
+  const cveUsuario = rows[0]?.cve_usuario;
+  return cveUsuario === undefined ? null : { employee_id: employeeId, user_id: userId, cve_usuario: cveUsuario, previous_cve_usuario: cveUsuario };
+};
+
+export const deleteEmployeeXlabLink = async (employeeId: number): Promise<XlabLinkMutation> => {
+  const userId = await requireEmployeeUserId(employeeId);
+  const link = await removeXlabLinkOfEmployee(pool, employeeId, userId);
+  if (!link) {
     throw codedError('XLAB_LINK_NOT_FOUND', 'Este colaborador no tiene vinculo con XLab.');
   }
-  return { employee_id: employeeId, user_id: userId, cve_usuario: rows[0]!.cve_usuario, previous_cve_usuario: rows[0]!.cve_usuario };
+  return link;
 };
+
+export const auditXlabLinkChange = (actor: Pick<AuthRequest, 'user' | 'ip'>, action: string, link: XlabLinkMutation) =>
+  registerAuditEvent({
+    user_id: actor.user?.id ?? null,
+    action: `${action}:${link.employee_id}`,
+    ip_address: actor.ip ?? null,
+    module_code: 'RH',
+    entity_type: 'xlab_user_link',
+    entity_id: link.employee_id,
+    employee_id: link.employee_id,
+    metadata: { user_id: link.user_id, cve_usuario: link.cve_usuario, previous_cve_usuario: link.previous_cve_usuario },
+  });

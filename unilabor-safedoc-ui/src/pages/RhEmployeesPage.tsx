@@ -14,7 +14,9 @@ import {
   updateEmployeeById,
 } from '../api/service';
 import { EmployeeDetailDrawer } from '../components/rh/EmployeeDetailDrawer';
+import { describeEmployeeDeactivationImpact } from '../components/rh/employeeDeactivationImpact';
 import type { Employee, EmployeeBranch, EmployeeDocumentAccessMatrix, LinkableUser } from '../types/models';
+import { confirmAction } from '../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { EmployeeAreaSelect } from '../components/rh/EmployeeAreaSelect';
@@ -383,6 +385,17 @@ export const RhEmployeesPage = () => {
       return;
     }
 
+    if (selectedEmployee.xlab_linked && (selectedEmployee.user_id ?? '') !== form.user_id) {
+      const confirmed = await confirmAction(
+        'Quitar vínculo con XLab',
+        'Al cambiar el usuario se quita el vínculo con XLab; deberás vincularlo de nuevo para que reciba sus notificaciones de Contigo+.',
+        'Guardar y quitar',
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       await updateEmployeeById(selectedEmployee.id, toEmployeePayload(form));
@@ -401,7 +414,18 @@ export const RhEmployeesPage = () => {
     }
   };
 
+  // Editar desde la ficha parte de detailEmployee: debe conocer el vínculo vigente.
+  const handleXlabLinkChange = (linked: boolean) => {
+    setDetailEmployee((current) => (current ? { ...current, xlab_linked: linked } : current));
+    void reloadEmployees();
+  };
+
   const handleDelete = async (employee: Employee) => {
+    const confirmed = await confirmAction('Inactivar colaborador', describeEmployeeDeactivationImpact(employee), 'Inactivar');
+    if (!confirmed) {
+      return;
+    }
+
     setDeletingId(employee.id);
     try {
       await deleteEmployeeById(employee.id);
@@ -539,7 +563,7 @@ export const RhEmployeesPage = () => {
         onClose={() => setDetailEmployee(null)}
         onEdit={openEdit}
         onConfigureAccess={(employee) => void openDocumentAccess(employee)}
-        onXlabLinkChange={() => void reloadEmployees()}
+        onXlabLinkChange={handleXlabLinkChange}
       />
 
       {(isCreateOpen || isEditOpen) && (

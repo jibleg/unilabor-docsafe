@@ -10,6 +10,7 @@ import {
   createEmployee,
   deactivateEmployee,
   getEmployeeById,
+  getEmployeeDetail,
   getEmployeeSummary,
   listBranches,
   listEmployees,
@@ -17,6 +18,7 @@ import {
   type EmployeePayload,
   updateEmployee,
 } from '../services/employee.service';
+import { auditXlabLinkChange } from '../services/xlab-user-link.service';
 
 const getText = (value: unknown): string | null => {
   if (typeof value !== 'string') {
@@ -189,7 +191,7 @@ export const getEmployeeByIdController = async (req: AuthRequest, res: Response)
   }
 
   try {
-    const employee = await getEmployeeById(employeeId);
+    const employee = await getEmployeeDetail(employeeId);
     if (!employee) {
       return res.status(404).json({ message: 'Colaborador no encontrado.' });
     }
@@ -381,16 +383,19 @@ export const updateEmployeeController = async (req: AuthRequest, res: Response) 
   }
 
   try {
-    const employee = await updateEmployee(employeeId, payload as Partial<EmployeePayload>);
-    if (!employee) {
+    const result = await updateEmployee(employeeId, payload as Partial<EmployeePayload>);
+    if (!result) {
       return res.status(404).json({ message: 'Colaborador no encontrado.' });
     }
 
     await logEmployeeAudit(req.user?.id, `RH_EMPLOYEE_UPDATE:${employeeId}`, req.ip);
+    if (result.removedXlabLink) {
+      await auditXlabLinkChange(req, 'RH_XLAB_LINK_AUTO_DELETE', result.removedXlabLink);
+    }
 
     return res.json({
       message: 'Colaborador actualizado correctamente.',
-      employee,
+      employee: result.employee,
     });
   } catch (error: any) {
     const mappedError = mapEmployeeError(res, error);
@@ -410,16 +415,19 @@ export const deleteEmployeeController = async (req: AuthRequest, res: Response) 
   }
 
   try {
-    const employee = await deactivateEmployee(employeeId);
-    if (!employee) {
+    const result = await deactivateEmployee(employeeId);
+    if (!result) {
       return res.status(404).json({ message: 'Colaborador no encontrado.' });
     }
 
     await logEmployeeAudit(req.user?.id, `RH_EMPLOYEE_DELETE:${employeeId}`, req.ip);
+    if (result.removedXlabLink) {
+      await auditXlabLinkChange(req, 'RH_XLAB_LINK_AUTO_DELETE', result.removedXlabLink);
+    }
 
     return res.json({
       message: 'Colaborador inactivado correctamente.',
-      employee,
+      employee: result.employee,
     });
   } catch (error: any) {
     const mappedError = mapEmployeeError(res, error);

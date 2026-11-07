@@ -5,6 +5,7 @@ import { getUserAccessibleModules, invalidateUserPermissions } from './permissio
 import { initializeDefaultEmployeeDocumentAccess } from './employee-document-access.service';
 import { resolveEmployeeAreaName } from './rh-employee-area.service';
 import { resyncDraftSignersQuietly } from './rh-supervision-signers.service';
+import { removeXlabLinkOfEmployee, type XlabLinkMutation } from './xlab-user-link.service';
 import type { EmployeeRecord, EmployeeSummary, LinkableUser } from '../types';
 import {
   PaginatedResult,
@@ -213,6 +214,26 @@ const EMPLOYEE_SEARCH_COLUMNS = [
   'e.position',
 ];
 
+/** Resultado de una edicion o baja: quien la pide audita el vinculo con XLab que se haya quitado. */
+export interface EmployeeMutationResult {
+  employee: EmployeeRecord | null;
+  removedXlabLink: XlabLinkMutation | null;
+}
+
+// Aparte de la consulta base: esta usada por toda la app y solo el listado y el detalle
+// de RH necesitan saber si el colaborador esta vinculado a XLab.
+const markXlabLinked = async (employees: EmployeeRecord[]): Promise<void> => {
+  const userIds = employees.flatMap((employee) => (employee.user_id ? [employee.user_id] : []));
+  const { rows } = await pool.query<{ user_id: string }>(
+    'SELECT user_id FROM public.xlab_user_links WHERE user_id = ANY($1::uuid[])',
+    [userIds],
+  );
+  const linkedUserIds = new Set(rows.map((row) => String(row.user_id)));
+  for (const employee of employees) {
+    employee.xlab_linked = employee.user_id !== null && linkedUserIds.has(employee.user_id);
+  }
+};
+
 export interface EmployeeListOptions extends PaginationInput {
   search?: string | undefined;
 }
@@ -239,17 +260,7 @@ export const listEmployees = async (
   );
   const data = await Promise.all(dataResult.rows.map((row) => mapEmployeeRow(row)));
 
-  // Solo aqui y no en la consulta base: esta usada por toda la app y el listado es
-  // lo unico que necesita saber si el colaborador esta vinculado a XLab.
-  const userIds = data.flatMap((employee) => (employee.user_id ? [employee.user_id] : []));
-  const linksResult = await pool.query<{ user_id: string }>(
-    'SELECT user_id FROM public.xlab_user_links WHERE user_id = ANY($1::uuid[])',
-    [userIds],
-  );
-  const linkedUserIds = new Set(linksResult.rows.map((row) => String(row.user_id)));
-  for (const employee of data) {
-    employee.xlab_linked = employee.user_id !== null && linkedUserIds.has(employee.user_id);
-  }
+  await markXlabLinked(data);
 
   if (!paginate) {
     return buildPaginatedResult(data, data.length, 1, data.length || 1);
@@ -279,6 +290,15 @@ export const getEmployeeById = async (employeeId: number): Promise<EmployeeRecor
   }
 
   return mapEmployeeRow(result.rows[0]);
+};
+
+/** Ficha de RH: el colaborador con su estado de vinculo con XLab. */
+export const getEmployeeDetail = async (employeeId: number): Promise<EmployeeRecord | null> => {
+  const employee = await getEmployeeById(employeeId);
+  if (employee) {
+    await markXlabLinked([employee]);
+  }
+  return employee;
 };
 
 export const getEmployeeByUserId = async (userId: string): Promise<EmployeeRecord | null> => {
@@ -423,11 +443,12 @@ export const createEmployee = async (payload: EmployeePayload): Promise<Employee
 export const updateEmployee = async (
   employeeId: number,
   payload: Partial<EmployeePayload>,
-): Promise<EmployeeRecord | null> => {
+): Promise<EmployeeMutationResult | null> => {
   await assertEmployeesTable();
 
   const client = await pool.connect();
   let branchChanged = false;
+  let removedXlabLink: XlabLinkMutation | null = null;
 
   try {
     await client.query('BEGIN');
@@ -495,6 +516,12 @@ export const updateEmployee = async (
       ],
     );
 
+    // El vinculo es de la cuenta: la que deja al colaborador ya no debe ver sus notificaciones.
+    const previousUserId = currentEmployee.user_id ? String(currentEmployee.user_id) : null;
+    if (previousUserId && previousUserId !== resolvedUserId) {
+      removedXlabLink = await removeXlabLinkOfEmployee(client, employeeId, previousUserId);
+    }
+
     if (resolvedUserId) {
       await ensureDefaultQualityAccess(resolvedUserId, client);
     }
@@ -511,29 +538,50 @@ export const updateEmployee = async (
   if (branchChanged) {
     await resyncDraftSignersQuietly({ employeeIds: [employeeId] });
   }
-  return getEmployeeById(employeeId);
+  return { employee: await getEmployeeById(employeeId), removedXlabLink };
 };
 
-export const deactivateEmployee = async (employeeId: number): Promise<EmployeeRecord | null> => {
+export const deactivateEmployee = async (employeeId: number): Promise<EmployeeMutationResult | null> => {
   await assertEmployeesTable();
 
-  const result = await pool.query(
-    `
-      UPDATE public.employees
-      SET is_active = FALSE, updated_at = NOW()
-      WHERE id = $1
-      RETURNING id;
-    `,
-    [employeeId],
-  );
+  const client = await pool.connect();
+  let removedXlabLink: XlabLinkMutation | null = null;
 
-  if (result.rows.length === 0) {
-    return null;
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `
+        UPDATE public.employees
+        SET is_active = FALSE, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, user_id;
+      `,
+      [employeeId],
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    // Quien causa baja deja de recibir notificaciones y su clave de XLab queda libre.
+    const userId = result.rows[0].user_id ? String(result.rows[0].user_id) : null;
+    if (userId) {
+      removedXlabLink = await removeXlabLinkOfEmployee(client, employeeId, userId);
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 
   // Un colaborador dado de baja ya no avala: sus borradores ANA-REG-060 pasan al siguiente responsable de la cadena.
   await resyncDraftSignersQuietly();
-  return getEmployeeById(employeeId);
+  return { employee: await getEmployeeById(employeeId), removedXlabLink };
 };
 
 export const getEmployeeSummary = async (): Promise<EmployeeSummary> => {
