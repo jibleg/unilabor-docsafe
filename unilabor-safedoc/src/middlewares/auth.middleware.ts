@@ -1,7 +1,7 @@
 ﻿import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../config/env';
-import { getUserPermissionCodes } from '../services/permission.service';
+import { getUserPermissionCodes, isUserActive } from '../services/permission.service';
 
 export interface JWTPayload {
   id: string;
@@ -13,7 +13,7 @@ export interface AuthRequest extends Request {
   user?: JWTPayload;
 }
 
-export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const verifyToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -21,27 +21,38 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
     return res.status(401).json({ message: 'Token de acceso no proporcionado' });
   }
 
+  let decoded: JWTPayload;
   try {
-    const decoded = jwt.verify(token, getJwtSecret()) as JWTPayload;
-    req.user = decoded;
-
-    const isChangePasswordRoute =
-      req.method === 'PATCH' &&
-      (req.originalUrl.endsWith('/api/users/change-password') || req.path === '/change-password');
-
-    if (decoded.mustChangePassword && !isChangePasswordRoute) {
-      return res.status(428).json({
-        message: 'Debes cambiar tu contrasena temporal para continuar',
-        mustChangePassword: true,
-      });
-    }
-
-    next();
+    decoded = jwt.verify(token, getJwtSecret()) as JWTPayload;
   } catch (_error) {
     // 401 (no 403) para que el frontend distinga "sesion expirada/invalida"
     // (-> logout + redirect) de "permisos insuficientes" (403 de requirePermission).
     return res.status(401).json({ message: 'Token invalido o expirado' });
   }
+
+  try {
+    if (!(await isUserActive(decoded.id))) {
+      return res.status(401).json({ message: 'Tu cuenta esta inactiva' });
+    }
+  } catch (error) {
+    console.error('Error validando la cuenta de la sesion:', error);
+    return res.status(500).json({ message: 'No se pudo validar la sesion' });
+  }
+
+  req.user = decoded;
+
+  const isChangePasswordRoute =
+    req.method === 'PATCH' &&
+    (req.originalUrl.endsWith('/api/users/change-password') || req.path === '/change-password');
+
+  if (decoded.mustChangePassword && !isChangePasswordRoute) {
+    return res.status(428).json({
+      message: 'Debes cambiar tu contrasena temporal para continuar',
+      mustChangePassword: true,
+    });
+  }
+
+  return next();
 };
 
 // RBAC por accion. Autoriza si el usuario tiene AL MENOS UNO de los permisos

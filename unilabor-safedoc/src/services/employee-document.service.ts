@@ -232,13 +232,23 @@ const mapEmployeeDocumentRow = (row: any): EmployeeDocumentRecord => {
 
 const ensureEmployeeExists = async (employeeId: number): Promise<EmployeeRecord> => {
   const employee = await getEmployeeById(employeeId);
-  if (!employee || !employee.is_active) {
+  if (!employee) {
     const error = new Error('EMPLOYEE_NOT_FOUND');
     (error as any).code = 'EMPLOYEE_NOT_FOUND';
     throw error;
   }
 
   return employee;
+};
+
+// El expediente de un colaborador inactivo se conserva solo para consulta.
+const ensureEmployeeIsActive = async (employeeId: number): Promise<void> => {
+  const employee = await ensureEmployeeExists(employeeId);
+  if (!employee.is_active) {
+    const error = new Error('EMPLOYEE_INACTIVE_READ_ONLY');
+    (error as any).code = 'EMPLOYEE_INACTIVE_READ_ONLY';
+    throw error;
+  }
 };
 
 const ensureDocumentTypeExists = async (documentTypeId: number): Promise<DocumentTypeRecord> => {
@@ -641,7 +651,7 @@ export const uploadEmployeeDocument = async (
 ): Promise<EmployeeDocumentRecord> => {
   await assertEmployeeDocumentsTable();
 
-  await ensureEmployeeExists(employeeId);
+  await ensureEmployeeIsActive(employeeId);
   const documentType = await ensureDocumentTypeExists(payload.document_type_id);
   await ensureDocumentTypeAssignedToEmployee(employeeId, documentType.id);
 
@@ -803,6 +813,7 @@ export const updateEmployeeDocumentMetadata = async (
 ): Promise<EmployeeDocumentRecord> => {
   await assertEmployeeDocumentsTable();
 
+  await ensureEmployeeIsActive(employeeId);
   const existing = await getEmployeeDocumentById(documentId);
   if (!existing || existing.employee_id !== employeeId) {
     const error = new Error('EMPLOYEE_DOCUMENT_NOT_FOUND');

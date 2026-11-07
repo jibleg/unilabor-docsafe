@@ -4,7 +4,8 @@ const query = vi.fn();
 const clientQuery = vi.fn();
 const release = vi.fn();
 vi.mock('../config/db', () => ({ default: { query, connect: vi.fn(async () => ({ query: clientQuery, release })) } }));
-vi.mock('./permission.service', () => ({ getUserAccessibleModules: vi.fn(), invalidateUserPermissions: vi.fn() }));
+const invalidateUserPermissions = vi.fn();
+vi.mock('./permission.service', () => ({ getUserAccessibleModules: vi.fn(), invalidateUserPermissions }));
 vi.mock('./employee-document-access.service', () => ({ initializeDefaultEmployeeDocumentAccess: vi.fn() }));
 vi.mock('./rh-employee-area.service', () => ({ resolveEmployeeAreaName: vi.fn() }));
 vi.mock('./rh-supervision-signers.service', () => ({ resyncDraftSignersQuietly: vi.fn() }));
@@ -29,6 +30,20 @@ describe('listEmployees', () => {
   });
 });
 
+describe('listEmployees e inactivos', () => {
+  const listSql = () => String(query.mock.calls.find(([text]) => String(text).includes('ORDER BY e.full_name'))?.[0]);
+
+  it('por defecto solo lista activos', async () => {
+    await listEmployees();
+    expect(listSql()).toContain('e.is_active = TRUE');
+  });
+
+  it('con includeInactive tambien lista a los inactivos', async () => {
+    await listEmployees({ includeInactive: true });
+    expect(listSql()).not.toContain('e.is_active = TRUE');
+  });
+});
+
 describe('getEmployeeDetail', () => {
   it('informa si el colaborador esta vinculado a XLab', async () => {
     expect((await getEmployeeDetail(1))?.xlab_linked).toBe(true);
@@ -43,9 +58,10 @@ describe('getEmployeeDetail', () => {
 describe('vinculo con XLab al editar o dar de baja', () => {
   const deleteLinkCalls = () => clientQuery.mock.calls.filter(([text]) => String(text).startsWith('DELETE FROM public.xlab_user_links'));
   const statements = () => clientQuery.mock.calls.map(([text]) => String(text));
-  const fakeClient = (onDeleteLink: () => Promise<{ rows: unknown[] }>, employee: ReturnType<typeof row> = row(1, 'u-1')) =>
+  const fakeClient = (onDeleteLink: () => Promise<{ rows: unknown[] }>, employee: ReturnType<typeof row> = row(1, 'u-1'), accountUpdate: { rows: unknown[] } = { rows: [{ id: employee.user_id }] }) =>
     clientQuery.mockImplementation(async (text: string) => {
       if (text.includes('SELECT * FROM public.employees')) return { rows: [employee] };
+      if (text.includes('UPDATE public.users')) return accountUpdate;
       if (text.includes('SET is_active = FALSE')) return { rows: [{ id: employee.id, user_id: employee.user_id }] };
       if (/FROM public\.users\s+WHERE id/.test(text)) return { rows: [{ id: 'u-9', is_active: true }] };
       if (text.startsWith('DELETE FROM public.xlab_user_links')) return onDeleteLink();
@@ -100,26 +116,45 @@ describe('vinculo con XLab al editar o dar de baja', () => {
   });
 
   describe('deactivateEmployee', () => {
-    it('borra el vinculo y lo reporta', async () => {
-      const result = await deactivateEmployee(1);
+    it('desactiva la cuenta y borra el vinculo en la misma transaccion', async () => {
+      const result = await deactivateEmployee(1, 'rh');
 
       expect(deleteLinkCalls().map(([, params]) => params)).toEqual([['u-1']]);
       expect(result?.removedXlabLink).toEqual(removedLink);
+      expect(result?.deactivatedUserId).toBe('u-1');
+      expect(invalidateUserPermissions).toHaveBeenCalledWith('u-1');
+      expect(statements().findIndex((text) => text.includes('UPDATE public.users'))).toBeLessThan(statements().indexOf('COMMIT'));
       expect(statements().findIndex((text) => text.startsWith('DELETE'))).toBeLessThan(statements().indexOf('COMMIT'));
     });
 
     it('un colaborador sin usuario no toca vinculos', async () => {
       fakeClient(async () => ({ rows: [] }), row(3, null));
-      const result = await deactivateEmployee(3);
+      const result = await deactivateEmployee(3, 'rh');
 
       expect(deleteLinkCalls()).toHaveLength(0);
+      expect(statements().some((text) => text.includes('UPDATE public.users'))).toBe(false);
       expect(result?.removedXlabLink).toBeNull();
+      expect(result?.deactivatedUserId).toBeNull();
+    });
+
+    it('una cuenta que ya estaba inactiva no se reporta como desactivada', async () => {
+      fakeClient(async () => ({ rows: [] }), row(1, 'u-1'), { rows: [] });
+      const result = await deactivateEmployee(1, 'rh');
+
+      expect(result?.deactivatedUserId).toBeNull();
+    });
+
+    it('nadie puede darse de baja a si mismo', async () => {
+      await expect(deactivateEmployee(1, 'u-1')).rejects.toMatchObject({ code: 'EMPLOYEE_SELF_DEACTIVATION' });
+      expect(statements()).toContain('ROLLBACK');
+      expect(statements()).not.toContain('COMMIT');
+      expect(statements().some((text) => text.includes('UPDATE public.users'))).toBe(false);
     });
 
     it('colaborador inexistente: revierte y responde null', async () => {
       clientQuery.mockImplementation(async () => ({ rows: [] }));
 
-      expect(await deactivateEmployee(99)).toBeNull();
+      expect(await deactivateEmployee(99, 'rh')).toBeNull();
       expect(statements()).toContain('ROLLBACK');
       expect(deleteLinkCalls()).toHaveLength(0);
     });
@@ -129,7 +164,7 @@ describe('vinculo con XLab al editar o dar de baja', () => {
         throw new Error('fallo');
       });
 
-      await expect(deactivateEmployee(1)).rejects.toThrow('fallo');
+      await expect(deactivateEmployee(1, 'rh')).rejects.toThrow('fallo');
       expect(statements()).toContain('ROLLBACK');
       expect(statements()).not.toContain('COMMIT');
     });

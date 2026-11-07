@@ -36,7 +36,8 @@ const getStatusClassName = (status: ExpedientItemStatus): string => {
 
 interface ExpedientSectionCardProps {
   section: EmployeeExpedientSection;
-  onUpload: (item: EmployeeExpedientSection['items'][number]) => void;
+  /** Sin esto el expediente es de solo consulta: no se ofrece cargar ni reemplazar. */
+  onUpload?: (item: EmployeeExpedientSection['items'][number]) => void;
   onView: (documentId: number) => void;
   onHistory?: (item: EmployeeExpedientSection['items'][number]) => void;
   /** Correccion de titulo/descripcion del documento vigente (solo RH; el
@@ -80,7 +81,7 @@ export const ExpedientSectionCard = ({
             {newItem ? (
               <button
                 type="button"
-                onClick={() => onUpload(newItem)}
+                onClick={() => onUpload?.(newItem)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--color-brand-700)] px-3 py-2 text-xs font-bold text-white shadow-md transition hover:opacity-90"
               >
                 <FilePlus2 size={14} />
@@ -186,14 +187,16 @@ export const ExpedientSectionCard = ({
                   Ver PDF
                 </button>
               ) : null}
-              <button
-                type="button"
-                onClick={() => onUpload(item)}
-                className="inline-flex items-center gap-1 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
-              >
-                {item.current_document ? <RefreshCw size={14} /> : <FilePlus2 size={14} />}
-                {item.current_document ? 'Reemplazar' : 'Cargar'}
-              </button>
+              {onUpload ? (
+                <button
+                  type="button"
+                  onClick={() => onUpload(item)}
+                  className="inline-flex items-center gap-1 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-2 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+                >
+                  {item.current_document ? <RefreshCw size={14} /> : <FilePlus2 size={14} />}
+                  {item.current_document ? 'Reemplazar' : 'Cargar'}
+                </button>
+              ) : null}
             </div>
 
             {!isOpen && item.current_document?.description ? (

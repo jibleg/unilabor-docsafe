@@ -11,6 +11,7 @@ import { InductionClosureModal } from './InductionClosureModal';
 import type { RhInductionMasterRecord, RhInductionPhaseRowStatus } from '../../types/models';
 
 interface EmployeeInductionHistoryPanelProps {
+  readOnly?: boolean;
   employeeId: number;
 }
 
@@ -40,7 +41,7 @@ const VERDICT_LABEL: Record<RhInductionMasterRecord['summary']['verdict'], strin
 
 const formatDate = (value: string | null): string => (value ? new Date(value).toLocaleDateString('es-MX') : '—');
 
-export const EmployeeInductionHistoryPanel = ({ employeeId }: EmployeeInductionHistoryPanelProps) => {
+export const EmployeeInductionHistoryPanel = ({ employeeId, readOnly = false }: EmployeeInductionHistoryPanelProps) => {
   const [record, setRecord] = useState<RhInductionMasterRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -135,7 +136,7 @@ export const EmployeeInductionHistoryPanel = ({ employeeId }: EmployeeInductionH
           </h3>
         </div>
         <div className="flex items-center gap-2">
-          {!record.closure && (
+          {!record.closure && !readOnly && (
             <button
               type="button"
               onClick={() => setClosureModal('open')}
@@ -171,13 +172,15 @@ export const EmployeeInductionHistoryPanel = ({ employeeId }: EmployeeInductionH
               {formatDate(record.closure.created_at)}. El PDF firmado está archivado en el expediente (sección
               Programa de Inducción).
             </p>
-            <button
-              type="button"
-              onClick={() => setClosureModal('supersede')}
-              className="font-semibold underline-offset-2 hover:underline"
-            >
-              Corregir cierre
-            </button>
+            {readOnly ? null : (
+              <button
+                type="button"
+                onClick={() => setClosureModal('supersede')}
+                className="font-semibold underline-offset-2 hover:underline"
+              >
+                Corregir cierre
+              </button>
+            )}
           </div>
         )}
         <div className="grid grid-cols-2 gap-3 text-xs text-[var(--unilabor-neutral)] sm:grid-cols-4">
@@ -258,14 +261,16 @@ export const EmployeeInductionHistoryPanel = ({ employeeId }: EmployeeInductionH
             <h4 className="text-sm font-bold text-[var(--color-brand-700)]">
               Eficacia del programa de inducción ({record.effectiveness_reviews.length})
             </h4>
-            <button
-              type="button"
-              onClick={() => setShowEffectivenessForm((prev) => !prev)}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"
-            >
-              <Plus size={13} />
-              Registrar seguimiento
-            </button>
+            {readOnly ? null : (
+              <button
+                type="button"
+                onClick={() => setShowEffectivenessForm((prev) => !prev)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-brand-700)] hover:underline"
+              >
+                <Plus size={13} />
+                Registrar seguimiento
+              </button>
+            )}
           </div>
 
           {showEffectivenessForm ? (

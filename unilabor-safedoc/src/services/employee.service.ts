@@ -234,8 +234,14 @@ const markXlabLinked = async (employees: EmployeeRecord[]): Promise<void> => {
   }
 };
 
+export interface EmployeeDeactivationResult extends EmployeeMutationResult {
+  /** Cuenta de DocSafe que la baja desactivo; null si no tenia o ya estaba inactiva. */
+  deactivatedUserId: string | null;
+}
+
 export interface EmployeeListOptions extends PaginationInput {
   search?: string | undefined;
+  includeInactive?: boolean | undefined;
 }
 
 export const listEmployees = async (
@@ -246,7 +252,7 @@ export const listEmployees = async (
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
   const search = buildIlikeSearch(EMPLOYEE_SEARCH_COLUMNS, options.search, 0);
-  const whereClause = ['e.is_active = TRUE', search.clause].filter(Boolean).join(' AND ');
+  const whereClause = [options.includeInactive ? '' : 'e.is_active = TRUE', search.clause].filter(Boolean).join(' AND ') || 'TRUE';
 
   const base = buildEmployeeBaseQuery();
   const limitSql = paginate
@@ -541,11 +547,12 @@ export const updateEmployee = async (
   return { employee: await getEmployeeById(employeeId), removedXlabLink };
 };
 
-export const deactivateEmployee = async (employeeId: number): Promise<EmployeeMutationResult | null> => {
+export const deactivateEmployee = async (employeeId: number, actorUserId: string | undefined): Promise<EmployeeDeactivationResult | null> => {
   await assertEmployeesTable();
 
   const client = await pool.connect();
   let removedXlabLink: XlabLinkMutation | null = null;
+  let deactivatedUserId: string | null = null;
 
   try {
     await client.query('BEGIN');
@@ -565,9 +572,17 @@ export const deactivateEmployee = async (employeeId: number): Promise<EmployeeMu
       return null;
     }
 
-    // Quien causa baja deja de recibir notificaciones y su clave de XLab queda libre.
+    // Quien causa baja ya no entra a la plataforma, deja de recibir notificaciones y su clave de XLab queda libre.
     const userId = result.rows[0].user_id ? String(result.rows[0].user_id) : null;
     if (userId) {
+      if (userId === actorUserId) {
+        throw Object.assign(new Error('EMPLOYEE_SELF_DEACTIVATION'), { code: 'EMPLOYEE_SELF_DEACTIVATION' });
+      }
+      const account = await client.query(
+        'UPDATE public.users SET is_active = FALSE, updated_at = NOW() WHERE id = $1 AND is_active = TRUE RETURNING id;',
+        [userId],
+      );
+      deactivatedUserId = account.rows.length > 0 ? userId : null;
       removedXlabLink = await removeXlabLinkOfEmployee(client, employeeId, userId);
     }
 
@@ -580,8 +595,11 @@ export const deactivateEmployee = async (employeeId: number): Promise<EmployeeMu
   }
 
   // Un colaborador dado de baja ya no avala: sus borradores ANA-REG-060 pasan al siguiente responsable de la cadena.
+  if (deactivatedUserId) {
+    invalidateUserPermissions(deactivatedUserId);
+  }
   await resyncDraftSignersQuietly();
-  return { employee: await getEmployeeById(employeeId), removedXlabLink };
+  return { employee: await getEmployeeById(employeeId), removedXlabLink, deactivatedUserId };
 };
 
 export const getEmployeeSummary = async (): Promise<EmployeeSummary> => {

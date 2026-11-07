@@ -23,6 +23,7 @@ interface CachedSnapshot {
 // request sin dejar los permisos "stale" mas alla de unos segundos.
 const SNAPSHOT_TTL_MS = 30_000;
 const snapshotCache = new Map<string, CachedSnapshot>();
+const activeUserCache = new Map<string, { active: boolean; expiresAt: number }>();
 
 let rbacTablesAvailable: boolean | null = null;
 
@@ -151,6 +152,20 @@ export const getUserAccessSnapshot = async (userId: string): Promise<UserAccessS
   return snapshot;
 };
 
+/** El JWT dura horas: esto corta la sesion de una cuenta desactivada sin esperar a que expire. */
+export const isUserActive = async (userId: string): Promise<boolean> => {
+  const cached = activeUserCache.get(userId);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) {
+    return cached.active;
+  }
+
+  const { rows } = await pool.query<{ is_active: boolean }>('SELECT is_active FROM public.users WHERE id = $1', [userId]);
+  const active = rows[0]?.is_active === true;
+  activeUserCache.set(userId, { active, expiresAt: now + SNAPSHOT_TTL_MS });
+  return active;
+};
+
 export const getUserPermissionCodes = async (userId: string): Promise<Set<string>> => {
   const snapshot = await getUserAccessSnapshot(userId);
   return new Set(snapshot.permissions);
@@ -166,7 +181,9 @@ export const getUserAccessibleModules = async (userId: string): Promise<ModuleAc
 export const invalidateUserPermissions = (userId?: string): void => {
   if (userId) {
     snapshotCache.delete(userId);
+    activeUserCache.delete(userId);
     return;
   }
   snapshotCache.clear();
+  activeUserCache.clear();
 };

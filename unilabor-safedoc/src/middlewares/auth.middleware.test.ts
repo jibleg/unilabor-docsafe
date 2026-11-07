@@ -5,12 +5,14 @@ import jwt from 'jsonwebtoken';
 // la BD); lo mockeamos para aislar la logica de autorizacion.
 vi.mock('../services/permission.service', () => ({
   getUserPermissionCodes: vi.fn(),
+  isUserActive: vi.fn(),
 }));
 
-import { getUserPermissionCodes } from '../services/permission.service';
+import { getUserPermissionCodes, isUserActive } from '../services/permission.service';
 import { requirePermission, verifyToken } from './auth.middleware';
 
 const mockedGetPermissions = vi.mocked(getUserPermissionCodes);
+const mockedIsUserActive = vi.mocked(isUserActive);
 
 type ResMock = {
   statusCode?: number;
@@ -35,6 +37,8 @@ const buildRes = (): ResMock => {
 
 beforeEach(() => {
   mockedGetPermissions.mockReset();
+  mockedIsUserActive.mockReset();
+  mockedIsUserActive.mockResolvedValue(true);
 });
 
 describe('verifyToken', () => {
@@ -45,45 +49,67 @@ describe('verifyToken', () => {
     process.env.JWT_SECRET = secret;
   });
 
-  it('responde 401 si no hay token', () => {
+  it('responde 401 si no hay token', async () => {
     const res = buildRes();
     const next = vi.fn();
-    verifyToken({ headers: {}, ...baseReq() } as any, res as any, next);
+    await verifyToken({ headers: {}, ...baseReq() } as any, res as any, next);
     expect(res.statusCode).toBe(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('responde 401 ante un token expirado (sesion invalida)', () => {
+  it('responde 401 ante un token expirado (sesion invalida)', async () => {
     const expired = jwt.sign({ id: 'u1', role: 'ADMIN', mustChangePassword: false }, secret, {
       expiresIn: '-1s',
     });
     const res = buildRes();
     const next = vi.fn();
-    verifyToken({ headers: { authorization: `Bearer ${expired}` }, ...baseReq() } as any, res as any, next);
+    await verifyToken({ headers: { authorization: `Bearer ${expired}` }, ...baseReq() } as any, res as any, next);
     expect(res.statusCode).toBe(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('llama next y setea req.user con un token valido', () => {
+  it('llama next y setea req.user con un token valido', async () => {
     const token = jwt.sign({ id: 'u1', role: 'ADMIN', mustChangePassword: false }, secret, {
       expiresIn: '8h',
     });
     const req: any = { headers: { authorization: `Bearer ${token}` }, ...baseReq() };
     const res = buildRes();
     const next = vi.fn();
-    verifyToken(req, res as any, next);
+    await verifyToken(req, res as any, next);
     expect(next).toHaveBeenCalledOnce();
     expect(req.user).toMatchObject({ id: 'u1', role: 'ADMIN' });
   });
 
-  it('responde 428 si el usuario debe cambiar su contrasena temporal', () => {
+  it('responde 428 si el usuario debe cambiar su contrasena temporal', async () => {
     const token = jwt.sign({ id: 'u1', role: 'VIEWER', mustChangePassword: true }, secret, {
       expiresIn: '8h',
     });
     const res = buildRes();
     const next = vi.fn();
-    verifyToken({ headers: { authorization: `Bearer ${token}` }, ...baseReq() } as any, res as any, next);
+    await verifyToken({ headers: { authorization: `Bearer ${token}` }, ...baseReq() } as any, res as any, next);
     expect(res.statusCode).toBe(428);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('responde 401 si la cuenta se desactivo aunque el token siga vigente', async () => {
+    mockedIsUserActive.mockResolvedValue(false);
+    const token = jwt.sign({ id: 'u1', role: 'VIEWER', mustChangePassword: false }, secret, { expiresIn: '8h' });
+    const req: any = { headers: { authorization: `Bearer ${token}` }, ...baseReq() };
+    const res = buildRes();
+    const next = vi.fn();
+    await verifyToken(req, res as any, next);
+    expect(res.statusCode).toBe(401);
+    expect(req.user).toBeUndefined();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('no deja pasar si no se pudo validar la cuenta', async () => {
+    mockedIsUserActive.mockRejectedValue(new Error('bd caida'));
+    const token = jwt.sign({ id: 'u1', role: 'VIEWER', mustChangePassword: false }, secret, { expiresIn: '8h' });
+    const res = buildRes();
+    const next = vi.fn();
+    await verifyToken({ headers: { authorization: `Bearer ${token}` }, ...baseReq() } as any, res as any, next);
+    expect(res.statusCode).toBe(500);
     expect(next).not.toHaveBeenCalled();
   });
 });

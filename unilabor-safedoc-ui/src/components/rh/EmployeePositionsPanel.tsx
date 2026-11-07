@@ -13,9 +13,10 @@ import type { RhEmployeePosition, RhPosition } from '../../types/models';
 
 interface EmployeePositionsPanelProps {
   employeeId: number;
+  readOnly?: boolean;
 }
 
-export const EmployeePositionsPanel = ({ employeeId }: EmployeePositionsPanelProps) => {
+export const EmployeePositionsPanel = ({ employeeId, readOnly = false }: EmployeePositionsPanelProps) => {
   const [assigned, setAssigned] = useState<RhEmployeePosition[]>([]);
   const [catalog, setCatalog] = useState<RhPosition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,20 +104,22 @@ export const EmployeePositionsPanel = ({ employeeId }: EmployeePositionsPanelPro
                   <p className="font-bold text-[var(--color-brand-700)]">{item.position_name}</p>
                   <p className="text-xs text-[var(--unilabor-neutral)]">{item.position_code}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void handleEnd(item.id)}
-                  className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-500/10"
-                  title="Finalizar este puesto"
-                >
-                  <X size={14} />
-                </button>
+                {readOnly ? null : (
+                  <button
+                    type="button"
+                    onClick={() => void handleEnd(item.id)}
+                    className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-500/10"
+                    title="Finalizar este puesto"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
         )}
 
-        <div className="flex gap-2">
+        <div className={readOnly ? 'hidden' : 'flex gap-2'}>
           <div className="w-full">
             <SearchableSelect
               value={selectedPositionId}

@@ -72,6 +72,7 @@ const EMPLOYEE_PAGE_SIZES = [10, 20, 30];
 
 export const EmployeeExpedientPage = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [showInactive, setShowInactive] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingExpedient, setLoadingExpedient] = useState(false);
   const [query, setQuery] = useState('');
@@ -96,9 +97,9 @@ export const EmployeeExpedientPage = () => {
   const loadEmployees = useCallback(async () => {
     setLoadingEmployees(true);
     try {
-      const data = await listEmployees();
+      const data = await listEmployees({ includeInactive: true });
       setEmployees(data);
-      setSelectedEmployeeId((current) => current ?? data[0]?.id ?? null);
+      setSelectedEmployeeId((current) => current ?? data.find((employee) => employee.is_active)?.id ?? null);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron cargar los colaboradores del expediente.'));
     } finally {
@@ -183,15 +184,25 @@ export const EmployeeExpedientPage = () => {
 
   const filteredEmployees = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
+    const inScope = employees.filter((employee) => employee.is_active !== showInactive);
     if (!normalizedQuery) {
-      return employees;
+      return inScope;
     }
 
-    return employees.filter((employee) =>
+    return inScope.filter((employee) =>
       [employee.employee_code, employee.full_name, employee.email, employee.area ?? '', employee.position ?? '']
         .some((value) => value.toLowerCase().includes(normalizedQuery)),
     );
-  }, [employees, query]);
+  }, [employees, query, showInactive]);
+
+  const inactiveCount = useMemo(() => employees.filter((employee) => !employee.is_active).length, [employees]);
+
+  const toggleShowInactive = () => {
+    const next = !showInactive;
+    setShowInactive(next);
+    setListPage(1);
+    setSelectedEmployeeId(employees.find((employee) => employee.is_active !== next)?.id ?? null);
+  };
 
   const listTotalPages = Math.max(1, Math.ceil(filteredEmployees.length / listPageSize));
   const currentListPage = Math.min(listPage, listTotalPages);
@@ -201,6 +212,7 @@ export const EmployeeExpedientPage = () => {
   );
 
   const currentEmployee = expedient?.employee ?? employees.find((employee) => employee.id === selectedEmployeeId) ?? null;
+  const readOnly = currentEmployee?.is_active === false;
 
   // Pestañas del expediente: Resumen, Puestos e inducción y una por sección documental.
   const [activeTab, setActiveTab] = useState('summary');
@@ -347,6 +359,18 @@ export const EmployeeExpedientPage = () => {
               placeholder="Buscar colaborador por codigo, nombre, correo..."
               className="w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-4 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]"
             />
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showInactive}
+              onClick={toggleShowInactive}
+              className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-brand-700)]"
+            >
+              <span className={`relative h-4 w-7 rounded-full transition ${showInactive ? 'bg-[var(--color-brand-700)]' : 'bg-[rgba(0,65,106,0.2)]'}`}>
+                <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${showInactive ? 'left-3.5' : 'left-0.5'}`} />
+              </span>
+              Inactivos ({inactiveCount})
+            </button>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/88 shadow-xl shadow-[rgba(0,65,106,0.08)] backdrop-blur-xl">
@@ -388,7 +412,7 @@ export const EmployeeExpedientPage = () => {
                         </div>
                         {isSelected && (
                           <span className="rounded-full border border-[rgba(0,65,106,0.14)] bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[var(--color-brand-700)]">
-                            Activo
+                            {employee.is_active ? 'Activo' : 'Inactivo'}
                           </span>
                         )}
                       </div>
@@ -472,6 +496,12 @@ export const EmployeeExpedientPage = () => {
                 </div>
               </div>
 
+              {readOnly ? (
+                <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                  Colaborador inactivo: expediente solo de consulta.
+                </p>
+              ) : null}
+
               <ExpedientTabs tabs={expedientTabs} active={currentTab} onChange={setActiveTab} />
 
               {/* Los paneles se mantienen montados y solo se ocultan: no se recargan al cambiar de pestaña. */}
@@ -486,8 +516,8 @@ export const EmployeeExpedientPage = () => {
               </div>
 
               <div className={currentTab === 'induction' ? 'space-y-6' : 'hidden'} role="tabpanel">
-                {selectedEmployeeId ? <EmployeePositionsPanel employeeId={selectedEmployeeId} /> : null}
-                {selectedEmployeeId ? <EmployeeInductionHistoryPanel employeeId={selectedEmployeeId} /> : null}
+                {selectedEmployeeId ? <EmployeePositionsPanel employeeId={selectedEmployeeId} readOnly={readOnly} /> : null}
+                {selectedEmployeeId ? <EmployeeInductionHistoryPanel employeeId={selectedEmployeeId} readOnly={readOnly} /> : null}
               </div>
 
               {expedient.sections.map((section) =>
@@ -495,8 +525,7 @@ export const EmployeeExpedientPage = () => {
                   <div key={section.section.id} role="tabpanel">
                     <ExpedientSectionCard
                       section={section}
-                      onUpload={(item) => setSelectedItem(item)}
-                      onEdit={(item) => setEditItem(item)}
+                      {...(readOnly ? {} : { onUpload: (item: EmployeeExpedientItem) => setSelectedItem(item), onEdit: (item: EmployeeExpedientItem) => setEditItem(item) })}
                       onHistory={(item) => {
                         setHistoryItem(item);
                         void loadDocumentHistory(

@@ -1,6 +1,7 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
+import { getUserPermissionCodes } from '../services/permission.service';
 import { createEmployeeArea, listEmployeeAreas } from '../services/rh-employee-area.service';
 import {
   listEmployeeDocumentAccessMatrix,
@@ -57,6 +58,10 @@ const mapEmployeeError = (res: Response, error: any) => {
     return res.status(409).json({ message: 'Ya existe un colaborador con ese correo.' });
   }
 
+  if (error?.code === 'EMPLOYEE_SELF_DEACTIVATION') {
+    return res.status(400).json({ message: 'No puedes inactivarte a ti mismo.' });
+  }
+
   if (error?.code === 'LINKED_USER_NOT_FOUND') {
     return res.status(404).json({ message: 'El usuario vinculado no existe.' });
   }
@@ -106,10 +111,16 @@ const logEmployeeAudit = async (userId: string | undefined, action: string, ipAd
 
 export const listEmployeesController = async (req: AuthRequest, res: Response) => {
   try {
+    // Los inactivos solo se listan para consultar su expediente; este directorio tambien lo usa Activos.
+    const includeInactive =
+      req.query.include_inactive === 'true' &&
+      Boolean(req.user?.id) &&
+      (await getUserPermissionCodes(req.user!.id)).has('RH.EMPLOYEE_DOCS.READ');
     const result = await listEmployees({
       page: req.query.page,
       limit: req.query.limit,
       search: typeof req.query.search === 'string' ? req.query.search : undefined,
+      includeInactive,
     });
     return res.json(result);
   } catch (error: any) {
@@ -415,12 +426,24 @@ export const deleteEmployeeController = async (req: AuthRequest, res: Response) 
   }
 
   try {
-    const result = await deactivateEmployee(employeeId);
+    const result = await deactivateEmployee(employeeId, req.user?.id);
     if (!result) {
       return res.status(404).json({ message: 'Colaborador no encontrado.' });
     }
 
     await logEmployeeAudit(req.user?.id, `RH_EMPLOYEE_DELETE:${employeeId}`, req.ip);
+    if (result.deactivatedUserId) {
+      await registerAuditEvent({
+        user_id: req.user?.id ?? null,
+        action: `RH_EMPLOYEE_ACCOUNT_DEACTIVATE:${employeeId}`,
+        ip_address: req.ip ?? null,
+        module_code: 'RH',
+        entity_type: 'employee',
+        entity_id: employeeId,
+        employee_id: employeeId,
+        metadata: { user_id: result.deactivatedUserId },
+      });
+    }
     if (result.removedXlabLink) {
       await auditXlabLinkChange(req, 'RH_XLAB_LINK_AUTO_DELETE', result.removedXlabLink);
     }

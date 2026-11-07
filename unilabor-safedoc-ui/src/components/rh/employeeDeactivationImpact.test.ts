@@ -5,7 +5,8 @@ describe('describeEmployeeDeactivationImpact', () => {
   it('con usuario y vínculo avisa de la cuenta y de XLab', () => {
     const text = describeEmployeeDeactivationImpact({ full_name: 'María Peña', user_id: 'u-1', xlab_linked: true });
     expect(text).toContain('María Peña saldrá de Colaboradores');
-    expect(text).toContain('Su cuenta de DocSafe seguirá activa.');
+    expect(text).toContain('Su cuenta de DocSafe se desactivará y ya no podrá entrar.');
+    expect(text).toContain('solo de consulta');
     expect(text).toContain('Se quitará su vínculo con XLab');
     expect(text).toContain('No hay opción para revertir');
   });

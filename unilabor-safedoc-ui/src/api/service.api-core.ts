@@ -239,8 +239,8 @@ export const resetUserPassword = async (userId: string): Promise<ResetUserPasswo
   };
 };
 
-export const listEmployees = async (): Promise<Employee[]> => {
-  const response = await api.get('/employees');
+export const listEmployees = async (options: { includeInactive?: boolean } = {}): Promise<Employee[]> => {
+  const response = await api.get('/employees', options.includeInactive ? { params: { include_inactive: 'true' } } : undefined);
   return getArrayFromPayload(response.data, ['employees', 'items', 'results'])
     .map(normalizeEmployee)
     .filter((employee): employee is Employee => employee !== null);

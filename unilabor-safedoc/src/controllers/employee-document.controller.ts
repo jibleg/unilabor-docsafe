@@ -79,6 +79,10 @@ const mapEmployeeDocumentError = (res: Response, error: any) => {
     return res.status(404).json({ message: 'Colaborador no encontrado.' });
   }
 
+  if (error?.code === 'EMPLOYEE_INACTIVE_READ_ONLY') {
+    return res.status(409).json({ message: 'El expediente de un colaborador inactivo es solo de consulta.' });
+  }
+
   if (error?.code === 'EMPLOYEE_PROFILE_NOT_FOUND') {
     return res.status(404).json({ message: 'Tu cuenta aun no esta vinculada a un expediente de colaborador.' });
   }
