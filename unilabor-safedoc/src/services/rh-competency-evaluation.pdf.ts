@@ -79,13 +79,16 @@ export interface CompetencyEvaluationPdfInput {
     rhName: string;
     directorName: string;
   };
+  /** null = aun sin firma (solo en la vista previa de un registro en firma). */
   signaturePngs: {
-    collaborator: Buffer;
-    evaluator: Buffer;
-    area: Buffer;
-    rh: Buffer;
-    director: Buffer;
+    collaborator: Buffer | null;
+    evaluator: Buffer | null;
+    area: Buffer | null;
+    rh: Buffer | null;
+    director: Buffer | null;
   };
+  /** Vista previa de un registro en firma: marca de agua y sin fecha de cierre. */
+  draft?: boolean;
 }
 
 type Rgb = ReturnType<typeof rgb>;
@@ -270,7 +273,7 @@ export const buildCompetencyEvaluationPdf = async (input: CompetencyEvaluationPd
     ['Tipo de evaluación', EVALUATION_TYPE_LABELS[record.evaluation_type] ?? record.evaluation_type],
     ['Fecha de evaluación', formatDate(record.evaluation_date)],
     ['Evaluador técnico', record.evaluator_name],
-    ['Cierre del registro', formatDate(input.closedAt)],
+    ['Cierre del registro', input.draft ? 'En firma' : formatDate(input.closedAt)],
   ];
   const colW = (CONTENT_W - 32) / 2;
   datos.forEach(([label, value], index) => {
@@ -606,7 +609,7 @@ export const buildCompetencyEvaluationPdf = async (input: CompetencyEvaluationPd
   }
 
   // ----------------------------------------------------------------- firmas
-  const signatureBlocks: Array<{ png: Buffer; name: string; role: string }> = [
+  const signatureBlocks: Array<{ png: Buffer | null; name: string; role: string }> = [
     { png: input.signaturePngs.collaborator, name: input.signatories.collaboratorName, role: 'Colaborador evaluado' },
     { png: input.signaturePngs.evaluator, name: input.signatories.evaluatorName, role: 'Evaluador técnico' },
     { png: input.signaturePngs.area, name: input.signatories.areaName, role: 'Coordinador del área' },
@@ -623,9 +626,13 @@ export const buildCompetencyEvaluationPdf = async (input: CompetencyEvaluationPd
       const boxW = columnWidth - 18;
       const boxH = 46;
       page.drawRectangle({ x, y: topY - boxH, width: boxW, height: boxH, color: WHITE, borderColor: BRAND_100, borderWidth: 0.6 });
-      const signature = await doc.embedPng(block.png);
-      const scaled = signature.scaleToFit(boxW - 12, boxH - 10);
-      page.drawImage(signature, { x: x + (boxW - scaled.width) / 2, y: topY - boxH + (boxH - scaled.height) / 2, width: scaled.width, height: scaled.height });
+      if (block.png) {
+        const signature = await doc.embedPng(block.png);
+        const scaled = signature.scaleToFit(boxW - 12, boxH - 10);
+        page.drawImage(signature, { x: x + (boxW - scaled.width) / 2, y: topY - boxH + (boxH - scaled.height) / 2, width: scaled.width, height: scaled.height });
+      } else {
+        drawCentered('Pendiente de firma', x + boxW / 2, topY - boxH / 2 - 3, 7.5, italic, MUTED);
+      }
       const lineY = topY - boxH - 6;
       page.drawLine({ start: { x, y: lineY }, end: { x: x + boxW, y: lineY }, thickness: 0.9, color: NAVY });
       let y = lineY - 11;
@@ -669,7 +676,9 @@ export const buildCompetencyEvaluationPdf = async (input: CompetencyEvaluationPd
   ensureSpace(30);
   for (const line of wrapText(
     safe(
-      `Registro cerrado el ${formatDate(input.closedAt)}. Conservar conforme al procedimiento de gestión de registros del laboratorio. Firmas autógrafas capturadas y verificadas en la Plataforma UNILABOR SafeDoc.`,
+      input.draft
+        ? 'Vista previa de un registro en firma: no tiene validez hasta reunir todas las firmas en el Buzón de firmas de la Plataforma UNILABOR SafeDoc.'
+        : `Registro cerrado el ${formatDate(input.closedAt)}. Conservar conforme al procedimiento de gestión de registros del laboratorio. Firmas autógrafas capturadas y verificadas en la Plataforma UNILABOR SafeDoc.`,
     ),
     italic,
     7,
@@ -685,7 +694,10 @@ export const buildCompetencyEvaluationPdf = async (input: CompetencyEvaluationPd
     page = current;
     const y = 22;
     page.drawLine({ start: { x: MARGIN, y: y + 12 }, end: { x: PAGE_W - MARGIN, y: y + 12 }, thickness: 0.6, color: RULE });
-    drawText(`UNILABOR  ·  Plataforma SafeDoc  ·  REH-REG-003 Rev. 1  ·  ${record.employee_name}  ·  Cerrada el ${formatDate(input.closedAt)}`, MARGIN, y, 6.8, regular, MUTED);
+    drawText(`UNILABOR  ·  Plataforma SafeDoc  ·  REH-REG-003 Rev. 1  ·  ${record.employee_name}  ·  ${input.draft ? 'En firma' : `Cerrada el ${formatDate(input.closedAt)}`}`, MARGIN, y, 6.8, regular, MUTED);
+    if (input.draft) {
+      page.drawText('EN FIRMA', { x: 150, y: 300, size: 90, font: bold, color: rgb(0.75, 0.75, 0.75), opacity: 0.18, rotate: degrees(35) });
+    }
     drawRight(`Página ${index + 1} de ${pages.length}`, PAGE_W - MARGIN, y, 6.8, bold, NAVY);
   });
 

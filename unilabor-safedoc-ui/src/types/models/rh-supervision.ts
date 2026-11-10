@@ -3,6 +3,9 @@
 // (rh-supervision-checklist.service.ts / rh-supervision-position.service.ts /
 // rh-supervision-signature.service.ts).
 
+import type { AssignmentLetter, DocumentSignerStatus, SignedDocumentKind } from './rh-assignment-letter';
+import type { RhCompetencyEvaluation } from './rh-competency';
+
 export type SupervisionResult = 'SI' | 'NO' | 'NA';
 export type SupervisionConclusion = 'CONFORME' | 'CONFORME_CON_OBSERVACIONES' | 'REQUIERE_SEGUIMIENTO';
 /** DRAFT -> (se envia a firma) PENDING_SIGNATURES -> (firman los tres roles: cierre automatico) CLOSED. */
@@ -249,27 +252,30 @@ export interface SupervisionGenerateDraftsResult {
   details: Array<{ enrollment_id: number; employee_name: string; position_code: string; checklist_id: number | null; message: string }>;
 }
 
-/** Una lista en el Buzon de firmas del colaborador de la sesion. */
+/** Registro que se firma en el Buzón: ANA-REG-060 (Fase 6), REH-REG-003 y REH-REG-008 (Fase 7). */
+export type InboxKind = 'SUPERVISION' | 'COMPETENCY_EVALUATION' | 'ASSIGNMENT_LETTER';
+
+/** Un registro en el Buzón de firmas del colaborador de la sesión. */
 export interface SignatureInboxEntry {
-  checklist_id: number;
+  kind: InboxKind;
+  id: number;
+  form_code: string;
+  title: string;
   folio: string;
-  status: SupervisionChecklistStatus;
+  status: 'IN_SIGNATURE' | 'CLOSED';
   employee_name: string;
   employee_code: string;
   position_code: string;
   position_name: string;
-  process_area_name: string | null;
-  /** Unidad del colaborador evaluado. */
   branch_name: string | null;
-  supervision_date: string;
-  enrollment_id: number | null;
-  is_final: boolean;
-  /** Roles que ocupo en la lista y cuales me falta firmar. */
-  my_roles: SupervisionSignerRole[];
-  pending_roles: SupervisionSignerRole[];
+  detail: string | null;
+  my_roles_label: string;
+  pending_roles_label: string;
+  has_pending: boolean;
   requested_at: string | null;
   requested_by_name: string | null;
   signatures_done: number;
+  signatures_total: number;
   my_signed_at: string | null;
   closed_at: string | null;
 }
@@ -279,19 +285,41 @@ export interface SignatureInbox {
   signed: SignatureInboxEntry[];
 }
 
-export interface SignatureInboxDetail {
+/** ANA-REG-060 abierto desde el Buzón. */
+export interface SupervisionInboxDetail {
   checklist: SupervisionChecklist;
   my_roles: SupervisionSignerRole[];
   pending_roles: SupervisionSignerRole[];
 }
 
-export interface SignatureInboxSignResult {
-  message: string;
-  checklist: SupervisionChecklist;
-  signed_roles: SupervisionSignerRole[];
-  pending_roles: SupervisionSignerRole[];
-  closed: boolean;
-  practical: SupervisionPracticalOutcome | null;
-  /** La firma quedo registrada pero la lista no pudo cerrarse sola. */
-  close_error: string | null;
+/** REH-REG-003 o REH-REG-008 abierto desde el Buzón. */
+export interface DocumentInboxDetail {
+  kind: SignedDocumentKind;
+  evaluation: RhCompetencyEvaluation | null;
+  letter: AssignmentLetter | null;
+  signers: DocumentSignerStatus[];
+  my_roles_label: string;
+  pending_roles_label: string;
+  has_pending: boolean;
 }
+
+/** Resultado de una firma (individual o de un registro dentro del lote). */
+export interface SignatureInboxSignOutcome {
+  kind: InboxKind;
+  id: number;
+  folio: string;
+  employee_name: string;
+  closed: boolean;
+  /** La firma quedó, pero el cierre automático (o lo que sigue) no se completó. */
+  warning: boolean;
+  message: string;
+}
+
+export interface SignatureInboxBatchResult {
+  results: Array<SignatureInboxSignOutcome & { ok: boolean }>;
+  signed: number;
+  closed: number;
+  failed: number;
+  message: string;
+}
+

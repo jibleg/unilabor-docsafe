@@ -82,6 +82,19 @@ export type SendToSignatureBody = z.infer<typeof sendToSignatureSchema>;
 export const signatureInboxSignSchema = z.object({ signature }).passthrough();
 export type SignatureInboxSignBody = z.infer<typeof signatureInboxSignSchema>;
 
+/** Firma en lote: un trazo para varios registros del Buzon (tope para que una peticion no tarde demasiado). */
+export const SIGNATURE_BATCH_MAX = 50;
+export const signatureInboxBatchSignSchema = z
+  .object({
+    signature,
+    items: z
+      .array(z.object({ kind: z.enum(['SUPERVISION', 'COMPETENCY_EVALUATION', 'ASSIGNMENT_LETTER']), id: positiveId }))
+      .min(1, 'Elige al menos un registro')
+      .max(SIGNATURE_BATCH_MAX, `A lo mas ${SIGNATURE_BATCH_MAX} registros por firma en lote`),
+  })
+  .passthrough();
+export type SignatureInboxBatchSignBody = z.infer<typeof signatureInboxBatchSignSchema>;
+
 export const setPositionNaItemsSchema = z
   .object({
     item_ids: z.array(positiveId).max(200),

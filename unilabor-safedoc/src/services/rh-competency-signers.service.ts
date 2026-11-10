@@ -30,12 +30,14 @@ export interface CompetencySuggestedSigners {
   /** Colaborador sugerido como Coordinador del area (misma resolucion que `area`). */
   area_employee_id: number | null;
   rh: string | null;
+  rh_employee_id: number | null;
   director: string | null;
+  director_employee_id: number | null;
 }
 
-const holderOf = async (positionCode: string, excludeEmployeeId: number): Promise<string | null> => {
+const holderOf = async (positionCode: string, excludeEmployeeId: number): Promise<{ id: number; name: string } | null> => {
   const result = await pool.query(
-    `SELECT e.full_name
+    `SELECT e.id, e.full_name
        FROM public.rh_employee_positions ep
        JOIN public.rh_positions rp ON rp.id = ep.position_id AND upper(rp.code) = $1
        JOIN public.employees e ON e.id = ep.employee_id AND e.is_active = TRUE
@@ -44,7 +46,8 @@ const holderOf = async (positionCode: string, excludeEmployeeId: number): Promis
       LIMIT 1;`,
     [positionCode, excludeEmployeeId],
   );
-  return result.rows[0]?.full_name ? String(result.rows[0].full_name) : null;
+  const row = result.rows[0];
+  return row?.full_name ? { id: Number(row.id), name: String(row.full_name) } : null;
 };
 
 export const getCompetencySuggestedSigners = async (evaluationId: number): Promise<CompetencySuggestedSigners | null> => {
@@ -57,5 +60,12 @@ export const getCompetencySuggestedSigners = async (evaluationId: number): Promi
     holderOf('CRH', employeeId),
     holderOf('DG', employeeId),
   ]);
-  return { area: responsible?.candidate.name ?? null, area_employee_id: responsible?.candidate.employee_id ?? null, rh, director };
+  return {
+    area: responsible?.candidate.name ?? null,
+    area_employee_id: responsible?.candidate.employee_id ?? null,
+    rh: rh?.name ?? null,
+    rh_employee_id: rh?.id ?? null,
+    director: director?.name ?? null,
+    director_employee_id: director?.id ?? null,
+  };
 };

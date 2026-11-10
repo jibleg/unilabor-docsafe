@@ -52,7 +52,7 @@ const formatDateTime = (iso: string | null): string =>
  */
 export const KnowledgeQuizPanel = ({ evaluation, onChanged }: KnowledgeQuizPanelProps) => {
   const quiz = evaluation.knowledge_quiz ?? null;
-  const readOnly = evaluation.status === 'CLOSED';
+  const readOnly = evaluation.status === 'CLOSED' || evaluation.in_signature;
   const [documents, setDocuments] = useState<RhPositionDocument[]>([]);
   const [approved, setApproved] = useState<QuestionBankItem[]>([]);
   const [loadingBank, setLoadingBank] = useState(false);

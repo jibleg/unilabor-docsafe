@@ -84,6 +84,14 @@ export interface RhCompetencyEvaluation {
   area_signatory_name: string | null;
   rh_signatory_name: string | null;
   director_signatory_name: string | null;
+  /** Firmantes institucionales como colaboradores (los elige RH al enviar a firma). */
+  area_signatory_employee_id: number | null;
+  rh_signatory_employee_id: number | null;
+  director_signatory_employee_id: number | null;
+  /** En firma: borrador bloqueado que espera las firmas del Buzón (sigue en DRAFT). */
+  in_signature: boolean;
+  signature_requested_at: string | null;
+  signature_requested_by_name: string | null;
   document_id: number | null;
   /** Constancia de competencia archivada en el expediente (null si no se emitió). */
   certificate_document_id?: number | null;

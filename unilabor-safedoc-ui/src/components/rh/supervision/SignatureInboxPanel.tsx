@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { FileText, Loader2, PenLine } from 'lucide-react';
-import { getSignatureInboxDetail, getSignatureInboxPdfUrl, signFromInbox } from '../../../api/service.api-signature-inbox';
+import { getSignatureInboxPdfUrl, getSupervisionInboxDetail, signFromInbox } from '../../../api/service.api-signature-inbox';
 import { getApiErrorMessage } from '../../../api/service.parsers';
-import type { SignatureInboxDetail, SignatureInboxEntry, SignatureInboxSignResult } from '../../../types/models';
+import type { SignatureInboxEntry, SignatureInboxSignOutcome, SupervisionInboxDetail } from '../../../types/models';
 import { notifyError, notifyWarning } from '../../../utils/notify';
 import { SignaturePad } from '../../helpdesk/SignaturePad';
 import { SupervisionSignatureProgress } from './SupervisionSignatureProgress';
@@ -12,7 +12,7 @@ interface SignatureInboxPanelProps {
   entry: SignatureInboxEntry;
   /** Avisa al panel lateral que no debe cerrarse mientras se registra la firma. */
   onBusyChange: (busy: boolean) => void;
-  onSigned: (result: SignatureInboxSignResult) => void;
+  onSigned: (result: SignatureInboxSignOutcome) => void;
 }
 
 /**
@@ -21,25 +21,25 @@ interface SignatureInboxPanelProps {
  * firma propia. El rol con el que se firma lo decide el servidor según la sesión.
  */
 export const SignatureInboxPanel = ({ entry, onBusyChange, onSigned }: SignatureInboxPanelProps) => {
-  const [detail, setDetail] = useState<SignatureInboxDetail | null>(null);
+  const [detail, setDetail] = useState<SupervisionInboxDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [busy, setBusy] = useState<'pdf' | 'sign' | null>(null);
 
   useEffect(() => {
     let alive = true;
-    getSignatureInboxDetail(entry.checklist_id)
+    getSupervisionInboxDetail(entry.id)
       .then((loaded) => alive && setDetail(loaded))
       .catch((error) => alive && setLoadError(getApiErrorMessage(error, 'No se pudo abrir la lista.')));
     return () => {
       alive = false;
     };
-  }, [entry.checklist_id]);
+  }, [entry.id]);
 
   const openPdf = async () => {
     setBusy('pdf');
     try {
-      window.open(await getSignatureInboxPdfUrl(entry.checklist_id), '_blank', 'noopener');
+      window.open(await getSignatureInboxPdfUrl('SUPERVISION', entry.id), '_blank', 'noopener');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo generar el PDF.'));
     } finally {
@@ -55,7 +55,7 @@ export const SignatureInboxPanel = ({ entry, onBusyChange, onSigned }: Signature
     setBusy('sign');
     onBusyChange(true);
     try {
-      onSigned(await signFromInbox(entry.checklist_id, signature));
+      onSigned(await signFromInbox('SUPERVISION', entry.id, signature));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo registrar tu firma.'));
     } finally {

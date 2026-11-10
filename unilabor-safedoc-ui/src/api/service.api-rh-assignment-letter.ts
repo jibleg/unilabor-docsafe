@@ -1,6 +1,12 @@
 import api from './axios';
 import { asRecord, unwrapPayload } from './service.shared';
-import type { AssignmentAuthorizationItem, AssignmentLetter, AssignmentLetterListRow, AssignmentLetterStatus } from '../types/models';
+import type {
+  AssignmentAuthorizationItem,
+  AssignmentLetter,
+  AssignmentLetterListRow,
+  AssignmentLetterStatus,
+  DocumentSignerStatus,
+} from '../types/models';
 
 // Carta de asignacion de puesto REH-REG-008 (Fase 7).
 const BASE = '/rh/assignment-letters';
@@ -38,8 +44,8 @@ export const getAssignmentLetter = async (id: number): Promise<AssignmentLetter>
 export interface UpdateAssignmentLetterPayload {
   letter_date?: string;
   other_authorizations?: string | null;
-  area_signatory_name?: string;
-  director_signatory_name?: string;
+  area_signatory_employee_id?: number;
+  director_signatory_employee_id?: number;
   items?: Array<{ item_id: number; authorized: boolean }>;
 }
 
@@ -48,13 +54,23 @@ export const updateAssignmentLetter = async (id: number, payload: UpdateAssignme
   return asRecord(unwrapPayload(response.data))?.letter as AssignmentLetter;
 };
 
-export const closeAssignmentLetter = async (
-  id: number,
-  payload: { collaborator_signature: string; area_signature: string; director_signature: string },
-): Promise<{ message: string; letter: AssignmentLetter }> => {
-  const response = await api.post(`${BASE}/${id}/close`, payload);
+/** Bloquea la carta y la manda al Buzón de firmas del colaborador, la Coordinación del área y el Director General. */
+export const sendLetterToSignature = async (id: number): Promise<{ message: string; letter: AssignmentLetter }> => {
+  const response = await api.post(`${BASE}/${id}/send-to-signature`);
   const data = asRecord(unwrapPayload(response.data)) ?? {};
   return { message: String(data.message ?? ''), letter: data.letter as AssignmentLetter };
+};
+
+/** Regresa la carta a borrador editable; las firmas recabadas se invalidan (no se borran). */
+export const cancelLetterSignature = async (id: number): Promise<{ message: string; letter: AssignmentLetter }> => {
+  const response = await api.delete(`${BASE}/${id}/signature-request`);
+  const data = asRecord(unwrapPayload(response.data)) ?? {};
+  return { message: String(data.message ?? ''), letter: data.letter as AssignmentLetter };
+};
+
+export const getLetterSigners = async (id: number): Promise<DocumentSignerStatus[]> => {
+  const response = await api.get(`${BASE}/${id}/signers`);
+  return (asRecord(unwrapPayload(response.data))?.signers as DocumentSignerStatus[]) ?? [];
 };
 
 export const deleteAssignmentLetterDraft = async (id: number): Promise<void> => {

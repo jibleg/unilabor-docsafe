@@ -1,19 +1,17 @@
-import fs from 'fs';
 import pool from '../config/db';
 import { withTransaction } from '../utils/transaction';
-import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image';
-import { archiveGeneratedPdfToExpedient } from './employee-document-archive.service';
-import { buildAssignmentLetterPdf } from './rh-assignment-letter.pdf';
 import { getCompetencySuggestedSigners } from './rh-competency-signers.service';
+import { assertNoDocumentSignatures } from './rh-document-signature.service';
 
 // -----------------------------------------------------------------------------
 // Carta de asignacion de puesto REH-REG-008 (Fase 7, una por puesto). Se abre
 // en borrador al AUTORIZAR el REH-REG-003 inicial del puesto, con las
 // autorizaciones del puesto prellenadas (las 1-8 "a todos" en Si por defecto,
 // pero se pueden negar) y
-// los firmantes sugeridos. RH la revisa, recaba las firmas del colaborador,
-// la Coordinacion del area y el Director General, y al cerrarla se genera el
-// PDF oficial y se archiva en el expediente. Una carta cerrada no se modifica.
+// los firmantes sugeridos. RH la revisa y la envia al Buzon de firmas, donde
+// firman el colaborador, la Coordinacion del area y el Director General; con la
+// tercera firma se cierra sola (rh-assignment-letter-signature.service.ts): PDF
+// oficial archivado en el expediente. Una carta cerrada no se modifica.
 // -----------------------------------------------------------------------------
 
 const throwCoded = (code: string, publicMessage: string): never => {
@@ -60,7 +58,12 @@ export interface AssignmentLetterRecord {
   other_authorizations: string | null;
   area_signatory_employee_id: number | null;
   area_signatory_name: string;
+  director_signatory_employee_id: number | null;
   director_signatory_name: string;
+  /** En firma: borrador bloqueado esperando las firmas del Buzon (sigue en DRAFT). */
+  in_signature: boolean;
+  signature_requested_at: string | null;
+  signature_requested_by_name: string | null;
   document_id: number | null;
   closed_at: string | null;
   created_at: string;
@@ -125,10 +128,12 @@ export const setPositionAuthorizations = async (positionId: number, itemIds: num
 // --- Consulta -----------------------------------------------------------------
 
 const LETTER_SELECT = `
-  SELECT l.*, emp.full_name AS employee_name, emp.employee_code, rp.code AS position_code, rp.name AS position_name
+  SELECT l.*, emp.full_name AS employee_name, emp.employee_code, rp.code AS position_code, rp.name AS position_name,
+         sr.full_name AS signature_requested_by_name
     FROM public.rh_assignment_letters l
     JOIN public.employees emp ON emp.id = l.employee_id
-    JOIN public.rh_positions rp ON rp.id = l.position_id`;
+    JOIN public.rh_positions rp ON rp.id = l.position_id
+    LEFT JOIN public.users sr ON sr.id = l.signature_requested_by_user_id`;
 
 const mapLetter = (row: any, items: AssignmentLetterItem[]): AssignmentLetterRecord => ({
   id: Number(row.id),
@@ -149,7 +154,11 @@ const mapLetter = (row: any, items: AssignmentLetterItem[]): AssignmentLetterRec
   other_authorizations: row.other_authorizations ? String(row.other_authorizations) : null,
   area_signatory_employee_id: row.area_signatory_employee_id ? Number(row.area_signatory_employee_id) : null,
   area_signatory_name: String(row.area_signatory_name ?? ''),
+  director_signatory_employee_id: row.director_signatory_employee_id ? Number(row.director_signatory_employee_id) : null,
   director_signatory_name: String(row.director_signatory_name ?? ''),
+  in_signature: String(row.status) === 'DRAFT' && Boolean(row.signature_requested_at),
+  signature_requested_at: iso(row.signature_requested_at),
+  signature_requested_by_name: row.signature_requested_by_name ? String(row.signature_requested_by_name) : null,
   document_id: row.document_id ? Number(row.document_id) : null,
   closed_at: iso(row.closed_at),
   created_at: iso(row.created_at) ?? '',
@@ -242,8 +251,9 @@ export const createLetterForEvaluation = async (evaluationId: number, actorUserI
     const inserted = await client.query(
       `INSERT INTO public.rh_assignment_letters
          (employee_id, position_id, competency_evaluation_id, letter_date, area_name, position_description_name,
-          area_signatory_employee_id, area_signatory_name, director_signatory_name, created_by_user_id)
-       VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10) RETURNING id;`,
+          area_signatory_employee_id, area_signatory_name, director_signatory_name, created_by_user_id,
+          director_signatory_employee_id)
+       VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10, $11) RETURNING id;`,
       [
         row.employee_id,
         row.position_id,
@@ -255,6 +265,7 @@ export const createLetterForEvaluation = async (evaluationId: number, actorUserI
         signers?.area ?? '',
         signers?.director ?? '',
         actorUserId,
+        signers?.director_employee_id ?? null,
       ],
     );
     const letterId = Number(inserted.rows[0].id);
@@ -301,28 +312,49 @@ export const generatePendingLetters = async (actorUserId: string | null): Promis
 
 // --- Edicion en borrador -------------------------------------------------------
 
-const assertDraft = (letter: AssignmentLetterRecord): void => {
+/** Un borrador que se puede editar: ni cerrado ni en firma. */
+export const assertLetterEditable = (letter: AssignmentLetterRecord): void => {
   if (letter.status !== 'DRAFT') throwCoded('RH_ASSIGNMENT_LETTER_CLOSED', 'La carta ya esta firmada; no se puede modificar.');
+  if (letter.in_signature) {
+    throwCoded(
+      'RH_ASSIGNMENT_LETTER_IN_SIGNATURE',
+      'La carta esta en firma en el Buzon y no se puede modificar. Si necesitas corregirla, cancela el envio a firma (las firmas recabadas se invalidan).',
+    );
+  }
 };
 
 export interface UpdateAssignmentLetterInput {
   letterDate?: string | undefined;
   otherAuthorizations?: string | null | undefined;
-  areaSignatoryName?: string | undefined;
-  directorSignatoryName?: string | undefined;
+  /** Firmantes como colaboradores (firman en su Buzon); el nombre sale de la ficha. Omitidos = no cambian. */
+  areaSignatoryEmployeeId?: number | undefined;
+  directorSignatoryEmployeeId?: number | undefined;
   items?: Array<{ item_id: number; authorized: boolean }> | undefined;
 }
 
+const employeeName = async (employeeId: number | undefined): Promise<string | null> => {
+  if (employeeId === undefined) return null;
+  const result = await pool.query(`SELECT full_name FROM public.employees WHERE id = $1;`, [employeeId]);
+  if (result.rows.length === 0) return throwCoded('RH_ASSIGNMENT_SIGNER_NOT_FOUND', 'El firmante elegido no existe.');
+  return String(result.rows[0].full_name);
+};
+
 export const updateAssignmentLetter = async (id: number, input: UpdateAssignmentLetterInput): Promise<AssignmentLetterRecord> => {
   const letter = await getAssignmentLetter(id);
-  assertDraft(letter);
+  assertLetterEditable(letter);
+  if (input.areaSignatoryEmployeeId === letter.employee_id || input.directorSignatoryEmployeeId === letter.employee_id) {
+    throwCoded('RH_ASSIGNMENT_SELF_SIGNATURE', 'El colaborador no puede firmar como otro rol de su propia carta.');
+  }
+  const [areaName, directorName] = await Promise.all([employeeName(input.areaSignatoryEmployeeId), employeeName(input.directorSignatoryEmployeeId)]);
   await withTransaction(async (client) => {
     await client.query(
       `UPDATE public.rh_assignment_letters
           SET letter_date = COALESCE($2::date, letter_date),
               other_authorizations = CASE WHEN $3::boolean THEN $4 ELSE other_authorizations END,
-              area_signatory_name = COALESCE($5, area_signatory_name),
-              director_signatory_name = COALESCE($6, director_signatory_name),
+              area_signatory_employee_id = COALESCE($5, area_signatory_employee_id),
+              area_signatory_name = COALESCE($6, area_signatory_name),
+              director_signatory_employee_id = COALESCE($7, director_signatory_employee_id),
+              director_signatory_name = COALESCE($8, director_signatory_name),
               updated_at = NOW()
         WHERE id = $1;`,
       [
@@ -330,8 +362,10 @@ export const updateAssignmentLetter = async (id: number, input: UpdateAssignment
         input.letterDate ?? null,
         input.otherAuthorizations !== undefined,
         input.otherAuthorizations?.trim() || null,
-        input.areaSignatoryName?.trim() ?? null,
-        input.directorSignatoryName?.trim() ?? null,
+        input.areaSignatoryEmployeeId ?? null,
+        areaName,
+        input.directorSignatoryEmployeeId ?? null,
+        directorName,
       ],
     );
     for (const item of input.items ?? []) {
@@ -347,100 +381,7 @@ export const updateAssignmentLetter = async (id: number, input: UpdateAssignment
 };
 
 export const deleteAssignmentLetterDraft = async (id: number): Promise<void> => {
-  assertDraft(await getAssignmentLetter(id));
-  await pool.query(`DELETE FROM public.rh_assignment_letters WHERE id = $1 AND status = 'DRAFT';`, [id]);
-};
-
-// --- Cierre con firmas ---------------------------------------------------------
-
-export interface CloseAssignmentLetterInput {
-  id: number;
-  collaboratorSignature: string;
-  areaSignature: string;
-  directorSignature: string;
-  closedByUserId: string;
-}
-
-export const closeAssignmentLetter = async (input: CloseAssignmentLetterInput): Promise<AssignmentLetterRecord> => {
-  const letter = await getAssignmentLetter(input.id);
-  assertDraft(letter);
-  if (!letter.area_signatory_name.trim() || !letter.director_signatory_name.trim()) {
-    throwCoded('RH_ASSIGNMENT_SIGNERS_REQUIRED', 'Elige a la Coordinacion del area y al Director General antes de firmar.');
-  }
-  if (letter.area_signatory_name.trim() === letter.employee_name.trim()) {
-    throwCoded('RH_ASSIGNMENT_SELF_SIGNATURE', 'El colaborador no puede firmar tambien como Coordinacion del area de su propia carta.');
-  }
-  const pngs = {
-    collaborator: decodeSignaturePng(input.collaboratorSignature),
-    area: decodeSignaturePng(input.areaSignature),
-    director: decodeSignaturePng(input.directorSignature),
-  };
-  if (!pngs.collaborator || !pngs.area || !pngs.director) {
-    throwCoded('RH_ASSIGNMENT_INVALID_SIGNATURE', 'Las tres firmas son obligatorias: colaborador, Coordinacion del area y Director General.');
-  }
-  const closedAt = new Date();
-  const pdf = await buildAssignmentLetterPdf({
-    letter: { ...letter, status: 'CLOSED', closed_at: closedAt.toISOString() },
-    draft: false,
-    signatures: { collaborator: pngs.collaborator!, area: pngs.area!, director: pngs.director! },
-  });
-  const documentId = await archiveGeneratedPdfToExpedient({
-    employeeId: letter.employee_id,
-    documentTypeCode: 'POSITION_ASSIGNMENT',
-    referenceKey: `assignment_letter:${letter.id}`,
-    title: `REH-REG-008 Carta de asignación de puesto · ${letter.position_code} ${letter.position_name}`,
-    description: `${letter.folio} · ${letter.items.filter((item) => item.authorized).length} autorizaciones · Coordinacion del area: ${letter.area_signatory_name}`,
-    pdf,
-    uploadedByUserId: input.closedByUserId,
-  });
-  const paths = {
-    collaborator: writeSignaturePng(pngs.collaborator!, 'REH008'),
-    area: writeSignaturePng(pngs.area!, 'REH008'),
-    director: writeSignaturePng(pngs.director!, 'REH008'),
-  };
-  try {
-    await pool.query(
-      `UPDATE public.rh_assignment_letters
-          SET status = 'CLOSED', collaborator_signature_path = $2, area_signature_path = $3, director_signature_path = $4,
-              document_id = $5, closed_at = $6, closed_by_user_id = $7, updated_at = NOW()
-        WHERE id = $1 AND status = 'DRAFT';`,
-      [letter.id, paths.collaborator, paths.area, paths.director, documentId, closedAt, input.closedByUserId],
-    );
-  } catch (error) {
-    for (const filePath of Object.values(paths)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch {
-        /* limpieza best-effort */
-      }
-    }
-    throw error;
-  }
-  return getAssignmentLetter(letter.id);
-};
-
-/** PDF de consulta: firmada (con las firmas guardadas) o borrador con marca de agua. */
-export const renderAssignmentLetterPdf = async (id: number): Promise<{ letter: AssignmentLetterRecord; pdf: Buffer }> => {
-  const letter = await getAssignmentLetter(id);
-  const read = (filePath: string | null): Buffer | null => {
-    try {
-      return filePath ? fs.readFileSync(filePath) : null;
-    } catch {
-      return null;
-    }
-  };
-  let signatures = { collaborator: null as Buffer | null, area: null as Buffer | null, director: null as Buffer | null };
-  if (letter.status === 'CLOSED') {
-    const paths = await pool.query(
-      `SELECT collaborator_signature_path, area_signature_path, director_signature_path FROM public.rh_assignment_letters WHERE id = $1;`,
-      [id],
-    );
-    const row = paths.rows[0] ?? {};
-    signatures = {
-      collaborator: read(row.collaborator_signature_path ?? null),
-      area: read(row.area_signature_path ?? null),
-      director: read(row.director_signature_path ?? null),
-    };
-  }
-  return { letter, pdf: await buildAssignmentLetterPdf({ letter, draft: letter.status !== 'CLOSED', signatures }) };
+  assertLetterEditable(await getAssignmentLetter(id));
+  await assertNoDocumentSignatures('ASSIGNMENT_LETTER', id);
+  await pool.query(`DELETE FROM public.rh_assignment_letters WHERE id = $1 AND status = 'DRAFT' AND signature_requested_at IS NULL;`, [id]);
 };

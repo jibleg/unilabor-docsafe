@@ -6,7 +6,6 @@ import type { AssignCourseKnowledgeInput } from '../schemas/rh-competency-evalua
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import {
-  closeEvaluation,
   createEvaluation,
   deleteDraftEvaluation,
   getEvaluationById,
@@ -69,6 +68,8 @@ const ERROR_STATUS: Record<string, number> = {
   RH_COMP_EVAL_EVALUATOR_NOT_FOUND: 409,
   RH_COMP_EVAL_EVALUATOR_REQUIRED: 409,
   RH_COMP_EVAL_INICIAL_ALREADY_OPEN: 409,
+  RH_COMP_EVAL_IN_SIGNATURE: 409,
+  RH_DOC_SIGNATURE_HAS_SIGNATURES: 409,
 };
 
 const mapError = (res: Response, error: any): Response | null => {
@@ -203,45 +204,6 @@ export const replaceCompetencyActionsController = async (req: AuthRequest, res: 
     if (mapped) return mapped;
     console.error('Error guardando plan de acciones:', error);
     return res.status(500).json({ message: 'No se pudo guardar el plan de acciones.' });
-  }
-};
-
-export const closeCompetencyEvaluationController = async (req: AuthRequest, res: Response) => {
-  const evaluationId = parseId(req.params.id);
-  if (!evaluationId) {
-    return res.status(400).json({ message: 'ID de evaluacion invalido.' });
-  }
-  try {
-    const evaluation = await closeEvaluation({
-      evaluationId,
-      collaboratorSignature: req.body.collaborator_signature,
-      evaluatorSignature: req.body.evaluator_signature,
-      areaSignature: req.body.area_signature,
-      rhSignature: req.body.rh_signature,
-      directorSignature: req.body.director_signature,
-      areaSignatoryName: req.body.area_signatory_name,
-      rhSignatoryName: req.body.rh_signatory_name,
-      directorSignatoryName: req.body.director_signatory_name,
-      closedByUserId: req.user?.id ?? null,
-    });
-    await logAudit(req.user?.id, `RH_COMP_EVAL_CLOSE:${evaluationId}:${evaluation.results.dictamen}`, evaluationId, req.ip);
-    // Constancia de competencia (dictamen competente): best-effort, nunca deshace el cierre.
-    const certificateDocumentId = await tryIssueCompetencyCertificate(evaluationId, req.user?.id ?? null);
-    if (certificateDocumentId) {
-      await logAudit(req.user?.id, `RH_COMP_EVAL_CERTIFICATE_ISSUED:${evaluationId}:${certificateDocumentId}`, evaluationId, req.ip);
-    }
-    const finalEvaluation = certificateDocumentId ? (await getEvaluationById(evaluationId)) ?? evaluation : evaluation;
-    return res.json({
-      message: certificateDocumentId
-        ? 'Evaluacion cerrada; registro y constancia de competencia archivados en el expediente.'
-        : 'Evaluacion cerrada y archivada en el expediente.',
-      evaluation: finalEvaluation,
-    });
-  } catch (error: any) {
-    const mapped = mapError(res, error);
-    if (mapped) return mapped;
-    console.error('Error cerrando evaluacion de competencia:', error);
-    return res.status(500).json({ message: 'No se pudo cerrar la evaluacion.' });
   }
 };
 

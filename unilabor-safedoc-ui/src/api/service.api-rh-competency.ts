@@ -9,6 +9,7 @@ import {
   type PageResult,
 } from './service.shared';
 import type {
+  DocumentSignerStatus,
   RhCompetencyCriticality,
   RhCompetencyEvaluation,
   RhCompetencyEvaluationType,
@@ -114,15 +115,11 @@ export const replaceCompetencyActions = async (
   return data?.evaluation as RhCompetencyEvaluation;
 };
 
-export interface CloseCompetencyEvaluationPayload {
-  collaborator_signature: string;
-  evaluator_signature: string;
-  area_signature: string;
-  rh_signature: string;
-  director_signature: string;
-  area_signatory_name: string;
-  rh_signatory_name: string;
-  director_signatory_name: string;
+/** Firmantes institucionales del REH-REG-003 (colaboradores que firmarán en su Buzón). */
+export interface SendCompetencyToSignaturePayload {
+  area_employee_id: number;
+  rh_employee_id: number;
+  director_employee_id: number;
 }
 
 export type CompetencyAuthorizationDecision = 'AUTORIZADO' | 'AUTORIZADO_CON_SEGUIMIENTO' | 'NO_AUTORIZADO';
@@ -137,13 +134,32 @@ export const authorizeCompetencyEvaluation = async (
   return { message: String(data?.message ?? 'Autorización registrada.'), evaluation: data?.evaluation as RhCompetencyEvaluation };
 };
 
-export const closeCompetencyEvaluation = async (
+/** Bloquea la evaluación y la manda al Buzón de firmas de sus cinco firmantes. */
+export const sendCompetencyToSignature = async (
   id: number,
-  payload: CloseCompetencyEvaluationPayload,
-): Promise<RhCompetencyEvaluation> => {
-  const response = await api.post(`/rh/competency-evaluations/${id}/close`, payload);
+  payload: SendCompetencyToSignaturePayload,
+): Promise<{ message: string; evaluation: RhCompetencyEvaluation }> => {
+  const response = await api.post(`/rh/competency-evaluations/${id}/send-to-signature`, payload);
   const data = asRecord(unwrapPayload(response.data));
-  return data?.evaluation as RhCompetencyEvaluation;
+  return { message: String(data?.message ?? 'Enviada a firma.'), evaluation: data?.evaluation as RhCompetencyEvaluation };
+};
+
+/** Regresa la evaluación a borrador editable; las firmas recabadas se invalidan (no se borran). */
+export const cancelCompetencySignature = async (id: number): Promise<{ message: string; evaluation: RhCompetencyEvaluation }> => {
+  const response = await api.delete(`/rh/competency-evaluations/${id}/signature-request`);
+  const data = asRecord(unwrapPayload(response.data));
+  return { message: String(data?.message ?? 'Envío cancelado.'), evaluation: data?.evaluation as RhCompetencyEvaluation };
+};
+
+export const getCompetencySigners = async (id: number): Promise<DocumentSignerStatus[]> => {
+  const response = await api.get(`/rh/competency-evaluations/${id}/signers`);
+  return (asRecord(unwrapPayload(response.data))?.signers as DocumentSignerStatus[]) ?? [];
+};
+
+/** PDF del REH-REG-003 en firma (vista previa con las firmas ya recabadas) como URL de blob. */
+export const getCompetencyPdfUrl = async (id: number): Promise<string> => {
+  const response = await api.get(`/rh/competency-evaluations/${id}/pdf`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data as Blob);
 };
 
 export const deleteCompetencyEvaluationDraft = async (id: number): Promise<void> => {
@@ -188,13 +204,29 @@ export const listKnowledgeCourseOptions = async (id: number): Promise<KnowledgeC
   return (asRecord(unwrapPayload(response.data))?.courses as KnowledgeCourseOption[]) ?? [];
 };
 
-/** Firmantes institucionales sugeridos para el cierre (responsable del área del puesto, titular de CRH y de DG). */
-export const getCompetencySuggestedSigners = async (
-  id: number,
-): Promise<{ area: string | null; rh: string | null; director: string | null }> => {
+export interface CompetencySuggestedSigners {
+  area: string | null;
+  area_employee_id: number | null;
+  rh: string | null;
+  rh_employee_id: number | null;
+  director: string | null;
+  director_employee_id: number | null;
+}
+
+/** Firmantes institucionales sugeridos (responsable del área del puesto, titular de CRH y de DG). */
+export const getCompetencySuggestedSigners = async (id: number): Promise<CompetencySuggestedSigners> => {
   const response = await api.get(`/rh/competency-evaluations/${id}/suggested-signers`);
   const data = asRecord(unwrapPayload(response.data));
-  return (data?.signers as { area: string | null; rh: string | null; director: string | null }) ?? { area: null, rh: null, director: null };
+  return (
+    (data?.signers as CompetencySuggestedSigners) ?? {
+      area: null,
+      area_employee_id: null,
+      rh: null,
+      rh_employee_id: null,
+      director: null,
+      director_employee_id: null,
+    }
+  );
 };
 
 export interface CompetencyProposedEvaluator {

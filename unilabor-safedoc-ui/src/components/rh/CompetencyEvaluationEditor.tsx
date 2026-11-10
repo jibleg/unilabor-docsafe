@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, Award, Check, Eye, FileCheck2, FileText, Loader2, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, Award, Check, Eye, FileText, Loader2, Plus, Save, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { KnowledgeQuizPanel } from './KnowledgeQuizPanel';
 import { toast } from 'react-toastify';
 import {
-  closeCompetencyEvaluation,
-  getCompetencySuggestedSigners,
+  cancelCompetencySignature,
+  getCompetencyPdfUrl,
+  getCompetencySigners,
   issueCompetencyCertificate,
   replaceCompetencyActions,
   replaceCompetencySectionItems,
@@ -17,10 +18,9 @@ import { PdfSafeViewer } from '../PdfSafeViewerSafe';
 import { AUTHORIZATION_UI, DICTAMEN_UI, formatDateOnly } from '../../utils/competency';
 import { useHasPermission } from '../../utils/permissions';
 import { CompetencyAuthorizeModal } from './CompetencyAuthorizeModal';
-import { SignaturePad } from '../helpdesk/SignaturePad';
 import { CompactListPager } from '../CompactListPager';
-import { SearchableSelect } from '../SearchableSelect';
-import { useEmployeeOptions } from './supervision/useEmployeeOptions';
+import { CompetencySendToSignatureModal } from './phase7-signature/CompetencySendToSignatureModal';
+import { DocumentInSignatureCard } from './phase7-signature/DocumentInSignatureCard';
 import type {
   RhCompetencyCriticality,
   RhCompetencyEvaluation,
@@ -436,128 +436,9 @@ const ActionsEditor = ({
   );
 };
 
-const CloseModal = ({
-  evaluation,
-  onClose,
-  onClosed,
-}: {
-  evaluation: RhCompetencyEvaluation;
-  onClose: () => void;
-  onClosed: (updated: RhCompetencyEvaluation) => void;
-}) => {
-  const [areaName, setAreaName] = useState('');
-  const [rhName, setRhName] = useState('');
-  const [directorName, setDirectorName] = useState('');
-  const [signatures, setSignatures] = useState<Record<string, string | null>>({});
-  const [saving, setSaving] = useState(false);
-  // Firmantes institucionales: precargados (responsable del área del puesto, CRH y DG) y elegibles de la lista.
-  const employeeOptions = useEmployeeOptions();
-  const signerOptions = employeeOptions
-    .filter((option) => option.value !== String(evaluation.employee_id))
-    .map((option) => ({ ...option, value: option.label }));
-  useEffect(() => {
-    getCompetencySuggestedSigners(evaluation.id)
-      .then((suggested) => {
-        setAreaName((current) => current || suggested.area || '');
-        setRhName((current) => current || suggested.rh || '');
-        setDirectorName((current) => current || suggested.director || '');
-      })
-      .catch(() => undefined);
-  }, [evaluation.id]);
-
-  const setSignature = (key: string) => (dataUrl: string | null) =>
-    setSignatures((current) => ({ ...current, [key]: dataUrl }));
-
-  const handleSubmit = async () => {
-    if (!areaName.trim() || !rhName.trim() || !directorName.trim()) {
-      toast.warning('Captura los nombres de los tres firmantes institucionales.');
-      return;
-    }
-    const required = ['collaborator', 'evaluator', 'area', 'rh', 'director'];
-    if (required.some((key) => !signatures[key])) {
-      toast.warning('Las cinco firmas son obligatorias.');
-      return;
-    }
-    setSaving(true);
-    try {
-      const updated = await closeCompetencyEvaluation(evaluation.id, {
-        collaborator_signature: signatures.collaborator as string,
-        evaluator_signature: signatures.evaluator as string,
-        area_signature: signatures.area as string,
-        rh_signature: signatures.rh as string,
-        director_signature: signatures.director as string,
-        area_signatory_name: areaName.trim(),
-        rh_signatory_name: rhName.trim(),
-        director_signatory_name: directorName.trim(),
-      });
-      toast.success('Evaluación cerrada y archivada en el expediente.');
-      onClosed(updated);
-      onClose();
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, 'No se pudo cerrar la evaluación.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/96 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
-              REH-REG-003 · {evaluation.employee_name}
-            </p>
-            <h2 className="mt-1 flex items-center gap-2 text-lg font-bold text-[var(--color-brand-700)]">
-              <FileCheck2 size={18} /> Cerrar evaluación de competencia
-            </h2>
-          </div>
-          <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.1)] text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]" aria-label="Cerrar">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            El cierre sella los resultados, genera el PDF oficial con las 5 firmas y lo archiva en el expediente
-            (sección Competencias laborales) con vigencia de 12 meses. No se puede modificar después.
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div>
-              <label className={labelClass}>Coordinador del área</label>
-              <SearchableSelect value={areaName} options={signerOptions} onChange={setAreaName} placeholder="Elige al coordinador" searchPlaceholder="Buscar colaborador..." />
-            </div>
-            <div>
-              <label className={labelClass}>Coordinador de RH</label>
-              <SearchableSelect value={rhName} options={signerOptions} onChange={setRhName} placeholder="Elige al coordinador de RH" searchPlaceholder="Buscar colaborador..." />
-            </div>
-            <div>
-              <label className={labelClass}>Director General</label>
-              <SearchableSelect value={directorName} options={signerOptions} onChange={setDirectorName} placeholder="Elige al director" searchPlaceholder="Buscar colaborador..." />
-            </div>
-          </div>
-          <SignaturePad label={`Colaborador evaluado — ${evaluation.employee_name}`} onChange={setSignature('collaborator')} />
-          <SignaturePad label={`Evaluador técnico — ${evaluation.evaluator_name || 'sin asignar'}`} onChange={setSignature('evaluator')} />
-          <SignaturePad label={`Coordinador del área — ${areaName || 'sin elegir'}`} onChange={setSignature('area')} />
-          <SignaturePad label={`Coordinador de RH — ${rhName || 'sin elegir'}`} onChange={setSignature('rh')} />
-          <SignaturePad label={`Director General — ${directorName || 'sin elegir'}`} onChange={setSignature('director')} />
-        </div>
-        <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-5 py-4">
-          <button type="button" onClick={onClose} disabled={saving} className="rounded-xl border border-[rgba(0,65,106,0.12)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50">
-            Cancelar
-          </button>
-          <button type="button" onClick={() => void handleSubmit()} disabled={saving} className={buttonClass}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <FileCheck2 size={14} />}
-            Guardar y archivar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 /** Editor completo de una evaluación REH-REG-003 (3 secciones + plan + resultados + cierre). */
 export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuthorize = false }: CompetencyEvaluationEditorProps) => {
-  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
   const canAuthorize = useHasPermission('RH.COMPETENCY.AUTHORIZE');
   const [showAuthorizeModal, setShowAuthorizeModal] = useState(
     () => autoOpenAuthorize && canAuthorize && evaluation.status === 'CLOSED' && evaluation.results.authorization_result === 'PENDIENTE',
@@ -567,15 +448,17 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
   // Secciones 1-3 en pestañas para acortar el scroll. Todas se mantienen montadas
   // (solo se ocultan) para no perder cambios sin guardar al cambiar de pestaña.
   const [activeSection, setActiveSection] = useState<RhCompetencySection>('COMPETENCIA');
-  const readOnly = evaluation.status === 'CLOSED';
+  // En firma queda bloqueada igual que cerrada (para corregir, RH cancela el envío).
+  const readOnly = evaluation.status === 'CLOSED' || evaluation.in_signature;
+  const closed = evaluation.status === 'CLOSED';
   const results = evaluation.results;
   const dictamenUi = results.dictamen ? DICTAMEN_UI[results.dictamen] : null;
   // Constancia: solo con dictamen competente (cualquiera de los tres grados).
   // La constancia nace al AUTORIZAR (paso de RH / Dirección General), no al cerrar.
-  const authorizationPending = readOnly && results.authorization_result === 'PENDIENTE';
+  const authorizationPending = closed && results.authorization_result === 'PENDIENTE';
   const authorizationUi = results.authorization_result ? AUTHORIZATION_UI[results.authorization_result] : null;
   const certificateEligible =
-    readOnly &&
+    closed &&
     results.dictamen !== null &&
     results.dictamen !== 'NO_COMPETENTE' &&
     ['AUTORIZADO', 'AUTORIZADO_CON_SEGUIMIENTO'].includes(results.authorization_result ?? '');
@@ -588,13 +471,33 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
     }
   };
 
-  // Una evaluación abierta automáticamente puede no tener evaluador: se asigna antes de recabar firmas.
-  const handleOpenClose = () => {
+  // Una evaluación abierta automáticamente puede no tener evaluador: se asigna antes de pedir firmas.
+  const handleOpenSend = () => {
     if (!evaluation.evaluator_name.trim()) {
-      toast.warning('Asigna al evaluador (cabecera de la evaluación) antes de cerrarla.');
+      toast.warning('Asigna al evaluador (cabecera de la evaluación) antes de enviarla a firma.');
       return;
     }
-    setShowCloseModal(true);
+    setShowSendModal(true);
+  };
+
+  const loadSigners = useCallback(() => getCompetencySigners(evaluation.id), [evaluation.id]);
+
+  const openSignaturePdf = async () => {
+    try {
+      setViewer({ url: await getCompetencyPdfUrl(evaluation.id), title: 'REH-REG-003 · En firma (vista previa)' });
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo generar el PDF.'));
+    }
+  };
+
+  const cancelSignature = async () => {
+    try {
+      const result = await cancelCompetencySignature(evaluation.id);
+      toast.success(result.message);
+      onChanged(result.evaluation);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo cancelar el envío a firma.'));
+    }
   };
 
   const handleIssueCertificate = async () => {
@@ -687,9 +590,9 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
                   ) : null}
                 </div>
               </>
-            ) : (
-              <button type="button" onClick={handleOpenClose} className={buttonClass}>
-                <FileCheck2 size={14} /> Cerrar evaluación
+            ) : evaluation.in_signature ? null : (
+              <button type="button" onClick={handleOpenSend} className={buttonClass} title="Bloquear y mandar al Buzón de firmas de los cinco firmantes">
+                <Send size={14} /> Enviar a firma
               </button>
             )}
           </div>
@@ -700,6 +603,17 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
           </p>
         )}
       </section>
+
+      {evaluation.in_signature ? (
+        <DocumentInSignatureCard
+          formCode="REH-REG-003"
+          requestedAt={evaluation.signature_requested_at}
+          requestedByName={evaluation.signature_requested_by_name}
+          loadSigners={loadSigners}
+          onOpenPdf={openSignaturePdf}
+          onCancel={cancelSignature}
+        />
+      ) : null}
 
       <div className="sticky top-0 z-20 -mx-1 rounded-2xl bg-[rgba(238,245,250,0.92)] px-1 py-1.5 backdrop-blur" role="tablist" aria-label="Secciones de la evaluación">
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
@@ -758,8 +672,8 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
 
       ) : null}
 
-      {showCloseModal && (
-        <CloseModal evaluation={evaluation} onClose={() => setShowCloseModal(false)} onClosed={onChanged} />
+      {showSendModal && (
+        <CompetencySendToSignatureModal evaluation={evaluation} onClose={() => setShowSendModal(false)} onSent={onChanged} />
       )}
 
       {viewer && (

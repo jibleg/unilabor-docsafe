@@ -80,18 +80,15 @@ export const replaceActionsSchema = z
   })
   .passthrough();
 
-export const closeCompetencyEvaluationSchema = z
+/** Enviar a firma: los tres firmantes institucionales como colaboradores (firman en su Buzon). */
+export const sendCompetencyToSignatureSchema = z
   .object({
-    collaborator_signature: requiredText('La firma del colaborador es obligatoria'),
-    evaluator_signature: requiredText('La firma del evaluador es obligatoria'),
-    area_signature: requiredText('La firma del coordinador del área es obligatoria'),
-    rh_signature: requiredText('La firma de RH es obligatoria'),
-    director_signature: requiredText('La firma del Director General es obligatoria'),
-    area_signatory_name: requiredText('El nombre del coordinador del área es obligatorio'),
-    rh_signatory_name: requiredText('El nombre del coordinador de RH es obligatorio'),
-    director_signatory_name: requiredText('El nombre del Director General es obligatorio'),
+    area_employee_id: z.coerce.number().int().positive('Elige al coordinador del área'),
+    rh_employee_id: z.coerce.number().int().positive('Elige al coordinador de RH'),
+    director_employee_id: z.coerce.number().int().positive('Elige al Director General'),
   })
   .passthrough();
+export type SendCompetencyToSignatureBody = z.infer<typeof sendCompetencyToSignatureSchema>;
 
 /**
  * Asignar el cuestionario de Conocimiento (seccion 3) al colaborador: N

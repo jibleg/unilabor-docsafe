@@ -61,6 +61,8 @@ const CONDITION =
 export interface AssignmentLetterPdfInput {
   letter: AssignmentLetterRecord;
   draft: boolean;
+  /** Borrador enviado al Buzon de firmas: lleva las firmas ya recabadas. */
+  inSignature?: boolean;
   signatures: { collaborator: Buffer | null; area: Buffer | null; director: Buffer | null };
 }
 
@@ -311,8 +313,9 @@ export const buildAssignmentLetterPdf = async (input: AssignmentLetterPdfInput):
   pages.forEach((p, index) => {
     const label = `P á g i n a  ${index + 1} | ${pages.length}`;
     p.drawText(safe(label), { x: PAGE_W - MARGIN - regular.widthOfTextAtSize(safe(label), 8.5), y: MARGIN - 6, size: 8.5, font: regular, color: INK });
-    p.drawText(safe(`SafeDoc · ${letter.folio}${input.draft ? ' · BORRADOR (sin firmas)' : ''}`), { x: MARGIN, y: MARGIN - 6, size: 6.5, font: sans, color: MUTED });
-    if (input.draft) p.drawText('BORRADOR', { x: 150, y: 260, size: 90, font: bold, color: rgb(0.75, 0.75, 0.75), opacity: 0.18, rotate: degrees(35) });
+    const draftNote = input.inSignature ? ' · EN FIRMA (vista previa, sin validez hasta reunir las firmas)' : ' · BORRADOR (sin firmas)';
+    p.drawText(safe(`SafeDoc · ${letter.folio}${input.draft ? draftNote : ''}`), { x: MARGIN, y: MARGIN - 6, size: 6.5, font: sans, color: MUTED });
+    if (input.draft) p.drawText(input.inSignature ? 'EN FIRMA' : 'BORRADOR', { x: 150, y: 260, size: 90, font: bold, color: rgb(0.75, 0.75, 0.75), opacity: 0.18, rotate: degrees(35) });
   });
   return Buffer.from(await doc.save());
 };

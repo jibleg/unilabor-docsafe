@@ -282,9 +282,6 @@ export const listSignatureInbox = async (employeeId: number): Promise<SignatureI
   };
 };
 
-/** Numero de listas que esperan la firma del colaborador (badge del menu). */
-export const countSignatureInboxPending = async (employeeId: number): Promise<number> => (await listPendingForEmployee(employeeId)).length;
-
 export interface SignatureInboxDetail {
   checklist: SupervisionChecklistRecord;
   my_roles: SupervisionSignerRole[];

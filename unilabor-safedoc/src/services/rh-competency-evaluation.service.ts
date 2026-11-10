@@ -1,8 +1,5 @@
-import fs from 'fs';
 import pool from '../config/db';
-import { decodeSignaturePng, writeSignaturePng } from '../utils/signature-image';
-import { archiveGeneratedPdfToExpedient } from './employee-document-archive.service';
-import { buildCompetencyEvaluationPdf } from './rh-competency-evaluation.pdf';
+import { assertNoDocumentSignatures } from './rh-document-signature.service';
 import { assertEvaluatorAllowed, resolveEvaluatorIdentity } from './rh-competency-evaluator.service';
 import {
   PaginatedResult,
@@ -101,7 +98,7 @@ export interface CompetencyEvaluationResults {
 }
 
 /** Calificacion efectiva de un item (conocimiento deriva 4/1 de is_correct). */
-const effectiveScore = (item: CompetencyEvaluationItem): number | null => {
+export const effectiveScore = (item: CompetencyEvaluationItem): number | null => {
   if (item.section === 'CONOCIMIENTO') {
     if (item.is_correct === null || item.is_correct === undefined) return null;
     return item.is_correct ? 4 : 1;
@@ -202,6 +199,14 @@ export interface CompetencyEvaluationRecord {
   area_signatory_name: string | null;
   rh_signatory_name: string | null;
   director_signatory_name: string | null;
+  /** Firmantes institucionales como colaboradores (los elige RH al enviar a firma). */
+  area_signatory_employee_id: number | null;
+  rh_signatory_employee_id: number | null;
+  director_signatory_employee_id: number | null;
+  /** En firma: borrador bloqueado esperando las firmas del Buzon (sigue en DRAFT). */
+  in_signature: boolean;
+  signature_requested_at: string | null;
+  signature_requested_by_name: string | null;
   document_id: number | null;
   /** Constancia de competencia archivada en el expediente (null si no se emitio / NO COMPETENTE). */
   certificate_document_id: number | null;
@@ -215,7 +220,7 @@ export interface CompetencyEvaluationRecord {
 const BASE_QUERY = `
   SELECT
     ev.*, e.full_name AS employee_name, e.employee_code, p.name AS position_name,
-    tc.title AS reference_course_title, au.full_name AS authorized_by_name,
+    tc.title AS reference_course_title, au.full_name AS authorized_by_name, sr.full_name AS signature_requested_by_name,
     ka.status AS knowledge_status, ka.deadline_at AS knowledge_deadline_at, ka.started_at AS knowledge_started_at,
     ka.submitted_at AS knowledge_submitted_at, ka.percentage AS knowledge_percentage,
     (SELECT COUNT(*)::int FROM public.evaluation_assignment_questions aq WHERE aq.assignment_id = ka.id) AS knowledge_question_count
@@ -225,6 +230,7 @@ const BASE_QUERY = `
   LEFT JOIN public.training_courses tc ON tc.id = ev.reference_course_id
   LEFT JOIN public.evaluation_assignments ka ON ka.id = ev.knowledge_assignment_id
   LEFT JOIN public.users au ON au.id = ev.authorized_by_user_id
+  LEFT JOIN public.users sr ON sr.id = ev.signature_requested_by_user_id
 `;
 
 const toIso = (value: unknown): string | null => {
@@ -270,6 +276,12 @@ const mapRow = (row: any): CompetencyEvaluationRecord => ({
   area_signatory_name: row.area_signatory_name ? String(row.area_signatory_name) : null,
   rh_signatory_name: row.rh_signatory_name ? String(row.rh_signatory_name) : null,
   director_signatory_name: row.director_signatory_name ? String(row.director_signatory_name) : null,
+  area_signatory_employee_id: row.area_signatory_employee_id ? Number(row.area_signatory_employee_id) : null,
+  rh_signatory_employee_id: row.rh_signatory_employee_id ? Number(row.rh_signatory_employee_id) : null,
+  director_signatory_employee_id: row.director_signatory_employee_id ? Number(row.director_signatory_employee_id) : null,
+  in_signature: String(row.status) === 'DRAFT' && Boolean(row.signature_requested_at),
+  signature_requested_at: toIso(row.signature_requested_at),
+  signature_requested_by_name: row.signature_requested_by_name ? String(row.signature_requested_by_name) : null,
   document_id: row.document_id ? Number(row.document_id) : null,
   certificate_document_id: row.certificate_document_id ? Number(row.certificate_document_id) : null,
   closed_at: row.closed_at ? String(row.closed_at) : null,
@@ -474,7 +486,7 @@ export const listEvaluations = async (
 };
 
 /** Estados del cuestionario en los que ya hay respuestas definitivas que volcar a la seccion 3. */
-const KNOWLEDGE_ANSWERED_STATUSES = ['passed', 'failed'];
+export const KNOWLEDGE_ANSWERED_STATUSES = ['passed', 'failed'];
 /** Estados en los que el cuestionario sigue vivo (no se puede reasignar ni capturar a mano). */
 export const KNOWLEDGE_ACTIVE_STATUSES = ['pending', 'in_progress', 'authorized_late', 'submitted', 'grading'];
 
@@ -572,14 +584,25 @@ export const getEvaluationById = async (evaluationId: number): Promise<Competenc
   return record;
 };
 
-const loadDraft = async (evaluationId: number): Promise<CompetencyEvaluationRecord> => {
+export const IN_SIGNATURE_MESSAGE =
+  'La evaluacion esta en firma en el Buzon y no se puede modificar. Si necesitas corregirla, cancela el envio a firma (las firmas recabadas se invalidan).';
+
+/** Un borrador que se puede editar: ni cerrado ni en firma. */
+export const assertEvaluationEditable = (record: Pick<CompetencyEvaluationRecord, 'status' | 'in_signature'>): void => {
+  if (record.status !== 'DRAFT') {
+    throwCoded('RH_COMP_EVAL_ALREADY_CLOSED', 'La evaluacion ya esta cerrada; no se puede modificar.');
+  }
+  if (record.in_signature) {
+    throwCoded('RH_COMP_EVAL_IN_SIGNATURE', IN_SIGNATURE_MESSAGE);
+  }
+};
+
+export const loadDraft = async (evaluationId: number): Promise<CompetencyEvaluationRecord> => {
   const record = await getEvaluationById(evaluationId);
   if (!record) {
     return throwCoded('RH_COMP_EVAL_NOT_FOUND', 'La evaluacion indicada no existe.');
   }
-  if (record.status !== 'DRAFT') {
-    return throwCoded('RH_COMP_EVAL_ALREADY_CLOSED', 'La evaluacion ya esta cerrada; no se puede modificar.');
-  }
+  assertEvaluationEditable(record);
   return record;
 };
 
@@ -732,195 +755,6 @@ export const replaceActions = async (evaluationId: number, actions: ActionInput[
 
 export const deleteDraftEvaluation = async (evaluationId: number): Promise<void> => {
   await loadDraft(evaluationId);
-  await pool.query(`DELETE FROM public.rh_competency_evaluations WHERE id = $1;`, [evaluationId]);
-};
-
-// --- Cierre ---------------------------------------------------------------------
-
-export interface CloseEvaluationInput {
-  evaluationId: number;
-  collaboratorSignature: string;
-  evaluatorSignature: string;
-  areaSignature: string;
-  rhSignature: string;
-  directorSignature: string;
-  areaSignatoryName: string;
-  rhSignatoryName: string;
-  directorSignatoryName: string;
-  closedByUserId: string | null;
-}
-
-/**
- * Cierra la evaluacion: valida completitud, sella resultados, embebe las 5
- * firmas en el PDF oficial y lo archiva en el expediente (seccion Competencias
- * laborales) con expiry_date = vigencia de 12 meses — eso hace que las alertas
- * de expediente existentes reclamen la reevaluacion al vencer (CR-05).
- */
-export const closeEvaluation = async (input: CloseEvaluationInput): Promise<CompetencyEvaluationRecord> => {
-  const record = await loadDraft(input.evaluationId);
-  const items = record.items ?? [];
-
-  // Una evaluacion abierta automaticamente puede nacer sin evaluador: no se cierra sin el.
-  if (!record.evaluator_name.trim()) {
-    throwCoded('RH_COMP_EVAL_EVALUATOR_REQUIRED', 'La evaluacion no tiene evaluador; asignalo antes de cerrarla.');
-  }
-  await assertEvaluatorAllowed({
-    evaluationType: record.evaluation_type,
-    employeeId: record.employee_id,
-    positionId: record.position_id,
-    evaluator: { employee_id: record.evaluator_employee_id, name: record.evaluator_name },
-  });
-
-  if (record.knowledge_quiz && !KNOWLEDGE_ANSWERED_STATUSES.includes(record.knowledge_quiz.status)) {
-    throwCoded(
-      'RH_COMP_EVAL_KNOWLEDGE_PENDING',
-      'El colaborador aun no contesta el cuestionario de Conocimiento (o esta vencido). Espera la respuesta, o cancela el cuestionario y reasignalo.',
-    );
-  }
-
-  const bySection = (section: CompetencySection) => items.filter((item) => item.section === section);
-  if (bySection('COMPETENCIA').length === 0 || bySection('DESEMPENO').length === 0 || bySection('CONOCIMIENTO').length === 0) {
-    throwCoded('RH_COMP_EVAL_INCOMPLETE', 'Las tres secciones deben tener al menos un item antes de cerrar.');
-  }
-  const unscored = items.filter((item) => effectiveScore(item) === null);
-  if (unscored.length > 0) {
-    throwCoded(
-      'RH_COMP_EVAL_UNSCORED_ITEMS',
-      `Hay ${unscored.length} item(s) sin calificar; captura todas las calificaciones antes de cerrar.`,
-    );
-  }
-
-  const results = computeResults(items);
-  if (results.final_pct === null || !results.dictamen) {
-    return throwCoded('RH_COMP_EVAL_INCOMPLETE', 'No se pudieron calcular los resultados.');
-  }
-
-  // Plan de acciones obligatorio salvo dictamen pleno.
-  if (results.dictamen !== 'COMPETENTE_Y_AUTORIZADO' && (record.actions ?? []).length === 0) {
-    throwCoded(
-      'RH_COMP_EVAL_ACTIONS_REQUIRED',
-      'El dictamen no es "Competente y autorizado": captura el plan de acciones antes de cerrar.',
-    );
-  }
-
-  const signatures = {
-    collaborator: decodeSignaturePng(input.collaboratorSignature),
-    evaluator: decodeSignaturePng(input.evaluatorSignature),
-    area: decodeSignaturePng(input.areaSignature),
-    rh: decodeSignaturePng(input.rhSignature),
-    director: decodeSignaturePng(input.directorSignature),
-  };
-  if (Object.values(signatures).some((buffer) => !buffer)) {
-    throwCoded('RH_COMP_EVAL_INVALID_SIGNATURE', 'Las cinco firmas son obligatorias y no pueden estar vacias.');
-  }
-
-  const closedAt = new Date();
-  // La autorizacion NO se da por hecha con el dictamen: la evaluacion competente
-  // queda PENDIENTE y la ejecuta RH o Direccion General (authorizeEvaluation),
-  // momento en el que nacen la vigencia de 12 meses y la constancia. Solo
-  // "No competente" se resuelve de inmediato como NO AUTORIZADO.
-  const pendingAuthorization = results.dictamen !== 'NO_COMPETENTE';
-  const sealedResults: CompetencyEvaluationResults = {
-    ...results,
-    authorization_result: pendingAuthorization ? 'PENDIENTE' : 'NO_AUTORIZADO',
-  };
-  const authorizedAt = pendingAuthorization ? null : closedAt;
-  const validUntil = null as Date | null;
-
-  const pdf = await buildCompetencyEvaluationPdf({
-    record: { ...record, results: sealedResults },
-    items,
-    actions: record.actions ?? [],
-    closedAt,
-    authorizedAt,
-    validUntil,
-    signatories: {
-      collaboratorName: record.employee_name,
-      evaluatorName: record.evaluator_name,
-      areaName: input.areaSignatoryName.trim(),
-      rhName: input.rhSignatoryName.trim(),
-      directorName: input.directorSignatoryName.trim(),
-    },
-    signaturePngs: {
-      collaborator: signatures.collaborator!,
-      evaluator: signatures.evaluator!,
-      area: signatures.area!,
-      rh: signatures.rh!,
-      director: signatures.director!,
-    },
-  });
-
-  const uploadedByUserId: string =
-    input.closedByUserId ??
-    (await pool
-      .query(`SELECT id FROM public.users WHERE is_active = TRUE ORDER BY (role = 'ADMIN') DESC, created_at ASC LIMIT 1;`)
-      .then((r) => (r.rows.length > 0 ? String(r.rows[0].id) : null))) ??
-    throwCoded('RH_COMP_EVAL_USER_NOT_FOUND');
-
-  const documentId = await archiveGeneratedPdfToExpedient({
-    employeeId: record.employee_id,
-    documentTypeCode: 'COMPETENCY_EVALUATION',
-    referenceKey: `competency_evaluation:${record.id}`,
-    title: `REH-REG-003 Evaluación de competencia - ${DICTAMEN_LABELS[results.dictamen]}`,
-    description: `Puesto: ${record.position_name}. Resultado final: ${results.final_pct}%.${results.veto_applied ? ' VETO aplicado por competencia critica.' : ''}`,
-    pdf,
-    uploadedByUserId,
-    expiryDate: validUntil ? validUntil.toISOString().slice(0, 10) : null,
-  });
-
-  const paths = {
-    collaborator: writeSignaturePng(signatures.collaborator!, 'COMP-EVAL'),
-    evaluator: writeSignaturePng(signatures.evaluator!, 'COMP-EVAL'),
-    area: writeSignaturePng(signatures.area!, 'COMP-EVAL'),
-    rh: writeSignaturePng(signatures.rh!, 'COMP-EVAL'),
-    director: writeSignaturePng(signatures.director!, 'COMP-EVAL'),
-  };
-
-  try {
-    await pool.query(
-      `UPDATE public.rh_competency_evaluations
-          SET status = 'CLOSED',
-              competency_pct = $1, performance_pct = $2, knowledge_pct = $3, final_pct = $4,
-              veto_applied = $5, dictamen = $6, authorization_result = $7,
-              authorized_at = $8, valid_until = $9,
-              collaborator_signature_path = $10, evaluator_signature_path = $11,
-              area_signature_path = $12, rh_signature_path = $13, director_signature_path = $14,
-              area_signatory_name = $15, rh_signatory_name = $16, director_signatory_name = $17,
-              document_id = $18, closed_at = $19, updated_at = NOW()
-        WHERE id = $20 AND status = 'DRAFT';`,
-      [
-        results.competency_pct,
-        results.performance_pct,
-        results.knowledge_pct,
-        results.final_pct,
-        results.veto_applied,
-        results.dictamen,
-        sealedResults.authorization_result,
-        authorizedAt,
-        validUntil,
-        paths.collaborator,
-        paths.evaluator,
-        paths.area,
-        paths.rh,
-        paths.director,
-        input.areaSignatoryName.trim(),
-        input.rhSignatoryName.trim(),
-        input.directorSignatoryName.trim(),
-        documentId,
-        closedAt,
-        record.id,
-      ],
-    );
-  } catch (error) {
-    for (const filePath of Object.values(paths)) {
-      try {
-        fs.existsSync(filePath) && fs.unlinkSync(filePath);
-      } catch {
-        /* limpieza best-effort */
-      }
-    }
-    throw error;
-  }
-
-  return (await getEvaluationById(record.id)) as CompetencyEvaluationRecord;
+  await assertNoDocumentSignatures('COMPETENCY_EVALUATION', evaluationId);
+  await pool.query(`DELETE FROM public.rh_competency_evaluations WHERE id = $1 AND status = 'DRAFT' AND signature_requested_at IS NULL;`, [evaluationId]);
 };

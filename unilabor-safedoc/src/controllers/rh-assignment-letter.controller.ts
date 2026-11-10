@@ -2,20 +2,17 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
 import {
-  closeAssignmentLetter,
   deleteAssignmentLetterDraft,
   generatePendingLetters,
   getAssignmentLetter,
   getPositionAuthorizations,
   listAssignmentLetters,
   listAuthorizationItems,
-  renderAssignmentLetterPdf,
   setPositionAuthorizations,
   updateAssignmentLetter,
 } from '../services/rh-assignment-letter.service';
 import {
   assignmentLetterListQuerySchema,
-  type CloseAssignmentLetterBody,
   type SetPositionAuthorizationsBody,
   type UpdateAssignmentLetterBody,
 } from '../schemas/rh-assignment-letter.schema';
@@ -35,7 +32,9 @@ const ERROR_STATUS: Record<string, number> = {
   RH_ASSIGNMENT_LETTER_CLOSED: 409,
   RH_ASSIGNMENT_SIGNERS_REQUIRED: 409,
   RH_ASSIGNMENT_SELF_SIGNATURE: 409,
-  RH_ASSIGNMENT_INVALID_SIGNATURE: 400,
+  RH_ASSIGNMENT_LETTER_IN_SIGNATURE: 409,
+  RH_ASSIGNMENT_SIGNER_NOT_FOUND: 404,
+  RH_DOC_SIGNATURE_HAS_SIGNATURES: 409,
   ARCHIVE_DOCUMENT_TYPE_NOT_FOUND: 409,
 };
 
@@ -118,19 +117,6 @@ export const getAssignmentLetterController = async (req: AuthRequest, res: Respo
   }
 };
 
-export const getAssignmentLetterPdfController = async (req: AuthRequest, res: Response) => {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({ message: 'ID invalido.' });
-  try {
-    const { letter, pdf } = await renderAssignmentLetterPdf(id);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${letter.folio}.pdf"`);
-    return res.send(pdf);
-  } catch (error) {
-    return fail(res, error, 'Error generando PDF REH-REG-008', 'No se pudo generar el PDF.');
-  }
-};
-
 export const updateAssignmentLetterController = async (req: AuthRequest, res: Response) => {
   const id = parseId(req.params.id);
   if (!id) return res.status(400).json({ message: 'ID invalido.' });
@@ -139,33 +125,13 @@ export const updateAssignmentLetterController = async (req: AuthRequest, res: Re
     const letter = await updateAssignmentLetter(id, {
       letterDate: body.letter_date,
       otherAuthorizations: body.other_authorizations,
-      areaSignatoryName: body.area_signatory_name,
-      directorSignatoryName: body.director_signatory_name,
+      areaSignatoryEmployeeId: body.area_signatory_employee_id,
+      directorSignatoryEmployeeId: body.director_signatory_employee_id,
       items: body.items,
     });
     return res.json({ message: 'Carta guardada.', letter });
   } catch (error) {
     return fail(res, error, 'Error guardando carta de asignacion', 'No se pudo guardar la carta.');
-  }
-};
-
-export const closeAssignmentLetterController = async (req: AuthRequest, res: Response) => {
-  const id = parseId(req.params.id);
-  if (!id) return res.status(400).json({ message: 'ID invalido.' });
-  if (!req.user?.id) return res.status(401).json({ message: 'Sesion invalida.' });
-  const body = req.body as CloseAssignmentLetterBody;
-  try {
-    const letter = await closeAssignmentLetter({
-      id,
-      collaboratorSignature: body.collaborator_signature,
-      areaSignature: body.area_signature,
-      directorSignature: body.director_signature,
-      closedByUserId: req.user.id,
-    });
-    await audit(req, `RH_ASSIGNMENT_LETTER_CLOSED:${id}`, id, letter.employee_id);
-    return res.status(201).json({ message: `Carta ${letter.folio} firmada y archivada en el expediente.`, letter });
-  } catch (error) {
-    return fail(res, error, 'Error cerrando carta de asignacion', 'No se pudo cerrar la carta.');
   }
 };
 

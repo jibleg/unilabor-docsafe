@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, FileText, Loader2, Lock, Save, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, FileText, Loader2, Lock, PenLine, Save, Send, Trash2 } from 'lucide-react';
 import {
-  closeAssignmentLetter,
+  cancelLetterSignature,
   deleteAssignmentLetterDraft,
   getAssignmentLetterPdfUrl,
+  getLetterSigners,
+  sendLetterToSignature,
   updateAssignmentLetter,
 } from '../../../api/service.api-rh-assignment-letter';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { AssignmentLetter } from '../../../types/models';
 import { confirmAction } from '../../../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../../../utils/notify';
-import { SignaturePad } from '../../helpdesk/SignaturePad';
 import { SearchableSelect } from '../../SearchableSelect';
+import { DocumentInSignatureCard } from '../phase7-signature/DocumentInSignatureCard';
 import { buttonClass, formatDateOnly, inputClass, labelClass, primaryButtonClass } from '../supervision/supervision-ui';
 import { useEmployeeOptions } from '../supervision/useEmployeeOptions';
 import { AuthorizationGroups } from './AuthorizationGroups';
@@ -25,32 +27,33 @@ interface AssignmentLetterEditorProps {
 
 /**
  * Carta de asignación de puesto REH-REG-008: autorizaciones Sí/No (prellenadas
- * con las del puesto; las generales activadas por defecto), "Otras", firmantes y
- * cierre con las firmas del colaborador, la Coordinación del área y el
- * Director General. Firmada queda de solo consulta.
+ * con las del puesto; las generales activadas por defecto), "Otras" y
+ * firmantes. "Enviar a firma" la bloquea y la manda al Buzón de firmas del
+ * colaborador, la Coordinación del área y el Director General; con la tercera
+ * firma se cierra sola. Firmada queda de solo consulta.
  */
 export const AssignmentLetterEditor = ({ letter, onBack, onChanged, onDeleted }: AssignmentLetterEditorProps) => {
-  const readOnly = letter.status !== 'DRAFT';
+  const closed = letter.status !== 'DRAFT';
+  // En firma queda bloqueada igual que firmada (para corregir, RH cancela el envío).
+  const readOnly = closed || letter.in_signature;
   const [authorized, setAuthorized] = useState<Record<number, boolean>>({});
   const [letterDate, setLetterDate] = useState(letter.letter_date);
   const [other, setOther] = useState(letter.other_authorizations ?? '');
-  const [areaName, setAreaName] = useState(letter.area_signatory_name);
-  const [directorName, setDirectorName] = useState(letter.director_signatory_name);
+  const [areaId, setAreaId] = useState(letter.area_signatory_employee_id ? String(letter.area_signatory_employee_id) : '');
+  const [directorId, setDirectorId] = useState(letter.director_signatory_employee_id ? String(letter.director_signatory_employee_id) : '');
   const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState<'save' | 'pdf' | 'delete' | null>(null);
-  const [showClose, setShowClose] = useState(false);
+  const [busy, setBusy] = useState<'save' | 'pdf' | 'delete' | 'send' | null>(null);
   const employeeOptions = useEmployeeOptions();
-  const signerOptions = useMemo(
-    () => employeeOptions.filter((option) => option.value !== String(letter.employee_id)).map((option) => ({ ...option, value: option.label })),
-    [employeeOptions, letter.employee_id],
-  );
+  // El colaborador nunca firma otro rol de su propia carta.
+  const signerOptions = useMemo(() => employeeOptions.filter((option) => option.value !== String(letter.employee_id)), [employeeOptions, letter.employee_id]);
+  const loadSigners = useCallback(() => getLetterSigners(letter.id), [letter.id]);
 
   useEffect(() => {
     setAuthorized(Object.fromEntries(letter.items.map((item) => [item.id, item.authorized])));
     setLetterDate(letter.letter_date);
     setOther(letter.other_authorizations ?? '');
-    setAreaName(letter.area_signatory_name);
-    setDirectorName(letter.director_signatory_name);
+    setAreaId(letter.area_signatory_employee_id ? String(letter.area_signatory_employee_id) : '');
+    setDirectorId(letter.director_signatory_employee_id ? String(letter.director_signatory_employee_id) : '');
     setDirty(false);
   }, [letter]);
 
@@ -66,8 +69,8 @@ export const AssignmentLetterEditor = ({ letter, onBack, onChanged, onDeleted }:
       const updated = await updateAssignmentLetter(letter.id, {
         letter_date: letterDate,
         other_authorizations: other.trim() || null,
-        area_signatory_name: areaName,
-        director_signatory_name: directorName,
+        area_signatory_employee_id: areaId ? Number(areaId) : undefined,
+        director_signatory_employee_id: directorId ? Number(directorId) : undefined,
         items: letter.items.map((item) => ({ item_id: item.id, authorized: Boolean(authorized[item.id]) })),
       });
       setDirty(false);
@@ -109,10 +112,44 @@ export const AssignmentLetterEditor = ({ letter, onBack, onChanged, onDeleted }:
     }
   };
 
-  const openClose = async () => {
-    if (!areaName.trim() || !directorName.trim()) return notifyWarning('Elige a la Coordinación del área y al Director General.');
+  const sendToSignature = async () => {
+    if (!areaId || !directorId) return notifyWarning('Elige a la Coordinación del área y al Director General.');
     if (dirty && !(await save(true))) return;
-    setShowClose(true);
+    const ok = await confirmAction(
+      'Enviar a firma',
+      `La carta ${letter.folio} queda bloqueada y llega al Buzón de firmas del colaborador, la Coordinación del área y el Director General. Con la tercera firma se cierra sola y se archiva en el expediente.`,
+      'Enviar a firma',
+      'primary',
+    );
+    if (!ok) return;
+    setBusy('send');
+    try {
+      const result = await sendLetterToSignature(letter.id);
+      notifySuccess(result.message);
+      onChanged(result.letter);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo enviar la carta a firma.'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openPdfOnly = async () => {
+    try {
+      window.open(await getAssignmentLetterPdfUrl(letter.id), '_blank', 'noopener');
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo generar el PDF.'));
+    }
+  };
+
+  const cancelSignature = async () => {
+    try {
+      const result = await cancelLetterSignature(letter.id);
+      notifySuccess(result.message);
+      onChanged(result.letter);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo cancelar el envío a firma.'));
+    }
   };
 
   return (
@@ -131,9 +168,13 @@ export const AssignmentLetterEditor = ({ letter, onBack, onChanged, onDeleted }:
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {readOnly ? (
+          {closed ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
               <Lock size={12} /> Firmada {formatDateOnly(letter.closed_at)}
+            </span>
+          ) : letter.in_signature ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700">
+              <PenLine size={12} /> En firma
             </span>
           ) : (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">Borrador</span>
@@ -149,13 +190,24 @@ export const AssignmentLetterEditor = ({ letter, onBack, onChanged, onDeleted }:
               <button type="button" onClick={() => void remove()} disabled={busy !== null} className={`${buttonClass} text-rose-700`} title="Eliminar borrador">
                 <Trash2 size={14} />
               </button>
-              <button type="button" onClick={() => void openClose()} disabled={busy !== null} className={primaryButtonClass}>
-                <Lock size={14} /> Firmar y cerrar
+              <button type="button" onClick={() => void sendToSignature()} disabled={busy !== null} className={primaryButtonClass} title="Bloquear y mandar al Buzón de firmas">
+                {busy === 'send' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Enviar a firma
               </button>
             </>
           ) : null}
         </div>
       </header>
+
+      {letter.in_signature ? (
+        <DocumentInSignatureCard
+          formCode="REH-REG-008"
+          requestedAt={letter.signature_requested_at}
+          requestedByName={letter.signature_requested_by_name}
+          loadSigners={loadSigners}
+          onOpenPdf={openPdfOnly}
+          onCancel={cancelSignature}
+        />
+      ) : null}
 
       <section className="grid gap-3 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white p-4 md:grid-cols-3">
         <div>
@@ -164,11 +216,19 @@ export const AssignmentLetterEditor = ({ letter, onBack, onChanged, onDeleted }:
         </div>
         <div>
           <label className={labelClass}>Coordinación del área</label>
-          <SearchableSelect value={areaName} options={signerOptions} onChange={mark(setAreaName)} placeholder="Elige al coordinador" searchPlaceholder="Buscar colaborador..." disabled={readOnly} />
+          {readOnly ? (
+            <p className="py-2 text-sm font-semibold text-[var(--unilabor-ink)]">{letter.area_signatory_name || '—'}</p>
+          ) : (
+            <SearchableSelect value={areaId} options={signerOptions} onChange={mark(setAreaId)} placeholder="Elige al coordinador" searchPlaceholder="Buscar colaborador..." />
+          )}
         </div>
         <div>
           <label className={labelClass}>Director General</label>
-          <SearchableSelect value={directorName} options={signerOptions} onChange={mark(setDirectorName)} placeholder="Elige al director" searchPlaceholder="Buscar colaborador..." disabled={readOnly} />
+          {readOnly ? (
+            <p className="py-2 text-sm font-semibold text-[var(--unilabor-ink)]">{letter.director_signatory_name || '—'}</p>
+          ) : (
+            <SearchableSelect value={directorId} options={signerOptions} onChange={mark(setDirectorId)} placeholder="Elige al director" searchPlaceholder="Buscar colaborador..." />
+          )}
         </div>
       </section>
 
@@ -189,82 +249,6 @@ export const AssignmentLetterEditor = ({ letter, onBack, onChanged, onDeleted }:
         </div>
       </section>
 
-      {showClose ? (
-        <CloseLetterModal
-          letter={{ ...letter, area_signatory_name: areaName, director_signatory_name: directorName }}
-          onClose={() => setShowClose(false)}
-          onClosed={(updated) => {
-            setShowClose(false);
-            onChanged(updated);
-          }}
-        />
-      ) : null}
-    </div>
-  );
-};
-
-const CloseLetterModal = ({ letter, onClose, onClosed }: { letter: AssignmentLetter; onClose: () => void; onClosed: (letter: AssignmentLetter) => void }) => {
-  const [signatures, setSignatures] = useState<{ collaborator: string | null; area: string | null; director: string | null }>({
-    collaborator: null,
-    area: null,
-    director: null,
-  });
-  const [saving, setSaving] = useState(false);
-  const set = (key: keyof typeof signatures) => (value: string | null) => setSignatures((current) => ({ ...current, [key]: value }));
-
-  const submit = async () => {
-    if (!signatures.collaborator || !signatures.area || !signatures.director) return notifyWarning('Las tres firmas son obligatorias.');
-    setSaving(true);
-    try {
-      const result = await closeAssignmentLetter(letter.id, {
-        collaborator_signature: signatures.collaborator,
-        area_signature: signatures.area,
-        director_signature: signatures.director,
-      });
-      notifySuccess(result.message);
-      onClosed(result.letter);
-    } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo cerrar la carta.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(11,34,53,0.28)] p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/96 shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-[rgba(0,65,106,0.08)] px-5 py-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">REH-REG-008 · {letter.folio}</p>
-            <h2 className="mt-1 text-lg font-bold text-[var(--color-brand-700)]">Firmar la carta de asignación</h2>
-            <p className="text-sm text-[var(--unilabor-ink)]">
-              {letter.employee_name} · {letter.position_code} {letter.position_name}
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-[var(--unilabor-neutral)] hover:bg-slate-100" aria-label="Cerrar">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="space-y-4 overflow-y-auto px-5 py-4">
-          <SignaturePad label={`Colaborador · ${letter.employee_name}`} hint="Confirma que recibió y comprendió la descripción de puesto" onChange={set('collaborator')} />
-          <div className="grid gap-4 md:grid-cols-2">
-            <SignaturePad label={`Coordinación del área · ${letter.area_signatory_name}`} hint="Obligatoria" onChange={set('area')} />
-            <SignaturePad label={`Director General · ${letter.director_signatory_name}`} hint="Obligatoria" onChange={set('director')} />
-          </div>
-          <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">
-            Al confirmar, la carta queda sellada, se genera el PDF con el diseño del REH-REG-008 y se archiva en el expediente del colaborador
-            (Documentos UNILABOR).
-          </p>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-5 py-3">
-          <button type="button" onClick={onClose} disabled={saving} className="rounded-xl px-3 py-2 text-sm font-semibold text-[var(--unilabor-neutral)] hover:bg-slate-100">
-            Cancelar
-          </button>
-          <button type="button" onClick={() => void submit()} disabled={saving} className={primaryButtonClass}>
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />} Firmar y cerrar
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

@@ -207,10 +207,10 @@ export const RhCompetencyEvaluationsPage = () => {
             </div>
             <span
               className={`rounded-full px-3 py-1 text-xs font-bold ${
-                selected.status === 'CLOSED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                selected.status === 'CLOSED' ? 'bg-emerald-50 text-emerald-700' : selected.in_signature ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'
               }`}
             >
-              {selected.status === 'CLOSED' ? 'Cerrada' : 'Borrador'}
+              {selected.status === 'CLOSED' ? 'Cerrada' : selected.in_signature ? 'En firma' : 'Borrador'}
             </span>
           </div>
         </div>
@@ -392,10 +392,14 @@ export const RhCompetencyEvaluationsPage = () => {
                         <div className="flex items-center gap-2">
                           <span
                             className={`rounded-full px-2 py-0.5 font-semibold ${
-                              evaluation.status === 'CLOSED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                              evaluation.status === 'CLOSED'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : evaluation.in_signature
+                                  ? 'bg-sky-50 text-sky-700'
+                                  : 'bg-amber-50 text-amber-700'
                             }`}
                           >
-                            {evaluation.status === 'CLOSED' ? 'Cerrada' : 'Borrador'}
+                            {evaluation.status === 'CLOSED' ? 'Cerrada' : evaluation.in_signature ? 'En firma' : 'Borrador'}
                           </span>
                           {evaluation.status === 'CLOSED' && evaluation.results.authorization_result === 'PENDIENTE' && canAuthorize ? (
                             <button
@@ -410,7 +414,7 @@ export const RhCompetencyEvaluationsPage = () => {
                               <ShieldCheck size={12} /> Autorizar
                             </button>
                           ) : null}
-                          {evaluation.status === 'DRAFT' && (
+                          {evaluation.status === 'DRAFT' && !evaluation.in_signature && (
                             <button
                               type="button"
                               onClick={(event) => {

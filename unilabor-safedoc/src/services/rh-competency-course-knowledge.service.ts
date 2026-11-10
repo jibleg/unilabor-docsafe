@@ -7,6 +7,7 @@ import {
   KNOWLEDGE_ACTIVE_STATUSES,
   syncKnowledgeFromAssignment,
   type CompetencyEvaluationRecord,
+  assertEvaluationEditable,
 } from './rh-competency-evaluation.service';
 
 // -----------------------------------------------------------------------------
@@ -209,9 +210,7 @@ export interface AssignCourseKnowledgeInput {
 }
 
 const assertEditable = (evaluation: CompetencyEvaluationRecord): void => {
-  if (evaluation.status !== 'DRAFT') {
-    throwCoded('RH_COMP_EVAL_ALREADY_CLOSED', 'La evaluacion ya esta cerrada; no se puede modificar.');
-  }
+  assertEvaluationEditable(evaluation);
   if (evaluation.knowledge_quiz && KNOWLEDGE_ACTIVE_STATUSES.includes(evaluation.knowledge_quiz.status)) {
     throwCoded(
       'RH_COMP_EVAL_KNOWLEDGE_ACTIVE',

@@ -9,7 +9,6 @@ import {
   cancelKnowledgeQuizController,
   issueCompetencyCertificateController,
   listApprovedPositionQuestionsController,
-  closeCompetencyEvaluationController,
   createCompetencyEvaluationController,
   deleteCompetencyEvaluationController,
   getCompetencyEvaluationController,
@@ -19,6 +18,12 @@ import {
   updateCompetencyEvaluationController,
   authorizeCompetencyEvaluationController,
 } from '../controllers/rh-competency-evaluation.controller';
+import {
+  cancelCompetencySignatureController,
+  getCompetencyPdfController,
+  getCompetencySignersController,
+  sendCompetencyToSignatureController,
+} from '../controllers/rh-phase7-signature.controller';
 import {
   getCompetencyDashboardController,
   getCompetencyEmployeeDetailController,
@@ -36,7 +41,7 @@ import { generateQuestionBankSchema, reviewQuestionBankItemSchema } from '../sch
 import {
   assignKnowledgeQuizSchema,
   assignCourseKnowledgeSchema,
-  closeCompetencyEvaluationSchema,
+  sendCompetencyToSignatureSchema,
   createCompetencyEvaluationSchema,
   replaceActionsSchema,
   replaceSectionItemsSchema,
@@ -74,7 +79,11 @@ router.get('/:id', getCompetencyEvaluationController);
 router.patch('/:id', validate(updateCompetencyEvaluationSchema), updateCompetencyEvaluationController);
 router.put('/:id/items', validate(replaceSectionItemsSchema), replaceCompetencySectionItemsController);
 router.put('/:id/actions', validate(replaceActionsSchema), replaceCompetencyActionsController);
-router.post('/:id/close', validate(closeCompetencyEvaluationSchema), closeCompetencyEvaluationController);
+// Buzon de firmas: enviar (bloquea y pide las 5 firmas), cancelar el envio, firmantes y PDF.
+router.post('/:id/send-to-signature', validate(sendCompetencyToSignatureSchema), sendCompetencyToSignatureController);
+router.delete('/:id/signature-request', cancelCompetencySignatureController);
+router.get('/:id/signers', getCompetencySignersController);
+router.get('/:id/pdf', getCompetencyPdfController);
 router.post('/:id/knowledge-quiz', validate(assignKnowledgeQuizSchema), assignKnowledgeQuizController);
 router.delete('/:id/knowledge-quiz', cancelKnowledgeQuizController);
 router.get('/:id/knowledge-courses', listKnowledgeCourseOptionsController);

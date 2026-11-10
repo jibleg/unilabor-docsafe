@@ -11,6 +11,7 @@ import {
   getEvaluationById,
   KNOWLEDGE_ACTIVE_STATUSES,
   type CompetencyEvaluationRecord,
+  assertEvaluationEditable,
 } from './rh-competency-evaluation.service';
 import { COMPETENCY_KNOWLEDGE_COURSE_PREFIX } from './rh-competency-knowledge.constants';
 
@@ -155,9 +156,7 @@ export const assignKnowledgeQuiz = async (input: AssignKnowledgeQuizInput): Prom
   if (!evaluation) {
     return throwCoded('RH_COMP_EVAL_NOT_FOUND', 'La evaluacion indicada no existe.');
   }
-  if (evaluation.status !== 'DRAFT') {
-    return throwCoded('RH_COMP_EVAL_ALREADY_CLOSED', 'La evaluacion ya esta cerrada; no se puede modificar.');
-  }
+  assertEvaluationEditable(evaluation);
   if (evaluation.knowledge_quiz && KNOWLEDGE_ACTIVE_STATUSES.includes(evaluation.knowledge_quiz.status)) {
     return throwCoded(
       'RH_COMP_EVAL_KNOWLEDGE_ACTIVE',
@@ -264,9 +263,7 @@ export const cancelKnowledgeQuiz = async (
   if (!evaluation) {
     return throwCoded('RH_COMP_EVAL_NOT_FOUND', 'La evaluacion indicada no existe.');
   }
-  if (evaluation.status !== 'DRAFT') {
-    return throwCoded('RH_COMP_EVAL_ALREADY_CLOSED', 'La evaluacion ya esta cerrada; no se puede modificar.');
-  }
+  assertEvaluationEditable(evaluation);
   if (!evaluation.knowledge_quiz) {
     return throwCoded('RH_COMP_EVAL_KNOWLEDGE_NOT_ASSIGNED', 'Esta evaluacion no tiene cuestionario asignado.');
   }

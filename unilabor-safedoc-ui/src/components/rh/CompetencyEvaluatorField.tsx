@@ -89,7 +89,7 @@ const EvaluatorEditor = ({ evaluation, onChanged, onClose }: CompetencyEvaluator
  */
 export const CompetencyEvaluatorField = ({ evaluation, onChanged }: CompetencyEvaluatorFieldProps) => {
   const [editing, setEditing] = useState(false);
-  const editable = evaluation.status === 'DRAFT';
+  const editable = evaluation.status === 'DRAFT' && !evaluation.in_signature;
   const missing = !evaluation.evaluator_name.trim();
 
   if (editable && editing) {
