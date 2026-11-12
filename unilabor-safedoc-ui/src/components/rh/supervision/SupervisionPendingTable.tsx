@@ -5,7 +5,15 @@ import { getApiErrorMessage } from '../../../api/service.parsers';
 import type { SupervisionPendingRow } from '../../../types/models';
 import { notifyError, notifySuccess } from '../../../utils/notify';
 import { SearchableSelect, type SearchableOption } from '../../SearchableSelect';
-import { SIGNERS_TOTAL, formatPct } from './supervision-ui';
+import {
+  PENDING_ROW_STATES,
+  PENDING_STATE_UI,
+  SIGNERS_TOTAL,
+  countPendingStates,
+  formatPct,
+  pendingRowState,
+  type PendingRowState,
+} from './supervision-ui';
 import { useEmployeeOptions } from './useEmployeeOptions';
 
 interface SupervisionPendingTableProps {
@@ -20,6 +28,16 @@ interface SupervisionPendingTableProps {
 // Valor del filtro para los colaboradores sin sucursal en su ficha.
 const NO_UNIT = '__sin_sucursal__';
 
+/** Texto de la columna Estado: la etiqueta del estado con su dato (firmas, porcentaje, numero de intermedias). */
+const stateLabel = (row: SupervisionPendingRow, state: PendingRowState): string => {
+  const label = PENDING_STATE_UI[state].label;
+  if (state === 'IN_SIGNATURE') return `${label} (${row.draft_signatures_done}/${SIGNERS_TOTAL})`;
+  if (state === 'PASSED') return `${label} ${formatPct(row.evaluation_percentage)}`;
+  if (state === 'FAILED') return `${label} ${formatPct(row.last_closed_pct ?? row.evaluation_percentage)}`;
+  if (state === 'INTERMEDIATE') return `${row.closed_count} supervisión(es) intermedia(s)`;
+  return label;
+};
+
 /**
  * Colaboradores con la Fase 6 en curso, agrupados por área del puesto. RH
  * asigna el Supervisor / Auditor de cada colaborador en su puesto (uno por
@@ -32,6 +50,7 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
   const [bulkSupervisor, setBulkSupervisor] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [unitFilter, setUnitFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState<PendingRowState | ''>('');
 
   const unitOptions = useMemo<SearchableOption[]>(() => {
     const names = [...new Set(rows.map((row) => row.branch_name).filter((name): name is string => Boolean(name)))].sort((a, b) => a.localeCompare(b));
@@ -40,13 +59,26 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
   }, [rows]);
   // Una unidad que ya no tiene pendientes (tras recargar la bandeja) deja de filtrar.
   const activeUnit = unitOptions.some((option) => option.value === unitFilter) ? unitFilter : '';
-  const visibleRows = useMemo(
+  const unitRows = useMemo(
     () => (activeUnit ? rows.filter((row) => (row.branch_name ?? NO_UNIT) === activeUnit) : rows),
     [rows, activeUnit],
+  );
+  // Los contadores del filtro de estado respetan la unidad elegida.
+  const stateCounts = useMemo(() => countPendingStates(unitRows), [unitRows]);
+  const stateOptions = PENDING_ROW_STATES.filter((state) => (stateCounts[state] ?? 0) > 0);
+  // Un estado que ya no tiene filas (tras recargar o cambiar de unidad) deja de filtrar.
+  const activeState = stateFilter && stateOptions.includes(stateFilter) ? stateFilter : '';
+  const visibleRows = useMemo(
+    () => (activeState ? unitRows.filter((row) => pendingRowState(row) === activeState) : unitRows),
+    [unitRows, activeState],
   );
   const changeUnit = (value: string) => {
     setUnitFilter(value);
     // La seleccion en bloque solo debe abarcar lo que se ve.
+    setSelectedIds(new Set());
+  };
+  const changeState = (value: PendingRowState | '') => {
+    setStateFilter(value);
     setSelectedIds(new Set());
   };
 
@@ -106,18 +138,46 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
   }
   return (
     <div className="space-y-4">
-      {unitOptions.length > 1 ? (
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {unitOptions.length > 1 ? (
           <div className="w-full max-w-xs">
             <SearchableSelect value={activeUnit} options={unitOptions} onChange={changeUnit} placeholder="Todas las unidades" emptyLabel="Todas las unidades" searchPlaceholder="Buscar unidad..." />
           </div>
-          {activeUnit ? (
-            <span className="text-xs text-[var(--unilabor-neutral)]">
-              {visibleRows.length} de {rows.length} pendiente(s)
-            </span>
-          ) : null}
+        ) : null}
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtrar por estado">
+          <button
+            type="button"
+            aria-pressed={!activeState}
+            onClick={() => changeState('')}
+            className={`rounded-full border px-3 py-1 text-xs font-bold transition ${
+              activeState ? 'border-[rgba(0,65,106,0.14)] bg-white text-[var(--color-brand-700)] hover:bg-[rgba(191,212,230,0.3)]' : 'border-[var(--color-brand-700)] bg-[var(--color-brand-700)] text-white'
+            }`}
+          >
+            Todos · {unitRows.length}
+          </button>
+          {stateOptions.map((state) => {
+            const ui = PENDING_STATE_UI[state];
+            const active = activeState === state;
+            return (
+              <button
+                key={state}
+                type="button"
+                aria-pressed={active}
+                title={ui.title}
+                onClick={() => changeState(active ? '' : state)}
+                className={`rounded-full border px-3 py-1 text-xs font-bold transition hover:opacity-85 ${active ? ui.active : ui.chip}`}
+              >
+                {ui.label} · {stateCounts[state]}
+              </button>
+            );
+          })}
         </div>
-      ) : null}
+        {activeUnit || activeState ? (
+          <span className="text-xs text-[var(--unilabor-neutral)]">
+            {visibleRows.length} de {rows.length}
+          </span>
+        ) : null}
+      </div>
       {selectedIds.size > 0 ? (
         <div className="sticky top-2 z-10 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--color-brand-300)] bg-white px-4 py-3 shadow-sm">
           <UserCheck size={16} className="text-[var(--color-brand-700)]" />
@@ -167,6 +227,7 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
             <tbody className="divide-y divide-[rgba(0,65,106,0.08)]">
               {items.map((row) => {
                 const opening = openingEnrollmentId === row.enrollment_id;
+                const state = pendingRowState(row);
                 return (
                   <tr key={row.enrollment_id} className="hover:bg-[rgba(248,251,253,0.9)]">
                     <td className="pl-4 py-2">
@@ -194,25 +255,9 @@ export const SupervisionPendingTable = ({ rows, loading, openingEnrollmentId, on
                     <td className="px-3 py-2 text-xs">{row.branch_name ?? '—'}</td>
                     <td className="px-3 py-2 text-xs">{row.days_in_phase !== null ? `${row.days_in_phase} d` : '—'}</td>
                     <td className="px-3 py-2 text-xs">
-                      {row.draft_status === 'PENDING_SIGNATURES' ? (
-                        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-semibold text-sky-700">
-                          En firma ({row.draft_signatures_done}/{SIGNERS_TOTAL})
-                        </span>
-                      ) : row.draft_checklist_id ? (
-                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">Borrador abierto</span>
-                      ) : row.evaluation_status === 'passed' ? (
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
-                          Acreditada {formatPct(row.evaluation_percentage)}
-                        </span>
-                      ) : row.evaluation_status === 'failed' ? (
-                        <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-700">
-                          No acreditó {formatPct(row.last_closed_pct ?? row.evaluation_percentage)}
-                        </span>
-                      ) : row.closed_count > 0 ? (
-                        <span className="text-[var(--unilabor-neutral)]">{row.closed_count} supervisión(es) intermedia(s)</span>
-                      ) : (
-                        <span className="text-[var(--unilabor-neutral)]">Sin lista</span>
-                      )}
+                      <span className={`rounded-full border px-2 py-0.5 font-semibold ${PENDING_STATE_UI[state].chip}`} title={PENDING_STATE_UI[state].title}>
+                        {stateLabel(row, state)}
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-right">
                       <button

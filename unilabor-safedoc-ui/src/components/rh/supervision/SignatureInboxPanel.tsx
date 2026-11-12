@@ -150,7 +150,7 @@ export const SignatureInboxPanel = ({ entry, onBusyChange, onSigned }: Signature
 
       {pendingRoles.length > 0 ? (
         <section className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(248,251,253,0.9)] p-4">
-          <SignaturePad label={`Tu firma · ${describeSignerRoles(pendingRoles)}`} hint="Firma con el dedo, lápiz o mouse" onChange={setSignature} />
+          <SignaturePad label={`Tu firma · ${describeSignerRoles(pendingRoles)}`} hint="Firma con el dedo, lápiz o mouse, o carga una imagen de tu firma" onChange={setSignature} allowUpload />
           <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">
             {pendingRoles.length > 1
               ? `Ocupas dos roles en esta lista: tu firma quedará registrada como ${describeSignerRoles(pendingRoles)}.`

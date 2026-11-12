@@ -7,12 +7,12 @@ import {
   POSITION_EVALUATION_STATE_LABEL,
 } from './rh-induction-position-evaluation';
 import {
-  hasPositionInProgress,
+  activatesPositionsInParallel,
+  activationCandidates,
   isTrackComplete,
   nextSequence,
   orderPositions,
   planTrackChanges,
-  queuedInOrder,
   type TrackEntry,
   type TrackPosition,
   type TrackQueueStatus,
@@ -30,11 +30,14 @@ import {
 // Ruta por puesto de las Fases 5 y 6 (decision RH 2026-10-07).
 //
 // Al entrar a la fase se crea UNA inscripcion por cada puesto elegible del
-// colaborador: la primera se activa (lecturas, plazo, SMS / practica) y las
-// demas quedan EN COLA. Al acreditar un puesto se activa el siguiente sin
-// descanso. Si RH da de baja un puesto, su inscripcion no aprobada se cancela
-// (baja logica, se conserva la evidencia); si le agrega uno, se forma al
-// final. Solo con TODOS los puestos aprobados puede entrar a la fase siguiente.
+// colaborador. En la Fase 5 la primera se activa (lecturas, plazo, SMS) y las
+// demas quedan EN COLA; al acreditar un puesto se activa el siguiente sin
+// descanso. En la Fase 6 (decision RH 2026-11-12) se activan TODAS a la vez:
+// solo queda en cola el puesto que aun no puede activarse (sin habilitar o
+// con la practica sin publicar). Si RH da de baja un puesto, su inscripcion no
+// aprobada se cancela (baja logica, se conserva la evidencia); si le agrega
+// uno, se forma al final. Solo con TODOS los puestos aprobados puede entrar a
+// la fase siguiente.
 // -----------------------------------------------------------------------------
 
 export type PositionTrackPhase = 5 | 6;
@@ -227,7 +230,10 @@ const activateEnrollment = async (
 export interface TrackSyncResult {
   cancelled: number[];
   queued: number[];
+  /** Primera inscripcion activada en esta pasada (null si ninguna). */
   activated: number | null;
+  /** Todas las inscripciones activadas en esta pasada (varias solo en la Fase 6). */
+  activated_all: number[];
   /** Motivo por el que el siguiente puesto en cola no pudo activarse (null si no aplica). */
   waiting_reason: string | null;
 }
@@ -257,16 +263,17 @@ const insertQueued = async (
 
 /**
  * Lleva la ruta del colaborador al estado correcto: baja logica de puestos
- * retirados, forma los puestos nuevos y, si no hay un puesto en curso, activa
- * el siguiente de la cola que ya pueda activarse. Idempotente. Solo actua si
- * el colaborador ya entro a la fase (tiene alguna inscripcion en ella).
+ * retirados, forma los puestos nuevos y activa lo que toque de la cola: en la
+ * Fase 5, el siguiente puesto si no hay uno en curso; en la Fase 6, todos los
+ * que ya puedan activarse. Idempotente. Solo actua si el colaborador ya entro
+ * a la fase (tiene alguna inscripcion en ella).
  */
 export const syncEmployeePositionTrack = async (
   employeeId: number,
   phaseNumber: PositionTrackPhase,
   actorUserId: string | null,
 ): Promise<TrackSyncResult> => {
-  const result: TrackSyncResult = { cancelled: [], queued: [], activated: null, waiting_reason: null };
+  const result: TrackSyncResult = { cancelled: [], queued: [], activated: null, activated_all: [], waiting_reason: null };
   const phase = await loadTrackPhase(phaseNumber);
   let entries = await loadTrackEntries(employeeId, phase.id);
   if (entries.length === 0) {
@@ -291,7 +298,9 @@ export const syncEmployeePositionTrack = async (
     entries = await loadTrackEntries(employeeId, phase.id);
   }
 
-  if (hasPositionInProgress(entries)) {
+  const parallel = activatesPositionsInParallel(phaseNumber);
+  const candidates = activationCandidates(entries, parallel);
+  if (candidates.length === 0) {
     return result;
   }
   const employeeUserId = await loadEmployeeUserId(employeeId);
@@ -300,20 +309,23 @@ export const syncEmployeePositionTrack = async (
     return result;
   }
   const actor = actorUserId ?? employeeUserId;
-  // Un puesto tras otro; si el siguiente aun no puede activarse (puesto sin
-  // habilitar, cuestionario sin publicar) se intenta el que sigue para no
-  // detener al colaborador: el pendiente se activa al quedar listo.
-  for (const queued of queuedInOrder(entries)) {
+  // Si un puesto aun no puede activarse (sin habilitar, evaluacion sin
+  // publicar) se intenta el que sigue para no detener al colaborador: el
+  // pendiente se activa al quedar listo. En secuencia basta con activar uno.
+  for (const queued of candidates) {
     const check = await checkPositionActivation(phase, queued.position_id);
     if (!check.ok) {
       result.waiting_reason = result.waiting_reason ?? check.reason;
       continue;
     }
     if (await activateEnrollment(queued.enrollment_id, phase, check, employeeUserId, actor)) {
-      result.activated = queued.enrollment_id;
+      result.activated = result.activated ?? queued.enrollment_id;
+      result.activated_all.push(queued.enrollment_id);
     }
-    result.waiting_reason = null;
-    break;
+    if (!parallel) {
+      result.waiting_reason = null;
+      break;
+    }
   }
   return result;
 };
@@ -341,8 +353,9 @@ export const isEmployeePositionPhaseComplete = async (employeeId: number, phaseN
 
 /**
  * Entrada a la fase por puesto: crea la ruta completa (una inscripcion por
- * puesto elegible) y activa el primero. Si ningun puesto puede activarse aun,
- * no crea nada (nadie queda inscrito en el limbo).
+ * puesto elegible) y activa el primero (Fase 5) o todos los que ya puedan
+ * (Fase 6). Si ningun puesto puede activarse aun, no crea nada (nadie queda
+ * inscrito en el limbo).
  */
 export const startEmployeePositionTrack = async (
   employeeId: number,
@@ -468,7 +481,7 @@ export const trySyncEmployeePositionTracks = async (employeeId: number, actorUse
       if (result.activated || result.cancelled.length > 0 || result.queued.length > 0) {
         console.info(
           `Induccion Fase ${phaseNumber}: ruta por puesto del colaborador ${employeeId} sincronizada ` +
-            `(activada ${result.activated ?? '-'}, en cola +${result.queued.length}, bajas ${result.cancelled.length}).`,
+            `(activada ${result.activated_all.join(', ') || '-'}, en cola +${result.queued.length}, bajas ${result.cancelled.length}).`,
         );
       }
     } catch (error) {

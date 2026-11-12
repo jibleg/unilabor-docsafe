@@ -104,7 +104,7 @@ export const SupervisionCloseModal = ({ checklist, onClose, onSent }: Supervisio
                 <span className="block text-xs leading-5 text-[var(--unilabor-neutral)]">
                   Al cerrarse, el porcentaje se registra como calificación de la práctica del puesto:{' '}
                   {summary.passed
-                    ? 'acredita la Fase 6 (≥ 80 %), se emite su constancia y se activa el siguiente puesto de su ruta.'
+                    ? 'acredita la Fase 6 de este puesto (≥ 80 %) y se emite su constancia.'
                     : 'NO acredita (< 80 %); RH deberá programar una nueva supervisión.'}{' '}
                   Desmárcala si es una supervisión intermedia.
                 </span>

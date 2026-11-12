@@ -87,8 +87,8 @@ export const buildPracticalStartedSms = (ctx: PositionStepContext): { subject: s
   body: phaseStartBody(
     ctx,
     (label) => `SafeDoc: ${label}: inicia tu practica supervisada. El responsable de tu area te evaluara en sitio.`,
-    (position) =>
-      `SafeDoc: Fase ${ctx.phaseNumber}: inicia tu practica supervisada, puesto por puesto (${ctx.total} en total); empiezas con ${position}. Te evaluaran en sitio.`,
+    // Fase 6: todos los puestos inician a la vez (decision RH 2026-11-12), no hay "primer" puesto que nombrar.
+    () => `SafeDoc: Fase ${ctx.phaseNumber}: inicia tu practica supervisada en tus ${ctx.total} puestos a la vez. Te evaluaran en sitio en cada uno.`,
   ),
 });
 

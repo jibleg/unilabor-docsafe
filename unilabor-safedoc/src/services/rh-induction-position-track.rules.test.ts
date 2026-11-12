@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activatesPositionsInParallel,
+  activationCandidates,
   hasPositionInProgress,
   isTrackComplete,
   nextSequence,
@@ -60,6 +62,23 @@ describe('ruta por puesto (Fases 5-6)', () => {
     expect(hasPositionInProgress([entry({ position_id: 1 })])).toBe(true);
     expect(hasPositionInProgress([entry({ position_id: 1, passed: true })])).toBe(false);
     expect(hasPositionInProgress([entry({ position_id: 1, queue_status: 'QUEUED' })])).toBe(false);
+  });
+
+  it('solo la Fase 6 activa todos los puestos a la vez', () => {
+    expect(activatesPositionsInParallel(5)).toBe(false);
+    expect(activatesPositionsInParallel(6)).toBe(true);
+  });
+
+  it('en secuencia no activa nada mientras haya un puesto en curso; en paralelo activa toda la cola', () => {
+    const entries = [
+      entry({ position_id: 1, sequence: 1 }),
+      entry({ position_id: 3, sequence: 3, queue_status: 'QUEUED' }),
+      entry({ position_id: 2, sequence: 2, queue_status: 'QUEUED' }),
+    ];
+    expect(activationCandidates(entries, false)).toEqual([]);
+    expect(activationCandidates(entries, true).map((e) => e.position_id)).toEqual([2, 3]);
+    const free = entries.map((e) => (e.position_id === 1 ? { ...e, passed: true } : e));
+    expect(activationCandidates(free, false).map((e) => e.position_id)).toEqual([2, 3]);
   });
 
   it('activa la cola en orden de secuencia', () => {

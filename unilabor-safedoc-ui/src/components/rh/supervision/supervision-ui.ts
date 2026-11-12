@@ -1,4 +1,11 @@
-import type { SupervisionConclusion, SupervisionResult, SupervisionSigner, SupervisionSignerRole } from '../../../types/models';
+import type {
+  SupervisionChecklistSection,
+  SupervisionConclusion,
+  SupervisionPendingRow,
+  SupervisionResult,
+  SupervisionSigner,
+  SupervisionSignerRole,
+} from '../../../types/models';
 
 /** Estilos y etiquetas compartidos de la Lista de verificacion ANA-REG-060. */
 
@@ -57,3 +64,91 @@ export const signerIssue = (signer: SupervisionSigner): string | null => {
 
 export const formatDateTime = (value: string | null | undefined): string =>
   value ? new Date(value).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+/**
+ * Captura rapida: lo que el supervisor aun no califica queda en SI (o en N/A si
+ * el aspecto no aplica al puesto). Nunca pisa lo ya calificado: asi puede
+ * marcar primero los incumplimientos y completar el resto de un clic, o al
+ * reves. Devuelve los resultados a aplicar por aspecto.
+ */
+export const quickFillPending = (
+  sections: SupervisionChecklistSection[],
+  current: Record<number, { result: SupervisionResult | null }>,
+): Record<number, SupervisionResult> => {
+  const fill: Record<number, SupervisionResult> = {};
+  for (const section of sections) {
+    for (const item of section.items) {
+      if (current[item.item_id]?.result) continue;
+      fill[item.item_id] = item.position_na ? 'NA' : 'SI';
+    }
+  }
+  return fill;
+};
+
+/** Estado de una inscripcion en la bandeja de la Fase 6 (lo que muestra la columna Estado). */
+export type PendingRowState = 'IN_SIGNATURE' | 'DRAFT' | 'NO_LIST' | 'INTERMEDIATE' | 'FAILED' | 'PASSED';
+
+/** Orden en que se ofrecen en el filtro: de lo mas cercano a cerrarse a lo ya acreditado. */
+export const PENDING_ROW_STATES: PendingRowState[] = ['IN_SIGNATURE', 'DRAFT', 'NO_LIST', 'INTERMEDIATE', 'FAILED', 'PASSED'];
+
+export const PENDING_STATE_UI: Record<PendingRowState, { label: string; chip: string; active: string; title: string }> = {
+  IN_SIGNATURE: {
+    label: 'En firma',
+    chip: 'border-sky-200 bg-sky-50 text-sky-700',
+    active: 'border-sky-600 bg-sky-600 text-white',
+    title: 'Lista enviada al Buzón de firmas: faltan firmas para cerrarla',
+  },
+  DRAFT: {
+    label: 'Borrador abierto',
+    chip: 'border-amber-200 bg-amber-50 text-amber-700',
+    active: 'border-amber-500 bg-amber-500 text-white',
+    title: 'Lista en captura: el supervisor aún no la envía a firma',
+  },
+  NO_LIST: {
+    label: 'Sin lista',
+    chip: 'border-slate-200 bg-slate-50 text-slate-600',
+    active: 'border-slate-600 bg-slate-600 text-white',
+    title: 'Aún no se abre la lista ANA-REG-060 de esta inscripción',
+  },
+  INTERMEDIATE: {
+    label: 'Intermedia',
+    chip: 'border-violet-200 bg-violet-50 text-violet-700',
+    active: 'border-violet-600 bg-violet-600 text-white',
+    title: 'Solo tiene supervisiones intermedias cerradas; falta la lista final',
+  },
+  FAILED: {
+    label: 'No acreditó',
+    chip: 'border-rose-200 bg-rose-50 text-rose-700',
+    active: 'border-rose-600 bg-rose-600 text-white',
+    title: 'La lista final quedó por debajo de 80 %: requiere nueva supervisión',
+  },
+  PASSED: {
+    label: 'Acreditada',
+    chip: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    active: 'border-emerald-600 bg-emerald-600 text-white',
+    title: 'Fase 6 acreditada en este puesto',
+  },
+};
+
+/** La lista en curso manda sobre el resultado previo: una acreditada con borrador abierto se ve como borrador. */
+export const pendingRowState = (
+  row: Pick<SupervisionPendingRow, 'draft_status' | 'draft_checklist_id' | 'evaluation_status' | 'closed_count'>,
+): PendingRowState => {
+  if (row.draft_status === 'PENDING_SIGNATURES') return 'IN_SIGNATURE';
+  if (row.draft_checklist_id) return 'DRAFT';
+  if (row.evaluation_status === 'passed') return 'PASSED';
+  if (row.evaluation_status === 'failed') return 'FAILED';
+  return row.closed_count > 0 ? 'INTERMEDIATE' : 'NO_LIST';
+};
+
+/** Cuantas inscripciones hay en cada estado (solo los que aparecen). */
+export const countPendingStates = (
+  rows: Array<Pick<SupervisionPendingRow, 'draft_status' | 'draft_checklist_id' | 'evaluation_status' | 'closed_count'>>,
+): Partial<Record<PendingRowState, number>> => {
+  const counts: Partial<Record<PendingRowState, number>> = {};
+  for (const row of rows) {
+    const state = pendingRowState(row);
+    counts[state] = (counts[state] ?? 0) + 1;
+  }
+  return counts;
+};

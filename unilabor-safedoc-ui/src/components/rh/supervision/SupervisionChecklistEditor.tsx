@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, FileText, Loader2, Lock, RefreshCw, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react';
+import { CheckCheck, ExternalLink, FileText, Loader2, Lock, RefreshCw, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   cancelSupervisionSignature,
@@ -29,6 +29,7 @@ import {
   inputClass,
   labelClass,
   primaryButtonClass,
+  quickFillPending,
   todayIsoDate,
 } from './supervision-ui';
 import { useEmployeeOptions } from './useEmployeeOptions';
@@ -137,6 +138,20 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
       return next;
     });
     markDirty();
+  };
+
+  /** Captura rapida: todo lo pendiente queda en SI (N/A si no aplica al puesto); lo ya calificado no se toca. */
+  const handleQuickFill = () => {
+    const fill = quickFillPending(checklist.sections, values);
+    const ids = Object.keys(fill).map(Number);
+    if (ids.length === 0) return;
+    setValues((current) => {
+      const next = { ...current };
+      for (const id of ids) next[id] = { ...(current[id] ?? { result: null, observations: '' }), result: fill[id]! };
+      return next;
+    });
+    markDirty();
+    notifyInfo(`${ids.length} aspecto(s) pendiente(s) marcados como cumple. Ajusta los que no cumplan antes de enviar a firma.`);
   };
 
   /** Guarda cabecera + resultados; devuelve la lista actualizada (o null si falló). */
@@ -470,6 +485,16 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
               <span className="text-xs text-[var(--unilabor-neutral)]">{summary.pending > 0 ? `${summary.pending} sin calificar` : '—'}</span>
             )}
           </div>
+          {!readOnly && summary.pending > 0 ? (
+            <button
+              type="button"
+              onClick={handleQuickFill}
+              className={`${buttonClass} ml-auto`}
+              title="Marca como SÍ todo lo que falta por calificar (N/A en lo que no aplica al puesto). No cambia lo que ya calificaste."
+            >
+              <CheckCheck size={16} /> Todo cumple
+            </button>
+          ) : null}
         </div>
       </section>
 

@@ -11,6 +11,7 @@ import {
 import { supervisionFolio } from './rh-supervision-checklist.rules';
 import {
   getSupervisionChecklist,
+  lockSupervisionEnrollment,
   updateSupervisionChecklist,
   type SupervisionChecklistRecord,
   type SupervisionChecklistStatus,
@@ -96,6 +97,23 @@ export const sendChecklistToSignature = async (input: SendToSignatureInput): Pro
     const issues = signerIssues(record.signers);
     if (issues.length > 0) {
       throwCoded('RH_SUPERVISION_SIGNERS_NOT_READY', `No se envio a firma. ${issues.join(' ')}`);
+    }
+    if (record.enrollment_id) {
+      // Una inscripcion solo puede tener UNA lista en firma: dos cerradas sobre la misma
+      // inscripcion calificarian dos veces la practica del puesto.
+      await lockSupervisionEnrollment(client, record.enrollment_id);
+      const other = await client.query(
+        `SELECT folio FROM public.rh_supervision_checklists
+          WHERE enrollment_id = $1 AND id <> $2 AND status = 'PENDING_SIGNATURES' ORDER BY id ASC LIMIT 1;`,
+        [record.enrollment_id, input.id],
+      );
+      if (other.rows.length > 0) {
+        throwCoded(
+          'RH_SUPERVISION_ENROLLMENT_IN_SIGNATURE',
+          `Este colaborador ya tiene la lista ${String(other.rows[0].folio)} en firma para este puesto. ` +
+            'Cancela ese envio si quieres enviar esta, o elimina este borrador.',
+        );
+      }
     }
     await client.query(
       `UPDATE public.rh_supervision_checklists

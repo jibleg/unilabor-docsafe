@@ -61,7 +61,7 @@ export const BatchSignPanel = ({ entries, onBusyChange, onSigned }: BatchSignPan
         </span>
       </label>
 
-      <SignaturePad label="Tu firma" hint="Se aplicará a todos los registros seleccionados" onChange={setSignature} />
+      <SignaturePad label="Tu firma" hint="Se aplicará a todos los registros seleccionados" onChange={setSignature} allowUpload />
 
       <div className="flex justify-end">
         <button type="button" onClick={() => void sign()} disabled={busy} className={primaryButtonClass}>

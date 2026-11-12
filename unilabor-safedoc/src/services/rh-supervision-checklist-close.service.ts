@@ -128,8 +128,8 @@ const readPng = (filePath: string | null): Buffer | null => {
 };
 
 /**
- * Que sigue para el colaborador tras acreditar el puesto. El siguiente puesto
- * lo activa el motor de la ruta por puesto. Al acreditar el ultimo, la Fase 7 se
+ * Que sigue para el colaborador tras acreditar el puesto. En la Fase 6 todos
+ * sus puestos corren a la vez: se informa cuales le faltan. Al acreditar el ultimo, la Fase 7 se
  * abre sola (REH-REG-003 inicial del primer puesto): aqui se informa lo que
  * realmente paso con ella (abierta, con o sin evaluador, o por que no se abrio).
  */
@@ -139,8 +139,10 @@ const describeNextStep = async (employeeId: number, phase7: Phase7AutoStartOutco
       return ` Con este puesto concluyo la Fase 6 en todos sus puestos. ${describePhase7AutoStart(phase7)}`.trimEnd();
     }
     const phase = await loadTrackPhase(6);
-    const next = (await loadTrackEntries(employeeId, phase.id)).find((entry) => entry.queue_status !== 'CANCELLED' && !entry.passed);
-    return next ? ` Sigue el puesto ${next.position_code} de su ruta en la Fase 6.` : '';
+    const pending = (await loadTrackEntries(employeeId, phase.id)).filter((entry) => entry.queue_status !== 'CANCELLED' && !entry.passed);
+    if (pending.length === 0) return '';
+    const codes = pending.map((entry) => entry.position_code).join(', ');
+    return pending.length === 1 ? ` Le falta el puesto ${codes} en la Fase 6.` : ` Le faltan ${pending.length} puestos en la Fase 6 (${codes}).`;
   } catch {
     return '';
   }

@@ -21,9 +21,11 @@ const pendingSignatures = (item: RhInductionProgressItem): number =>
   item.evaluation_status === 'passed' ? (item.reading_to_sign ?? 0) : 0;
 
 const stepStatus = (item: RhInductionProgressItem): { label: string; icon: typeof BookOpenCheck; done: boolean } => {
-  // Ruta por puesto: los puestos se cursan uno tras otro.
+  // Ruta por puesto: en la Fase 5 se cursan uno tras otro; en la Fase 6 todos a la
+  // vez, y solo queda en cola el puesto que RH aun no tiene listo.
   if (item.queue_status === 'QUEUED') {
-    return { label: 'En cola: inicia al acreditar tu puesto anterior', icon: Clock3, done: false };
+    const label = item.phase_number === 6 ? 'En cola: inicia cuando RH habilite este puesto' : 'En cola: inicia al acreditar tu puesto anterior';
+    return { label, icon: Clock3, done: false };
   }
   if (item.evaluation_status === 'passed') {
     const toSign = pendingSignatures(item);

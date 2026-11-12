@@ -4,6 +4,10 @@
 // Decision RH (2026-10-07): las fases por puesto se cursan por CADA puesto
 // activo del colaborador, un puesto tras otro y sin descanso entre ellos; solo
 // se avanza a la fase siguiente cuando TODOS los puestos aprobaron la anterior.
+//
+// Decision RH (2026-11-12): en la Fase 6 (practica supervisada) todos los
+// puestos se activan A LA VEZ, para que cada supervisor evalue sin esperar a
+// los demas. La Fase 5 (lecturas + cuestionario) sigue un puesto tras otro.
 // -----------------------------------------------------------------------------
 
 export type TrackQueueStatus = 'QUEUED' | 'ACTIVE' | 'CANCELLED';
@@ -65,6 +69,16 @@ export const hasPositionInProgress = (entries: TrackEntry[]): boolean =>
 /** Puestos en cola en el orden en que deben activarse. */
 export const queuedInOrder = (entries: TrackEntry[]): TrackEntry[] =>
   entries.filter((entry) => entry.queue_status === 'QUEUED').sort((a, b) => a.sequence - b.sequence);
+
+/** La fase activa todos los puestos del colaborador a la vez (Fase 6) en lugar de uno tras otro (Fase 5). */
+export const activatesPositionsInParallel = (phaseNumber: number): boolean => phaseNumber === 6;
+
+/**
+ * Inscripciones en cola que toca intentar activar ahora, en orden. En paralelo
+ * son todas; en secuencia, ninguna mientras haya un puesto en curso.
+ */
+export const activationCandidates = (entries: TrackEntry[], parallel: boolean): TrackEntry[] =>
+  !parallel && hasPositionInProgress(entries) ? [] : queuedInOrder(entries);
 
 /**
  * La fase esta completa para el colaborador cuando CADA puesto elegible tiene

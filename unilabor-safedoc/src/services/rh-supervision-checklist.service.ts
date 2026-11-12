@@ -438,6 +438,22 @@ export const createSupervisionChecklist = async (raw: CreateSupervisionChecklist
   const naSet = new Set(naItems.rows.map((row) => Number(row.item_id)));
 
   const id = await withTransaction(async (client) => {
+    if (enrollmentId) {
+      // Candado por inscripcion: el boton "Generar borradores", el proceso automatico y
+      // "Aplicar lista" pueden coincidir. Con el candado tomado se vuelve a revisar, asi
+      // el segundo en llegar reutiliza la lista del primero en vez de abrir otra.
+      await lockSupervisionEnrollment(client, enrollmentId);
+      if (input.reuseDraft !== false) {
+        const existing = await client.query(
+          `SELECT id FROM public.rh_supervision_checklists
+            WHERE enrollment_id = $1 AND status IN ('DRAFT', 'PENDING_SIGNATURES') ORDER BY id DESC LIMIT 1;`,
+          [enrollmentId],
+        );
+        if (existing.rows.length > 0) {
+          return Number(existing.rows[0].id);
+        }
+      }
+    }
     const inserted = await client.query(
       `INSERT INTO public.rh_supervision_checklists
          (form_code, form_revision, employee_id, position_id, enrollment_id, supervision_date, supervision_type,
@@ -490,6 +506,15 @@ export interface UpdateSupervisionChecklistInput {
   sgcReference?: string | null | undefined;
   supervisorComments?: string | null | undefined;
 }
+
+/**
+ * Candado de transaccion por inscripcion de la Fase 6: serializa la apertura y
+ * el envio a firma de sus listas para que nunca haya dos en curso a la vez. Se
+ * libera solo al terminar la transaccion.
+ */
+export const lockSupervisionEnrollment = async (client: Queryable, enrollmentId: number): Promise<void> => {
+  await client.query(`SELECT pg_advisory_xact_lock(hashtext('rh_supervision_enrollment'), $1::int);`, [enrollmentId]);
+};
 
 /**
  * Solo un borrador se edita. Con `lock` (dentro de una transaccion) toma el

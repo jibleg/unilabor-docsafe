@@ -35,6 +35,19 @@ import { notifyError, notifyInfo, notifySuccess, notifyWarning } from '../utils/
 type Tab = 'pending' | 'records' | 'signatories';
 const PAGE_SIZE = 20;
 
+/** Filtro de estado de Registros, con los mismos colores que la columna Estado. */
+const RECORD_STATUS_FILTERS: Array<{ value: SupervisionChecklistStatus | ''; label: string; chip: string; active: string }> = [
+  {
+    value: '',
+    label: 'Todas',
+    chip: 'border-[rgba(0,65,106,0.14)] bg-white text-[var(--color-brand-700)]',
+    active: 'border-[var(--color-brand-700)] bg-[var(--color-brand-700)] text-white',
+  },
+  { value: 'PENDING_SIGNATURES', label: 'En firma', chip: 'border-sky-200 bg-sky-50 text-sky-700', active: 'border-sky-600 bg-sky-600 text-white' },
+  { value: 'DRAFT', label: 'Borrador', chip: 'border-amber-200 bg-amber-50 text-amber-700', active: 'border-amber-500 bg-amber-500 text-white' },
+  { value: 'CLOSED', label: 'Cerrada', chip: 'border-emerald-200 bg-emerald-50 text-emerald-700', active: 'border-emerald-600 bg-emerald-600 text-white' },
+];
+
 /**
  * Supervisión (ANA-REG-060): bandeja de la Fase 6 por área para aplicar la
  * lista a cada colaborador y puesto, registros (borradores, en firma y
@@ -240,8 +253,8 @@ export const RhSupervisionChecklistsPage = () => {
           <h1 className="text-2xl font-bold text-[var(--color-brand-700)]">Supervisión (ANA-REG-060)</h1>
           <p className="max-w-3xl text-sm leading-6 text-[var(--unilabor-ink)]">
             Lista de verificación de Supervisión por colaborador y puesto. Al enviarla a firma, el supervisor, el responsable del área y el
-            colaborador firman desde su Buzón de firmas y la lista se cierra sola. Ligada a la Fase 6, su porcentaje (≥ 80 %) acredita la fase,
-            emite la constancia y activa el siguiente puesto. El PDF se archiva en el expediente con el diseño del formato controlado.
+            colaborador firman desde su Buzón de firmas y la lista se cierra sola. Ligada a la Fase 6, su porcentaje (≥ 80 %) acredita la fase
+            de ese puesto y emite la constancia; todos los puestos del colaborador se evalúan a la vez. El PDF se archiva en el expediente con el diseño del formato controlado.
           </p>
         </div>
         <button type="button" onClick={() => setShowCreate((value) => !value)} className={primaryButtonClass}>
@@ -345,12 +358,22 @@ export const RhSupervisionChecklistsPage = () => {
               <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" />
               <input value={recordSearch} onChange={(e) => { setRecordSearch(e.target.value); setPage(1); }} placeholder="Buscar por folio, colaborador, puesto o área" className={`${inputClass} pl-9`} />
             </div>
-            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as SupervisionChecklistStatus | ''); setPage(1); }} className={`${inputClass} w-auto`}>
-              <option value="">Todas</option>
-              <option value="DRAFT">Borradores</option>
-              <option value="PENDING_SIGNATURES">En firma</option>
-              <option value="CLOSED">Cerradas</option>
-            </select>
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtrar por estado">
+              {RECORD_STATUS_FILTERS.map((option) => {
+                const active = statusFilter === option.value;
+                return (
+                  <button
+                    key={option.value || 'all'}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => { setStatusFilter(active ? '' : option.value); setPage(1); }}
+                    className={`rounded-full border px-3 py-1 text-xs font-bold transition hover:opacity-85 ${active ? option.active : option.chip}`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           {loadingRows ? (
             <p className="inline-flex items-center gap-2 text-sm text-[var(--unilabor-neutral)]">

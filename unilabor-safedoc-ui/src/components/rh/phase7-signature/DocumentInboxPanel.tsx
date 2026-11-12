@@ -160,7 +160,7 @@ export const DocumentInboxPanel = ({ entry, onBusyChange, onSigned }: DocumentIn
 
       {detail.has_pending ? (
         <section className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(248,251,253,0.9)] p-4">
-          <SignaturePad label={`Tu firma · ${detail.pending_roles_label}`} hint="Firma con el dedo, lápiz o mouse" onChange={setSignature} />
+          <SignaturePad label={`Tu firma · ${detail.pending_roles_label}`} hint="Firma con el dedo, lápiz o mouse, o carga una imagen de tu firma" onChange={setSignature} allowUpload />
           <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">
             Firmas como {detail.pending_roles_label}. Cuando estén todas las firmas el registro se cierra solo y se archiva en el expediente del colaborador.
           </p>

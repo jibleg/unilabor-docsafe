@@ -45,7 +45,8 @@ describe('SMS de la ruta por puesto', () => {
   it('Fase 6 y Fase 7: un aviso de inicio de fase con el total de puestos y el primero', () => {
     const f6 = buildPracticalStartedSms(ctx({ phaseNumber: 6, ordinal: 1 }));
     const f7 = buildCompetencyOpenedSms(ctx({ phaseNumber: 7, ordinal: 1, positionName: 'Flebotomista', positionCode: 'FLEB' }));
-    expect(f6.body).toBe('SafeDoc: Fase 6: inicia tu practica supervisada, puesto por puesto (3 en total); empiezas con Almacén. Te evaluaran en sitio.');
+    // Fase 6: todos los puestos inician a la vez, no se nombra un primero.
+    expect(f6.body).toBe('SafeDoc: Fase 6: inicia tu practica supervisada en tus 3 puestos a la vez. Te evaluaran en sitio en cada uno.');
     expect(f7.body).toBe(
       'SafeDoc: Fase 7: inicia tu evaluacion de competencia, puesto por puesto (3 en total); empiezas con Flebotomista. Tu evaluador te dira fecha y hora.',
     );
@@ -65,7 +66,7 @@ describe('SMS de la ruta por puesto', () => {
     const long = { positionName: 'Coordinador de Procedimientos Preanalíticos y Postanalíticos', positionCode: 'CPP', ordinal: 1 };
     const f6 = buildPracticalStartedSms(ctx({ phaseNumber: 6, ...long }));
     const f7 = buildCompetencyOpenedSms(ctx({ phaseNumber: 7, ...long }));
-    expect(f6.body).toContain('empiezas con CPP.');
+    expect(f6.body).toContain('en tus 3 puestos a la vez');
     expect(f7.body).toContain('empiezas con CPP.');
     expect(f6.body.length).toBeLessThanOrEqual(SMS_MAX_LENGTH);
     expect(f7.body.length).toBeLessThanOrEqual(SMS_MAX_LENGTH);

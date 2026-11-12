@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Eraser, PenLine } from 'lucide-react';
+import { Eraser, ImageUp, PenLine } from 'lucide-react';
+import { notifyError } from '../../utils/notify';
+import { SIGNATURE_IMAGE_ACCEPT, fitInside, signatureImageIssue } from './signature-image';
 
 interface SignaturePadProps {
   label: string;
   hint?: string;
   // Devuelve el PNG (data URL) al terminar un trazo, o null al limpiar.
   onChange: (dataUrl: string | null) => void;
+  /** Permite cargar la firma desde una imagen (PNG / JPG) ademas de trazarla. */
+  allowUpload?: boolean;
 }
 
 // Lienzo de firma trazada (dedo / Apple Pencil / mouse). Exporta PNG con
-// canvas.toDataURL, mismo mecanismo que las etiquetas Code128.
-export const SignaturePad = ({ label, hint, onChange }: SignaturePadProps) => {
+// canvas.toDataURL, mismo mecanismo que las etiquetas Code128. Con
+// `allowUpload` la firma tambien puede venir de una imagen: se dibuja en el
+// mismo lienzo y sale por el mismo camino (un PNG nuevo, sin metadatos).
+export const SignaturePad = ({ label, hint, onChange, allowUpload = false }: SignaturePadProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const drawing = useRef(false);
   const dirty = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -103,19 +110,68 @@ export const SignaturePad = ({ label, hint, onChange }: SignaturePadProps) => {
     onChange(null);
   };
 
+  /** Dibuja la imagen elegida centrada y ajustada al lienzo, y la entrega como la firma. */
+  const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!file || !canvas || !ctx) {
+      return;
+    }
+    const issue = signatureImageIssue(file);
+    if (issue) {
+      notifyError(issue);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      const rect = canvas.getBoundingClientRect();
+      const box = fitInside(image.naturalWidth, image.naturalHeight, rect.width, rect.height, 8);
+      // clearRect usa las mismas unidades (CSS px) que el trazo: el contexto ya esta escalado.
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.drawImage(image, box.x, box.y, box.width, box.height);
+      dirty.current = true;
+      setHasContent(true);
+      onChange(canvas.toDataURL('image/png'));
+    } catch {
+      notifyError('No se pudo leer la imagen. Usa un archivo PNG o JPG.');
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
           <PenLine size={13} /> {label}
         </span>
-        <button
-          type="button"
-          onClick={handleClear}
-          className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
-        >
-          <Eraser size={12} /> Limpiar
-        </button>
+        <span className="flex items-center gap-1.5">
+          {allowUpload ? (
+            <>
+              <input ref={fileRef} type="file" accept={SIGNATURE_IMAGE_ACCEPT} onChange={(e) => void handleFile(e)} className="hidden" />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                title="Cargar tu firma desde una imagen PNG o JPG (reemplaza lo trazado)"
+                className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+              >
+                <ImageUp size={12} /> Imagen
+              </button>
+            </>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleClear}
+            className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+          >
+            <Eraser size={12} /> Limpiar
+          </button>
+        </span>
       </div>
       <div
         className={`relative rounded-xl border-2 ${
@@ -133,7 +189,7 @@ export const SignaturePad = ({ label, hint, onChange }: SignaturePadProps) => {
         />
         {!hasContent ? (
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-[var(--unilabor-neutral)]">
-            Firme aquí
+            {allowUpload ? 'Firme aquí o cargue una imagen' : 'Firme aquí'}
           </span>
         ) : null}
       </div>

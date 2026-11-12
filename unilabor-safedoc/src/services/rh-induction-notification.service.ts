@@ -208,12 +208,14 @@ export const queueNotifyPracticalStarted = (enrollmentId: number): void => {
     try {
       const step = await loadPositionStep(enrollmentId);
       if (!step) return;
-      // Otro puesto de la misma fase ya activado (aunque despues se diera de baja) = la fase ya se aviso.
+      // Otro puesto de la misma fase activado ANTES (aunque despues se diera de baja) = la fase ya se aviso.
+      // En la Fase 6 todos los puestos se activan en la misma pasada: solo avisa el primero.
       const started = await pool.query(
         `SELECT EXISTS (
            SELECT 1 FROM public.rh_induction_enrollments e
              JOIN public.rh_induction_enrollments x ON x.employee_id = e.employee_id AND x.phase_id = e.phase_id AND x.id <> e.id
             WHERE e.id = $1 AND x.activated_at IS NOT NULL
+              AND (x.activated_at < e.activated_at OR (x.activated_at = e.activated_at AND x.id < e.id))
          ) AS already_started;`,
         [enrollmentId],
       );
