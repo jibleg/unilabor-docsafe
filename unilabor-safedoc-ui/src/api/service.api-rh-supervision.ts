@@ -108,7 +108,7 @@ export interface SupervisionHeaderPayload {
   supervision_date?: string;
   supervision_type?: SupervisionType;
   area_name?: string | null;
-  /** Solo supervisión de área (sin inscripción): en la Fase 6 los firmantes salen de la asignación. */
+  /** El supervisor solo en supervisión de área (en la Fase 6 es el de la inscripción); el responsable, en la Fase 6, solo vale si Firmantes por área no resuelve a nadie. */
   supervisor_employee_id?: number | null;
   area_responsible_employee_id?: number | null;
   sgc_follow_up_required?: boolean;

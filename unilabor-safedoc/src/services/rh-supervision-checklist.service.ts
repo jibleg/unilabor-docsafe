@@ -520,9 +520,9 @@ export const lockSupervisionEnrollment = async (client: Queryable, enrollmentId:
  * Solo un borrador se edita. Con `lock` (dentro de una transaccion) toma el
  * candado de la fila para no cruzarse con un envio a firma simultaneo.
  */
-const assertDraft = async (id: number, db: Queryable = pool, lock = false): Promise<{ enrollmentId: number | null }> => {
+const assertDraft = async (id: number, db: Queryable = pool, lock = false): Promise<{ enrollmentId: number | null; employeeId: number }> => {
   const result = await db.query(
-    `SELECT status, enrollment_id FROM public.rh_supervision_checklists WHERE id = $1 LIMIT 1${lock ? ' FOR UPDATE' : ''};`,
+    `SELECT status, enrollment_id, employee_id FROM public.rh_supervision_checklists WHERE id = $1 LIMIT 1${lock ? ' FOR UPDATE' : ''};`,
     [id],
   );
   if (result.rows.length === 0) {
@@ -535,7 +535,10 @@ const assertDraft = async (id: number, db: Queryable = pool, lock = false): Prom
   if (status !== 'DRAFT') {
     throwCoded('RH_SUPERVISION_ALREADY_CLOSED', 'La lista ya esta cerrada y firmada; no se puede modificar.');
   }
-  return { enrollmentId: result.rows[0].enrollment_id ? Number(result.rows[0].enrollment_id) : null };
+  return {
+    enrollmentId: result.rows[0].enrollment_id ? Number(result.rows[0].enrollment_id) : null,
+    employeeId: Number(result.rows[0].employee_id),
+  };
 };
 
 const loadActiveEmployeeName = async (employeeId: number): Promise<string> => {
@@ -547,7 +550,7 @@ const loadActiveEmployeeName = async (employeeId: number): Promise<string> => {
 };
 
 export const updateSupervisionChecklist = async (id: number, input: UpdateSupervisionChecklistInput): Promise<SupervisionChecklistRecord> => {
-  const { enrollmentId } = await assertDraft(id);
+  const { enrollmentId, employeeId } = await assertDraft(id);
   const sets: string[] = [];
   const params: unknown[] = [id];
   const push = (column: string, value: unknown, cast = '') => {
@@ -558,11 +561,16 @@ export const updateSupervisionChecklist = async (id: number, input: UpdateSuperv
   if (input.supervisionType !== undefined) push('supervision_type', input.supervisionType);
   if (input.areaName !== undefined) push('area_name', input.areaName?.trim() || null);
   if (input.supervisorEmployeeId !== undefined || input.areaResponsibleEmployeeId !== undefined) {
-    if (enrollmentId) {
+    // Fase 6: el supervisor es de la inscripcion (se asigna alla). El responsable si se puede
+    // elegir para esta lista, pero solo vale mientras Firmantes por area no resuelva a nadie.
+    if (enrollmentId && input.supervisorEmployeeId !== undefined) {
       throwCoded(
         'RH_SUPERVISION_SIGNERS_ASSIGNED',
-        'En la Fase 6 los firmantes no se eligen en la lista: el supervisor se asigna en Pendientes Fase 6 y el responsable en Firmantes por area.',
+        'En la Fase 6 el supervisor no se elige en la lista: se asigna por colaborador y puesto (Pendientes Fase 6 o al enviar a firma).',
       );
+    }
+    if (input.supervisorEmployeeId === employeeId || input.areaResponsibleEmployeeId === employeeId) {
+      throwCoded('RH_SUPERVISION_SELF_SUPERVISION', 'El colaborador evaluado no puede firmar como supervisor ni como responsable de su propia lista.');
     }
     if (input.supervisorEmployeeId !== undefined) {
       push('supervisor_employee_id', input.supervisorEmployeeId);
@@ -587,7 +595,8 @@ export const updateSupervisionChecklist = async (id: number, input: UpdateSuperv
       await assertDraft(id);
     }
   }
-  if (input.areaResponsibleEmployeeId === null) {
+  // Al quitarlo, o en la Fase 6 (donde la configuracion manda sobre el elegido a mano), se re-sincroniza.
+  if (input.areaResponsibleEmployeeId === null || (enrollmentId && input.areaResponsibleEmployeeId !== undefined)) {
     await syncDraftSigners({ checklistIds: [id] });
   }
   return getSupervisionChecklist(id);

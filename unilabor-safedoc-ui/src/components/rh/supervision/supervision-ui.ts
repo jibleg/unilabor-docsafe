@@ -62,6 +62,22 @@ export const signerIssue = (signer: SupervisionSigner): string | null => {
   return null;
 };
 
+/**
+ * Firmantes que RH puede asignar desde el modal "Enviar a firma".
+ *   * Supervisor: cuando falta o no puede firmar (sin asignar, de baja, sin usuario).
+ *   * Responsable del área: igual en una supervisión de área; en la Fase 6 solo cuando
+ *     Firmantes por área no resuelve a nadie (si resuelve a alguien, esa configuración manda).
+ * El colaborador evaluado nunca se elige.
+ */
+export const assignableSignerRoles = (signers: SupervisionSigner[], linked: boolean): Array<'SUPERVISOR' | 'AREA_RESPONSIBLE'> => {
+  const roles: Array<'SUPERVISOR' | 'AREA_RESPONSIBLE'> = [];
+  for (const signer of signers) {
+    if (signer.role === 'SUPERVISOR' && signerIssue(signer) !== null) roles.push('SUPERVISOR');
+    if (signer.role === 'AREA_RESPONSIBLE' && (linked ? !signer.employee_id : signerIssue(signer) !== null)) roles.push('AREA_RESPONSIBLE');
+  }
+  return roles;
+};
+
 export const formatDateTime = (value: string | null | undefined): string =>
   value ? new Date(value).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 

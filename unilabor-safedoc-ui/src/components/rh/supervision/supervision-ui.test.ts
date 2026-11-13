@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SupervisionChecklistSection, SupervisionSigner } from '../../../types/models';
-import { countPendingStates, describeSignerRoles, pendingRowState, quickFillPending, signerIssue } from './supervision-ui';
+import { assignableSignerRoles, countPendingStates, describeSignerRoles, pendingRowState, quickFillPending, signerIssue } from './supervision-ui';
 
 const signer = (patch: Partial<SupervisionSigner> = {}): SupervisionSigner => ({
   role: 'SUPERVISOR',
@@ -69,5 +69,32 @@ describe('ANA-REG-060: estado en la bandeja de la Fase 6', () => {
   it('cuenta solo los estados presentes', () => {
     const rows = [row({ draft_status: 'DRAFT', draft_checklist_id: 1 }), row({ draft_status: 'DRAFT', draft_checklist_id: 2 }), row()];
     expect(countPendingStates(rows)).toEqual({ DRAFT: 2, NO_LIST: 1 });
+  });
+});
+
+describe('ANA-REG-060: firmantes que se asignan al enviar a firma', () => {
+  const responsible = (patch: Partial<SupervisionSigner> = {}) => signer({ role: 'AREA_RESPONSIBLE', employee_id: 20, name: 'Rosa Responsable', ...patch });
+  const employee = signer({ role: 'EMPLOYEE', employee_id: 30, name: 'Luis Evaluado' });
+
+  it('con los tres listos no hay nada que asignar', () => {
+    expect(assignableSignerRoles([signer(), responsible(), employee], true)).toEqual([]);
+  });
+
+  it('ofrece asignar al supervisor que falta o que no puede firmar', () => {
+    expect(assignableSignerRoles([signer({ employee_id: null }), responsible(), employee], true)).toEqual(['SUPERVISOR']);
+    expect(assignableSignerRoles([signer({ has_user: false }), responsible(), employee], true)).toEqual(['SUPERVISOR']);
+  });
+
+  it('Fase 6: el responsable solo se elige si la configuración no resolvió a nadie', () => {
+    expect(assignableSignerRoles([signer(), responsible({ employee_id: null }), employee], true)).toEqual(['AREA_RESPONSIBLE']);
+    expect(assignableSignerRoles([signer(), responsible({ has_user: false }), employee], true)).toEqual([]);
+  });
+
+  it('supervisión de área: el responsable se elige ante cualquier impedimento', () => {
+    expect(assignableSignerRoles([signer(), responsible({ has_user: false }), employee], false)).toEqual(['AREA_RESPONSIBLE']);
+  });
+
+  it('nunca ofrece elegir al colaborador evaluado', () => {
+    expect(assignableSignerRoles([signer(), responsible(), signer({ role: 'EMPLOYEE', has_user: false })], true)).toEqual([]);
   });
 });

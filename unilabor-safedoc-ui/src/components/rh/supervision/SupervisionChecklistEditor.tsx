@@ -437,7 +437,7 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
               value={checklist.supervisor_name}
               disabled
               className={inputClass}
-              placeholder={assignedSigners ? 'Asígnalo en Pendientes Fase 6' : 'Sin asignar'}
+              placeholder={assignedSigners ? 'Asígnalo en Pendientes Fase 6 o al enviar a firma' : 'Sin asignar'}
               title={assignedSigners ? 'Se asigna por colaborador y puesto en Pendientes Fase 6' : undefined}
             />
           ) : (
@@ -451,7 +451,7 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
               value={checklist.area_responsible_name}
               disabled
               className={inputClass}
-              placeholder={assignedSigners ? 'Configúralo en Firmantes por área' : 'Sin asignar'}
+              placeholder={assignedSigners ? 'Configúralo en Firmantes por área o al enviar a firma' : 'Sin asignar'}
               title={assignedSigners ? 'Se configura por área del puesto en Firmantes por área' : undefined}
             />
           ) : (
@@ -533,6 +533,7 @@ export const SupervisionChecklistEditor = ({ checklist, onChanged, onClosed, onD
         <SupervisionCloseModal
           checklist={checklist}
           onClose={() => setShowClose(false)}
+          onChanged={onChanged}
           onSent={(result) => {
             notifySuccess(result.message);
             onChanged(result.checklist);

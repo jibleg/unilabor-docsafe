@@ -1,17 +1,40 @@
 import { useState } from 'react';
-import { Loader2, Send, X } from 'lucide-react';
-import { sendSupervisionToSignature, type SupervisionSignatureResult } from '../../../api/service.api-rh-supervision';
+import { Loader2, Send, UserPlus, X } from 'lucide-react';
+import {
+  assignPhase6Supervisor,
+  getSupervisionChecklist,
+  sendSupervisionToSignature,
+  updateSupervisionChecklist,
+  type SupervisionSignatureResult,
+} from '../../../api/service.api-rh-supervision';
 import { getApiErrorMessage } from '../../../api/service.parsers';
-import type { SupervisionChecklist } from '../../../types/models';
-import { notifyError } from '../../../utils/notify';
+import type { SupervisionChecklist, SupervisionSignerRole } from '../../../types/models';
+import { notifyError, notifySuccess } from '../../../utils/notify';
+import { SearchableSelect } from '../../SearchableSelect';
 import { SupervisionSignatureProgress } from './SupervisionSignatureProgress';
-import { CONCLUSION_UI, formatPct, primaryButtonClass, signerIssue } from './supervision-ui';
+import { CONCLUSION_UI, SIGNER_ROLE_LABELS, assignableSignerRoles, formatPct, primaryButtonClass, signerIssue } from './supervision-ui';
+import { useEmployeeOptions } from './useEmployeeOptions';
 
 interface SupervisionCloseModalProps {
   checklist: SupervisionChecklist;
   onClose: () => void;
   onSent: (result: SupervisionSignatureResult) => void;
+  /** Se asignó un firmante desde aquí: la lista cambió y el editor debe refrescarla. */
+  onChanged: (updated: SupervisionChecklist) => void;
 }
+
+type AssignableRole = Exclude<SupervisionSignerRole, 'EMPLOYEE'>;
+
+const ASSIGN_HINT: Record<AssignableRole, { linked: string; area: string }> = {
+  SUPERVISOR: {
+    linked: 'Queda como supervisor de este colaborador en este puesto.',
+    area: 'Queda como supervisor de esta lista.',
+  },
+  AREA_RESPONSIBLE: {
+    linked: 'Solo para esta lista; para toda el área configúralo en Firmantes por área.',
+    area: 'Queda como responsable del área en esta lista.',
+  },
+};
 
 /**
  * "Cerrar y firmar" ya no recaba firmas en pantalla: confirma el ENVÍO A FIRMA.
@@ -19,10 +42,40 @@ interface SupervisionCloseModalProps {
  * si la lista está ligada a la Fase 6, la decisión de si es la lista FINAL del
  * puesto. La lista queda bloqueada y se cierra sola al reunirse las tres firmas.
  */
-export const SupervisionCloseModal = ({ checklist, onClose, onSent }: SupervisionCloseModalProps) => {
+export const SupervisionCloseModal = ({ checklist, onClose, onSent, onChanged }: SupervisionCloseModalProps) => {
   const linked = checklist.enrollment_id !== null;
   const [isFinal, setIsFinal] = useState(linked);
   const [saving, setSaving] = useState(false);
+  const [picked, setPicked] = useState<Partial<Record<AssignableRole, string>>>({});
+  const [assigning, setAssigning] = useState<AssignableRole | null>(null);
+  const employeeOptions = useEmployeeOptions().filter((option) => option.value !== String(checklist.employee_id));
+  const assignable = assignableSignerRoles(checklist.signers, linked);
+
+  /** Asigna al firmante que falta sin salir del modal y refresca la lista. */
+  const handleAssign = async (role: AssignableRole) => {
+    const employeeId = Number(picked[role]);
+    if (!employeeId) return;
+    setAssigning(role);
+    try {
+      let updated: SupervisionChecklist;
+      if (role === 'SUPERVISOR' && checklist.enrollment_id !== null) {
+        await assignPhase6Supervisor([checklist.enrollment_id], employeeId);
+        updated = await getSupervisionChecklist(checklist.id);
+      } else {
+        updated = await updateSupervisionChecklist(
+          checklist.id,
+          role === 'SUPERVISOR' ? { supervisor_employee_id: employeeId } : { area_responsible_employee_id: employeeId },
+        );
+      }
+      setPicked((current) => ({ ...current, [role]: '' }));
+      onChanged(updated);
+      notifySuccess(`${SIGNER_ROLE_LABELS[role]} asignado.`);
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudo asignar al firmante.'));
+    } finally {
+      setAssigning(null);
+    }
+  };
   const summary = checklist.summary;
   const conclusion = summary.conclusion ? CONCLUSION_UI[summary.conclusion] : null;
   const blocked = checklist.signers.some((signer) => signerIssue(signer) !== null);
@@ -86,12 +139,39 @@ export const SupervisionCloseModal = ({ checklist, onClose, onSent }: Supervisio
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">Firman desde su Buzón de firmas</p>
             <SupervisionSignatureProgress signers={checklist.signers} inSignature={false} />
+            {assignable.map((role) => (
+              <div key={role} className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2">
+                <p className="text-xs font-semibold text-amber-900">Asignar {SIGNER_ROLE_LABELS[role]}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <SearchableSelect
+                      value={picked[role] ?? ''}
+                      options={employeeOptions}
+                      onChange={(value) => setPicked((current) => ({ ...current, [role]: value }))}
+                      placeholder="Elige al colaborador"
+                      emptyLabel="Sin asignar"
+                      searchPlaceholder="Buscar colaborador..."
+                      disabled={assigning !== null || saving}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAssign(role)}
+                    disabled={!picked[role] || assigning !== null || saving}
+                    className={primaryButtonClass}
+                    title={`Asignar ${SIGNER_ROLE_LABELS[role]}`}
+                  >
+                    {assigning === role ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                    Asignar
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] leading-4 text-amber-900/80">{linked ? ASSIGN_HINT[role].linked : ASSIGN_HINT[role].area}</p>
+              </div>
+            ))}
             {blocked ? (
               <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs leading-5 text-rose-800">
                 No se puede enviar todavía: los tres firmantes deben estar asignados, activos y con usuario de sistema vinculado.{' '}
-                {linked
-                  ? 'El supervisor se asigna en Pendientes Fase 6 y el responsable en Firmantes por área; el usuario se vincula en el expediente del colaborador.'
-                  : 'Elige al supervisor y al responsable en la lista; el usuario se vincula en el expediente del colaborador.'}
+                {assignable.length > 0 ? 'Asigna aquí a quien falte. ' : ''}El usuario se vincula en el expediente del colaborador.
               </p>
             ) : null}
           </div>
@@ -123,7 +203,7 @@ export const SupervisionCloseModal = ({ checklist, onClose, onSent }: Supervisio
           <button type="button" onClick={onClose} disabled={saving} className="rounded-xl px-3 py-2 text-sm font-semibold text-[var(--unilabor-neutral)] hover:bg-slate-100">
             Cancelar
           </button>
-          <button type="button" onClick={handleSubmit} disabled={saving || blocked} className={primaryButtonClass}>
+          <button type="button" onClick={handleSubmit} disabled={saving || blocked || assigning !== null} className={primaryButtonClass}>
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
             Enviar a firma
           </button>

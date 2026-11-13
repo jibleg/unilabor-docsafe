@@ -82,7 +82,9 @@ export interface DraftAreaResponsible {
 
 /**
  * Responsable que debe quedar en un borrador tras sincronizarlo.
- *   * Fase 6 (con inscripcion): siempre el resuelto; si nadie es valido queda vacio.
+ *   * Fase 6 (con inscripcion): siempre el resuelto. Si la configuracion no resuelve a
+ *     nadie, se conserva el que RH eligio a mano para esa lista al enviarla a firma
+ *     (MANUAL); sin eleccion manual queda vacio.
  *   * Supervision de area (sin inscripcion): se respeta el elegido a mano en la
  *     lista, y si la configuracion no resuelve a nadie se conserva lo que tenga.
  */
@@ -92,6 +94,9 @@ export const nextDraftAreaResponsible = (
   resolved: ResolvedAreaResponsible | null,
 ): DraftAreaResponsible => {
   if (!hasEnrollment && (current.source === 'MANUAL' || !resolved)) {
+    return current;
+  }
+  if (hasEnrollment && !resolved && current.source === 'MANUAL' && current.employee_id) {
     return current;
   }
   return resolved

@@ -100,6 +100,16 @@ describe('Responsable del Area: que queda en el borrador al sincronizar', () => 
     expect(nextDraftAreaResponsible(current(), true, null)).toEqual({ employee_id: null, name: '', source: null });
   });
 
+  it('Fase 6: sin nadie resuelto conserva al elegido a mano para esa lista', () => {
+    const manual = current({ employee_id: 99, name: 'Elegido a mano', source: 'MANUAL' });
+    expect(nextDraftAreaResponsible(manual, true, null)).toBe(manual);
+  });
+
+  it('Fase 6: la configuracion manda sobre el elegido a mano', () => {
+    const manual = current({ employee_id: 99, name: 'Elegido a mano', source: 'MANUAL' });
+    expect(nextDraftAreaResponsible(manual, true, unitResolved).employee_id).toBe(86);
+  });
+
   it('supervision de area: respeta al responsable elegido a mano en la lista', () => {
     const manual = current({ employee_id: 99, name: 'Elegido a mano', source: 'MANUAL' });
     expect(nextDraftAreaResponsible(manual, false, unitResolved)).toBe(manual);
