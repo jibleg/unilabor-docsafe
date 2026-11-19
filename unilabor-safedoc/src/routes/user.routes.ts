@@ -57,9 +57,17 @@ router.patch('/:id/reset-password', verifyToken, requirePermission('ADMIN.USERS.
 
 /**
  * ASIGNACION DE CATEGORIAS A USUARIOS
- * Parte de la administración de usuarios
+ * Parte de la administración de usuarios. Guardar acepta también el permiso
+ * propio ADMIN.USER_CATEGORIES.ASSIGN (Calidad asigna categorías sin poder
+ * editar al usuario).
  */
 router.get('/:id/categories', verifyToken, requirePermission('ADMIN.USERS.READ'), getUserCategoriesById);
-router.put('/:id/categories', verifyToken, requirePermission('ADMIN.USERS.MANAGE'), validate(replaceUserCategoriesSchema), replaceUserCategoriesById);
+router.put(
+  '/:id/categories',
+  verifyToken,
+  requirePermission(['ADMIN.USERS.MANAGE', 'ADMIN.USER_CATEGORIES.ASSIGN']),
+  validate(replaceUserCategoriesSchema),
+  replaceUserCategoriesById,
+);
 
 export default router;

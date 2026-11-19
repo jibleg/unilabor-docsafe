@@ -18,6 +18,9 @@ interface UserFormModalProps {
   categories: Category[];
   loadingCategories: boolean;
   showCredentialsNote?: boolean;
+  // Solo asignación de categorías: los datos del empleado se muestran sin poder
+  // editarse (quien tiene ADMIN.USER_CATEGORIES.ASSIGN pero no ADMIN.USERS.MANAGE).
+  categoriesOnly?: boolean;
   submitting: boolean;
   submitLabel: string;
   submittingLabel: string;
@@ -27,7 +30,7 @@ interface UserFormModalProps {
 }
 
 const inputClassName =
-  'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)]';
+  'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)] disabled:cursor-not-allowed disabled:opacity-70';
 
 const labelClassName =
   'mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]';
@@ -44,6 +47,7 @@ export const UserFormModal = ({
   categories,
   loadingCategories,
   showCredentialsNote = false,
+  categoriesOnly = false,
   submitting,
   submitLabel,
   submittingLabel,
@@ -51,7 +55,7 @@ export const UserFormModal = ({
   onSubmit,
   onClose,
 }: UserFormModalProps) => {
-  const [activeTab, setActiveTab] = useState<UserFormTab>('info');
+  const [activeTab, setActiveTab] = useState<UserFormTab>(categoriesOnly ? 'categories' : 'info');
   const [categorySearch, setCategorySearch] = useState('');
 
   const filteredCategories = useMemo(() => {
@@ -110,6 +114,7 @@ export const UserFormModal = ({
                     onChange={(event) =>
                       setForm((currentForm) => ({ ...currentForm, full_name: event.target.value }))
                     }
+                    disabled={categoriesOnly}
                     className={inputClassName}
                     placeholder="Nombre Apellido"
                   />
@@ -123,6 +128,7 @@ export const UserFormModal = ({
                     onChange={(event) =>
                       setForm((currentForm) => ({ ...currentForm, email: event.target.value }))
                     }
+                    disabled={categoriesOnly}
                     className={inputClassName}
                     placeholder="usuario@unilabor.mx"
                   />
@@ -134,6 +140,7 @@ export const UserFormModal = ({
                 <select
                   value={form.role}
                   onChange={(event) => onUpdateRole(normalizeRoleValue(event.target.value))}
+                  disabled={categoriesOnly}
                   className={inputClassName}
                 >
                   {ROLE_OPTIONS.map((roleOption) => (

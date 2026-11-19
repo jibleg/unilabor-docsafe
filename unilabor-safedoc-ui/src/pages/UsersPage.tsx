@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
-import { Edit3, KeyRound, Plus, RefreshCw, Trash2, UserPlus } from 'lucide-react';
+import { Edit3, KeyRound, Plus, RefreshCw, Tags, Trash2, UserPlus } from 'lucide-react';
 import {
   createUser,
   deleteUserById,
@@ -16,6 +16,7 @@ import {
 } from '../api/service';
 import type { Category, ManagedUser } from '../types/models';
 import { useAuthStore } from '../store/useAuthStore';
+import { useHasPermission } from '../utils/permissions';
 import { notifyError, notifySuccess, notifyWarning, notifyWarningPersistent } from '../utils/notify';
 
 import { UserFormModal } from '../components/admin/UserFormModal';
@@ -34,6 +35,10 @@ import {
 export const UsersPage = () => {
   const currentUserId = useAuthStore((state) => state.user?.id ?? '');
   const currentUserEmail = useAuthStore((state) => state.user?.email?.trim().toLowerCase() ?? '');
+  // Alta, edición, baja y reseteo exigen ADMIN.USERS.MANAGE. Asignar categorías
+  // tiene permiso propio: quien solo tiene ese abre el modal en modo categorías.
+  const canManageUsers = useHasPermission('ADMIN.USERS.MANAGE');
+  const canAssignCategories = useHasPermission(['ADMIN.USERS.MANAGE', 'ADMIN.USER_CATEGORIES.ASSIGN']);
 
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -257,7 +262,7 @@ export const UsersPage = () => {
       return;
     }
 
-    if (!validateForm(editForm)) {
+    if (canManageUsers && !validateForm(editForm)) {
       return;
     }
 
@@ -269,10 +274,15 @@ export const UsersPage = () => {
 
     setSavingEdit(true);
     try {
-      await updateUserById(editingUser.id, payload);
+      if (canManageUsers) {
+        await updateUserById(editingUser.id, payload);
+      }
 
       await updateUserCategories(editingUser.id, editForm.categoryIds);
 
+      if (!canManageUsers) {
+        notifySuccess('Categorías actualizadas');
+      }
       closeEditModal();
       await loadUsers();
     } catch (requestError) {
@@ -356,14 +366,16 @@ export const UsersPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
-          >
-            <UserPlus size={16} />
-            Nuevo usuario
-          </button>
+          {canManageUsers && (
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)]"
+            >
+              <UserPlus size={16} />
+              Nuevo usuario
+            </button>
+          )}
 
           <button
             type="button"
@@ -482,16 +494,20 @@ export const UsersPage = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-2">
+                        {canAssignCategories && (
                         <button
                           type="button"
                           onClick={() => void openEditModal(user)}
                           disabled={isDeleting || isResetting}
                           className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.36)] px-3 py-1.5 text-xs font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <Edit3 size={14} />
-                          Editar
+                          {canManageUsers ? <Edit3 size={14} /> : <Tags size={14} />}
+                          {canManageUsers ? 'Editar' : 'Categorías'}
                         </button>
+                        )}
 
+                        {canManageUsers && (
+                        <>
                         <button
                           type="button"
                           onClick={() => void triggerPasswordReset(user)}
@@ -513,6 +529,8 @@ export const UsersPage = () => {
                           <Trash2 size={14} />
                           {isDeleting ? 'Eliminando...' : 'Eliminar'}
                         </button>
+                        </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -571,7 +589,8 @@ export const UsersPage = () => {
 
       {isEditModalOpen && editingUser && (
         <UserFormModal
-          title="Editar usuario"
+          title={canManageUsers ? 'Editar usuario' : 'Categorías del usuario'}
+          categoriesOnly={!canManageUsers}
           form={editForm}
           setForm={setEditForm}
           onUpdateRole={updateEditRole}
