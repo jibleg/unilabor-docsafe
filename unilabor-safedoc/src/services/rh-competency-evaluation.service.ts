@@ -437,10 +437,12 @@ export const createEvaluation = async (input: CreateEvaluationInput): Promise<Co
       [evaluationId, input.positionId],
     );
 
-    // Precarga: los 7 criterios de desempeno.
+    // Precarga: los 7 criterios de desempeno con su observacion por defecto
+    // (la calificacion la pone el evaluador).
     await client.query(
-      `INSERT INTO public.rh_competency_evaluation_items (evaluation_id, section, item_text, criticality, sort_order)
-       SELECT $1, 'DESEMPENO', criterion_text, criticality, sort_order
+      `INSERT INTO public.rh_competency_evaluation_items
+         (evaluation_id, section, item_text, criticality, observations, sort_order)
+       SELECT $1, 'DESEMPENO', criterion_text, criticality, default_observations, sort_order
          FROM public.rh_performance_criteria
         WHERE is_active = TRUE
         ORDER BY sort_order ASC, id ASC;`,
