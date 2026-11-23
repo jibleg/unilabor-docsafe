@@ -5,6 +5,7 @@ import {
   closePublicationController,
   getPublicationController,
   listAssignableAreasController,
+  listAssignableUsersController,
   listPublicationsController,
   listRepublishCandidatesController,
   publishReadingController,
@@ -48,6 +49,7 @@ router.post(
 );
 
 router.get('/readings/areas', manageReading, listAssignableAreasController);
+router.get('/readings/assignable-users', manageReading, listAssignableUsersController);
 
 // Antes de /readings/:id para no ser opacada por el parametro.
 router.get('/readings/republish-candidates', manageReading, listRepublishCandidatesController);

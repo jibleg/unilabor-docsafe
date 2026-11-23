@@ -141,6 +141,12 @@ export interface AssignableArea {
   total: number;
 }
 
+export interface AssignableUser {
+  user_id: string;
+  full_name: string;
+  area: string | null;
+}
+
 /** Una lectura del SGC asignada a mí, tal como la ve el lector. */
 export interface MyReading {
   id: number;

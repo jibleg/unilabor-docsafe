@@ -10,6 +10,7 @@ import {
   getReaderSignedCopyUrl,
   getReadingPublication,
   listAssignableAreas,
+  listAssignableUsers,
   listReadingPublications,
   listRepublishCandidates,
   republishForNewVersion,
@@ -22,6 +23,7 @@ import { RepublishCandidatesPanel } from '../components/quality/reading-room/Rep
 import { ExpedientTabs } from '../components/rh/ExpedientTabs';
 import type {
   AssignableArea,
+  AssignableUser,
   ReadingAssignment,
   ReadingPublication,
   ReadingPublicationStatus,
@@ -84,6 +86,7 @@ export const QualityReadingRoomPage = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detail, setDetail] = useState<{ publication: ReadingPublication; readers: ReadingAssignment[] } | null>(null);
   const [areas, setAreas] = useState<AssignableArea[]>([]);
+  const [users, setUsers] = useState<AssignableUser[]>([]);
   const [assigning, setAssigning] = useState(false);
 
   const [candidates, setCandidates] = useState<RepublishCandidate[]>([]);
@@ -114,8 +117,10 @@ export const QualityReadingRoomPage = () => {
   const refreshDetail = async (publicationId: number) => {
     try {
       setDetail(await getReadingPublication(publicationId));
-      if (areas.length === 0) {
-        setAreas(await listAssignableAreas());
+      if (areas.length === 0 || users.length === 0) {
+        const [nextAreas, nextUsers] = await Promise.all([listAssignableAreas(), listAssignableUsers()]);
+        setAreas(nextAreas);
+        setUsers(nextUsers);
       }
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudo abrir la publicación.'));
@@ -454,6 +459,7 @@ export const QualityReadingRoomPage = () => {
         open={drawerOpen}
         detail={detail}
         areas={areas}
+        users={users}
         assigning={assigning}
         onClose={() => setDrawerOpen(false)}
         onAssign={(payload) => void handleAssign(payload)}

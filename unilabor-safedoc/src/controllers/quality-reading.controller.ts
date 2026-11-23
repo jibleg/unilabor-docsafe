@@ -7,6 +7,7 @@ import {
   closePublication,
   getPublicationById,
   listAssignableAreas,
+  listAssignableUsers,
   listPublications,
   listReaders,
   listRepublishCandidates,
@@ -224,6 +225,15 @@ export const listAssignableAreasController = async (_req: AuthRequest, res: Resp
   } catch (error) {
     console.error('Error listando areas asignables:', error);
     return res.status(500).json({ message: 'No se pudieron consultar las areas.' });
+  }
+};
+
+export const listAssignableUsersController = async (_req: AuthRequest, res: Response) => {
+  try {
+    return res.json(await listAssignableUsers());
+  } catch (error) {
+    console.error('Error listando colaboradores asignables:', error);
+    return res.status(500).json({ message: 'No se pudieron consultar los colaboradores.' });
   }
 };
 

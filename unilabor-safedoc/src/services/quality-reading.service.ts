@@ -582,6 +582,25 @@ export const listAssignableAreas = async (): Promise<Array<{ area: string; total
   return result.rows.map((row) => ({ area: String(row.area), total: Number(row.total) }));
 };
 
+/** Colaboradores activos con cuenta activa, para asignar la lectura a una persona. */
+export const listAssignableUsers = async (): Promise<
+  Array<{ user_id: string; full_name: string; area: string | null }>
+> => {
+  const result = await pool.query(
+    `SELECT u.id AS user_id, e.full_name, e.area
+       FROM public.employees e
+       INNER JOIN public.users u ON u.id = e.user_id AND u.is_active = TRUE
+      WHERE e.is_active = TRUE
+      ORDER BY e.full_name ASC;`,
+  );
+
+  return result.rows.map((row) => ({
+    user_id: String(row.user_id),
+    full_name: String(row.full_name),
+    area: row.area ? String(row.area) : null,
+  }));
+};
+
 /**
  * Marca como vencidas las lecturas cuyo plazo ya paso. Idempotente: solo toca
  * las que siguen en curso, nunca una firmada (que es evidencia).

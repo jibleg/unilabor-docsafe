@@ -7,15 +7,17 @@ import {
   formatStamp,
   signedPercent,
 } from '../../../pages/QualityReadingRoomPage.helpers';
-import type { AcknowledgementStatus, AssignableArea, ReadingAssignment, ReadingPublication } from '../../../types/models';
+import type { AcknowledgementStatus, AssignableArea, AssignableUser, ReadingAssignment, ReadingPublication } from '../../../types/models';
 import { DrawerShell } from '../../attendance/schedule/DrawerShell';
 import { Pagination } from '../../Pagination';
+import { SearchableSelect, type SearchableOption } from '../../SearchableSelect';
 
 interface ReadingPublicationDrawerProps {
   open: boolean;
   /** null mientras carga (o si no se pudo abrir). */
   detail: { publication: ReadingPublication; readers: ReadingAssignment[] } | null;
   areas: AssignableArea[];
+  users: AssignableUser[];
   assigning: boolean;
   onClose: () => void;
   onAssign: (payload: AssignReadersPayload) => void;
@@ -34,6 +36,10 @@ const STATUS_FILTERS: Array<{ value: AcknowledgementStatus | 'all'; label: strin
 ];
 
 const PAGE_SIZE_OPTIONS = [30, 50, 70];
+
+type AssignMode = 'all' | 'area' | 'user';
+
+const TARGET_LABEL: Record<AssignMode, string> = { all: 'Área o colaborador', area: 'Área', user: 'Colaborador' };
 
 const normalize = (value: string): string => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -70,6 +76,7 @@ export const ReadingPublicationDrawer = ({
   open,
   detail,
   areas,
+  users,
   assigning,
   onClose,
   onAssign,
@@ -77,8 +84,9 @@ export const ReadingPublicationDrawer = ({
   onOpenSignedCopy,
   onClosePublication,
 }: ReadingPublicationDrawerProps) => {
-  const [assignMode, setAssignMode] = useState<'all' | 'area'>('all');
-  const [assignArea, setAssignArea] = useState('');
+  const [assignMode, setAssignMode] = useState<AssignMode>('all');
+  // Área o colaborador elegido, según el modo; se limpia al cambiar de modo.
+  const [assignTarget, setAssignTarget] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<AcknowledgementStatus | 'all'>('all');
   const [page, setPage] = useState(1);
@@ -97,6 +105,22 @@ export const ReadingPublicationDrawer = ({
   // Si el filtro o una recarga dejan menos páginas, se muestra la última que exista.
   const currentPage = Math.min(page, totalPages);
   const pageReaders = readers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const targetOptions = useMemo<SearchableOption[]>(() => {
+    if (assignMode === 'area') {
+      return areas.map((area) => ({ value: area.area, label: `${area.area} (${area.total})` }));
+    }
+    if (assignMode === 'user') {
+      return users.map((user) => ({ value: user.user_id, label: user.full_name, hint: user.area ?? 'Sin área' }));
+    }
+    return [];
+  }, [assignMode, areas, users]);
+
+  const assignPayload = (): AssignReadersPayload => {
+    if (assignMode === 'area') return { mode: 'area', area: assignTarget };
+    if (assignMode === 'user') return { mode: 'users', user_ids: [assignTarget] };
+    return { mode: 'all' };
+  };
 
   const publication = detail?.publication ?? null;
   const total = detail?.readers.length ?? 0;
@@ -159,34 +183,34 @@ export const ReadingPublicationDrawer = ({
                 Asignar a
                 <select
                   value={assignMode}
-                  onChange={(event) => setAssignMode(event.target.value as 'all' | 'area')}
+                  onChange={(event) => {
+                    setAssignMode(event.target.value as AssignMode);
+                    setAssignTarget('');
+                  }}
                   className="mt-1 block rounded-xl border border-[rgba(0,65,106,0.15)] bg-white px-3 py-1.5 text-sm text-[var(--color-brand-700)]"
                 >
                   <option value="all">Todos los colaboradores</option>
                   <option value="area">Un área</option>
+                  <option value="user">Un colaborador</option>
                 </select>
               </label>
               {/* Siempre montado (solo se deshabilita) para que el bloque no salte al cambiar el modo. */}
-              <label className={`text-xs font-semibold text-[var(--unilabor-neutral)] ${assignMode === 'area' ? '' : 'opacity-40'}`}>
-                Área
-                <select
-                  value={assignArea}
-                  disabled={assignMode !== 'area'}
-                  onChange={(event) => setAssignArea(event.target.value)}
-                  className="mt-1 block rounded-xl border border-[rgba(0,65,106,0.15)] bg-white px-3 py-1.5 text-sm text-[var(--color-brand-700)]"
-                >
-                  <option value="">Selecciona…</option>
-                  {areas.map((area) => (
-                    <option key={area.area} value={area.area}>
-                      {area.area} ({area.total})
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className={`w-72 max-w-full text-xs font-semibold text-[var(--unilabor-neutral)] ${assignMode === 'all' ? 'opacity-40' : ''}`}>
+                <span className="mb-1 block">{TARGET_LABEL[assignMode]}</span>
+                <SearchableSelect
+                  value={assignTarget}
+                  options={targetOptions}
+                  onChange={setAssignTarget}
+                  disabled={assignMode === 'all'}
+                  clearable={false}
+                  placeholder="Selecciona…"
+                  searchPlaceholder={assignMode === 'user' ? 'Buscar colaborador…' : 'Buscar área…'}
+                />
+              </div>
               <button
                 type="button"
-                disabled={assigning || (assignMode === 'area' && !assignArea)}
-                onClick={() => onAssign(assignMode === 'all' ? { mode: 'all' } : { mode: 'area', area: assignArea })}
+                disabled={assigning || (assignMode !== 'all' && !assignTarget)}
+                onClick={() => onAssign(assignPayload())}
                 className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-700)] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
               >
                 {assigning ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />} Asignar

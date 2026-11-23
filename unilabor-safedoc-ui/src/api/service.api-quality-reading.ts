@@ -2,6 +2,7 @@ import api from './axios';
 import { getArrayFromPayload } from './service.shared';
 import type {
   AssignableArea,
+  AssignableUser,
   MyReading,
   ReadingAssignment,
   RepublishCandidate,
@@ -42,6 +43,11 @@ export const getReadingPublication = async (
 export const listAssignableAreas = async (): Promise<AssignableArea[]> => {
   const response = await api.get('/quality/readings/areas');
   return getArrayFromPayload(response.data, ['areas', 'items', 'results']) as AssignableArea[];
+};
+
+export const listAssignableUsers = async (): Promise<AssignableUser[]> => {
+  const response = await api.get('/quality/readings/assignable-users');
+  return getArrayFromPayload(response.data, ['users', 'items', 'results']) as AssignableUser[];
 };
 
 /** Las tres formas de asignar: individual, por area, o a todos. */
