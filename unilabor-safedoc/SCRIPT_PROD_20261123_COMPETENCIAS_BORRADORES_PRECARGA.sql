@@ -16,7 +16,7 @@
 --   - No borra nada. Repetirlo no cambia nada. Compatible con PostgreSQL 10.
 BEGIN;
 
-CREATE FUNCTION pg_temp.norm_comp(t TEXT) RETURNS TEXT AS $$
+CREATE OR REPLACE FUNCTION pg_temp.norm_comp(t TEXT) RETURNS TEXT AS $$
   SELECT regexp_replace(translate(lower(t), 'áéíóúüñ', 'aeiouun'), '[^a-z0-9]', '', 'g');
 $$ LANGUAGE sql IMMUTABLE;
 

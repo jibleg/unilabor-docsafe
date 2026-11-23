@@ -480,7 +480,7 @@ INSERT INTO tmp_comp VALUES
     ('VTA', 10, 'Conocimiento de los principios de confidencialidad, protección de datos personales y manejo de información institucional.', 'A', 'OD', 'Ante la petición simulada de un médico de conocer los resultados de otro paciente o los precios de un convenio ajeno, se niega y explica el motivo.'),
     ('VTA', 11, 'Identificación, comunicación y seguimiento de riesgos, quejas y oportunidades de mejora relacionadas con la atención y comercialización de los servicios.', 'A', 'RR', 'Registra de manera textual una queja recibida en visita y la entrega en el formato institucional.');
 
-CREATE FUNCTION pg_temp.norm_comp(t TEXT) RETURNS TEXT AS $$
+CREATE OR REPLACE FUNCTION pg_temp.norm_comp(t TEXT) RETURNS TEXT AS $$
   SELECT regexp_replace(translate(lower(t), 'áéíóúüñ', 'aeiouun'), '[^a-z0-9]', '', 'g');
 $$ LANGUAGE sql IMMUTABLE;
 
