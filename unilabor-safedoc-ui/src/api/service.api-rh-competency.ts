@@ -127,7 +127,7 @@ export type CompetencyAuthorizationDecision = 'AUTORIZADO' | 'AUTORIZADO_CON_SEG
 /** Autorización del REH-REG-003 (RH o Dirección General; permiso RH.COMPETENCY.AUTHORIZE). */
 export const authorizeCompetencyEvaluation = async (
   id: number,
-  payload: { decision: CompetencyAuthorizationDecision; note?: string | null },
+  payload: { decision: CompetencyAuthorizationDecision; note?: string | null; authorization_level_id?: number | null },
 ): Promise<{ message: string; evaluation: RhCompetencyEvaluation }> => {
   const response = await api.post(`/rh/competency-evaluations/${id}/authorize`, payload);
   const data = asRecord(unwrapPayload(response.data));

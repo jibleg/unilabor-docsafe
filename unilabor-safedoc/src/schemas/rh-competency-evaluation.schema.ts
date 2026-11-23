@@ -134,11 +134,23 @@ export const linkPositionTrainingCourseSchema = z.object({
 export type LinkPositionTrainingCourseInput = z.infer<typeof linkPositionTrainingCourseSchema>;
 
 /** Autorizacion del REH-REG-003 (paso propio de RH / Direccion General, sin firma). */
-export const authorizeCompetencyEvaluationSchema = z.object({
-  decision: z.enum(['AUTORIZADO', 'AUTORIZADO_CON_SEGUIMIENTO', 'NO_AUTORIZADO'], {
-    error: 'Indica la decision: AUTORIZADO, AUTORIZADO_CON_SEGUIMIENTO o NO_AUTORIZADO.',
-  }),
-  note: z.string().trim().max(1000, 'La nota es demasiado larga').nullable().optional(),
+export const authorizeCompetencyEvaluationSchema = z
+  .object({
+    decision: z.enum(['AUTORIZADO', 'AUTORIZADO_CON_SEGUIMIENTO', 'NO_AUTORIZADO'], {
+      error: 'Indica la decision: AUTORIZADO, AUTORIZADO_CON_SEGUIMIENTO o NO_AUTORIZADO.',
+    }),
+    note: z.string().trim().max(1000, 'La nota es demasiado larga').nullable().optional(),
+    /** Nivel de autorizacion del REH-REG-026: obligatorio cuando se autoriza. */
+    authorization_level_id: z.coerce.number().int().positive().nullable().optional(),
+  })
+  .refine((value) => value.decision === 'NO_AUTORIZADO' || Boolean(value.authorization_level_id), {
+    message: 'Elige el nivel de autorizacion.',
+    path: ['authorization_level_id'],
+  });
+
+/** Correccion del nivel de autorizacion de una evaluacion ya autorizada. */
+export const setCompetencyAuthorizationLevelSchema = z.object({
+  authorization_level_id: z.coerce.number({ message: 'Elige el nivel de autorizacion' }).int().positive('Elige el nivel de autorizacion'),
 });
 
 export type AuthorizeCompetencyEvaluationInput = z.infer<typeof authorizeCompetencyEvaluationSchema>;

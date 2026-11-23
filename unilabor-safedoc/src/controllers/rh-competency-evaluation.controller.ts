@@ -38,6 +38,8 @@ const parseId = (value: unknown): number | null => {
 
 const ERROR_STATUS: Record<string, number> = {
   RH_COMP_EVAL_AUTH_NOT_PENDING: 409,
+  RH_COMP_EVAL_AUTH_LEVEL_REQUIRED: 400,
+  RH_COMP_EVAL_AUTH_LEVEL_INVALID: 400,
   RH_COMP_EVAL_SIGNATURE_FILE_MISSING: 409,
   RH_COMP_EVAL_EMPLOYEE_NOT_FOUND: 404,
   RH_COMP_EVAL_POSITION_NOT_FOUND: 404,
@@ -224,7 +226,8 @@ export const authorizeCompetencyEvaluationController = async (req: AuthRequest, 
   const decision = req.body.decision as 'AUTORIZADO' | 'AUTORIZADO_CON_SEGUIMIENTO' | 'NO_AUTORIZADO';
   const note = typeof req.body.note === 'string' && req.body.note.trim() ? String(req.body.note).trim() : null;
   try {
-    const evaluation = await authorizeEvaluation({ evaluationId, decision, note, decidedByUserId: req.user.id });
+    const authorizationLevelId = req.body.authorization_level_id ? Number(req.body.authorization_level_id) : null;
+    const evaluation = await authorizeEvaluation({ evaluationId, decision, note, authorizationLevelId, decidedByUserId: req.user.id });
     await logAudit(req.user.id, `RH_COMP_EVAL_AUTHORIZE:${evaluationId}:${decision}`, evaluationId, req.ip);
     // Constancia de competencia: nace al autorizar (best-effort, no deshace la autorizacion).
     const certificateDocumentId = decision === 'NO_AUTORIZADO' ? null : await tryIssueCompetencyCertificate(evaluationId, req.user.id);

@@ -81,6 +81,10 @@ export interface RhCompetencyEvaluation {
   /** Quién ejecutó la autorización (RH o Dirección General) y su nota. */
   authorized_by_name?: string | null;
   authorization_note?: string | null;
+  /** Nivel de autorización (REH-REG-026) elegido al autorizar. */
+  authorization_level_id?: number | null;
+  authorization_level_no?: number | null;
+  authorization_level_name?: string | null;
   area_signatory_name: string | null;
   rh_signatory_name: string | null;
   director_signatory_name: string | null;

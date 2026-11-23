@@ -196,6 +196,10 @@ export interface CompetencyEvaluationRecord {
   /** Quien ejecuto la autorizacion (RH o Direccion General) y su nota. */
   authorized_by_name: string | null;
   authorization_note: string | null;
+  /** Nivel de autorizacion (REH-REG-026) elegido al autorizar; null si no se ha elegido. */
+  authorization_level_id: number | null;
+  authorization_level_no: number | null;
+  authorization_level_name: string | null;
   area_signatory_name: string | null;
   rh_signatory_name: string | null;
   director_signatory_name: string | null;
@@ -221,6 +225,7 @@ const BASE_QUERY = `
   SELECT
     ev.*, e.full_name AS employee_name, e.employee_code, p.name AS position_name,
     tc.title AS reference_course_title, au.full_name AS authorized_by_name, sr.full_name AS signature_requested_by_name,
+    al.level_no AS authorization_level_no, al.name AS authorization_level_name,
     ka.status AS knowledge_status, ka.deadline_at AS knowledge_deadline_at, ka.started_at AS knowledge_started_at,
     ka.submitted_at AS knowledge_submitted_at, ka.percentage AS knowledge_percentage,
     (SELECT COUNT(*)::int FROM public.evaluation_assignment_questions aq WHERE aq.assignment_id = ka.id) AS knowledge_question_count
@@ -231,6 +236,7 @@ const BASE_QUERY = `
   LEFT JOIN public.evaluation_assignments ka ON ka.id = ev.knowledge_assignment_id
   LEFT JOIN public.users au ON au.id = ev.authorized_by_user_id
   LEFT JOIN public.users sr ON sr.id = ev.signature_requested_by_user_id
+  LEFT JOIN public.rh_authorization_levels al ON al.id = ev.authorization_level_id
 `;
 
 const toIso = (value: unknown): string | null => {
@@ -273,6 +279,9 @@ const mapRow = (row: any): CompetencyEvaluationRecord => ({
   valid_until: toDateString(row.valid_until),
   authorized_by_name: row.authorized_by_name ? String(row.authorized_by_name) : null,
   authorization_note: row.authorization_note ? String(row.authorization_note) : null,
+  authorization_level_id: row.authorization_level_id ? Number(row.authorization_level_id) : null,
+  authorization_level_no: row.authorization_level_no ? Number(row.authorization_level_no) : null,
+  authorization_level_name: row.authorization_level_name ? String(row.authorization_level_name) : null,
   area_signatory_name: row.area_signatory_name ? String(row.area_signatory_name) : null,
   rh_signatory_name: row.rh_signatory_name ? String(row.rh_signatory_name) : null,
   director_signatory_name: row.director_signatory_name ? String(row.director_signatory_name) : null,

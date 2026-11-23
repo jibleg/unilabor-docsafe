@@ -32,6 +32,7 @@ export interface PositionPayload {
   sort_order?: number | null;
   is_active?: boolean;
   process_area_id?: number | null;
+  organizational_level_id?: number | null;
 }
 
 /** Las 4 areas del proceso (las rige el puesto). */

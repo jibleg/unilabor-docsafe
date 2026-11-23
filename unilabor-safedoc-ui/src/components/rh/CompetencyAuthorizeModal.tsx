@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, ShieldCheck, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { authorizeCompetencyEvaluation, type CompetencyAuthorizationDecision } from '../../api/service.api-rh-competency';
+import { listAuthorizationLevels } from '../../api/service.api-rh-authorized-personnel';
 import { getApiErrorMessage } from '../../api/service.parsers';
-import type { RhCompetencyEvaluation } from '../../types/models';
+import type { RhAuthorizationLevel, RhCompetencyEvaluation } from '../../types/models';
 import { DICTAMEN_UI } from '../../utils/competency';
 
 interface CompetencyAuthorizeModalProps {
@@ -42,6 +43,16 @@ export const CompetencyAuthorizeModal = ({ evaluation, onClose, onAuthorized }: 
   const [decision, setDecision] = useState<CompetencyAuthorizationDecision>('AUTORIZADO');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [levels, setLevels] = useState<RhAuthorizationLevel[]>([]);
+  const [levelId, setLevelId] = useState<number | null>(null);
+  const authorizes = decision !== 'NO_AUTORIZADO';
+
+  useEffect(() => {
+    listAuthorizationLevels()
+      .then(setLevels)
+      .catch((error) => toast.error(getApiErrorMessage(error, 'No se pudieron cargar los niveles de autorización.')));
+  }, []);
+
   const dictamenUi = evaluation.results.dictamen ? DICTAMEN_UI[evaluation.results.dictamen] : null;
 
   const handleSubmit = async () => {
@@ -49,9 +60,17 @@ export const CompetencyAuthorizeModal = ({ evaluation, onClose, onAuthorized }: 
       toast.warning('Para "No autorizado" captura el motivo en la nota.');
       return;
     }
+    if (authorizes && !levelId) {
+      toast.warning('Elige el nivel de autorización de este puesto.');
+      return;
+    }
     setSaving(true);
     try {
-      const result = await authorizeCompetencyEvaluation(evaluation.id, { decision, note: note.trim() || null });
+      const result = await authorizeCompetencyEvaluation(evaluation.id, {
+        decision,
+        note: note.trim() || null,
+        authorization_level_id: authorizes ? levelId : null,
+      });
       toast.success(result.message);
       onAuthorized(result.evaluation);
       onClose();
@@ -64,7 +83,7 @@ export const CompetencyAuthorizeModal = ({ evaluation, onClose, onAuthorized }: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(11,34,53,0.35)] p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Autorizar evaluación de competencia">
-      <div className="w-full max-w-xl rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white p-6 shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-brand-500)]">REH-REG-003 · Autorización</p>
@@ -100,6 +119,32 @@ export const CompetencyAuthorizeModal = ({ evaluation, onClose, onAuthorized }: 
             </label>
           ))}
         </div>
+
+        {/* El bloque no se desmonta al elegir "No autorizado": solo se atenúa, para que el modal no salte. */}
+        <fieldset className={`mt-4 transition-opacity ${authorizes ? '' : 'pointer-events-none opacity-40'}`} disabled={!authorizes}>
+          <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
+            Nivel de autorización para {evaluation.position_name} (obligatorio)
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {levels.map((level) => (
+              <label
+                key={level.id}
+                title={level.description ?? undefined}
+                className={`flex cursor-pointer items-start gap-2 rounded-xl border px-3 py-2 transition ${
+                  levelId === level.id ? 'border-[var(--color-brand-500)] bg-[rgba(191,212,230,0.34)]' : 'border-[rgba(0,65,106,0.12)] bg-white hover:bg-[rgba(191,212,230,0.18)]'
+                }`}
+              >
+                <input type="radio" name="competency-authorization-level" checked={levelId === level.id} onChange={() => setLevelId(level.id)} className="mt-1" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-[var(--color-brand-700)]">
+                    {level.level_no} · {level.name}
+                  </span>
+                  <span className="block text-[11px] leading-4 text-[var(--unilabor-neutral)]">{level.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <label className="mt-4 block">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">

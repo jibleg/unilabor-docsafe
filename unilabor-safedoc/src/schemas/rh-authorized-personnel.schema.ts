@@ -1,0 +1,22 @@
+import { z } from 'zod';
+
+/** Catalogos del Listado de personal autorizado (REH-REG-026). */
+
+export const organizationalLevelSchema = z.object({
+  code: z.string().trim().min(1, 'La clave es obligatoria').max(4, 'La clave admite hasta 4 caracteres'),
+  name: z.string().trim().min(1, 'El nombre es obligatorio').max(80, 'El nombre es demasiado largo'),
+  description: z.string().trim().max(400, 'La descripcion es demasiado larga').nullish(),
+  sort_order: z.number().int().min(0).nullish(),
+  is_active: z.boolean().optional(),
+});
+export type OrganizationalLevelInput = z.infer<typeof organizationalLevelSchema>;
+
+export const authorizationLevelSchema = z.object({
+  level_no: z.coerce.number({ message: 'El numero de nivel es obligatorio' }).int().min(1, 'El nivel debe ser mayor a cero').max(99),
+  name: z.string().trim().min(1, 'El nombre es obligatorio').max(80, 'El nombre es demasiado largo'),
+  description: z.string().trim().max(400, 'La descripcion es demasiado larga').nullish(),
+  is_active: z.boolean().optional(),
+});
+export type AuthorizationLevelInput = z.infer<typeof authorizationLevelSchema>;
+
+export const levelParamsSchema = z.object({ id: z.coerce.number().int().positive() });

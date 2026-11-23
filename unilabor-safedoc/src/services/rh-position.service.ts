@@ -44,6 +44,10 @@ export interface RhPositionRecord {
   process_area_id: number | null;
   process_area_code: string | null;
   process_area_name: string | null;
+  /** Nivel organizacional del puesto (Gerencial, Supervision, Operativo): columna NIVEL ORG. del REH-REG-026. */
+  organizational_level_id: number | null;
+  organizational_level_code: string | null;
+  organizational_level_name: string | null;
   competencies: RhPositionCompetency[];
   documents: RhPositionDocument[];
   created_at: string;
@@ -56,6 +60,7 @@ export interface RhPositionPayload {
   description?: string | null;
   sort_order?: number | null;
   process_area_id?: number | null;
+  organizational_level_id?: number | null;
 }
 
 export interface RhProcessArea {
@@ -70,9 +75,11 @@ export const listProcessAreas = async (): Promise<RhProcessArea[]> => {
   return result.rows.map((row) => ({ id: Number(row.id), code: String(row.code), name: String(row.name) }));
 };
 
-const POSITION_SELECT = `SELECT p.*, pa.code AS process_area_code, pa.name AS process_area_name
+const POSITION_SELECT = `SELECT p.*, pa.code AS process_area_code, pa.name AS process_area_name,
+         ol.code AS organizational_level_code, ol.name AS organizational_level_name
   FROM public.rh_positions p
-  LEFT JOIN public.rh_process_areas pa ON pa.id = p.process_area_id`;
+  LEFT JOIN public.rh_process_areas pa ON pa.id = p.process_area_id
+  LEFT JOIN public.rh_organizational_levels ol ON ol.id = p.organizational_level_id`;
 
 const mapPosition = (row: any): Omit<RhPositionRecord, 'competencies' | 'documents'> => ({
   id: Number(row.id),
@@ -83,6 +90,9 @@ const mapPosition = (row: any): Omit<RhPositionRecord, 'competencies' | 'documen
   process_area_id: row.process_area_id ? Number(row.process_area_id) : null,
   process_area_code: row.process_area_code ? String(row.process_area_code) : null,
   process_area_name: row.process_area_name ? String(row.process_area_name) : null,
+  organizational_level_id: row.organizational_level_id ? Number(row.organizational_level_id) : null,
+  organizational_level_code: row.organizational_level_code ? String(row.organizational_level_code) : null,
+  organizational_level_name: row.organizational_level_name ? String(row.organizational_level_name) : null,
   sort_order: Number(row.sort_order ?? 0),
   created_at: String(row.created_at),
   updated_at: String(row.updated_at),
@@ -151,9 +161,19 @@ export const createPosition = async (payload: RhPositionPayload): Promise<RhPosi
   }
   try {
     const result = await pool.query(
-      `INSERT INTO public.rh_positions (code, name, description, sort_order, process_area_id)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id;`,
-      [code, name, payload.description?.trim() || null, payload.sort_order ?? 0, payload.process_area_id ?? null],
+      // Sin nivel organizacional indicado, el puesto nace en OPERATIVO (regla de RH).
+      `INSERT INTO public.rh_positions (code, name, description, sort_order, process_area_id, organizational_level_id)
+       VALUES ($1, $2, $3, $4, $5,
+               COALESCE($6::bigint, (SELECT id FROM public.rh_organizational_levels WHERE UPPER(code) = 'O' LIMIT 1)))
+       RETURNING id;`,
+      [
+        code,
+        name,
+        payload.description?.trim() || null,
+        payload.sort_order ?? 0,
+        payload.process_area_id ?? null,
+        payload.organizational_level_id ?? null,
+      ],
     );
     return (await getPositionById(Number(result.rows[0].id)))!;
   } catch (error: any) {
@@ -176,8 +196,8 @@ export const updatePosition = async (
     await pool.query(
       `UPDATE public.rh_positions
           SET code = $1, name = $2, description = $3, sort_order = $4,
-              is_active = $5, process_area_id = $6, updated_at = NOW()
-        WHERE id = $7;`,
+              is_active = $5, process_area_id = $6, organizational_level_id = $7, updated_at = NOW()
+        WHERE id = $8;`,
       [
         (payload.code ?? existing.code).trim(),
         (payload.name ?? existing.name).trim(),
@@ -185,6 +205,8 @@ export const updatePosition = async (
         payload.sort_order ?? existing.sort_order,
         payload.is_active ?? existing.is_active,
         payload.process_area_id !== undefined ? payload.process_area_id : existing.process_area_id,
+        // El nivel organizacional no se puede dejar vacio: null conserva el actual.
+        payload.organizational_level_id ?? existing.organizational_level_id,
         id,
       ],
     );

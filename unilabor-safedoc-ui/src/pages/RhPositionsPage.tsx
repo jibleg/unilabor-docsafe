@@ -17,6 +17,7 @@ import { CompactListPager } from '../components/CompactListPager';
 import { DocumentSearchPicker } from '../components/rh/DocumentSearchPicker';
 import { ExpedientTabs } from '../components/rh/ExpedientTabs';
 import { PositionTrainingCoursesPanel } from '../components/rh/PositionTrainingCoursesPanel';
+import { PositionOrgLevelSelect } from '../components/rh/PositionOrgLevelSelect';
 import { PositionProcessAreaSelect } from '../components/rh/PositionProcessAreaSelect';
 import { PositionSupervisionItemsPanel } from '../components/rh/supervision/PositionSupervisionItemsPanel';
 import { PositionAssignmentAuthorizationsPanel } from '../components/rh/assignment-letter/PositionAssignmentAuthorizationsPanel';
@@ -357,10 +358,16 @@ export const RhPositionsPage = () => {
                   <h2 className="text-lg font-bold text-[var(--color-brand-700)]">{selectedPosition.name}</h2>
                   <p className="text-xs text-[var(--unilabor-neutral)]">{selectedPosition.code}</p>
                 </div>
-                <PositionProcessAreaSelect
-                  position={selectedPosition}
-                  onSaved={(updated) => setPositions((current) => current.map((item) => (item.id === updated.id ? updated : item)))}
-                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <PositionOrgLevelSelect
+                    position={selectedPosition}
+                    onSaved={(updated) => setPositions((current) => current.map((item) => (item.id === updated.id ? updated : item)))}
+                  />
+                  <PositionProcessAreaSelect
+                    position={selectedPosition}
+                    onSaved={(updated) => setPositions((current) => current.map((item) => (item.id === updated.id ? updated : item)))}
+                  />
+                </div>
               </div>
 
               <ExpedientTabs

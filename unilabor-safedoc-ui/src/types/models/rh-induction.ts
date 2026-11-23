@@ -29,6 +29,10 @@ export interface RhPosition {
   process_area_id: number | null;
   process_area_code: string | null;
   process_area_name: string | null;
+  /** Nivel organizacional del puesto (Gerencial, Supervisión, Operativo). */
+  organizational_level_id: number | null;
+  organizational_level_code: string | null;
+  organizational_level_name: string | null;
   competencies: RhPositionCompetency[];
   documents: RhPositionDocument[];
   created_at: string;

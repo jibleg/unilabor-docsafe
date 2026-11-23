@@ -1,0 +1,46 @@
+import { Router } from 'express';
+import {
+  createAuthorizationLevelController,
+  createOrganizationalLevelController,
+  getAuthorizedPersonnelController,
+  getAuthorizedPersonnelPdfController,
+  listAuthorizationLevelsController,
+  listOrganizationalLevelsController,
+  setAuthorizationLevelController,
+  updateAuthorizationLevelController,
+  updateOrganizationalLevelController,
+} from '../controllers/rh-authorized-personnel.controller';
+import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import { authorizationLevelSchema, organizationalLevelSchema } from '../schemas/rh-authorized-personnel.schema';
+import { setCompetencyAuthorizationLevelSchema } from '../schemas/rh-competency-evaluation.schema';
+
+/**
+ * Listado de personal autorizado (REH-REG-026). Se monta en /api/rh.
+ * Consulta: quien gestiona competencia. Catalogos: los leen tambien quienes
+ * administran puestos; los editan RH / Direccion General (quienes autorizan).
+ */
+const router = Router();
+
+router.use(verifyToken);
+
+const READ_CATALOGS = ['RH.COMPETENCY.MANAGE', 'RH.INDUCTION.MANAGE'];
+
+router.get('/authorized-personnel', requirePermission('RH.COMPETENCY.MANAGE'), getAuthorizedPersonnelController);
+router.get('/authorized-personnel/pdf', requirePermission('RH.COMPETENCY.MANAGE'), getAuthorizedPersonnelPdfController);
+router.put(
+  '/authorized-personnel/evaluations/:id/authorization-level',
+  requirePermission('RH.COMPETENCY.AUTHORIZE'),
+  validate(setCompetencyAuthorizationLevelSchema),
+  setAuthorizationLevelController,
+);
+
+router.get('/organizational-levels', requirePermission(READ_CATALOGS), listOrganizationalLevelsController);
+router.post('/organizational-levels', requirePermission('RH.COMPETENCY.AUTHORIZE'), validate(organizationalLevelSchema), createOrganizationalLevelController);
+router.put('/organizational-levels/:id', requirePermission('RH.COMPETENCY.AUTHORIZE'), validate(organizationalLevelSchema), updateOrganizationalLevelController);
+
+router.get('/authorization-levels', requirePermission(READ_CATALOGS), listAuthorizationLevelsController);
+router.post('/authorization-levels', requirePermission('RH.COMPETENCY.AUTHORIZE'), validate(authorizationLevelSchema), createAuthorizationLevelController);
+router.put('/authorization-levels/:id', requirePermission('RH.COMPETENCY.AUTHORIZE'), validate(authorizationLevelSchema), updateAuthorizationLevelController);
+
+export default router;

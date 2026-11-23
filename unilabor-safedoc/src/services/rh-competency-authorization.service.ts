@@ -38,8 +38,17 @@ export interface AuthorizeEvaluationInput {
   evaluationId: number;
   decision: CompetencyAuthorizationDecision;
   note: string | null;
+  /** Nivel de autorizacion del REH-REG-026; obligatorio salvo NO_AUTORIZADO. */
+  authorizationLevelId: number | null;
   decidedByUserId: string;
 }
+
+const requireActiveAuthorizationLevel = async (levelId: number): Promise<void> => {
+  const level = await pool.query(`SELECT 1 FROM public.rh_authorization_levels WHERE id = $1 AND is_active = TRUE;`, [levelId]);
+  if (level.rows.length === 0) {
+    throwCoded('RH_COMP_EVAL_AUTH_LEVEL_INVALID', 'El nivel de autorizacion elegido no existe o esta inactivo.');
+  }
+};
 
 const readSignatureFile = (storedPath: string | null): Buffer => {
   if (!storedPath) return throwCoded('RH_COMP_EVAL_SIGNATURE_FILE_MISSING', 'No se encontro una firma del cierre para regenerar el registro.');
@@ -61,6 +70,13 @@ export const authorizeEvaluation = async (input: AuthorizeEvaluationInput): Prom
   if (record.status !== 'CLOSED') return throwCoded('RH_COMP_EVAL_NOT_CLOSED', 'La autorizacion se ejecuta sobre una evaluacion cerrada.');
   if (record.results.authorization_result !== 'PENDIENTE') {
     return throwCoded('RH_COMP_EVAL_AUTH_NOT_PENDING', 'Esta evaluacion no esta pendiente de autorizacion.');
+  }
+  const authorizationLevelId = input.decision === 'NO_AUTORIZADO' ? null : input.authorizationLevelId;
+  if (input.decision !== 'NO_AUTORIZADO') {
+    if (!authorizationLevelId) {
+      return throwCoded('RH_COMP_EVAL_AUTH_LEVEL_REQUIRED', 'Elige el nivel de autorizacion para autorizar este puesto.');
+    }
+    await requireActiveAuthorizationLevel(authorizationLevelId);
   }
 
   const paths = await pool.query(
@@ -121,10 +137,37 @@ export const authorizeEvaluation = async (input: AuthorizeEvaluationInput): Prom
   await pool.query(
     `UPDATE public.rh_competency_evaluations
         SET authorization_result = $2, authorized_at = $3, valid_until = $4,
-            authorized_by_user_id = $5, authorization_note = $6, document_id = $7, updated_at = NOW()
+            authorized_by_user_id = $5, authorization_note = $6, document_id = $7,
+            authorization_level_id = $8, updated_at = NOW()
       WHERE id = $1 AND status = 'CLOSED' AND authorization_result = 'PENDIENTE';`,
-    [record.id, input.decision, decidedAt, validUntil, input.decidedByUserId, input.note, documentId],
+    [record.id, input.decision, decidedAt, validUntil, input.decidedByUserId, input.note, documentId, authorizationLevelId],
   );
 
   return (await getEvaluationById(record.id)) as CompetencyEvaluationRecord;
+};
+
+/**
+ * Fija o corrige el nivel de autorizacion de una evaluacion YA autorizada (las
+ * autorizadas antes de existir el catalogo nacieron sin nivel). No toca la
+ * decision, la vigencia ni el registro archivado.
+ */
+export const setEvaluationAuthorizationLevel = async (
+  evaluationId: number,
+  authorizationLevelId: number,
+): Promise<{ record: CompetencyEvaluationRecord; previousLevelNo: number | null }> => {
+  const record = await getEvaluationById(evaluationId);
+  if (!record) return throwCoded('RH_COMP_EVAL_NOT_FOUND', 'La evaluacion indicada no existe.');
+  const result = record.results.authorization_result;
+  if (record.status !== 'CLOSED' || (result !== 'AUTORIZADO' && result !== 'AUTORIZADO_CON_SEGUIMIENTO')) {
+    return throwCoded('RH_COMP_EVAL_NOT_AUTHORIZED', 'El nivel de autorizacion solo se asigna a evaluaciones autorizadas.');
+  }
+  await requireActiveAuthorizationLevel(authorizationLevelId);
+  await pool.query(
+    `UPDATE public.rh_competency_evaluations SET authorization_level_id = $2, updated_at = NOW() WHERE id = $1;`,
+    [record.id, authorizationLevelId],
+  );
+  return {
+    record: (await getEvaluationById(record.id)) as CompetencyEvaluationRecord,
+    previousLevelNo: record.authorization_level_no,
+  };
 };

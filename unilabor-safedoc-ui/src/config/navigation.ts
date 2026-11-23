@@ -24,6 +24,7 @@ import {
   KeyRound,
   Laptop,
   LayoutDashboard,
+  ListChecks,
   Layers,
   LifeBuoy,
   Move,
@@ -115,6 +116,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: ClipboardCheck, label: 'Evaluación de competencia', path: '/rh/competency-evaluations', permission: 'RH.COMPETENCY.MANAGE' },
         { icon: FileSignature, label: 'Cartas de asignación', path: '/rh/assignment-letters', permission: 'RH.COMPETENCY.MANAGE' },
         { icon: Gauge, label: 'Tablero de competencia', path: '/rh/competency-dashboard', permission: 'RH.COMPETENCY.MANAGE' },
+        { icon: ListChecks, label: 'Personal autorizado', path: '/rh/authorized-personnel', permission: 'RH.COMPETENCY.MANAGE' },
       ],
     },
     {
