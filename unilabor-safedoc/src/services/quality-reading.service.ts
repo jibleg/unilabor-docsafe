@@ -617,8 +617,8 @@ export interface RepublishCandidate {
 }
 
 /**
- * Publicaciones cuyo documento fuente fue reemplazado por una version nueva
- * VIGENTE que todavia no se ha publicado a lectura.
+ * Publicaciones cuyo documento fuente fue reemplazado (una o varias veces) y
+ * cuya version VIGENTE todavia no se ha publicado a lectura.
  *
  * Se PROPONEN, no se republican solas: reemplazar un documento no siempre
  * obliga a que todos vuelvan a firmarlo, y una correccion menor no deberia
@@ -627,8 +627,24 @@ export interface RepublishCandidate {
 export const listRepublishCandidates = async (): Promise<RepublishCandidate[]> => {
   await assertTables();
 
+  // La version vigente puede estar a VARIOS reemplazos de la publicada (el
+  // documento se sube, se corrige y se vuelve a subir el mismo dia): se recorre
+  // toda la cadena replaced_by_document_id hasta la vigente. Si alguna version
+  // posterior ya se publico a lectura, la ronda nueva ya existe (o le toca a esa
+  // publicacion proponerla) y esta no se ofrece.
   const result = await pool.query(
-    `SELECT
+    `WITH RECURSIVE chain AS (
+       SELECT p.id AS publication_id, d.replaced_by_document_id AS document_id, 1 AS depth
+         FROM public.quality_reading_publications p
+         INNER JOIN public.documents d ON d.id = p.document_id
+        WHERE d.replaced_by_document_id IS NOT NULL
+       UNION ALL
+       SELECT c.publication_id, d.replaced_by_document_id, c.depth + 1
+         FROM chain c
+         INNER JOIN public.documents d ON d.id = c.document_id
+        WHERE d.replaced_by_document_id IS NOT NULL AND c.depth < 100
+     )
+     SELECT
        p.id AS publication_id,
        p.document_id AS previous_document_id,
        p.title_snapshot AS previous_title,
@@ -638,12 +654,14 @@ export const listRepublishCandidates = async (): Promise<RepublishCandidate[]> =
        COUNT(a.id) FILTER (WHERE a.status = 'signed')::int AS signed_readers,
        COUNT(a.id) FILTER (WHERE a.status <> 'cancelled')::int AS assigned_readers
      FROM public.quality_reading_publications p
-     INNER JOIN public.documents d ON d.id = p.document_id
-     INNER JOIN public.documents nd ON nd.id = d.replaced_by_document_id
+     INNER JOIN chain c ON c.publication_id = p.id
+     INNER JOIN public.documents nd ON nd.id = c.document_id AND nd.status = 'active'
      LEFT JOIN public.quality_reading_acknowledgements a ON a.publication_id = p.id
-     WHERE nd.status = 'active'
-       AND NOT EXISTS (
-         SELECT 1 FROM public.quality_reading_publications p2 WHERE p2.document_id = nd.id
+     WHERE NOT EXISTS (
+         SELECT 1
+           FROM chain later
+           INNER JOIN public.quality_reading_publications p2 ON p2.document_id = later.document_id
+          WHERE later.publication_id = p.id
        )
      GROUP BY p.id, nd.id, nd.title
      ORDER BY p.published_at DESC;`,

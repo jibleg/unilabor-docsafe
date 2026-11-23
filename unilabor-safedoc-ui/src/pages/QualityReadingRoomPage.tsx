@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BookOpen, FileClock, RefreshCw } from 'lucide-react';
+import { AlertTriangle, BookOpen, FileClock, RefreshCw, Search, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { confirmAction } from '../utils/confirm';
@@ -60,6 +60,13 @@ const paginate = <T,>(items: T[], page: number, pageSize: number) => {
   return { totalPages, current, slice: items.slice((current - 1) * pageSize, current * pageSize) };
 };
 
+// Sin mayusculas ni acentos, para que "tecnico" encuentre "Técnico".
+const normalizeText = (value: string | null | undefined) =>
+  (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
 export const QualityReadingRoomPage = () => {
   const [publications, setPublications] = useState<ReadingPublication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +75,7 @@ export const QualityReadingRoomPage = () => {
   const [tab, setTab] = useState<RoomTab>('publications');
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]!);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   const [candidatesPage, setCandidatesPage] = useState(1);
 
   const [publishOpen, setPublishOpen] = useState(false);
@@ -220,7 +228,25 @@ export const QualityReadingRoomPage = () => {
     }
   };
 
-  const publicationPages = useMemo(() => paginate(publications, page, pageSize), [publications, page, pageSize]);
+  // Busqueda en el cliente: todas las palabras escritas deben aparecer en el
+  // titulo publicado o en el titulo del documento.
+  const visiblePublications = useMemo(() => {
+    const words = normalizeText(search).split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      return publications;
+    }
+    return publications.filter((publication) => {
+      const haystack = `${normalizeText(publication.title_snapshot)} ${normalizeText(publication.document_title)}`;
+      return words.every((word) => haystack.includes(word));
+    });
+  }, [publications, search]);
+  const hasSearch = search.trim().length > 0;
+  const changeSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const publicationPages = useMemo(() => paginate(visiblePublications, page, pageSize), [visiblePublications, page, pageSize]);
   const candidatePages = useMemo(() => paginate(candidates, candidatesPage, pageSize), [candidates, candidatesPage, pageSize]);
   const changePageSize = (size: number) => {
     setPageSize(size);
@@ -297,7 +323,7 @@ export const QualityReadingRoomPage = () => {
         </>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {FILTERS.map((option) => (
               <button
                 key={option.value}
@@ -315,6 +341,30 @@ export const QualityReadingRoomPage = () => {
                 {option.label}
               </button>
             ))}
+            <label className="relative min-w-[220px] max-w-md flex-1">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--unilabor-neutral)]" />
+              <input
+                value={search}
+                onChange={(event) => changeSearch(event.target.value)}
+                placeholder="Buscar documento"
+                aria-label="Buscar documento"
+                className="w-full rounded-xl border border-[rgba(0,65,106,0.14)] bg-white py-2 pl-9 pr-9 text-sm text-[var(--unilabor-ink)] outline-none focus:border-[var(--color-brand-300)]"
+              />
+              <button
+                type="button"
+                onClick={() => changeSearch('')}
+                title="Limpiar búsqueda"
+                aria-label="Limpiar búsqueda"
+                className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-[var(--unilabor-neutral)] hover:bg-[rgba(0,65,106,0.05)] hover:text-[var(--color-brand-700)] ${
+                  search ? '' : 'invisible'
+                }`}
+              >
+                <X size={14} />
+              </button>
+            </label>
+            <span className={`ml-auto text-xs text-[var(--unilabor-neutral)] ${hasSearch ? '' : 'invisible'}`} aria-live="polite">
+              {visiblePublications.length} de {publications.length}
+            </span>
           </div>
 
           {loading && publications.length === 0 && <p className="text-sm text-[var(--unilabor-neutral)]">Cargando…</p>}
@@ -323,6 +373,13 @@ export const QualityReadingRoomPage = () => {
             <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/92 px-5 py-8 text-center">
               <BookOpen className="mx-auto text-[var(--color-brand-500)]" size={28} />
               <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">Todavía no hay documentos publicados a lectura.</p>
+            </div>
+          )}
+
+          {hasSearch && publications.length > 0 && visiblePublications.length === 0 && (
+            <div className="rounded-2xl border border-[rgba(0,65,106,0.08)] bg-white/92 px-5 py-8 text-center">
+              <Search className="mx-auto text-[var(--color-brand-500)]" size={28} />
+              <p className="mt-2 text-sm text-[var(--unilabor-neutral)]">Ningún documento coincide con la búsqueda.</p>
             </div>
           )}
 
@@ -368,11 +425,11 @@ export const QualityReadingRoomPage = () => {
             ))}
           </div>
 
-          {publications.length > PAGE_SIZE_OPTIONS[0]! ? (
+          {visiblePublications.length > PAGE_SIZE_OPTIONS[0]! ? (
             <Pagination
               page={publicationPages.current}
               totalPages={publicationPages.totalPages}
-              total={publications.length}
+              total={visiblePublications.length}
               pageSize={pageSize}
               onPageChange={setPage}
               pageSizeOptions={PAGE_SIZE_OPTIONS}
