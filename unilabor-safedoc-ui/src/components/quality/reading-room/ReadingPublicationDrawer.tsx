@@ -187,7 +187,7 @@ export const ReadingPublicationDrawer = ({
                     setAssignMode(event.target.value as AssignMode);
                     setAssignTarget('');
                   }}
-                  className="mt-1 block rounded-xl border border-[rgba(0,65,106,0.15)] bg-white px-3 py-1.5 text-sm text-[var(--color-brand-700)]"
+                  className="mt-1 block h-[42px] rounded-xl border border-[rgba(0,65,106,0.15)] bg-white px-3 text-sm text-[var(--color-brand-700)]"
                 >
                   <option value="all">Todos los colaboradores</option>
                   <option value="area">Un área</option>
@@ -211,7 +211,7 @@ export const ReadingPublicationDrawer = ({
                 type="button"
                 disabled={assigning || (assignMode !== 'all' && !assignTarget)}
                 onClick={() => onAssign(assignPayload())}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-brand-700)] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                className="inline-flex h-[42px] items-center gap-1.5 rounded-full bg-[var(--color-brand-700)] px-5 text-xs font-semibold text-white disabled:opacity-60"
               >
                 {assigning ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />} Asignar
               </button>
