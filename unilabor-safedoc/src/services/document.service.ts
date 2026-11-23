@@ -4,6 +4,7 @@ import pool from '../config/db';
 import { UserRole } from '../types';
 import * as categoryService from './category.service';
 import { closePublicationsForReplacedDocument } from './quality-reading-hooks.service';
+import { relinkInductionDocumentsForReplacedDocument } from './rh-induction-document-hooks.service';
 import {
   PaginatedResult,
   PaginationInput,
@@ -450,6 +451,20 @@ export const replaceDocumentWithNewVersion = async (
     // firmando un documento que el SGC acaba de reemplazar. Las lecturas ya
     // firmadas se conservan intactas como evidencia historica.
     await closePublicationsForReplacedDocument(client, String(previous_document_id));
+
+    // Induccion: los puestos y las fases que tenian ligada la version anterior
+    // pasan a la nueva (solo configuracion: aplica a inscripciones futuras).
+    const relinked = await relinkInductionDocumentsForReplacedDocument(
+      client,
+      String(previous_document_id),
+      String(newDocument.id),
+    );
+    if (relinked.positions > 0 || relinked.phases > 0) {
+      await client.query(
+        'INSERT INTO access_logs (user_id, document_id, action, ip_address) VALUES ($1, $2, $3, $4)',
+        [uploaded_by, newDocument.id, `RH_INDUCTION_LINKS_MOVED:puestos=${relinked.positions}:fases=${relinked.phases}`, ip],
+      );
+    }
 
     await client.query(
       'INSERT INTO access_logs (user_id, document_id, action, ip_address) VALUES ($1, $2, $3, $4)',
