@@ -7,6 +7,10 @@ export interface RhPositionCompetency {
   id: number;
   competency_text: string;
   criticality: RhCompetencyCriticality;
+  /** Método que el REH-REG-003 fija para la competencia (OD, RR, ES, EP, SI). */
+  method?: string | null;
+  /** Qué se observa al evaluarla; se precarga en Observaciones / evidencia. */
+  evidence_guide?: string | null;
   sort_order: number;
 }
 

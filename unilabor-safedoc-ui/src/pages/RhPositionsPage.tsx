@@ -35,6 +35,15 @@ const buttonClass =
 /** Tamaños de página del listado de puestos y de sus documentos obligatorios. */
 const POSITION_PAGE_SIZES = [10, 20, 30];
 
+/** Método de evaluación de la competencia (REH-REG-003, sección 3). */
+const COMPETENCY_METHOD_LABELS: Record<string, string> = {
+  OD: 'Observación directa',
+  RR: 'Revisión de registro',
+  ES: 'Examen escrito',
+  EP: 'Examen práctico',
+  SI: 'Simulación',
+};
+
 type PositionTabKey = 'competencies' | 'documents' | 'courses' | 'supervision' | 'assignment';
 
 export const RhPositionsPage = () => {
@@ -388,8 +397,17 @@ export const RhPositionsPage = () => {
                         key={competency.id}
                         className="flex items-center justify-between gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-1.5 text-sm"
                       >
-                        <span className="text-[var(--unilabor-ink)]">{competency.competency_text}</span>
-                        <div className="flex items-center gap-2">
+                        <span className="min-w-0 text-[var(--unilabor-ink)]">
+                          {competency.competency_text}
+                          {competency.method || competency.evidence_guide ? (
+                            <span className="mt-0.5 block text-xs text-[var(--unilabor-neutral)]">
+                              {competency.method ? <span className="font-semibold">{COMPETENCY_METHOD_LABELS[competency.method] ?? competency.method}</span> : null}
+                              {competency.method && competency.evidence_guide ? ' · ' : null}
+                              {competency.evidence_guide}
+                            </span>
+                          ) : null}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-2">
                           <select
                             value={competency.criticality}
                             onChange={(event) => void handleChangeCriticality(competency.id, event.target.value as 'A' | 'M' | 'B')}

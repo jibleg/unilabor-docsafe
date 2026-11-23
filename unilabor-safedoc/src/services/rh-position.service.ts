@@ -22,6 +22,10 @@ export interface RhPositionCompetency {
   competency_text: string;
   /** A=5 / M=3 / B=1: pondera el item en el REH-REG-003 (Fase 7 / reevaluacion). */
   criticality: 'A' | 'M' | 'B';
+  /** Metodo que el REH-REG-003 fija para la competencia (OD, RR, ES, EP, SI). */
+  method: string | null;
+  /** Que se observa al evaluarla; se precarga en Observaciones / evidencia. */
+  evidence_guide: string | null;
   sort_order: number;
 }
 
@@ -100,7 +104,7 @@ const mapPosition = (row: any): Omit<RhPositionRecord, 'competencies' | 'documen
 
 const loadCompetencies = async (positionId: number): Promise<RhPositionCompetency[]> => {
   const result = await pool.query(
-    `SELECT id, competency_text, criticality, sort_order FROM public.rh_position_competencies
+    `SELECT id, competency_text, criticality, method, evidence_guide, sort_order FROM public.rh_position_competencies
       WHERE position_id = $1 ORDER BY sort_order ASC, id ASC;`,
     [positionId],
   );
@@ -108,6 +112,8 @@ const loadCompetencies = async (positionId: number): Promise<RhPositionCompetenc
     id: Number(row.id),
     competency_text: String(row.competency_text),
     criticality: (String(row.criticality || 'M') as 'A' | 'M' | 'B'),
+    method: row.method ? String(row.method) : null,
+    evidence_guide: row.evidence_guide ? String(row.evidence_guide) : null,
     sort_order: Number(row.sort_order ?? 0),
   }));
 };
@@ -250,7 +256,7 @@ export const addPositionCompetency = async (
   }
   const result = await pool.query(
     `INSERT INTO public.rh_position_competencies (position_id, competency_text, sort_order, criticality)
-     VALUES ($1, $2, $3, $4) RETURNING id, competency_text, criticality, sort_order;`,
+     VALUES ($1, $2, $3, $4) RETURNING id, competency_text, criticality, method, evidence_guide, sort_order;`,
     [positionId, text, sortOrder, criticality],
   );
   const row = result.rows[0];
@@ -258,6 +264,8 @@ export const addPositionCompetency = async (
     id: Number(row.id),
     competency_text: String(row.competency_text),
     criticality: String(row.criticality) as 'A' | 'M' | 'B',
+    method: row.method ? String(row.method) : null,
+    evidence_guide: row.evidence_guide ? String(row.evidence_guide) : null,
     sort_order: Number(row.sort_order ?? 0),
   };
 };
@@ -276,7 +284,7 @@ export const updatePositionCompetency = async (
         SET competency_text = COALESCE($2, competency_text),
             criticality = COALESCE($3, criticality)
       WHERE id = $1
-      RETURNING id, competency_text, criticality, sort_order;`,
+      RETURNING id, competency_text, criticality, method, evidence_guide, sort_order;`,
     [competencyId, text ?? null, changes.criticality ?? null],
   );
   const row = result.rows[0];
@@ -287,6 +295,8 @@ export const updatePositionCompetency = async (
     id: Number(row.id),
     competency_text: String(row.competency_text),
     criticality: String(row.criticality) as 'A' | 'M' | 'B',
+    method: row.method ? String(row.method) : null,
+    evidence_guide: row.evidence_guide ? String(row.evidence_guide) : null,
     sort_order: Number(row.sort_order ?? 0),
   };
 };

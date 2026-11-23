@@ -425,10 +425,12 @@ export const createEvaluation = async (input: CreateEvaluationInput): Promise<Co
     );
     const evaluationId = Number(inserted.rows[0].id);
 
-    // Precarga: competencias del puesto (catalogo, con criticidad).
+    // Precarga: competencias del puesto (catalogo) con su criticidad, su metodo
+    // y que se observa (REH-REG-003, seccion 3), que entra como Observaciones / evidencia.
     await client.query(
-      `INSERT INTO public.rh_competency_evaluation_items (evaluation_id, section, item_text, criticality, sort_order)
-       SELECT $1, 'COMPETENCIA', competency_text, criticality, sort_order
+      `INSERT INTO public.rh_competency_evaluation_items
+         (evaluation_id, section, item_text, criticality, method, observations, sort_order)
+       SELECT $1, 'COMPETENCIA', competency_text, criticality, method, evidence_guide, sort_order
          FROM public.rh_position_competencies
         WHERE position_id = $2
         ORDER BY sort_order ASC, id ASC;`,
