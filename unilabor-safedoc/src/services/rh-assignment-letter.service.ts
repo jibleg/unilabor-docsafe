@@ -208,6 +208,10 @@ const loadItems = async (letterId: number): Promise<AssignmentLetterItem[]> => {
 export const getAssignmentLetter = async (id: number): Promise<AssignmentLetterRecord> => {
   const result = await pool.query(`${LETTER_SELECT} WHERE l.id = $1 LIMIT 1;`, [id]);
   if (result.rows.length === 0) return throwCoded('RH_ASSIGNMENT_LETTER_NOT_FOUND', 'La carta de asignacion no existe.');
+  // Una carta sustituida por otra queda como antecedente en la base, pero ya no se consulta.
+  if (result.rows[0].superseded_by_letter_id) {
+    return throwCoded('RH_ASSIGNMENT_LETTER_NOT_FOUND', 'Esta carta fue sustituida por una carta nueva y ya no se puede consultar.');
+  }
   return mapLetter(result.rows[0], await loadItems(id));
 };
 
@@ -217,7 +221,8 @@ export interface AssignmentLetterListRow extends Omit<AssignmentLetterRecord, 'i
 
 export const listAssignmentLetters = async (query: { status?: AssignmentLetterStatus | undefined; search?: string | undefined }): Promise<AssignmentLetterListRow[]> => {
   const params: unknown[] = [];
-  const clauses: string[] = [];
+  // Las cartas sustituidas por una nueva no se listan.
+  const clauses: string[] = ['l.superseded_by_letter_id IS NULL'];
   if (query.status) {
     params.push(query.status);
     clauses.push(`l.status = $${params.length}`);
