@@ -7,6 +7,9 @@ import { notifyError, notifySuccess } from '../../../utils/notify';
 import { buttonClass } from '../supervision/supervision-ui';
 import { AuthorizationGroups } from './AuthorizationGroups';
 
+/** Número de la autorización «Otras» del formato REH-REG-008. */
+const OTHER_ITEM_NO = 82;
+
 interface PositionAssignmentAuthorizationsPanelProps {
   positionId: number;
   positionName: string;
@@ -22,6 +25,8 @@ export const PositionAssignmentAuthorizationsPanel = ({ positionId, positionName
   const [items, setItems] = useState<AssignmentAuthorizationItem[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [saved, setSaved] = useState<Set<number>>(new Set());
+  const [other, setOther] = useState('');
+  const [savedOther, setSavedOther] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -29,11 +34,13 @@ export const PositionAssignmentAuthorizationsPanel = ({ positionId, positionName
     let cancelled = false;
     setLoading(true);
     Promise.all([listAssignmentAuthorizationItems(), getPositionAuthorizations(positionId)])
-      .then(([catalog, ids]) => {
+      .then(([catalog, defaults]) => {
         if (cancelled) return;
         setItems(catalog);
-        setSelected(new Set(ids));
-        setSaved(new Set(ids));
+        setSelected(new Set(defaults.item_ids));
+        setSaved(new Set(defaults.item_ids));
+        setOther(defaults.other_authorizations ?? '');
+        setSavedOther(defaults.other_authorizations ?? '');
       })
       .catch((error) => notifyError(getApiErrorMessage(error, 'No se pudieron cargar las autorizaciones del puesto.')))
       .finally(() => {
@@ -45,7 +52,10 @@ export const PositionAssignmentAuthorizationsPanel = ({ positionId, positionName
   }, [positionId]);
 
   const general = items.filter((item) => item.applies_to_all);
-  const dirty = selected.size !== saved.size || [...selected].some((id) => !saved.has(id));
+  // "Otras" (82) lleva texto libre: se define aquí para que todas las cartas del puesto digan lo mismo.
+  const otherItem = items.find((item) => item.item_no === OTHER_ITEM_NO);
+  const otherEnabled = otherItem ? selected.has(otherItem.id) : false;
+  const dirty = selected.size !== saved.size || [...selected].some((id) => !saved.has(id)) || other.trim() !== savedOther.trim();
   const toggle = (id: number) =>
     setSelected((current) => {
       const next = new Set(current);
@@ -57,9 +67,11 @@ export const PositionAssignmentAuthorizationsPanel = ({ positionId, positionName
   const save = async () => {
     setSaving(true);
     try {
-      const ids = await setPositionAuthorizations(positionId, [...selected]);
-      setSelected(new Set(ids));
-      setSaved(new Set(ids));
+      const defaults = await setPositionAuthorizations(positionId, [...selected], otherEnabled ? other.trim() || null : null);
+      setSelected(new Set(defaults.item_ids));
+      setSaved(new Set(defaults.item_ids));
+      setOther(defaults.other_authorizations ?? '');
+      setSavedOther(defaults.other_authorizations ?? '');
       notifySuccess(`Autorizaciones de ${positionName} guardadas.`);
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron guardar las autorizaciones.'));
@@ -99,6 +111,19 @@ export const PositionAssignmentAuthorizationsPanel = ({ positionId, positionName
       <p className="text-xs font-semibold text-[var(--color-brand-700)]">
         {selected.size} de {items.length} autorizaciones activadas
       </p>
+      {/* Siempre montado (solo se deshabilita) para que el panel no salte al marcar "Otras". */}
+      <label className={`block text-xs font-semibold text-[var(--unilabor-neutral)] ${otherEnabled ? '' : 'opacity-40'}`}>
+        Texto de «Otras» (autorización {OTHER_ITEM_NO})
+        <input
+          value={other}
+          onChange={(event) => setOther(event.target.value)}
+          disabled={!otherEnabled}
+          maxLength={500}
+          placeholder={otherEnabled ? 'Ej. Elaboración de bitácoras de trabajo, Generación de facturas a pacientes' : 'Activa «Otras» para capturar su texto'}
+          title="Se precarga en la carta de cada colaborador del puesto"
+          className="mt-1 block w-full rounded-xl border border-[rgba(0,65,106,0.15)] bg-white px-3 py-2 text-sm font-normal text-[var(--unilabor-ink)] outline-none focus:border-[var(--color-brand-300)]"
+        />
+      </label>
       <AuthorizationGroups
         items={items}
         isChecked={(id) => selected.has(id)}

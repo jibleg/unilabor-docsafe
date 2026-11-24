@@ -6,9 +6,11 @@ import {
   generatePendingLetters,
   getAssignmentLetter,
   getPositionAuthorizations,
+  getPositionOtherAuthorizations,
   listAssignmentLetters,
   listAuthorizationItems,
   setPositionAuthorizations,
+  setPositionOtherAuthorizations,
   updateAssignmentLetter,
 } from '../services/rh-assignment-letter.service';
 import {
@@ -71,7 +73,8 @@ export const getPositionAuthorizationsController = async (req: AuthRequest, res:
   const positionId = parseId(req.params.positionId);
   if (!positionId) return res.status(400).json({ message: 'ID de puesto invalido.' });
   try {
-    return res.json({ item_ids: await getPositionAuthorizations(positionId) });
+    const [itemIds, otherAuthorizations] = await Promise.all([getPositionAuthorizations(positionId), getPositionOtherAuthorizations(positionId)]);
+    return res.json({ item_ids: itemIds, other_authorizations: otherAuthorizations });
   } catch (error) {
     return fail(res, error, 'Error cargando autorizaciones del puesto', 'No se pudieron cargar las autorizaciones del puesto.');
   }
@@ -81,8 +84,14 @@ export const setPositionAuthorizationsController = async (req: AuthRequest, res:
   const positionId = parseId(req.params.positionId);
   if (!positionId) return res.status(400).json({ message: 'ID de puesto invalido.' });
   try {
-    const itemIds = await setPositionAuthorizations(positionId, (req.body as SetPositionAuthorizationsBody).item_ids, req.user?.id ?? null);
-    return res.json({ message: 'Autorizaciones del puesto guardadas.', item_ids: itemIds });
+    const body = req.body as SetPositionAuthorizationsBody;
+    const itemIds = await setPositionAuthorizations(positionId, body.item_ids, req.user?.id ?? null);
+    // El texto de "Otras" solo se toca cuando viene en la peticion.
+    const otherAuthorizations =
+      body.other_authorizations === undefined
+        ? await getPositionOtherAuthorizations(positionId)
+        : await setPositionOtherAuthorizations(positionId, body.other_authorizations);
+    return res.json({ message: 'Autorizaciones del puesto guardadas.', item_ids: itemIds, other_authorizations: otherAuthorizations });
   } catch (error) {
     return fail(res, error, 'Error guardando autorizaciones del puesto', 'No se pudieron guardar las autorizaciones del puesto.');
   }

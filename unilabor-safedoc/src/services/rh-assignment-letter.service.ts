@@ -97,6 +97,9 @@ export const listAuthorizationItems = async (): Promise<AssignmentAuthorizationI
   }));
 };
 
+/** Numero de la autorizacion "Otras" del formato: su texto es libre. */
+export const OTHER_AUTHORIZATIONS_ITEM_NO = 82;
+
 /**
  * Autorizaciones que aplican al puesto. Sin configuracion guardada, el puesto
  * toma por defecto las generales (1-8 "a todos").
@@ -107,6 +110,22 @@ export const getPositionAuthorizations = async (positionId: number): Promise<num
   ]);
   if (result.rows.length > 0) return result.rows.map((row) => Number(row.item_id));
   return (await listAuthorizationItems()).filter((item) => item.applies_to_all).map((item) => item.id);
+};
+
+/** Texto predeterminado de la autorizacion 82 "Otras" del puesto (null si no tiene). */
+export const getPositionOtherAuthorizations = async (positionId: number): Promise<string | null> => {
+  const result = await pool.query(`SELECT assignment_other_authorizations FROM public.rh_positions WHERE id = $1 LIMIT 1;`, [positionId]);
+  const value = result.rows[0]?.assignment_other_authorizations;
+  return value ? String(value) : null;
+};
+
+/** Guarda el texto predeterminado de "Otras" del puesto; vacio lo quita. */
+export const setPositionOtherAuthorizations = async (positionId: number, text: string | null): Promise<string | null> => {
+  await pool.query(`UPDATE public.rh_positions SET assignment_other_authorizations = $2, updated_at = NOW() WHERE id = $1;`, [
+    positionId,
+    text?.trim() || null,
+  ]);
+  return getPositionOtherAuthorizations(positionId);
 };
 
 export const setPositionAuthorizations = async (positionId: number, itemIds: number[], actorUserId: string | null): Promise<number[]> => {
@@ -247,13 +266,16 @@ export const createLetterForEvaluation = async (evaluationId: number, actorUserI
   const signers = await getCompetencySuggestedSigners(evaluationId);
   const items = await listAuthorizationItems();
   const positionItems = new Set(await getPositionAuthorizations(Number(row.position_id)));
+  // "Otras" (82) sale activada con el texto del puesto cuando el puesto la tiene entre sus autorizaciones.
+  const otherItem = items.find((item) => item.item_no === OTHER_AUTHORIZATIONS_ITEM_NO);
+  const otherText = otherItem && positionItems.has(otherItem.id) ? await getPositionOtherAuthorizations(Number(row.position_id)) : null;
   const id = await withTransaction(async (client) => {
     const inserted = await client.query(
       `INSERT INTO public.rh_assignment_letters
          (employee_id, position_id, competency_evaluation_id, letter_date, area_name, position_description_name,
           area_signatory_employee_id, area_signatory_name, director_signatory_name, created_by_user_id,
-          director_signatory_employee_id)
-       VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10, $11) RETURNING id;`,
+          director_signatory_employee_id, other_authorizations)
+       VALUES ($1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id;`,
       [
         row.employee_id,
         row.position_id,
@@ -266,6 +288,7 @@ export const createLetterForEvaluation = async (evaluationId: number, actorUserI
         signers?.director ?? '',
         actorUserId,
         signers?.director_employee_id ?? null,
+        otherText,
       ],
     );
     const letterId = Number(inserted.rows[0].id);

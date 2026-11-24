@@ -16,14 +16,32 @@ export const listAssignmentAuthorizationItems = async (): Promise<AssignmentAuth
   return (asRecord(unwrapPayload(response.data))?.items as AssignmentAuthorizationItem[]) ?? [];
 };
 
-export const getPositionAuthorizations = async (positionId: number): Promise<number[]> => {
-  const response = await api.get(`${BASE}/positions/${positionId}/authorizations`);
-  return (asRecord(unwrapPayload(response.data))?.item_ids as number[]) ?? [];
+/** Autorizaciones predeterminadas del puesto y su texto de "Otras" (autorización 82). */
+export interface PositionAuthorizationDefaults {
+  item_ids: number[];
+  other_authorizations: string | null;
+}
+
+const toPositionDefaults = (data: unknown): PositionAuthorizationDefaults => {
+  const record = asRecord(unwrapPayload(data));
+  return {
+    item_ids: (record?.item_ids as number[]) ?? [],
+    other_authorizations: record?.other_authorizations ? String(record.other_authorizations) : null,
+  };
 };
 
-export const setPositionAuthorizations = async (positionId: number, itemIds: number[]): Promise<number[]> => {
-  const response = await api.put(`${BASE}/positions/${positionId}/authorizations`, { item_ids: itemIds });
-  return (asRecord(unwrapPayload(response.data))?.item_ids as number[]) ?? [];
+export const getPositionAuthorizations = async (positionId: number): Promise<PositionAuthorizationDefaults> => {
+  const response = await api.get(`${BASE}/positions/${positionId}/authorizations`);
+  return toPositionDefaults(response.data);
+};
+
+export const setPositionAuthorizations = async (
+  positionId: number,
+  itemIds: number[],
+  otherAuthorizations: string | null,
+): Promise<PositionAuthorizationDefaults> => {
+  const response = await api.put(`${BASE}/positions/${positionId}/authorizations`, { item_ids: itemIds, other_authorizations: otherAuthorizations });
+  return toPositionDefaults(response.data);
 };
 
 export const listAssignmentLetters = async (query: { status?: AssignmentLetterStatus; q?: string } = {}): Promise<AssignmentLetterListRow[]> => {

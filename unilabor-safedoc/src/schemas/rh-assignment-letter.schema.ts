@@ -3,7 +3,9 @@ import { z } from 'zod';
 const positiveId = z.coerce.number().int().positive();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha invalida (AAAA-MM-DD)');
 
-export const setPositionAuthorizationsSchema = z.object({ item_ids: z.array(positiveId).max(200) }).passthrough();
+export const setPositionAuthorizationsSchema = z
+  .object({ item_ids: z.array(positiveId).max(200), other_authorizations: z.string().trim().max(500).nullable().optional() })
+  .passthrough();
 export type SetPositionAuthorizationsBody = z.infer<typeof setPositionAuthorizationsSchema>;
 
 export const updateAssignmentLetterSchema = z
