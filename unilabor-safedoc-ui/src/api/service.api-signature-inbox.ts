@@ -4,6 +4,7 @@ import type {
   DocumentInboxDetail,
   InboxKind,
   PendingSigner,
+  PendingSignerGroup,
   SignatureInbox,
   SignatureInboxBatchResult,
   SignatureInboxEntry,
@@ -31,6 +32,12 @@ export const listPendingSigners = async (): Promise<PendingSigner[]> => {
 
 /** Tope de registros por firma en lote (lo valida también el backend). */
 export const SIGNATURE_BATCH_MAX = 50;
+
+/** Los pendientes de todos, agrupados por firmante (solo con el permiso de firma por imagen). */
+export const listAllPendingBySigner = async (): Promise<PendingSignerGroup[]> => {
+  const response = await api.get(`${BASE}/all-pending`);
+  return (asRecord(unwrapPayload(response.data))?.groups as PendingSignerGroup[]) ?? [];
+};
 
 export const listSignatureInbox = async (onBehalfOf?: number | null): Promise<SignatureInbox> => {
   const response = await api.get(BASE, onBehalf(onBehalfOf));

@@ -4,6 +4,7 @@ import { SIGNATURE_BATCH_MAX, listPendingSigners, listSignatureInbox } from '../
 import { getApiErrorMessage } from '../api/service.parsers';
 import { DrawerShell } from '../components/attendance/schedule/DrawerShell';
 import { SearchableSelect } from '../components/SearchableSelect';
+import { AllPendingBySigner } from '../components/rh/phase7-signature/AllPendingBySigner';
 import { BatchSignPanel } from '../components/rh/phase7-signature/BatchSignPanel';
 import { DocumentInboxPanel } from '../components/rh/phase7-signature/DocumentInboxPanel';
 import { SignatureInboxPanel } from '../components/rh/supervision/SignatureInboxPanel';
@@ -38,7 +39,14 @@ interface LastResult {
   failures: Array<{ folio: string; message: string }>;
 }
 
-type Drawer = { mode: 'one'; entry: SignatureInboxEntry } | { mode: 'batch'; entries: SignatureInboxEntry[] } | null;
+/** `signer`: a nombre de quién se firma (null = el buzón propio de la sesión). */
+type Drawer =
+  | { mode: 'one'; entry: SignatureInboxEntry; signer: PendingSigner | null }
+  | { mode: 'batch'; entries: SignatureInboxEntry[]; signer: PendingSigner | null }
+  | null;
+
+/** Qué se muestra a quien firma por imagen: su buzón (o el del firmante elegido) o los pendientes de todos. */
+type Scope = 'inbox' | 'all';
 
 /**
  * Buzón de firmas: los registros que esperan la firma del usuario. ANA-REG-060
@@ -64,6 +72,9 @@ export const RhSignatureInboxPage = () => {
   const canSignOnBehalf = useHasPermission(SIGN_ON_BEHALF_PERMISSION);
   const [signers, setSigners] = useState<PendingSigner[]>([]);
   const [onBehalfOf, setOnBehalfOf] = useState<PendingSigner | null>(null);
+  const [scope, setScope] = useState<Scope>('inbox');
+  const [allReloadKey, setAllReloadKey] = useState(0);
+  const showAll = canSignOnBehalf && scope === 'all';
   const behalfId = onBehalfOf?.employee_id ?? null;
 
   const loadSigners = useCallback(async () => {
@@ -137,6 +148,7 @@ export const RhSignatureInboxPage = () => {
     setDrawer(null);
     void load();
     void loadSigners();
+    setAllReloadKey((current) => current + 1);
     void refreshBadge();
   };
 
@@ -178,6 +190,7 @@ export const RhSignatureInboxPage = () => {
           onClick={() => {
             void load();
             void loadSigners();
+            setAllReloadKey((current) => current + 1);
           }}
           className={buttonClass}
         >
@@ -188,10 +201,30 @@ export const RhSignatureInboxPage = () => {
       {canSignOnBehalf ? (
         <section className={`${cardClass} space-y-2`}>
           <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex overflow-hidden rounded-xl border border-[rgba(0,65,106,0.14)] bg-white">
+              {(
+                [
+                  ['inbox', 'Por firmante'],
+                  ['all', 'Todos los pendientes'],
+                ] as Array<[Scope, string]>
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setScope(key);
+                    setDrawer(null);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-semibold ${scope === key ? 'bg-[var(--color-brand-700)] text-white' : 'text-[var(--unilabor-neutral)] hover:bg-[rgba(191,212,230,0.3)]'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-brand-700)]">
               <ImageUp size={15} /> Firmar con archivo a nombre de
             </span>
-            <div className="min-w-[260px] flex-1">
+            <div className={`min-w-[260px] flex-1 ${showAll ? 'pointer-events-none opacity-50' : ''}`} aria-hidden={showAll}>
               <SearchableSelect
                 value={onBehalfOf ? String(onBehalfOf.employee_id) : ''}
                 options={signerOptions.map((signer) => ({
@@ -207,7 +240,12 @@ export const RhSignatureInboxPage = () => {
             </div>
             <span className="text-xs text-[var(--unilabor-neutral)]">{signers.length} firmante(s) con pendientes</span>
           </div>
-          {onBehalfOf ? (
+          {showAll ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900" role="status">
+              Pendientes de todos los firmantes, agrupados por persona. En cada grupo carga el archivo de la firma de esa persona (PNG, JPG o BMP) en un
+              registro o selecciona varios. Cada firma queda registrada como colocada por ti a su nombre.
+            </p>
+          ) : onBehalfOf ? (
             <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900" role="status">
               Estás en el buzón de <span className="font-semibold">{onBehalfOf.full_name}</span>. Carga el archivo de su firma (PNG, JPG o BMP) en un registro o
               selecciona varios. Cada firma queda registrada como colocada por ti a su nombre.
@@ -245,7 +283,7 @@ export const RhSignatureInboxPage = () => {
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex overflow-hidden rounded-xl border border-[rgba(0,65,106,0.14)] bg-white">
+        <div className={`inline-flex overflow-hidden rounded-xl border border-[rgba(0,65,106,0.14)] bg-white ${showAll ? 'invisible' : ''}`} aria-hidden={showAll}>
           {(
             [
               ['pending', 'Pendientes'],
@@ -274,13 +312,23 @@ export const RhSignatureInboxPage = () => {
                   : 'border-[rgba(0,65,106,0.14)] bg-white text-[var(--unilabor-neutral)] hover:bg-[rgba(191,212,230,0.3)]'
               }`}
             >
-              {label} ({countOf(kind)})
+              {label}
+              {showAll ? '' : ` (${countOf(kind)})`}
             </button>
           ))}
         </div>
       </div>
 
-      {tab === 'pending' && rows.length > 0 ? (
+      {showAll ? (
+        <AllPendingBySigner
+          kindFilter={kindFilter}
+          reloadKey={allReloadKey}
+          onOpenOne={(entry, signer) => setDrawer({ mode: 'one', entry, signer })}
+          onOpenBatch={(entries, signer) => setDrawer({ mode: 'batch', entries, signer })}
+        />
+      ) : null}
+
+      {!showAll && tab === 'pending' && rows.length > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white px-4 py-2">
           <label className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--unilabor-ink)]">
             <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} className="h-4 w-4 accent-[var(--color-brand-700)]" />
@@ -288,7 +336,7 @@ export const RhSignatureInboxPage = () => {
           </label>
           <button
             type="button"
-            onClick={() => setDrawer({ mode: 'batch', entries: selectedEntries })}
+            onClick={() => setDrawer({ mode: 'batch', entries: selectedEntries, signer: onBehalfOf })}
             disabled={selectedEntries.length === 0}
             className={primaryButtonClass}
             title={onBehalfOf ? 'Revisar los registros seleccionados y firmarlos con un solo archivo' : 'Revisar los registros seleccionados y firmarlos con un solo trazo'}
@@ -298,7 +346,7 @@ export const RhSignatureInboxPage = () => {
         </div>
       ) : null}
 
-      <section className={`${cardClass} space-y-3`}>
+      <section className={`${cardClass} space-y-3 ${showAll ? 'hidden' : ''}`}>
         {loading ? (
           <p className="inline-flex items-center gap-2 text-sm text-[var(--unilabor-neutral)]">
             <Loader2 size={14} className="animate-spin" /> Cargando…
@@ -336,7 +384,7 @@ export const RhSignatureInboxPage = () => {
                   ) : null}
                   <button
                     type="button"
-                    onClick={() => setDrawer({ mode: 'one', entry })}
+                    onClick={() => setDrawer({ mode: 'one', entry, signer: onBehalfOf })}
                     className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 text-left"
                   >
                     <div className="min-w-0">
@@ -383,17 +431,17 @@ export const RhSignatureInboxPage = () => {
 
       <DrawerShell open={drawer !== null} title={drawerTitle} subtitle={drawerSubtitle} onClose={() => setDrawer(null)} widthClass="max-w-2xl" busy={signing}>
         {drawer?.mode === 'batch' ? (
-          <BatchSignPanel key={drawer.entries.map(keyOf).join(',')} entries={drawer.entries} onBusyChange={setSigning} onSigned={handleBatchSigned} onBehalfOf={onBehalfOf} />
+          <BatchSignPanel key={`${drawer.signer?.employee_id ?? 'me'}|${drawer.entries.map(keyOf).join(',')}`} entries={drawer.entries} onBusyChange={setSigning} onSigned={handleBatchSigned} onBehalfOf={drawer.signer} />
         ) : drawer?.mode === 'one' ? (
           drawer.entry.kind === 'SUPERVISION' ? (
-            <SignatureInboxPanel key={keyOf(drawer.entry)} entry={drawer.entry} onBusyChange={setSigning} onSigned={handleSigned} onBehalfOf={onBehalfOf} />
+            <SignatureInboxPanel key={`${drawer.signer?.employee_id ?? 'me'}|${keyOf(drawer.entry)}`} entry={drawer.entry} onBusyChange={setSigning} onSigned={handleSigned} onBehalfOf={drawer.signer} />
           ) : (
             <DocumentInboxPanel
-              key={keyOf(drawer.entry)}
+              key={`${drawer.signer?.employee_id ?? 'me'}|${keyOf(drawer.entry)}`}
               entry={drawer.entry as SignatureInboxEntry & { kind: SignedDocumentKind }}
               onBusyChange={setSigning}
               onSigned={handleSigned}
-              onBehalfOf={onBehalfOf}
+              onBehalfOf={drawer.signer}
             />
           )
         ) : null}

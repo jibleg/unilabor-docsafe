@@ -14,7 +14,11 @@ import {
 } from './rh-document-signature.rules';
 import { loadDocumentSigners, type DocumentSignerStatus } from './rh-document-signature.service';
 import { describeRoles } from './rh-supervision-signature.rules';
-import { listSignatureInbox as listSupervisionInbox, type SignatureInboxEntry as SupervisionInboxEntry } from './rh-supervision-signature.service';
+import {
+  listAllPendingInbox as listAllSupervisionPending,
+  listSignatureInbox as listSupervisionInbox,
+  type SignatureInboxEntry as SupervisionInboxEntry,
+} from './rh-supervision-signature.service';
 
 // -----------------------------------------------------------------------------
 // Buzon de firmas unificado: lo que espera la firma del colaborador de la sesion
@@ -219,6 +223,45 @@ export const listUnifiedInbox = async (employeeId: number): Promise<UnifiedInbox
     pending: [...supervision.pending.map(fromSupervision), ...competency.pending, ...letters.pending].sort(byRequestedAt),
     signed: [...supervision.signed.map(fromSupervision), ...competency.signed, ...letters.signed].sort(bySignedAtDesc).slice(0, RECENT_SIGNED_LIMIT),
   };
+};
+
+/** Registros de la Fase 7 en firma, vistos desde cada firmante al que aun le falta firmar. */
+const listAllDocumentsPending = async (kind: SignedDocumentKind): Promise<Array<{ employee_id: number; entry: InboxEntry }>> => {
+  // $1 = 0: aqui no hay "mi" firma; my_signed_at no aplica a un pendiente.
+  const result = await pool.query(
+    `${documentSelect(kind)}
+      WHERE d.status = 'DRAFT' AND d.signature_requested_at IS NOT NULL
+      ORDER BY d.signature_requested_at ASC, d.id ASC;`,
+    [0],
+  );
+  const pending: Array<{ employee_id: number; entry: InboxEntry }> = [];
+  for (const row of result.rows) {
+    const signerIds = new Set(Object.values(assignmentFromRow(kind, row)).filter((value): value is number => typeof value === 'number'));
+    for (const employeeId of signerIds) {
+      const entry = mapDocumentRow(kind, row, employeeId);
+      if (entry.has_pending) pending.push({ employee_id: employeeId, entry });
+    }
+  }
+  return pending;
+};
+
+/**
+ * Los pendientes de TODOS los firmantes, agrupados por firmante (cada grupo es el
+ * buzon de esa persona, con las mismas reglas de roles). Para quien firma por
+ * imagen a nombre de los demas: tres consultas, sin importar cuantos firmantes haya.
+ */
+export const listAllPendingByEmployee = async (): Promise<Map<number, InboxEntry[]>> => {
+  const [supervision, competency, letters] = await Promise.all([
+    listAllSupervisionPending(),
+    listAllDocumentsPending('COMPETENCY_EVALUATION'),
+    listAllDocumentsPending('ASSIGNMENT_LETTER'),
+  ]);
+  const byEmployee = new Map<number, InboxEntry[]>();
+  const add = (employeeId: number, entry: InboxEntry) => byEmployee.set(employeeId, [...(byEmployee.get(employeeId) ?? []), entry]);
+  supervision.forEach((item) => add(item.employee_id, fromSupervision(item.entry)));
+  [...competency, ...letters].forEach((item) => add(item.employee_id, item.entry));
+  byEmployee.forEach((entries) => entries.sort(byRequestedAt));
+  return byEmployee;
 };
 
 /** Numero de registros que esperan la firma del colaborador (badge del menu). */

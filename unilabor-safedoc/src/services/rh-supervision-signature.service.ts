@@ -280,6 +280,30 @@ const listPendingForEmployee = async (employeeId: number): Promise<SignatureInbo
   return result.rows.map((row) => mapInboxRow(row, employeeId)).filter((entry) => entry.pending_roles.length > 0);
 };
 
+/**
+ * Todas las listas en firma, vistas desde cada firmante al que aun le falta firmar:
+ * una entrada por (lista, firmante). Para la vista "Todos los pendientes" de quien
+ * firma por imagen a nombre de los demas.
+ */
+export const listAllPendingInbox = async (): Promise<Array<{ employee_id: number; entry: SignatureInboxEntry }>> => {
+  // $1 = 0: aqui no hay "mi" firma; my_signed_at no aplica a un pendiente.
+  const result = await pool.query(
+    `${INBOX_SELECT} WHERE c.status = 'PENDING_SIGNATURES' ORDER BY c.signature_requested_at ASC NULLS LAST, c.id ASC;`,
+    [0],
+  );
+  const pending: Array<{ employee_id: number; entry: SignatureInboxEntry }> = [];
+  for (const row of result.rows) {
+    const signerIds = new Set(
+      [row.employee_id, row.supervisor_employee_id, row.area_responsible_employee_id].filter((value) => value !== null).map(Number),
+    );
+    for (const employeeId of signerIds) {
+      const entry = mapInboxRow(row, employeeId);
+      if (entry.pending_roles.length > 0) pending.push({ employee_id: employeeId, entry });
+    }
+  }
+  return pending;
+};
+
 export const listSignatureInbox = async (employeeId: number): Promise<SignatureInbox> => {
   const [pending, signed] = await Promise.all([
     listPendingForEmployee(employeeId),

@@ -4,6 +4,7 @@ import {
   countSignatureInboxController,
   getSignatureInboxDetailController,
   getSignatureInboxPdfController,
+  listAllPendingController,
   listPendingSignersController,
   listSignatureInboxController,
   signFromInboxController,
@@ -28,6 +29,7 @@ router.get('/', listSignatureInboxController);
 // Antes de /:kind/:id.
 router.get('/count', countSignatureInboxController);
 router.get('/signers', requirePermission(SIGN_ON_BEHALF_PERMISSION), listPendingSignersController);
+router.get('/all-pending', requirePermission(SIGN_ON_BEHALF_PERMISSION), listAllPendingController);
 router.post('/batch-sign', validate(signatureInboxBatchSignSchema), batchSignFromInboxController);
 router.get('/:kind/:id', getSignatureInboxDetailController);
 router.get('/:kind/:id/pdf', getSignatureInboxPdfController);

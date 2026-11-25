@@ -16,6 +16,7 @@ import {
   countUnifiedInboxPending,
   getDocumentInboxDetail,
   isInboxKind,
+  listAllPendingByEmployee,
   listUnifiedInbox,
   type InboxKind,
 } from '../services/signature-inbox.service';
@@ -166,6 +167,23 @@ export const listPendingSignersController = async (_req: AuthRequest, res: Respo
     return res.json({ signers: await listPendingSigners() });
   } catch (error) {
     return fail(res, error, 'Error listando firmantes con pendientes', 'No se pudieron cargar los firmantes con firmas pendientes.');
+  }
+};
+
+/**
+ * GET /my/signature-inbox/all-pending  (permiso de firma por imagen)
+ * Los pendientes de todos, agrupados por firmante: cada grupo es el buzon de esa persona.
+ */
+export const listAllPendingController = async (_req: AuthRequest, res: Response) => {
+  try {
+    const [signers, byEmployee] = await Promise.all([listPendingSigners(), listAllPendingByEmployee()]);
+    const groups = signers
+      .map((signer) => ({ signer, pending: byEmployee.get(signer.employee_id) ?? [] }))
+      .filter((group) => group.pending.length > 0)
+      .map((group) => ({ ...group, signer: { ...group.signer, pending: group.pending.length } }));
+    return res.json({ groups });
+  } catch (error) {
+    return fail(res, error, 'Error listando todos los pendientes de firma', 'No se pudieron cargar los pendientes de firma.');
   }
 };
 

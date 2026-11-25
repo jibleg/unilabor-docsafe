@@ -324,6 +324,12 @@ export interface PendingSigner {
   pending: number;
 }
 
+/** Los pendientes de un firmante dentro de la vista "Todos los pendientes". */
+export interface PendingSignerGroup {
+  signer: PendingSigner;
+  pending: SignatureInboxEntry[];
+}
+
 export interface SignatureInboxBatchResult {
   results: Array<SignatureInboxSignOutcome & { ok: boolean }>;
   signed: number;
