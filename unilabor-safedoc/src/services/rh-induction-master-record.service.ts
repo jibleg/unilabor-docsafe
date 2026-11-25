@@ -20,6 +20,10 @@ export type RhInductionPhaseRowStatus = 'PENDIENTE' | 'EN_PROCESO' | 'APROBADA' 
 export interface RhInductionMasterRecordPhaseRow {
   phase_number: number;
   name: string;
+  /** Nombre de la fase sin el puesto (para el formato de un solo puesto). */
+  phase_name: string;
+  /** Puesto de la fila en las fases por puesto (5-7); null en las institucionales o sin inscripcion. */
+  position_id: number | null;
   responsible_label: string;
   supervisor_name: string | null;
   started_at: string | null;
@@ -46,15 +50,19 @@ export interface RhInductionMasterRecord {
   started_at: string | null;
   finished_at: string | null;
   phases: RhInductionMasterRecordPhaseRow[];
-  summary: {
-    approved_count: number;
-    not_approved_count: number;
-    pending_count: number;
-    average_score: number | null;
-    verdict: RhInductionVerdict;
-    what_next: string;
-  };
+  summary: RhInductionMasterRecordSummary;
   effectiveness_reviews: RhInductionEffectivenessReview[];
+  /** Con valor, el registro es el formato de ese puesto (Fases 1-4 + 5-7 del puesto). */
+  scope_position: { id: number; name: string } | null;
+}
+
+export interface RhInductionMasterRecordSummary {
+  approved_count: number;
+  not_approved_count: number;
+  pending_count: number;
+  average_score: number | null;
+  verdict: RhInductionVerdict;
+  what_next: string;
 }
 
 const collaboratorSignatureNote = (readingTotal: number, readingSigned: number): string => {
@@ -90,107 +98,7 @@ const resolveStatus = (
   return 'EN_PROCESO';
 };
 
-export const getEmployeeInductionMasterRecord = async (employeeId: number): Promise<RhInductionMasterRecord> => {
-  const employeeResult = await pool.query(
-    `SELECT id, full_name, employee_code, area, position FROM public.employees WHERE id = $1 LIMIT 1;`,
-    [employeeId],
-  );
-  if (employeeResult.rows.length === 0) {
-    const error = new Error('RH_INDUCTION_EMPLOYEE_NOT_FOUND');
-    (error as any).code = 'RH_INDUCTION_EMPLOYEE_NOT_FOUND';
-    (error as any).publicMessage = 'El colaborador no existe.';
-    throw error;
-  }
-  const employeeRow = employeeResult.rows[0];
-  const activePositions = await listEmployeePositions(employeeId, false);
-
-  const phasesResult = await pool.query(
-    `SELECT
-        p.phase_number, p.name, p.responsible_label, p.scope,
-        e.id AS enrollment_id, e.created_at AS enrolled_at, e.supervisor_employee_id,
-        rp.name AS position_name, e.queue_status,
-        sup.full_name AS supervisor_name,
-        ea.status AS evaluation_status, ea.percentage AS evaluation_percentage, ea.graded_at,
-        ea.certificate_document_id,
-        (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id) AS reading_total,
-        (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri
-           INNER JOIN public.quality_reading_acknowledgements a ON a.id = ri.acknowledgement_id
-          WHERE ri.enrollment_id = e.id AND a.status = 'signed') AS reading_signed,
-        (SELECT COUNT(*)::int FROM public.rh_induction_phase_checklist_items ci WHERE ci.phase_id = p.id) AS checklist_total,
-        (SELECT COUNT(*)::int FROM public.rh_induction_checklist_progress cp WHERE cp.enrollment_id = e.id) AS checklist_completed
-      FROM public.rh_induction_phases p
-      LEFT JOIN public.rh_induction_enrollments e ON e.phase_id = p.id AND e.employee_id = $1 AND e.queue_status <> 'CANCELLED'
-      LEFT JOIN public.rh_positions rp ON rp.id = e.position_id
-      LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
-      LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
-     ORDER BY p.phase_number ASC, e.position_sequence ASC NULLS FIRST;`,
-    [employeeId],
-  );
-
-  const phases: RhInductionMasterRecordPhaseRow[] = phasesResult.rows.map((row) => {
-    const hasEnrollment = row.enrollment_id !== null && row.enrollment_id !== undefined;
-    const evaluationStatus = row.evaluation_status ? String(row.evaluation_status) : null;
-    const readingTotal = Number(row.reading_total ?? 0);
-    const readingSigned = Number(row.reading_signed ?? 0);
-    // Fases por puesto (5-6): una fila por puesto de la ruta; en cola = aun sin iniciar.
-    const queued = String(row.queue_status ?? '') === 'QUEUED';
-    return {
-      phase_number: Number(row.phase_number),
-      name: row.position_name ? `${String(row.name)} — ${String(row.position_name)}` : String(row.name),
-      responsible_label: String(row.responsible_label),
-      supervisor_name: row.supervisor_name ? String(row.supervisor_name) : null,
-      started_at: row.enrolled_at ? String(row.enrolled_at) : null,
-      finished_at: row.graded_at ? String(row.graded_at) : null,
-      score_percentage:
-        row.evaluation_percentage !== null && row.evaluation_percentage !== undefined
-          ? Number(row.evaluation_percentage)
-          : null,
-      status: resolveStatus(String(row.scope), hasEnrollment && !queued, evaluationStatus),
-      checklist_total: Number(row.checklist_total ?? 0),
-      checklist_completed: Number(row.checklist_completed ?? 0),
-      collaborator_signature_note: hasEnrollment ? collaboratorSignatureNote(readingTotal, readingSigned) : 'Pendiente',
-      responsible_signature_note: row.certificate_document_id
-        ? '✓ constancia emitida con 3 firmas'
-        : 'Pendiente',
-    };
-  });
-
-  // Fase 7 (Evaluacion de competencia inicial): su instrumento es el
-  // REH-REG-003 (rh_competency_evaluations tipo INICIAL), no el motor de
-  // evaluaciones de lectura. Si existe una cerrada, la fase deja de ser
-  // NO_DISPONIBLE y refleja su resultado real.
-  const phase7Index = phases.findIndex((phase) => phase.phase_number === 7);
-  if (phase7Index >= 0) {
-    // Un REH-REG-003 INICIAL por puesto: una fila de Fase 7 por cada puesto evaluado.
-    const compEval = await pool.query(
-      `SELECT DISTINCT ON (c.position_id) c.final_pct, c.dictamen, c.evaluation_date, c.closed_at, c.status, rp.name AS position_name
-         FROM public.rh_competency_evaluations c
-         JOIN public.rh_positions rp ON rp.id = c.position_id
-        WHERE c.employee_id = $1 AND c.evaluation_type = 'INICIAL'
-        ORDER BY c.position_id, c.created_at DESC;`,
-      [employeeId],
-    );
-    if (compEval.rows.length > 0) {
-      const base = phases[phase7Index]!;
-      const rows = compEval.rows.map((row) => {
-        const closed = String(row.status) === 'CLOSED';
-        return {
-          ...base,
-          name: `${base.name} — ${String(row.position_name)}`,
-          status: (closed
-            ? String(row.dictamen) !== 'NO_COMPETENTE' ? 'APROBADA' : 'NO_APROBADA'
-            : 'EN_PROCESO') as RhInductionMasterRecordPhaseRow['status'],
-          score_percentage: closed && row.final_pct !== null ? Number(row.final_pct) : null,
-          started_at: row.evaluation_date ? String(row.evaluation_date) : base.started_at,
-          finished_at: row.closed_at ? String(row.closed_at) : null,
-          collaborator_signature_note: closed ? '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)' : 'Pendiente',
-          responsible_signature_note: closed ? '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)' : 'Pendiente',
-        };
-      });
-      phases.splice(phase7Index, 1, ...rows);
-    }
-  }
-
+const summarizePhases = (phases: RhInductionMasterRecordPhaseRow[]): RhInductionMasterRecordSummary => {
   const institutionalPhases = phases.filter((phase) => phase.status !== 'NO_DISPONIBLE');
   const approvedCount = institutionalPhases.filter((phase) => phase.status === 'APROBADA').length;
   const notApprovedCount = institutionalPhases.filter((phase) => phase.status === 'NO_APROBADA').length;
@@ -228,8 +136,174 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
     whatNext = 'Continúe con la siguiente fase institucional pendiente. No se avanza de fase sin aprobar la anterior.';
   }
 
-  const startedTimestamps = phases.map((phase) => phase.started_at).filter((value): value is string => value !== null);
-  const finishedTimestamps = phases.map((phase) => phase.finished_at).filter((value): value is string => value !== null);
+  return {
+    approved_count: approvedCount,
+    not_approved_count: notApprovedCount,
+    pending_count: pendingCount,
+    average_score: averageScore,
+    verdict,
+    what_next: whatNext,
+  };
+};
+
+const phaseDateRange = (phases: RhInductionMasterRecordPhaseRow[]): { started_at: string | null; finished_at: string | null } => {
+  // Orden cronologico real: las fechas llegan como texto y no ordenan alfabeticamente.
+  const byTime = (a: string, b: string): number => new Date(a).getTime() - new Date(b).getTime();
+  const started = phases.map((phase) => phase.started_at).filter((value): value is string => value !== null);
+  const finished = phases.map((phase) => phase.finished_at).filter((value): value is string => value !== null);
+  return {
+    started_at: started.sort(byTime)[0] ?? null,
+    finished_at: finished.sort(byTime).reverse()[0] ?? null,
+  };
+};
+
+/**
+ * Formato de Induccion de UN puesto: las fases institucionales (1-4) mas las
+ * filas de las Fases 5-7 de ese puesto. Una fase por puesto sin fila para el
+ * puesto se conserva como NO_DISPONIBLE (nunca se inventan datos ni se toman
+ * los de otro puesto). Recalcula resumen y fechas sobre esas filas.
+ */
+export const scopeMasterRecordToPosition = (
+  record: RhInductionMasterRecord,
+  position: { id: number; name: string },
+): RhInductionMasterRecord => {
+  const phases: RhInductionMasterRecordPhaseRow[] = [];
+  const phaseNumbers = [...new Set(record.phases.map((phase) => phase.phase_number))];
+  for (const phaseNumber of phaseNumbers) {
+    const rows = record.phases.filter((phase) => phase.phase_number === phaseNumber);
+    const own = rows.filter((phase) => phase.position_id === null || phase.position_id === position.id);
+    if (own.length > 0) {
+      phases.push(...own);
+      continue;
+    }
+    const base = rows[0]!;
+    phases.push({
+      ...base,
+      name: base.phase_name,
+      position_id: null,
+      supervisor_name: null,
+      started_at: null,
+      finished_at: null,
+      score_percentage: null,
+      status: 'NO_DISPONIBLE',
+      checklist_completed: 0,
+      collaborator_signature_note: 'Pendiente',
+      responsible_signature_note: 'Pendiente',
+    });
+  }
+  return {
+    ...record,
+    ...phaseDateRange(phases),
+    phases,
+    summary: summarizePhases(phases),
+    scope_position: position,
+  };
+};
+
+
+export const getEmployeeInductionMasterRecord = async (employeeId: number): Promise<RhInductionMasterRecord> => {
+  const employeeResult = await pool.query(
+    `SELECT id, full_name, employee_code, area, position FROM public.employees WHERE id = $1 LIMIT 1;`,
+    [employeeId],
+  );
+  if (employeeResult.rows.length === 0) {
+    const error = new Error('RH_INDUCTION_EMPLOYEE_NOT_FOUND');
+    (error as any).code = 'RH_INDUCTION_EMPLOYEE_NOT_FOUND';
+    (error as any).publicMessage = 'El colaborador no existe.';
+    throw error;
+  }
+  const employeeRow = employeeResult.rows[0];
+  const activePositions = await listEmployeePositions(employeeId, false);
+
+  const phasesResult = await pool.query(
+    `SELECT
+        p.phase_number, p.name, p.responsible_label, p.scope,
+        e.id AS enrollment_id, e.created_at AS enrolled_at, e.supervisor_employee_id,
+        e.position_id, rp.name AS position_name, e.queue_status,
+        sup.full_name AS supervisor_name,
+        ea.status AS evaluation_status, ea.percentage AS evaluation_percentage, ea.graded_at,
+        ea.certificate_document_id,
+        (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri WHERE ri.enrollment_id = e.id) AS reading_total,
+        (SELECT COUNT(*)::int FROM public.rh_induction_reading_items ri
+           INNER JOIN public.quality_reading_acknowledgements a ON a.id = ri.acknowledgement_id
+          WHERE ri.enrollment_id = e.id AND a.status = 'signed') AS reading_signed,
+        (SELECT COUNT(*)::int FROM public.rh_induction_phase_checklist_items ci WHERE ci.phase_id = p.id) AS checklist_total,
+        (SELECT COUNT(*)::int FROM public.rh_induction_checklist_progress cp WHERE cp.enrollment_id = e.id) AS checklist_completed
+      FROM public.rh_induction_phases p
+      LEFT JOIN public.rh_induction_enrollments e ON e.phase_id = p.id AND e.employee_id = $1 AND e.queue_status <> 'CANCELLED'
+      LEFT JOIN public.rh_positions rp ON rp.id = e.position_id
+      LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
+      LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
+     ORDER BY p.phase_number ASC, e.position_sequence ASC NULLS FIRST;`,
+    [employeeId],
+  );
+
+  const phases: RhInductionMasterRecordPhaseRow[] = phasesResult.rows.map((row) => {
+    const hasEnrollment = row.enrollment_id !== null && row.enrollment_id !== undefined;
+    const evaluationStatus = row.evaluation_status ? String(row.evaluation_status) : null;
+    const readingTotal = Number(row.reading_total ?? 0);
+    const readingSigned = Number(row.reading_signed ?? 0);
+    // Fases por puesto (5-6): una fila por puesto de la ruta; en cola = aun sin iniciar.
+    const queued = String(row.queue_status ?? '') === 'QUEUED';
+    return {
+      phase_number: Number(row.phase_number),
+      name: row.position_name ? `${String(row.name)} — ${String(row.position_name)}` : String(row.name),
+      phase_name: String(row.name),
+      position_id: row.position_id ? Number(row.position_id) : null,
+      responsible_label: String(row.responsible_label),
+      supervisor_name: row.supervisor_name ? String(row.supervisor_name) : null,
+      started_at: row.enrolled_at ? String(row.enrolled_at) : null,
+      finished_at: row.graded_at ? String(row.graded_at) : null,
+      score_percentage:
+        row.evaluation_percentage !== null && row.evaluation_percentage !== undefined
+          ? Number(row.evaluation_percentage)
+          : null,
+      status: resolveStatus(String(row.scope), hasEnrollment && !queued, evaluationStatus),
+      checklist_total: Number(row.checklist_total ?? 0),
+      checklist_completed: Number(row.checklist_completed ?? 0),
+      collaborator_signature_note: hasEnrollment ? collaboratorSignatureNote(readingTotal, readingSigned) : 'Pendiente',
+      responsible_signature_note: row.certificate_document_id
+        ? '✓ constancia emitida con 3 firmas'
+        : 'Pendiente',
+    };
+  });
+
+  // Fase 7 (Evaluacion de competencia inicial): su instrumento es el
+  // REH-REG-003 (rh_competency_evaluations tipo INICIAL), no el motor de
+  // evaluaciones de lectura. Si existe una cerrada, la fase deja de ser
+  // NO_DISPONIBLE y refleja su resultado real.
+  const phase7Index = phases.findIndex((phase) => phase.phase_number === 7);
+  if (phase7Index >= 0) {
+    // Un REH-REG-003 INICIAL por puesto: una fila de Fase 7 por cada puesto evaluado.
+    const compEval = await pool.query(
+      `SELECT DISTINCT ON (c.position_id) c.position_id, c.final_pct, c.dictamen, c.evaluation_date, c.closed_at, c.status, rp.name AS position_name
+         FROM public.rh_competency_evaluations c
+         JOIN public.rh_positions rp ON rp.id = c.position_id
+        WHERE c.employee_id = $1 AND c.evaluation_type = 'INICIAL'
+        ORDER BY c.position_id, c.created_at DESC;`,
+      [employeeId],
+    );
+    if (compEval.rows.length > 0) {
+      const base = phases[phase7Index]!;
+      const rows = compEval.rows.map((row) => {
+        const closed = String(row.status) === 'CLOSED';
+        return {
+          ...base,
+          name: `${base.name} — ${String(row.position_name)}`,
+          position_id: Number(row.position_id),
+          status: (closed
+            ? String(row.dictamen) !== 'NO_COMPETENTE' ? 'APROBADA' : 'NO_APROBADA'
+            : 'EN_PROCESO') as RhInductionMasterRecordPhaseRow['status'],
+          score_percentage: closed && row.final_pct !== null ? Number(row.final_pct) : null,
+          started_at: row.evaluation_date ? String(row.evaluation_date) : base.started_at,
+          finished_at: row.closed_at ? String(row.closed_at) : null,
+          collaborator_signature_note: closed ? '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)' : 'Pendiente',
+          responsible_signature_note: closed ? '✓ REH-REG-003 cerrada con 5 firmas (archivada en el expediente)' : 'Pendiente',
+        };
+      });
+      phases.splice(phase7Index, 1, ...rows);
+    }
+  }
 
   return {
     employee: {
@@ -240,17 +314,10 @@ export const getEmployeeInductionMasterRecord = async (employeeId: number): Prom
       position: employeeRow.position ? String(employeeRow.position) : null,
       active_positions: activePositions.map((position) => position.position_name),
     },
-    started_at: startedTimestamps.length > 0 ? startedTimestamps.sort()[0] ?? null : null,
-    finished_at: finishedTimestamps.length > 0 ? finishedTimestamps.sort().reverse()[0] ?? null : null,
+    ...phaseDateRange(phases),
     phases,
-    summary: {
-      approved_count: approvedCount,
-      not_approved_count: notApprovedCount,
-      pending_count: pendingCount,
-      average_score: averageScore,
-      verdict,
-      what_next: whatNext,
-    },
+    summary: summarizePhases(phases),
     effectiveness_reviews: await listEffectivenessReviews(employeeId),
+    scope_position: null,
   };
 };

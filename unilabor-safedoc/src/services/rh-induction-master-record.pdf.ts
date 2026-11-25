@@ -23,6 +23,8 @@ export interface InductionClosurePdfInput {
   collaboratorSignaturePng: Buffer;
   rhSignaturePng: Buffer;
   areaSignaturePng: Buffer;
+  /** Cierre por puesto: carta REH-REG-008 cerrada que lo habilita. */
+  assignmentLetter?: { folio: string | null; closedAt: Date } | null;
 }
 
 const A4: [number, number] = [595.28, 841.89];
@@ -160,13 +162,26 @@ export const buildInductionMasterRecordPdf = async (
   cursor.y -= 20;
 
   drawLabelValue(page, cursor, 'COLABORADOR', `${record.employee.full_name} (${record.employee.employee_code})`, fonts);
-  drawLabelValue(
-    page,
-    cursor,
-    'PUESTO(S) / ÁREA',
-    `${record.employee.active_positions.join(', ') || record.employee.position || 'Sin puesto asignado'} — ${record.employee.area ?? 'Sin área'}`,
-    fonts,
-  );
+  if (record.scope_position) {
+    drawLabelValue(page, cursor, 'PUESTO / ÁREA', `${record.scope_position.name} — ${record.employee.area ?? 'Sin área'}`, fonts);
+  } else {
+    drawLabelValue(
+      page,
+      cursor,
+      'PUESTO(S) / ÁREA',
+      `${record.employee.active_positions.join(', ') || record.employee.position || 'Sin puesto asignado'} — ${record.employee.area ?? 'Sin área'}`,
+      fonts,
+    );
+  }
+  if (closure?.assignmentLetter) {
+    drawLabelValue(
+      page,
+      cursor,
+      'CARTA DE ASIGNACIÓN DE PUESTO (REH-REG-008)',
+      `${closure.assignmentLetter.folio ?? 'Sin folio'} — cerrada el ${formatDate(closure.assignmentLetter.closedAt.toISOString())}`,
+      fonts,
+    );
+  }
   drawLabelValue(page, cursor, 'FECHA DE INICIO', formatDate(record.started_at), fonts);
   drawLabelValue(page, cursor, 'FECHA DE TÉRMINO (última fase completada)', formatDate(record.finished_at), fonts);
 

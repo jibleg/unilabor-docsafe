@@ -30,12 +30,17 @@ import {
 import type { SetPhaseDocumentExpedientTypeInput, UpdatePhaseAutoChecklistInput } from '../schemas/rh-induction-phase.schema';
 import { archiveSignedReadingsForPhaseDocument } from '../services/rh-induction-expedient-archive.service';
 import { createEffectivenessReview, listEffectivenessReviews } from '../services/rh-induction-effectiveness.service';
-import { getEmployeeInductionMasterRecord } from '../services/rh-induction-master-record.service';
+import {
+  getEmployeeInductionMasterRecord,
+  scopeMasterRecordToPosition,
+} from '../services/rh-induction-master-record.service';
 import { buildInductionMasterRecordPdf } from '../services/rh-induction-master-record.pdf';
 import {
   closeInductionRecord,
   getCurrentInductionClosure,
   getCurrentInductionClosureForPdf,
+  getGeneralClosureSuggestedSigners,
+  listPositionClosures,
 } from '../services/rh-induction-closure.service';
 import { registerAuditEvent } from '../services/audit.service';
 import { authorizeInductionRetry } from '../services/rh-induction-retry.service';
@@ -758,7 +763,13 @@ export const getEmployeeInductionMasterRecordController = async (req: AuthReques
       getEmployeeInductionMasterRecord(employeeId),
       getCurrentInductionClosure(employeeId),
     ]);
-    return res.json({ record: { ...record, closure } });
+    const [positionClosures, suggestedSigners] = await Promise.all([
+      listPositionClosures(record),
+      getGeneralClosureSuggestedSigners(employeeId),
+    ]);
+    return res.json({
+      record: { ...record, closure, position_closures: positionClosures, suggested_signers: suggestedSigners },
+    });
   } catch (error: any) {
     const mapped = mapError(res, error);
     if (mapped) return mapped;
@@ -775,6 +786,7 @@ export const closeInductionRecordController = async (req: AuthRequest, res: Resp
   try {
     const closure = await closeInductionRecord({
       employeeId,
+      positionId: req.body.position_id ?? null,
       verdict: req.body.verdict,
       closingNotes: req.body.closing_notes ?? null,
       collaboratorSignature: req.body.collaborator_signature,
@@ -787,7 +799,9 @@ export const closeInductionRecordController = async (req: AuthRequest, res: Resp
     });
     await registerAuditEvent({
       user_id: req.user?.id ?? null,
-      action: `RH_INDUCTION_CLOSE:${employeeId}:${closure.verdict}`,
+      action: closure.position_id
+        ? `RH_INDUCTION_CLOSE:${employeeId}:POSITION:${closure.position_id}:${closure.verdict}`
+        : `RH_INDUCTION_CLOSE:${employeeId}:${closure.verdict}`,
       ip_address: req.ip ?? null,
       module_code: 'RH',
       entity_type: 'induction_closure',
@@ -798,6 +812,8 @@ export const closeInductionRecordController = async (req: AuthRequest, res: Resp
     const CLOSE_ERROR_STATUS: Record<string, number> = {
       RH_INDUCTION_ALREADY_CLOSED: 409,
       RH_INDUCTION_CLOSE_NOT_READY: 409,
+      RH_INDUCTION_CLOSE_LETTER_NOT_CLOSED: 409,
+      RH_INDUCTION_CLOSE_POSITION_VERDICT: 400,
       RH_INDUCTION_CLOSE_NOTES_REQUIRED: 400,
       RH_INDUCTION_INVALID_SIGNATURE: 400,
       ARCHIVE_DOCUMENT_TYPE_NOT_FOUND: 409,
@@ -818,11 +834,26 @@ export const getEmployeeInductionMasterRecordPdfController = async (req: AuthReq
   if (!employeeId) {
     return res.status(400).json({ message: 'ID de colaborador invalido.' });
   }
+  // ?position_id= -> formato de ese puesto (solo existe una vez cerrado).
+  const positionId = req.query.position_id === undefined ? null : parsePositiveInt(String(req.query.position_id));
+  if (req.query.position_id !== undefined && !positionId) {
+    return res.status(400).json({ message: 'ID de puesto invalido.' });
+  }
   try {
-    const [record, closureForPdf] = await Promise.all([
+    const [fullRecord, closureForPdf] = await Promise.all([
       getEmployeeInductionMasterRecord(employeeId),
-      getCurrentInductionClosureForPdf(employeeId),
+      getCurrentInductionClosureForPdf(employeeId, positionId),
     ]);
+    let record = fullRecord;
+    let assignmentLetter: { folio: string | null; closedAt: Date } | null = null;
+    if (positionId) {
+      const row = (await listPositionClosures(fullRecord)).find((item) => item.position_id === positionId);
+      if (!row || !closureForPdf) {
+        return res.status(404).json({ message: 'El Formato de Induccion de este puesto aun no esta cerrado.' });
+      }
+      record = scopeMasterRecordToPosition(fullRecord, { id: row.position_id, name: row.position_name });
+      assignmentLetter = { folio: row.letter_folio, closedAt: new Date(row.letter_closed_at) };
+    }
     const pdf = await buildInductionMasterRecordPdf(
       record,
       closureForPdf
@@ -836,6 +867,7 @@ export const getEmployeeInductionMasterRecordPdfController = async (req: AuthReq
             collaboratorSignaturePng: closureForPdf.signatures.collaborator,
             rhSignaturePng: closureForPdf.signatures.rh,
             areaSignaturePng: closureForPdf.signatures.area,
+            assignmentLetter,
           }
         : undefined,
     );

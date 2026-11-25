@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ClipboardList, Download, FileCheck2, Loader2, Plus } from 'lucide-react';
+import { ClipboardList, Download, FileCheck2, FileText, Loader2, Pencil, Plus } from 'lucide-react';
 import { toast } from 'react-toastify';
 import {
   createEffectivenessReview,
@@ -8,7 +8,11 @@ import {
 } from '../../api/service.api-rh-induction';
 import { getApiErrorMessage } from '../../api/service.parsers';
 import { InductionClosureModal } from './InductionClosureModal';
-import type { RhInductionMasterRecord, RhInductionPhaseRowStatus } from '../../types/models';
+import type {
+  RhInductionMasterRecord,
+  RhInductionPhaseRowStatus,
+  RhInductionPositionClosure,
+} from '../../types/models';
 
 interface EmployeeInductionHistoryPanelProps {
   readOnly?: boolean;
@@ -46,6 +50,8 @@ export const EmployeeInductionHistoryPanel = ({ employeeId, readOnly = false }: 
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [closureModal, setClosureModal] = useState<'closed' | 'open' | 'supersede'>('closed');
+  const [closurePosition, setClosurePosition] = useState<RhInductionPositionClosure | null>(null);
+  const [exportingPositionId, setExportingPositionId] = useState<number | null>(null);
 
   const [showEffectivenessForm, setShowEffectivenessForm] = useState(false);
   const [reviewDate, setReviewDate] = useState('');
@@ -80,6 +86,28 @@ export const EmployeeInductionHistoryPanel = ({ employeeId, readOnly = false }: 
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExportPositionPdf = async (positionId: number) => {
+    setExportingPositionId(positionId);
+    try {
+      const url = await getEmployeeInductionMasterRecordPdfUrl(employeeId, positionId);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo generar el PDF.'));
+    } finally {
+      setExportingPositionId(null);
+    }
+  };
+
+  const openPositionClosure = (position: RhInductionPositionClosure) => {
+    setClosurePosition(position);
+    setClosureModal(position.closure ? 'supersede' : 'open');
+  };
+
+  const closeClosureModal = () => {
+    setClosureModal('closed');
+    setClosurePosition(null);
   };
 
   const handleSaveReview = async () => {
@@ -256,6 +284,72 @@ export const EmployeeInductionHistoryPanel = ({ employeeId, readOnly = false }: 
           </table>
         </div>
 
+        {record.position_closures && record.position_closures.length > 0 && (
+          <div>
+            <h4 className="text-sm font-bold text-[var(--color-brand-700)]">Cierre por puesto</h4>
+            <div className="mt-2 space-y-1.5">
+              {record.position_closures.map((position) => (
+                <div
+                  key={position.position_id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.96)] px-3 py-2 text-xs text-[var(--unilabor-neutral)]"
+                >
+                  <div>
+                    <p className="font-bold text-[var(--color-brand-700)]">{position.position_name}</p>
+                    <p>
+                      Carta {position.letter_folio ?? '—'} cerrada el {formatDate(position.letter_closed_at)}
+                    </p>
+                  </div>
+                  {position.closure ? (
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                        Formato cerrado {formatDate(position.closure.created_at)}
+                      </span>
+                      <button
+                        type="button"
+                        title="Ver formato cerrado (PDF)"
+                        aria-label="Ver formato cerrado (PDF)"
+                        onClick={() => void handleExportPositionPdf(position.position_id)}
+                        disabled={exportingPositionId === position.position_id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.14)] bg-white text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50"
+                      >
+                        {exportingPositionId === position.position_id ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <FileText size={14} />
+                        )}
+                      </button>
+                      {readOnly ? null : (
+                        <button
+                          type="button"
+                          title="Corregir cierre"
+                          aria-label="Corregir cierre"
+                          onClick={() => openPositionClosure(position)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[rgba(0,65,106,0.14)] bg-white text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ) : readOnly ? (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">
+                      Formato sin cerrar
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openPositionClosure(position)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-1.5 font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+                    >
+                      <FileCheck2 size={14} />
+                      Cerrar formato
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-bold text-[var(--color-brand-700)]">
@@ -348,7 +442,8 @@ export const EmployeeInductionHistoryPanel = ({ employeeId, readOnly = false }: 
         <InductionClosureModal
           record={record}
           supersede={closureModal === 'supersede'}
-          onClose={() => setClosureModal('closed')}
+          position={closurePosition ?? undefined}
+          onClose={closeClosureModal}
           onClosed={() => void load()}
         />
       )}

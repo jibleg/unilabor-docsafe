@@ -4,12 +4,14 @@ import { toast } from 'react-toastify';
 import { closeInductionRecord } from '../../api/service.api-rh-induction';
 import { getApiErrorMessage } from '../../api/service.parsers';
 import { SignaturePad } from '../helpdesk/SignaturePad';
-import type { RhInductionMasterRecord } from '../../types/models';
+import type { RhInductionMasterRecord, RhInductionPositionClosure } from '../../types/models';
 
 interface InductionClosureModalProps {
   record: RhInductionMasterRecord;
   /** true = re-cierre correctivo del registro ya cerrado (genera nueva version). */
   supersede?: boolean;
+  /** Con valor, cierra el formato de ese puesto (su carta REH-REG-008 ya está cerrada). */
+  position?: RhInductionPositionClosure;
   onClose: () => void;
   onClosed: () => void;
 }
@@ -22,14 +24,24 @@ const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide tex
  * Cierre formal del Formato de Induccion (REH-REG-005): dictamen + 3 firmas
  * digitales. El gate del dictamen positivo lo re-valida el backend; aqui solo
  * se ofrece "Aprobada" cuando las fases institucionales estan completas.
+ * Por puesto, la carta REH-REG-008 cerrada es el candado y el cierre es
+ * siempre aprobado.
  */
-export const InductionClosureModal = ({ record, supersede = false, onClose, onClosed }: InductionClosureModalProps) => {
-  const fullApprove = record.summary.verdict === 'COMPLETA_7_FASES';
+export const InductionClosureModal = ({
+  record,
+  supersede = false,
+  position,
+  onClose,
+  onClosed,
+}: InductionClosureModalProps) => {
+  const fullApprove = Boolean(position) || record.summary.verdict === 'COMPLETA_7_FASES';
   const canApprove = fullApprove || record.summary.verdict === 'COMPLETA_1_A_4';
   const [verdict, setVerdict] = useState<'APROBADA' | 'NO_APROBADA'>(canApprove ? 'APROBADA' : 'NO_APROBADA');
   const [closingNotes, setClosingNotes] = useState('');
-  const [rhName, setRhName] = useState('');
-  const [areaName, setAreaName] = useState('');
+  // Firmantes asignados al colaborador en el puesto (o los sugeridos del cierre general).
+  const assigned = position ?? record.suggested_signers;
+  const [rhName, setRhName] = useState(assigned?.rh_signatory_name ?? '');
+  const [areaName, setAreaName] = useState(assigned?.area_signatory_name ?? '');
   const [collaboratorSignature, setCollaboratorSignature] = useState<string | null>(null);
   const [rhSignature, setRhSignature] = useState<string | null>(null);
   const [areaSignature, setAreaSignature] = useState<string | null>(null);
@@ -59,6 +71,7 @@ export const InductionClosureModal = ({ record, supersede = false, onClose, onCl
         rh_signatory_name: rhName.trim(),
         area_signatory_name: areaName.trim(),
         supersede,
+        position_id: position?.position_id ?? null,
       });
       toast.success('Formato de Inducción cerrado y archivado en el expediente.');
       onClosed();
@@ -77,6 +90,7 @@ export const InductionClosureModal = ({ record, supersede = false, onClose, onCl
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-brand-500)]">
               REH-REG-005 · {record.employee.full_name}
+              {position ? ` · ${position.position_name}` : ''}
             </p>
             <h2 className="mt-1 flex items-center gap-2 text-lg font-bold text-[var(--color-brand-700)]">
               <FileCheck2 size={18} />
@@ -99,6 +113,20 @@ export const InductionClosureModal = ({ record, supersede = false, onClose, onCl
             Programa de Inducción). No se puede borrar; una corrección genera una nueva versión.
           </div>
 
+          {position && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              Carta de asignación {position.letter_folio ?? ''} cerrada el{' '}
+              {new Date(position.letter_closed_at).toLocaleDateString('es-MX')}. Se cierra el formato del puesto{' '}
+              <span className="font-bold">{position.position_name}</span>.
+            </div>
+          )}
+          {position && position.pending_phases.length > 0 && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+              El sistema no tiene como aprobadas: {position.pending_phases.join(', ')}. El formato se archivará con
+              ese estado.
+            </div>
+          )}
+
           <div>
             <label className={labelClass}>Dictamen</label>
             <select
@@ -111,7 +139,7 @@ export const InductionClosureModal = ({ record, supersede = false, onClose, onCl
                   {fullApprove ? 'Aprobada — Inducción completa (7 fases)' : 'Aprobada — Inducción institucional (Fases 1-4)'}
                 </option>
               )}
-              <option value="NO_APROBADA">No aprobada — Inducción no superada</option>
+              {!position && <option value="NO_APROBADA">No aprobada — Inducción no superada</option>}
             </select>
             {!canApprove && (
               <p className="mt-1 text-[11px] text-[var(--unilabor-neutral)]">
@@ -162,9 +190,18 @@ export const InductionClosureModal = ({ record, supersede = false, onClose, onCl
           <SignaturePad
             label={`Firma del colaborador — ${record.employee.full_name}`}
             onChange={setCollaboratorSignature}
+            allowUpload
           />
-          <SignaturePad label="Firma — Coordinación de Recursos Humanos" onChange={setRhSignature} />
-          <SignaturePad label="Firma — Coordinador del área" onChange={setAreaSignature} />
+          <SignaturePad
+            label={`Firma — Coordinación de RH${rhName.trim() ? ` — ${rhName.trim()}` : ''}`}
+            onChange={setRhSignature}
+            allowUpload
+          />
+          <SignaturePad
+            label={`Firma — Coordinador del área${areaName.trim() ? ` — ${areaName.trim()}` : ''}`}
+            onChange={setAreaSignature}
+            allowUpload
+          />
         </div>
 
         <div className="flex justify-end gap-2 border-t border-[rgba(0,65,106,0.08)] px-5 py-4">

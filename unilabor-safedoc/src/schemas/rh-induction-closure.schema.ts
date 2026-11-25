@@ -23,5 +23,7 @@ export const closeInductionRecordSchema = z
     rh_signatory_name: requiredText('El nombre del firmante de RH es obligatorio'),
     area_signatory_name: requiredText('El nombre del coordinador del área es obligatorio'),
     supersede: z.coerce.boolean().optional(),
+    // Con valor, cierra el formato de ese puesto (requiere su carta REH-REG-008 cerrada).
+    position_id: z.coerce.number().int().positive().optional().nullable(),
   })
   .passthrough();

@@ -707,6 +707,24 @@ export interface RhInductionClosure {
   area_signatory_name: string;
   document_id: number | null;
   created_at: string;
+  /** Puesto del cierre; null = cierre general del colaborador. */
+  position_id: number | null;
+  assignment_letter_id: number | null;
+}
+
+/** Puesto con carta REH-REG-008 cerrada: puede cerrar su Formato de Inducción. */
+export interface RhInductionPositionClosure {
+  position_id: number;
+  position_name: string;
+  letter_id: number;
+  letter_folio: string | null;
+  letter_closed_at: string;
+  /** Coordinador del área y de RH asignados al colaborador en el puesto. */
+  area_signatory_name: string;
+  rh_signatory_name: string;
+  /** Fases del puesto que el sistema no tiene como aprobadas (aviso; no bloquea). */
+  pending_phases: string[];
+  closure: RhInductionClosure | null;
 }
 
 export interface RhInductionMasterRecord {
@@ -731,6 +749,9 @@ export interface RhInductionMasterRecord {
   };
   effectiveness_reviews: RhInductionEffectivenessReview[];
   closure?: RhInductionClosure | null;
+  position_closures?: RhInductionPositionClosure[];
+  /** Firmantes sugeridos para el cierre general (sin puesto). */
+  suggested_signers?: { rh_signatory_name: string; area_signatory_name: string };
 }
 
 // --- Evaluacion de competencia (REH-REG-003) --------------------------------

@@ -320,6 +320,8 @@ export interface CloseInductionRecordPayload {
   rh_signatory_name: string;
   area_signatory_name: string;
   supersede?: boolean;
+  /** Con valor, cierra el formato de ese puesto (requiere su carta REH-REG-008 cerrada). */
+  position_id?: number | null;
 }
 
 export const closeInductionRecord = async (
@@ -331,9 +333,18 @@ export const closeInductionRecord = async (
   return data?.closure as RhInductionClosure;
 };
 
-/** Descarga el reporte de avance del Formato de Induccion como blob y devuelve un object URL. */
-export const getEmployeeInductionMasterRecordPdfUrl = async (employeeId: number): Promise<string> => {
-  const response = await api.get(`/rh/employees/${employeeId}/induction/master-record.pdf`, { responseType: 'blob' });
+/**
+ * Descarga el Formato de Induccion como blob y devuelve un object URL. Con
+ * `positionId`, el formato cerrado de ese puesto.
+ */
+export const getEmployeeInductionMasterRecordPdfUrl = async (
+  employeeId: number,
+  positionId?: number,
+): Promise<string> => {
+  const response = await api.get(`/rh/employees/${employeeId}/induction/master-record.pdf`, {
+    responseType: 'blob',
+    params: positionId ? { position_id: positionId } : undefined,
+  });
   return URL.createObjectURL(response.data as Blob);
 };
 

@@ -35,7 +35,8 @@ export interface CompetencySuggestedSigners {
   director_employee_id: number | null;
 }
 
-const holderOf = async (positionCode: string, excludeEmployeeId: number): Promise<{ id: number; name: string } | null> => {
+/** Quien ocupa un puesto institucional (CRH, DG...), sin contar al colaborador evaluado. */
+export const holderOf = async (positionCode: string, excludeEmployeeId: number): Promise<{ id: number; name: string } | null> => {
   const result = await pool.query(
     `SELECT e.id, e.full_name
        FROM public.rh_employee_positions ep
