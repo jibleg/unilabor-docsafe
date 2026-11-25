@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Eraser, ImageUp, PenLine } from 'lucide-react';
+import { ClipboardPaste, Eraser, ImageUp, PenLine } from 'lucide-react';
+import { useImagePaste } from '../../hooks/useImagePaste';
+import { readClipboardImage } from '../../utils/clipboard-image';
 import { notifyError } from '../../utils/notify';
 import { SIGNATURE_IMAGE_ACCEPT, fitInside, signatureImageIssue } from './signature-image';
 
@@ -8,9 +10,9 @@ interface SignaturePadProps {
   hint?: string;
   // Devuelve el PNG (data URL) al terminar un trazo, o null al limpiar.
   onChange: (dataUrl: string | null) => void;
-  /** Permite cargar la firma desde una imagen (PNG / JPG / BMP) ademas de trazarla. */
+  /** Permite cargar o pegar (portapapeles) la firma como imagen PNG / JPG / BMP, ademas de trazarla. */
   allowUpload?: boolean;
-  /** La firma solo puede venir de un archivo de imagen: no se traza (firma a nombre de otro firmante). */
+  /** La firma solo puede venir de una imagen (archivo o portapapeles): no se traza (firma a nombre de otro firmante). */
   uploadOnly?: boolean;
 }
 
@@ -21,6 +23,7 @@ interface SignaturePadProps {
 export const SignaturePad = ({ label, hint, onChange, allowUpload = false, uploadOnly = false }: SignaturePadProps) => {
   const canUpload = allowUpload || uploadOnly;
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const zoneRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const drawing = useRef(false);
   const dirty = useRef(false);
@@ -119,12 +122,10 @@ export const SignaturePad = ({ label, hint, onChange, allowUpload = false, uploa
   };
 
   /** Dibuja la imagen elegida centrada y ajustada al lienzo, y la entrega como la firma. */
-  const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
+  const applyImage = async (file: File) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!file || !canvas || !ctx) {
+    if (!canvas || !ctx) {
       return;
     }
     const issue = signatureImageIssue(file);
@@ -152,16 +153,32 @@ export const SignaturePad = ({ label, hint, onChange, allowUpload = false, uploa
     }
   };
 
+  const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) void applyImage(file);
+  };
+
+  const handlePasteClick = async () => {
+    try {
+      await applyImage(await readClipboardImage());
+    } catch (error) {
+      notifyError(error instanceof Error ? error.message : 'No se pudo leer el portapapeles.');
+    }
+  };
+
+  useImagePaste(zoneRef, canUpload, (file) => void applyImage(file));
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <div ref={zoneRef} tabIndex={canUpload ? -1 : undefined} className="space-y-2 outline-none">
+      <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--unilabor-neutral)]">
           <PenLine size={13} /> {label}
         </span>
         <span className="flex items-center gap-1.5">
           {canUpload ? (
             <>
-              <input ref={fileRef} type="file" accept={SIGNATURE_IMAGE_ACCEPT} onChange={(e) => void handleFile(e)} className="hidden" />
+              <input ref={fileRef} type="file" accept={SIGNATURE_IMAGE_ACCEPT} onChange={handleFile} className="hidden" />
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
@@ -169,6 +186,14 @@ export const SignaturePad = ({ label, hint, onChange, allowUpload = false, uploa
                 className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
               >
                 <ImageUp size={12} /> {uploadOnly ? 'Cargar archivo' : 'Imagen'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handlePasteClick()}
+                title="Pegar la imagen copiada en el portapapeles (o Ctrl+V sobre el recuadro)"
+                className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
+              >
+                <ClipboardPaste size={12} /> Pegar
               </button>
             </>
           ) : null}
@@ -197,7 +222,7 @@ export const SignaturePad = ({ label, hint, onChange, allowUpload = false, uploa
         />
         {!hasContent ? (
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-[var(--unilabor-neutral)]">
-            {uploadOnly ? 'Cargue el archivo de la firma (PNG, JPG o BMP)' : allowUpload ? 'Firme aquí o cargue una imagen' : 'Firme aquí'}
+            {uploadOnly ? 'Cargue o pegue la imagen de la firma (PNG, JPG o BMP)' : allowUpload ? 'Firme aquí, cargue o pegue una imagen' : 'Firme aquí'}
           </span>
         ) : null}
       </div>

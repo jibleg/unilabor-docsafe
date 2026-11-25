@@ -7,6 +7,7 @@ import {
   saveCertificateTemplate,
   uploadCertificateImage,
 } from '../../api/service';
+import { CertificateSignatureImagePicker } from './CertificateSignatureImagePicker';
 import type { CertificateSignature, CertificateTemplate } from '../../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
 
@@ -291,19 +292,10 @@ export const CertificateDesignerModal = ({ courseId, courseTitle, onClose }: Cer
                         placeholder="Cargo (opcional)"
                         className={inputClass}
                       />
-                      <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-[var(--color-brand-500)] transition hover:text-[var(--color-brand-700)]">
-                        <ImageIcon size={13} />
-                        {signature.signature_image_path ? 'Cambiar imagen de firma' : 'Subir imagen de firma (opcional)'}
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) void handleSignatureUpload(index, file);
-                          }}
-                        />
-                      </label>
+                      <CertificateSignatureImagePicker
+                        hasImage={Boolean(signature.signature_image_path)}
+                        onFile={(file) => void handleSignatureUpload(index, file)}
+                      />
                     </div>
                   ))}
                 </div>
