@@ -240,7 +240,43 @@ export interface PositionCoverage {
   counts: Record<CompetencyStanding, number>;
 }
 
-/** Cobertura por puesto: cuántos colaboradores del puesto hay en cada estado. */
+/** Estado del colaborador EN un puesto: el propio de ese puesto (sin ese dato, su estado general). */
+export const standingInPosition = (employee: CompetencyDashboardEmployee, positionId: number): CompetencyStanding =>
+  employee.position_standings?.find((item) => item.position_id === positionId)?.standing ?? employee.standing;
+
+export interface PositionBreakdown {
+  /** Pares colaborador-puesto: cada colaborador cuenta una vez por cada puesto activo. */
+  total: number;
+  counts: Record<CompetencyStanding, number>;
+  /** Pares con competencia autorizada y vigente (vigentes + por vencer). */
+  competent: number;
+  /** Colaboradores con al menos un puesto competente pero no todos: no suman al índice general. */
+  partial_employees: number;
+}
+
+/**
+ * Desglose por puesto: el índice general exige que TODOS los puestos del
+ * colaborador estén en regla; aquí cada puesto asignado cuenta por separado.
+ * Con `positionId` solo se cuenta ese puesto.
+ */
+export const positionBreakdown = (employees: CompetencyDashboardEmployee[], positionId = ''): PositionBreakdown => {
+  const counts = countByStanding([]);
+  let total = 0;
+  let partial = 0;
+  for (const employee of employees) {
+    const standings = employee.positions.map((position) => ({ id: position.id, standing: standingInPosition(employee, position.id) }));
+    const competent = standings.filter((item) => item.standing === 'VIGENTE' || item.standing === 'POR_VENCER').length;
+    if (competent > 0 && competent < standings.length) partial += 1;
+    for (const item of standings) {
+      if (positionId && String(item.id) !== positionId) continue;
+      counts[item.standing] += 1;
+      total += 1;
+    }
+  }
+  return { total, counts, competent: counts.VIGENTE + counts.POR_VENCER, partial_employees: partial };
+};
+
+/** Cobertura por puesto: cuántos colaboradores del puesto hay en cada estado (el de ESE puesto). */
 export const coverageByPosition = (employees: CompetencyDashboardEmployee[]): PositionCoverage[] => {
   const map = new Map<number, PositionCoverage>();
   for (const employee of employees) {
@@ -254,7 +290,7 @@ export const coverageByPosition = (employees: CompetencyDashboardEmployee[]): Po
           counts: countByStanding([]),
         } satisfies PositionCoverage);
       entry.total += 1;
-      entry.counts[employee.standing] += 1;
+      entry.counts[standingInPosition(employee, position.id)] += 1;
       map.set(position.id, entry);
     }
   }

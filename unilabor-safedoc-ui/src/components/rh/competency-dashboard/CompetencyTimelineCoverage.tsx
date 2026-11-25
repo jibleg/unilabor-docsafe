@@ -79,14 +79,14 @@ const MonthlyChart = ({ evaluations, employees, today }: { evaluations: Competen
   );
 };
 
-/** Barras apiladas por puesto (estado de cada colaborador); clic filtra por puesto. */
+/** Barras apiladas por puesto (estado de cada colaborador EN ese puesto); clic filtra por puesto. */
 const PositionCoverageChart = ({ employees, activePositionId, onFocusPosition }: { employees: CompetencyDashboardEmployee[]; activePositionId: string; onFocusPosition: (positionId: string) => void }) => {
-  const rows = coverageByPosition(employees).slice(0, 12);
+  const rows = coverageByPosition(employees);
   if (rows.length === 0) {
     return <EmptyChart text="No hay colaboradores con puesto en la selección." />;
   }
   return (
-    <ul className="space-y-2">
+    <ul className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
       {rows.map((row, i) => {
         const competent = row.counts.VIGENTE + row.counts.POR_VENCER;
         const active = activePositionId === String(row.position_id);
@@ -108,7 +108,7 @@ const PositionCoverageChart = ({ employees, activePositionId, onFocusPosition }:
                   <span
                     key={standing}
                     title={`${STANDING_META[standing].label}: ${row.counts[standing]}`}
-                    style={{ width: `${(row.counts[standing] / row.total) * 100}%`, backgroundColor: STANDING_META[standing].color, marginLeft: j ? 2 : 0, animation: `agr-wide .7s ease ${i * 40}ms both` }}
+                    style={{ width: `${(row.counts[standing] / row.total) * 100}%`, backgroundColor: STANDING_META[standing].color, marginLeft: j ? 2 : 0, animation: `agr-wide .7s ease ${Math.min(i, 12) * 40}ms both` }}
                   />
                 ))}
               </div>
@@ -136,7 +136,7 @@ export const CompetencyTimelineCoverage = ({ evaluations, employees, today, acti
       </ChartCard>
     </div>
     <div className="xl:col-span-2">
-      <ChartCard icon={Briefcase} title="Cobertura por puesto" hint="Estado de los colaboradores de cada puesto · clic para filtrar">
+      <ChartCard icon={Briefcase} title="Cobertura por puesto" hint="Estado de cada colaborador en ese puesto · clic para filtrar">
         <PositionCoverageChart employees={employees} activePositionId={activePositionId} onFocusPosition={onFocusPosition} />
       </ChartCard>
     </div>

@@ -106,7 +106,7 @@ export const RhCompetencyDashboardPage = () => {
         </div>
       ) : dashboard && scoped && filtered ? (
         <>
-          <CompetencyHero employees={scoped.employees} evaluations={scoped.evaluations} activeStandings={filters.standings} onFocusStanding={focusStanding} />
+          <CompetencyHero employees={scoped.employees} evaluations={scoped.evaluations} activeStandings={filters.standings} onFocusStanding={focusStanding} activePositionId={filters.positionId} />
 
           {(pendingAuthorization > 0 || urgent > 0) && !singleStanding ? (
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 via-white to-amber-50 px-4 py-3 text-sm text-[var(--unilabor-ink)]" style={{ animation: 'agr-fade .4s ease both' }}>

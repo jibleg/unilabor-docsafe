@@ -1,13 +1,15 @@
-import { Award, CalendarClock, FileCheck2, Users } from 'lucide-react';
+import { Award, Briefcase, CalendarClock, FileCheck2, Users } from 'lucide-react';
 import type { CompetencyDashboardEmployee, CompetencyDashboardEvaluation, CompetencyStanding } from '../../../types/competencyDashboard';
 import { useCountUp } from '../../../hooks/useCountUp';
-import { STANDING_META, STANDING_ORDER, countByStanding, sectionAverages } from '../../../utils/competencyDashboard';
+import { STANDING_META, STANDING_ORDER, countByStanding, positionBreakdown, sectionAverages } from '../../../utils/competencyDashboard';
 
 interface CompetencyHeroProps {
   employees: CompetencyDashboardEmployee[];
   evaluations: CompetencyDashboardEvaluation[];
   activeStandings: CompetencyStanding[];
   onFocusStanding: (standing: CompetencyStanding | null) => void;
+  /** Puesto elegido en los filtros ('' = todos): el desglose por puesto se limita a él. */
+  activePositionId?: string;
 }
 
 /** Medidor radial del índice de competencia vigente (vigentes + por vencer / total). */
@@ -104,10 +106,59 @@ const StandingTile = ({
 };
 
 /**
- * Cabecera del panel: banda con el índice de competencia vigente y cifras
- * globales, y debajo un mosaico por estado que enfoca el tablero al hacer clic.
+ * Desglose por puesto: el índice general cuenta colaboradores y exige todos sus
+ * puestos en regla; aquí cada puesto asignado cuenta por separado, para ver el
+ * avance real aunque el colaborador aún no complete todos.
  */
-export const CompetencyHero = ({ employees, evaluations, activeStandings, onFocusStanding }: CompetencyHeroProps) => {
+const PositionBreakdownCard = ({ employees, positionId }: { employees: CompetencyDashboardEmployee[]; positionId: string }) => {
+  const breakdown = positionBreakdown(employees, positionId);
+  if (breakdown.total === 0) return null;
+  const pct = Math.round((breakdown.competent / breakdown.total) * 100);
+  const present = STANDING_ORDER.filter((standing) => breakdown.counts[standing] > 0);
+  return (
+    <section className="rounded-2xl border border-[rgba(0,65,106,0.1)] bg-white/95 px-5 py-4 shadow-sm" style={{ animation: 'agr-fade .5s ease both' }}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="inline-flex items-center gap-2 text-sm font-bold text-[var(--color-brand-700)]">
+          <Briefcase size={16} /> Desglose por puesto
+        </h2>
+        <p className="text-sm text-[var(--unilabor-ink)]">
+          <b className="tabular-nums text-emerald-700">{breakdown.competent}</b> de <b className="tabular-nums">{breakdown.total}</b> puestos asignados con
+          competencia vigente <span className="font-bold tabular-nums text-[var(--color-brand-700)]">({pct}%)</span>
+        </p>
+      </div>
+      <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-[rgba(0,65,106,0.06)]" role="img" aria-label="Puestos asignados por estado de competencia">
+        {present.map((standing, i) => (
+          <span
+            key={standing}
+            title={`${STANDING_META[standing].label}: ${breakdown.counts[standing]}`}
+            style={{ width: `${(breakdown.counts[standing] / breakdown.total) * 100}%`, backgroundColor: STANDING_META[standing].color, marginLeft: i ? 2 : 0, animation: 'agr-wide .8s ease both' }}
+          />
+        ))}
+      </div>
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-[var(--unilabor-ink)]">
+        {present.map((standing) => (
+          <li key={standing} className="inline-flex items-center gap-1.5" title={STANDING_META[standing].description}>
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STANDING_META[standing].color }} />
+            {STANDING_META[standing].label} <b className="tabular-nums">{breakdown.counts[standing]}</b>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[11px] leading-5 text-[var(--unilabor-neutral)]">
+        Cada colaborador cuenta una vez por cada puesto activo. El índice de arriba solo cuenta a quien tiene todos sus puestos en regla
+        {breakdown.partial_employees > 0 && !positionId
+          ? `: ${breakdown.partial_employees} colaborador(es) ya son competentes en al menos un puesto, pero no en todos.`
+          : '.'}
+      </p>
+    </section>
+  );
+};
+
+/**
+ * Cabecera del panel: banda con el índice de competencia vigente y cifras
+ * globales, el desglose por puesto y un mosaico por estado que enfoca el
+ * tablero al hacer clic.
+ */
+export const CompetencyHero = ({ employees, evaluations, activeStandings, onFocusStanding, activePositionId = '' }: CompetencyHeroProps) => {
   const counts = countByStanding(employees);
   const total = employees.length;
   const competent = counts.VIGENTE + counts.POR_VENCER;
@@ -146,6 +197,7 @@ export const CompetencyHero = ({ employees, evaluations, activeStandings, onFocu
           </div>
         </div>
       </section>
+      <PositionBreakdownCard employees={employees} positionId={activePositionId} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
         {STANDING_ORDER.map((standing, i) => (
           <StandingTile
