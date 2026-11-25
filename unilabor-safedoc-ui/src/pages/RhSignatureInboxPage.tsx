@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Inbox, Loader2, PenLine, RefreshCw, TriangleAlert, X } from 'lucide-react';
-import { SIGNATURE_BATCH_MAX, listSignatureInbox } from '../api/service.api-signature-inbox';
+import { CheckCircle2, ImageUp, Inbox, Loader2, PenLine, RefreshCw, TriangleAlert, X } from 'lucide-react';
+import { SIGNATURE_BATCH_MAX, listPendingSigners, listSignatureInbox } from '../api/service.api-signature-inbox';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { DrawerShell } from '../components/attendance/schedule/DrawerShell';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { BatchSignPanel } from '../components/rh/phase7-signature/BatchSignPanel';
 import { DocumentInboxPanel } from '../components/rh/phase7-signature/DocumentInboxPanel';
 import { SignatureInboxPanel } from '../components/rh/supervision/SignatureInboxPanel';
 import { buttonClass, cardClass, formatDateTime, primaryButtonClass } from '../components/rh/supervision/supervision-ui';
 import { usePendingSignaturesStore } from '../store/usePendingSignaturesStore';
-import type { InboxKind, SignatureInbox, SignatureInboxBatchResult, SignatureInboxEntry, SignatureInboxSignOutcome, SignedDocumentKind } from '../types/models';
+import type { InboxKind, PendingSigner, SignatureInbox, SignatureInboxBatchResult, SignatureInboxEntry, SignatureInboxSignOutcome, SignedDocumentKind } from '../types/models';
 import { notifyError, notifySuccess, notifyWarning } from '../utils/notify';
+import { useHasPermission } from '../utils/permissions';
 
 type Tab = 'pending' | 'signed';
 type KindFilter = 'ALL' | InboxKind;
@@ -22,6 +24,9 @@ const KIND_FILTERS: Array<[KindFilter, string]> = [
   ['COMPETENCY_EVALUATION', 'REH-REG-003'],
   ['ASSIGNMENT_LETTER', 'REH-REG-008'],
 ];
+
+/** Permiso de firma por imagen a nombre del firmante (RH resguarda las firmas del personal). */
+const SIGN_ON_BEHALF_PERMISSION = 'RH.SIGNATURE_INBOX.SIGN_ON_BEHALF';
 
 const keyOf = (entry: Pick<SignatureInboxEntry, 'kind' | 'id'>) => `${entry.kind}:${entry.id}`;
 
@@ -41,6 +46,10 @@ type Drawer = { mode: 'one'; entry: SignatureInboxEntry } | { mode: 'batch'; ent
  * (Carta de asignación, Fase 7). Cada quien firma desde su sesión, en cualquier
  * orden; con la última firma el registro se cierra solo. Quien tiene varios
  * pendientes puede elegirlos y firmarlos de una vez (firma en lote).
+ *
+ * Con el permiso de firma por imagen, además se puede abrir el buzón de cualquier
+ * firmante con pendientes y colocar su firma cargando el archivo que resguarda
+ * RH, de uno en uno o varios registros a la vez.
  */
 export const RhSignatureInboxPage = () => {
   const refreshBadge = usePendingSignaturesStore((state) => state.refresh);
@@ -52,21 +61,50 @@ export const RhSignatureInboxPage = () => {
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [signing, setSigning] = useState(false);
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
+  const canSignOnBehalf = useHasPermission(SIGN_ON_BEHALF_PERMISSION);
+  const [signers, setSigners] = useState<PendingSigner[]>([]);
+  const [onBehalfOf, setOnBehalfOf] = useState<PendingSigner | null>(null);
+  const behalfId = onBehalfOf?.employee_id ?? null;
+
+  const loadSigners = useCallback(async () => {
+    if (!canSignOnBehalf) return;
+    try {
+      setSigners(await listPendingSigners());
+    } catch (error) {
+      notifyError(getApiErrorMessage(error, 'No se pudieron cargar los firmantes con firmas pendientes.'));
+    }
+  }, [canSignOnBehalf]);
+  useEffect(() => {
+    void loadSigners();
+  }, [loadSigners]);
+
+  // El firmante elegido sigue en la lista aunque ya no le quede nada pendiente.
+  const signerOptions = useMemo(
+    () => (onBehalfOf && !signers.some((signer) => signer.employee_id === onBehalfOf.employee_id) ? [{ ...onBehalfOf, pending: 0 }, ...signers] : signers),
+    [signers, onBehalfOf],
+  );
+
+  const chooseSigner = (value: string) => {
+    setOnBehalfOf(signerOptions.find((signer) => String(signer.employee_id) === value) ?? null);
+    setSelected(new Set());
+    setDrawer(null);
+    setTab('pending');
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const loaded = await listSignatureInbox();
+      const loaded = await listSignatureInbox(behalfId);
       setInbox(loaded);
       // La selección solo conserva lo que sigue pendiente.
       const stillPending = new Set(loaded.pending.map(keyOf));
       setSelected((current) => new Set([...current].filter((key) => stillPending.has(key))));
     } catch (error) {
-      notifyError(getApiErrorMessage(error, 'No se pudo cargar tu buzón de firmas.'));
+      notifyError(getApiErrorMessage(error, behalfId ? 'No se pudo cargar el buzón del firmante.' : 'No se pudo cargar tu buzón de firmas.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [behalfId]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -98,6 +136,7 @@ export const RhSignatureInboxPage = () => {
   const afterSigning = () => {
     setDrawer(null);
     void load();
+    void loadSigners();
     void refreshBadge();
   };
 
@@ -134,10 +173,48 @@ export const RhSignatureInboxPage = () => {
             tienes varios, selecciónalos y fírmalos de una vez.
           </p>
         </div>
-        <button type="button" onClick={() => void load()} className={buttonClass}>
+        <button
+          type="button"
+          onClick={() => {
+            void load();
+            void loadSigners();
+          }}
+          className={buttonClass}
+        >
           <RefreshCw size={14} /> Actualizar
         </button>
       </header>
+
+      {canSignOnBehalf ? (
+        <section className={`${cardClass} space-y-2`}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-brand-700)]">
+              <ImageUp size={15} /> Firmar con archivo a nombre de
+            </span>
+            <div className="min-w-[260px] flex-1">
+              <SearchableSelect
+                value={onBehalfOf ? String(onBehalfOf.employee_id) : ''}
+                options={signerOptions.map((signer) => ({
+                  value: String(signer.employee_id),
+                  label: signer.full_name,
+                  hint: `${signer.pending} pendiente(s) · ${signer.employee_code}${signer.is_active ? '' : ' · dado de baja'}`,
+                }))}
+                onChange={chooseSigner}
+                placeholder="Mi buzón"
+                emptyLabel="Mi buzón"
+                searchPlaceholder="Busca al firmante…"
+              />
+            </div>
+            <span className="text-xs text-[var(--unilabor-neutral)]">{signers.length} firmante(s) con pendientes</span>
+          </div>
+          {onBehalfOf ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900" role="status">
+              Estás en el buzón de <span className="font-semibold">{onBehalfOf.full_name}</span>. Carga el archivo de su firma (PNG, JPG o BMP) en un registro o
+              selecciona varios. Cada firma queda registrada como colocada por ti a su nombre.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {lastResult ? (
         <div
@@ -214,7 +291,7 @@ export const RhSignatureInboxPage = () => {
             onClick={() => setDrawer({ mode: 'batch', entries: selectedEntries })}
             disabled={selectedEntries.length === 0}
             className={primaryButtonClass}
-            title="Revisar los registros seleccionados y firmarlos con un solo trazo"
+            title={onBehalfOf ? 'Revisar los registros seleccionados y firmarlos con un solo archivo' : 'Revisar los registros seleccionados y firmarlos con un solo trazo'}
           >
             <PenLine size={14} /> Firmar seleccionados ({selectedEntries.length})
           </button>
@@ -229,7 +306,13 @@ export const RhSignatureInboxPage = () => {
         ) : rows.length === 0 ? (
           <p className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[rgba(0,65,106,0.14)] p-8 text-center text-sm text-[var(--unilabor-neutral)]">
             <Inbox size={22} />
-            {tab === 'pending' ? 'No tienes firmas pendientes.' : 'Aún no has firmado registros.'}
+            {onBehalfOf
+              ? tab === 'pending'
+                ? 'Este firmante no tiene firmas pendientes.'
+                : 'Este firmante aún no tiene registros firmados.'
+              : tab === 'pending'
+                ? 'No tienes firmas pendientes.'
+                : 'Aún no has firmado registros.'}
           </p>
         ) : (
           <div className="space-y-2">
@@ -266,10 +349,10 @@ export const RhSignatureInboxPage = () => {
                         {entry.branch_name ? ` · ${entry.branch_name}` : ''}
                       </p>
                       <p className="text-[11px] leading-5 text-[var(--unilabor-neutral)]">
-                        Mi rol: <span className="font-semibold text-[var(--unilabor-ink)]">{entry.my_roles_label}</span>
+                        {onBehalfOf ? 'Su rol' : 'Mi rol'}: <span className="font-semibold text-[var(--unilabor-ink)]">{entry.my_roles_label}</span>
                         {tab === 'pending'
                           ? ` · enviado${entry.requested_by_name ? ` por ${entry.requested_by_name}` : ''} el ${formatDateTime(entry.requested_at)}`
-                          : ` · firmé el ${formatDateTime(entry.my_signed_at)}`}
+                          : ` · ${onBehalfOf ? 'firmado' : 'firmé'} el ${formatDateTime(entry.my_signed_at)}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -300,16 +383,17 @@ export const RhSignatureInboxPage = () => {
 
       <DrawerShell open={drawer !== null} title={drawerTitle} subtitle={drawerSubtitle} onClose={() => setDrawer(null)} widthClass="max-w-2xl" busy={signing}>
         {drawer?.mode === 'batch' ? (
-          <BatchSignPanel key={drawer.entries.map(keyOf).join(',')} entries={drawer.entries} onBusyChange={setSigning} onSigned={handleBatchSigned} />
+          <BatchSignPanel key={drawer.entries.map(keyOf).join(',')} entries={drawer.entries} onBusyChange={setSigning} onSigned={handleBatchSigned} onBehalfOf={onBehalfOf} />
         ) : drawer?.mode === 'one' ? (
           drawer.entry.kind === 'SUPERVISION' ? (
-            <SignatureInboxPanel key={keyOf(drawer.entry)} entry={drawer.entry} onBusyChange={setSigning} onSigned={handleSigned} />
+            <SignatureInboxPanel key={keyOf(drawer.entry)} entry={drawer.entry} onBusyChange={setSigning} onSigned={handleSigned} onBehalfOf={onBehalfOf} />
           ) : (
             <DocumentInboxPanel
               key={keyOf(drawer.entry)}
               entry={drawer.entry as SignatureInboxEntry & { kind: SignedDocumentKind }}
               onBusyChange={setSigning}
               onSigned={handleSigned}
+              onBehalfOf={onBehalfOf}
             />
           )
         ) : null}

@@ -315,6 +315,15 @@ export interface SignatureInboxSignOutcome {
   message: string;
 }
 
+/** Firmante con registros en espera de su firma (firma por imagen a su nombre). */
+export interface PendingSigner {
+  employee_id: number;
+  full_name: string;
+  employee_code: string;
+  is_active: boolean;
+  pending: number;
+}
+
 export interface SignatureInboxBatchResult {
   results: Array<SignatureInboxSignOutcome & { ok: boolean }>;
   signed: number;

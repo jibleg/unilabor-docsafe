@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, FileText, Loader2, PenLine } from 'lucide-react';
 import { getDocumentInboxDetail, getSignatureInboxPdfUrl, signFromInbox } from '../../../api/service.api-signature-inbox';
 import { getApiErrorMessage } from '../../../api/service.parsers';
-import type { DocumentInboxDetail, SignatureInboxEntry, SignatureInboxSignOutcome, SignedDocumentKind } from '../../../types/models';
+import type { DocumentInboxDetail, PendingSigner, SignatureInboxEntry, SignatureInboxSignOutcome, SignedDocumentKind } from '../../../types/models';
 import { DICTAMEN_UI } from '../../../utils/competency';
 import { notifyError, notifyWarning } from '../../../utils/notify';
 import { SignaturePad } from '../../helpdesk/SignaturePad';
@@ -13,6 +13,8 @@ interface DocumentInboxPanelProps {
   entry: SignatureInboxEntry & { kind: SignedDocumentKind };
   onBusyChange: (busy: boolean) => void;
   onSigned: (result: SignatureInboxSignOutcome) => void;
+  /** Firma por imagen a nombre de este firmante (el registro es de SU buzón). */
+  onBehalfOf?: PendingSigner | null;
 }
 
 const pct = (value: number | null | undefined) => (value === null || value === undefined ? '—' : `${value}%`);
@@ -80,7 +82,8 @@ const LetterSummary = ({ detail }: { detail: DocumentInboxDetail }) => {
  * quién ha firmado, el PDF y el pad para la firma propia. El rol con el que se
  * firma lo decide el servidor según la sesión.
  */
-export const DocumentInboxPanel = ({ entry, onBusyChange, onSigned }: DocumentInboxPanelProps) => {
+export const DocumentInboxPanel = ({ entry, onBusyChange, onSigned, onBehalfOf = null }: DocumentInboxPanelProps) => {
+  const behalfId = onBehalfOf?.employee_id ?? null;
   const [detail, setDetail] = useState<DocumentInboxDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -88,18 +91,18 @@ export const DocumentInboxPanel = ({ entry, onBusyChange, onSigned }: DocumentIn
 
   useEffect(() => {
     let alive = true;
-    getDocumentInboxDetail(entry.kind, entry.id)
+    getDocumentInboxDetail(entry.kind, entry.id, behalfId)
       .then((loaded) => alive && setDetail(loaded))
       .catch((error) => alive && setLoadError(getApiErrorMessage(error, 'No se pudo abrir el registro.')));
     return () => {
       alive = false;
     };
-  }, [entry.kind, entry.id]);
+  }, [entry.kind, entry.id, behalfId]);
 
   const openPdf = async () => {
     setBusy('pdf');
     try {
-      window.open(await getSignatureInboxPdfUrl(entry.kind, entry.id), '_blank', 'noopener');
+      window.open(await getSignatureInboxPdfUrl(entry.kind, entry.id, behalfId), '_blank', 'noopener');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo generar el PDF.'));
     } finally {
@@ -108,11 +111,11 @@ export const DocumentInboxPanel = ({ entry, onBusyChange, onSigned }: DocumentIn
   };
 
   const sign = async () => {
-    if (!signature) return notifyWarning('Traza tu firma.');
+    if (!signature) return notifyWarning(onBehalfOf ? 'Carga el archivo de la firma.' : 'Traza tu firma.');
     setBusy('sign');
     onBusyChange(true);
     try {
-      onSigned(await signFromInbox(entry.kind, entry.id, signature));
+      onSigned(await signFromInbox(entry.kind, entry.id, signature, behalfId));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo registrar tu firma.'));
     } finally {
@@ -160,9 +163,15 @@ export const DocumentInboxPanel = ({ entry, onBusyChange, onSigned }: DocumentIn
 
       {detail.has_pending ? (
         <section className="space-y-3 rounded-2xl border border-[rgba(0,65,106,0.1)] bg-[rgba(248,251,253,0.9)] p-4">
-          <SignaturePad label={`Tu firma · ${detail.pending_roles_label}`} hint="Firma con el dedo, lápiz o mouse, o carga una imagen de tu firma" onChange={setSignature} allowUpload />
+          <SignaturePad
+            label={`${onBehalfOf ? `Firma de ${onBehalfOf.full_name}` : 'Tu firma'} · ${detail.pending_roles_label}`}
+            hint={onBehalfOf ? 'Carga el archivo de su firma (PNG, JPG o BMP)' : 'Firma con el dedo, lápiz o mouse, o carga una imagen de tu firma'}
+            onChange={setSignature}
+            allowUpload
+            uploadOnly={onBehalfOf !== null}
+          />
           <p className="text-xs leading-5 text-[var(--unilabor-neutral)]">
-            Firmas como {detail.pending_roles_label}. Cuando estén todas las firmas el registro se cierra solo y se archiva en el expediente del colaborador.
+            {onBehalfOf ? `La firma quedará registrada como ${detail.pending_roles_label}, colocada por ti a su nombre.` : `Firmas como ${detail.pending_roles_label}.`} Cuando estén todas las firmas el registro se cierra solo y se archiva en el expediente del colaborador.
           </p>
           <div className="flex justify-end">
             <button type="button" onClick={() => void sign()} disabled={busy !== null} className={primaryButtonClass}>
@@ -174,7 +183,7 @@ export const DocumentInboxPanel = ({ entry, onBusyChange, onSigned }: DocumentIn
         <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-800">
           {closed
             ? 'Registro cerrado con todas sus firmas y archivado en el expediente del colaborador.'
-            : `Ya firmaste como ${detail.my_roles_label}; el registro se cerrará solo cuando firmen los demás.`}
+            : `${onBehalfOf ? 'Ya tiene su firma' : 'Ya firmaste'} como ${detail.my_roles_label}; el registro se cerrará solo cuando firmen los demás.`}
         </p>
       )}
     </div>

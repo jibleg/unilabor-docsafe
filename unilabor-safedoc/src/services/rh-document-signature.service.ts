@@ -243,6 +243,8 @@ export interface PlaceDocumentSignatureInput {
   employeeId: number;
   userId: string;
   png: Buffer;
+  /** La firma la coloca otra persona (userId) desde una imagen, a nombre de employeeId. */
+  onBehalf?: boolean;
 }
 
 export interface PlacedDocumentSignature {
@@ -253,7 +255,8 @@ export interface PlacedDocumentSignature {
 
 /**
  * El firmante coloca su firma. El rol NO lo elige el cliente: se deduce del
- * colaborador de la sesion (nadie firma por otro). Si ocupa varios roles la misma
+ * colaborador firmante (el de la sesion, o aquel a cuyo nombre firma quien tiene
+ * el permiso de firma por imagen: onBehalf). Si ocupa varios roles la misma
  * firma cubre todos, una fila por rol. El cierre lo intenta el llamador.
  */
 export const placeDocumentSignature = async (input: PlaceDocumentSignatureInput): Promise<PlacedDocumentSignature> => {
@@ -287,9 +290,9 @@ export const placeDocumentSignature = async (input: PlaceDocumentSignatureInput)
         written.push(signaturePath);
         await client.query(
           `INSERT INTO public.rh_document_signatures
-             (document_kind, document_id, signer_role, signer_employee_id, signer_user_id, signer_name, signature_path)
-           VALUES ($1, $2, $3, $4, $5, $6, $7);`,
-          [kind, id, role, input.employeeId, input.userId, signerName, signaturePath],
+             (document_kind, document_id, signer_role, signer_employee_id, signer_user_id, signer_name, signature_path, on_behalf)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+          [kind, id, role, input.employeeId, input.userId, signerName, signaturePath, input.onBehalf === true],
         );
       }
       return { signed_roles: toSign, pending_roles: pendingDocumentRoles(kind, [...signed, ...toSign]) };

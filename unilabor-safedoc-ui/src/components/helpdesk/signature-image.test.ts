@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { SIGNATURE_IMAGE_MAX_BYTES, fitInside, signatureImageIssue } from './signature-image';
 
 describe('firma desde imagen', () => {
-  it('solo acepta PNG o JPG, con contenido y hasta 5 MB', () => {
+  it('solo acepta PNG, JPG o BMP, con contenido y hasta 5 MB', () => {
     expect(signatureImageIssue({ type: 'image/png', size: 1000 })).toBeNull();
     expect(signatureImageIssue({ type: 'image/jpeg', size: 1000 })).toBeNull();
-    expect(signatureImageIssue({ type: 'application/pdf', size: 1000 })).toContain('PNG o JPG');
-    expect(signatureImageIssue({ type: 'image/svg+xml', size: 1000 })).toContain('PNG o JPG');
+    expect(signatureImageIssue({ type: 'image/bmp', size: 1000 })).toBeNull();
+    expect(signatureImageIssue({ type: 'image/x-ms-bmp', size: 1000 })).toBeNull();
+    expect(signatureImageIssue({ type: 'application/pdf', size: 1000 })).toContain('PNG, JPG o BMP');
+    expect(signatureImageIssue({ type: 'image/svg+xml', size: 1000 })).toContain('PNG, JPG o BMP');
     expect(signatureImageIssue({ type: 'image/png', size: 0 })).toContain('vacío');
     expect(signatureImageIssue({ type: 'image/png', size: SIGNATURE_IMAGE_MAX_BYTES + 1 })).toContain('5 MB');
   });

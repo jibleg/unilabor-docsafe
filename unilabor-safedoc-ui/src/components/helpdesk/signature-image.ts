@@ -1,13 +1,14 @@
 // Reglas puras para cargar la firma desde una imagen (sin DOM, testeables).
 
-export const SIGNATURE_IMAGE_ACCEPT = 'image/png,image/jpeg';
+export const SIGNATURE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/bmp,.png,.jpg,.jpeg,.bmp';
 export const SIGNATURE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg']);
+// BMP llega como image/bmp o image/x-ms-bmp segun el sistema.
+const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/bmp', 'image/x-ms-bmp']);
 
 /** Por que no se acepta el archivo como firma (null si sirve). */
 export const signatureImageIssue = (file: { type: string; size: number }): string | null => {
-  if (!ALLOWED_TYPES.has(file.type)) return 'La firma debe ser una imagen PNG o JPG.';
+  if (!ALLOWED_TYPES.has(file.type)) return 'La firma debe ser una imagen PNG, JPG o BMP.';
   if (file.size === 0) return 'El archivo está vacío.';
   if (file.size > SIGNATURE_IMAGE_MAX_BYTES) return 'La imagen pesa más de 5 MB.';
   return null;

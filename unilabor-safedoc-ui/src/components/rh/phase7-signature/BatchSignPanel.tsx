@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Loader2, PenLine } from 'lucide-react';
 import { batchSignFromInbox } from '../../../api/service.api-signature-inbox';
 import { getApiErrorMessage } from '../../../api/service.parsers';
-import type { SignatureInboxBatchResult, SignatureInboxEntry } from '../../../types/models';
+import type { PendingSigner, SignatureInboxBatchResult, SignatureInboxEntry } from '../../../types/models';
 import { notifyError, notifyWarning } from '../../../utils/notify';
 import { SignaturePad } from '../../helpdesk/SignaturePad';
 import { primaryButtonClass } from '../supervision/supervision-ui';
@@ -11,6 +11,8 @@ interface BatchSignPanelProps {
   entries: SignatureInboxEntry[];
   onBusyChange: (busy: boolean) => void;
   onSigned: (result: SignatureInboxBatchResult) => void;
+  /** Firma por imagen a nombre de este firmante (los registros son de SU buzón). */
+  onBehalfOf?: PendingSigner | null;
 }
 
 /**
@@ -18,18 +20,18 @@ interface BatchSignPanelProps {
  * su firma una sola vez; se aplica a cada uno por separado (cada firma queda en
  * la auditoría con su fecha). Si alguno ya no se puede firmar, los demás sí.
  */
-export const BatchSignPanel = ({ entries, onBusyChange, onSigned }: BatchSignPanelProps) => {
+export const BatchSignPanel = ({ entries, onBusyChange, onSigned, onBehalfOf = null }: BatchSignPanelProps) => {
   const [signature, setSignature] = useState<string | null>(null);
   const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const sign = async () => {
     if (!reviewed) return notifyWarning('Confirma que revisaste los registros seleccionados.');
-    if (!signature) return notifyWarning('Traza tu firma.');
+    if (!signature) return notifyWarning(onBehalfOf ? 'Carga el archivo de la firma.' : 'Traza tu firma.');
     setBusy(true);
     onBusyChange(true);
     try {
-      onSigned(await batchSignFromInbox(entries.map((entry) => ({ kind: entry.kind, id: entry.id })), signature));
+      onSigned(await batchSignFromInbox(entries.map((entry) => ({ kind: entry.kind, id: entry.id })), signature, onBehalfOf?.employee_id));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo registrar la firma en lote.'));
     } finally {
@@ -47,7 +49,7 @@ export const BatchSignPanel = ({ entries, onBusyChange, onSigned }: BatchSignPan
               {entry.employee_name} · <span className="text-[var(--color-brand-700)]">{entry.position_code}</span>
             </p>
             <p className="text-[11px] leading-5 text-[var(--unilabor-neutral)]">
-              {entry.form_code} {entry.title} · {entry.folio} · firmas como <span className="font-semibold text-[var(--unilabor-ink)]">{entry.pending_roles_label}</span>
+              {entry.form_code} {entry.title} · {entry.folio} · {onBehalfOf ? 'firma' : 'firmas'} como <span className="font-semibold text-[var(--unilabor-ink)]">{entry.pending_roles_label}</span>
             </p>
           </li>
         ))}
@@ -56,12 +58,19 @@ export const BatchSignPanel = ({ entries, onBusyChange, onSigned }: BatchSignPan
       <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
         <input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand-700)]" />
         <span>
-          Revisé los {entries.length} registros seleccionados y estoy de acuerdo con su contenido. Mi firma se colocará en cada uno, con el rol que tengo en
-          cada registro.
+          {onBehalfOf
+            ? `Revisé los ${entries.length} registros seleccionados. La firma de ${onBehalfOf.full_name} se colocará en cada uno, con el rol que tiene en cada registro, y quedará registrado que la coloqué yo.`
+            : `Revisé los ${entries.length} registros seleccionados y estoy de acuerdo con su contenido. Mi firma se colocará en cada uno, con el rol que tengo en cada registro.`}
         </span>
       </label>
 
-      <SignaturePad label="Tu firma" hint="Se aplicará a todos los registros seleccionados" onChange={setSignature} allowUpload />
+      <SignaturePad
+        label={onBehalfOf ? `Firma de ${onBehalfOf.full_name}` : 'Tu firma'}
+        hint={onBehalfOf ? 'Carga el archivo de su firma (PNG, JPG o BMP); se aplicará a todos los registros seleccionados' : 'Se aplicará a todos los registros seleccionados'}
+        onChange={setSignature}
+        allowUpload
+        uploadOnly={onBehalfOf !== null}
+      />
 
       <div className="flex justify-end">
         <button type="button" onClick={() => void sign()} disabled={busy} className={primaryButtonClass}>

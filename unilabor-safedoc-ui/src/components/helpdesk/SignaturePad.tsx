@@ -8,15 +8,18 @@ interface SignaturePadProps {
   hint?: string;
   // Devuelve el PNG (data URL) al terminar un trazo, o null al limpiar.
   onChange: (dataUrl: string | null) => void;
-  /** Permite cargar la firma desde una imagen (PNG / JPG) ademas de trazarla. */
+  /** Permite cargar la firma desde una imagen (PNG / JPG / BMP) ademas de trazarla. */
   allowUpload?: boolean;
+  /** La firma solo puede venir de un archivo de imagen: no se traza (firma a nombre de otro firmante). */
+  uploadOnly?: boolean;
 }
 
 // Lienzo de firma trazada (dedo / Apple Pencil / mouse). Exporta PNG con
 // canvas.toDataURL, mismo mecanismo que las etiquetas Code128. Con
 // `allowUpload` la firma tambien puede venir de una imagen: se dibuja en el
 // mismo lienzo y sale por el mismo camino (un PNG nuevo, sin metadatos).
-export const SignaturePad = ({ label, hint, onChange, allowUpload = false }: SignaturePadProps) => {
+export const SignaturePad = ({ label, hint, onChange, allowUpload = false, uploadOnly = false }: SignaturePadProps) => {
+  const canUpload = allowUpload || uploadOnly;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const drawing = useRef(false);
@@ -65,6 +68,11 @@ export const SignaturePad = ({ label, hint, onChange, allowUpload = false }: Sig
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.preventDefault();
+    if (uploadOnly) {
+      // Sin trazo: tocar el recuadro abre el selector de archivo.
+      fileRef.current?.click();
+      return;
+    }
     drawing.current = true;
     last.current = pointFromEvent(event);
     canvasRef.current?.setPointerCapture(event.pointerId);
@@ -138,7 +146,7 @@ export const SignaturePad = ({ label, hint, onChange, allowUpload = false }: Sig
       setHasContent(true);
       onChange(canvas.toDataURL('image/png'));
     } catch {
-      notifyError('No se pudo leer la imagen. Usa un archivo PNG o JPG.');
+      notifyError('No se pudo leer la imagen. Usa un archivo PNG, JPG o BMP.');
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -151,16 +159,16 @@ export const SignaturePad = ({ label, hint, onChange, allowUpload = false }: Sig
           <PenLine size={13} /> {label}
         </span>
         <span className="flex items-center gap-1.5">
-          {allowUpload ? (
+          {canUpload ? (
             <>
               <input ref={fileRef} type="file" accept={SIGNATURE_IMAGE_ACCEPT} onChange={(e) => void handleFile(e)} className="hidden" />
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                title="Cargar tu firma desde una imagen PNG o JPG (reemplaza lo trazado)"
+                title={uploadOnly ? 'Cargar la firma desde un archivo PNG, JPG o BMP' : 'Cargar tu firma desde una imagen PNG, JPG o BMP (reemplaza lo trazado)'}
                 className="inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)]"
               >
-                <ImageUp size={12} /> Imagen
+                <ImageUp size={12} /> {uploadOnly ? 'Cargar archivo' : 'Imagen'}
               </button>
             </>
           ) : null}
@@ -184,12 +192,12 @@ export const SignaturePad = ({ label, hint, onChange, allowUpload = false }: Sig
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
-          className="h-40 w-full touch-none rounded-xl"
+          className={`h-40 w-full touch-none rounded-xl ${uploadOnly ? 'cursor-pointer' : ''}`}
           style={{ touchAction: 'none' }}
         />
         {!hasContent ? (
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-[var(--unilabor-neutral)]">
-            {allowUpload ? 'Firme aquí o cargue una imagen' : 'Firme aquí'}
+            {uploadOnly ? 'Cargue el archivo de la firma (PNG, JPG o BMP)' : allowUpload ? 'Firme aquí o cargue una imagen' : 'Firme aquí'}
           </span>
         ) : null}
       </div>

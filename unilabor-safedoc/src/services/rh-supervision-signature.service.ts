@@ -332,6 +332,8 @@ export interface SignFromInboxInput {
   userId: string;
   employeeId: number;
   signature: string;
+  /** La firma la coloca otra persona (userId) desde una imagen, a nombre de employeeId. */
+  onBehalf?: boolean;
 }
 
 export interface SignFromInboxResult {
@@ -361,7 +363,8 @@ const unlinkQuietly = (paths: string[]): void => {
 
 /**
  * El firmante coloca su firma. El rol NO lo elige el cliente: se deduce del
- * colaborador de la sesion (nadie firma por otro). Si ocupa dos roles
+ * colaborador firmante (el de la sesion, o aquel a cuyo nombre firma quien tiene
+ * el permiso de firma por imagen: onBehalf). Si ocupa dos roles
  * (supervisor y responsable del area) la misma firma cubre ambos, una fila por
  * rol. Con la tercera firma se intenta el cierre automatico.
  */
@@ -417,9 +420,9 @@ export const signFromInbox = async (input: SignFromInboxInput): Promise<SignFrom
         written.push(signaturePath);
         await client.query(
           `INSERT INTO public.rh_supervision_checklist_signatures
-             (checklist_id, signer_role, signer_employee_id, signer_user_id, signer_name, signature_path)
-           VALUES ($1, $2, $3, $4, $5, $6);`,
-          [input.id, role, input.employeeId, input.userId, String(row.signer_name ?? ''), signaturePath],
+             (checklist_id, signer_role, signer_employee_id, signer_user_id, signer_name, signature_path, on_behalf)
+           VALUES ($1, $2, $3, $4, $5, $6, $7);`,
+          [input.id, role, input.employeeId, input.userId, String(row.signer_name ?? ''), signaturePath, input.onBehalf === true],
         );
       }
       return toSign;

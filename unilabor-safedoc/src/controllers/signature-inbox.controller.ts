@@ -6,6 +6,9 @@ import { tryIssueCompetencyCertificate } from '../services/rh-competency-certifi
 import { closeFullySignedEvaluation, renderCompetencyEvaluationPdf } from '../services/rh-competency-signature.service';
 import { DOCUMENT_FORM_CODES, describeDocumentRoles, type SignedDocumentKind } from '../services/rh-document-signature.rules';
 import { placeDocumentSignature } from '../services/rh-document-signature.service';
+import { getUserPermissionCodes } from '../services/permission.service';
+import { SIGN_ON_BEHALF_PERMISSION, findSignerName, listPendingSigners } from '../services/signature-inbox-on-behalf.service';
+import { resolveEmployeeIdForUser } from '../services/rh-supervision-signers.service';
 import { renderSupervisionChecklistPdf } from '../services/rh-supervision-checklist-close.service';
 import { describeRoles } from '../services/rh-supervision-signature.rules';
 import { getSignatureInboxDetail, signFromInbox } from '../services/rh-supervision-signature.service';
@@ -25,11 +28,18 @@ import { audit as auditSupervision, closedAuditMetadata, closedMessage, fail as 
  * Buzon de firmas: cada firmante coloca su firma desde su propia sesion en el
  * ANA-REG-060 (Fase 6), el REH-REG-003 y el REH-REG-008 (Fase 7). Solo requiere
  * sesion; cada endpoint comprueba que el colaborador de la sesion sea firmante
- * de ESE registro. Nadie firma por otro: el rol no viaja en la peticion, se
- * deduce de la sesion. Montado en /api/my/signature-inbox.
+ * de ESE registro. El rol no viaja en la peticion: se deduce del firmante.
+ *
+ * Firma por imagen a nombre del firmante: con ?on_behalf_of=<colaborador> y el
+ * permiso RH.SIGNATURE_INBOX.SIGN_ON_BEHALF, los mismos endpoints operan sobre el
+ * buzon de ese colaborador (RH resguarda las firmas del personal en archivos de
+ * imagen). La firma queda marcada on_behalf y auditada con quien la coloco.
+ * Montado en /api/my/signature-inbox.
  */
 
 const ERROR_STATUS: Record<string, number> = {
+  RH_SIGNATURE_ON_BEHALF_FORBIDDEN: 403,
+  RH_SIGNATURE_ON_BEHALF_NOT_FOUND: 404,
   RH_DOC_SIGNATURE_NOT_FOUND: 404,
   RH_DOC_SIGNATURE_NOT_YOURS: 403,
   RH_DOC_SIGNATURE_CLOSED: 409,
@@ -75,6 +85,56 @@ const auditDocument = async (req: AuthRequest, kind: SignedDocumentKind, action:
   }).catch((error) => console.error(`Auditoria ${DOCUMENT_FORM_CODES[kind]}:`, error));
 };
 
+/** De quien es el buzon sobre el que opera la peticion. */
+interface InboxSigner {
+  employeeId: number;
+  /** La sesion firma a nombre de otro colaborador (permiso de firma por imagen). */
+  onBehalf: boolean;
+  name: string;
+}
+
+const inboxSigner = async (req: AuthRequest): Promise<InboxSigner> => {
+  const raw = req.query.on_behalf_of;
+  if (raw === undefined || raw === '') return { employeeId: await myEmployeeId(req), onBehalf: false, name: '' };
+  const employeeId = parseId(raw);
+  if (!employeeId) throw coded('RH_DOC_SIGNATURE_INVALID', 'Firmante invalido.');
+  const userId = req.user?.id;
+  if (!userId || !(await getUserPermissionCodes(userId)).has(SIGN_ON_BEHALF_PERMISSION)) {
+    throw coded('RH_SIGNATURE_ON_BEHALF_FORBIDDEN', 'No tienes permiso para firmar a nombre de otro firmante.');
+  }
+  // Su propio buzon no es "a nombre de otro", aunque llegue con el parametro.
+  if ((await resolveEmployeeIdForUser(userId)) === employeeId) return { employeeId, onBehalf: false, name: '' };
+  const name = await findSignerName(employeeId);
+  if (name === null) throw coded('RH_SIGNATURE_ON_BEHALF_NOT_FOUND', 'El firmante no existe.');
+  return { employeeId, onBehalf: true, name };
+};
+
+/** Rastro de auditoria de una firma colocada a nombre de otro. */
+const onBehalfAudit = (signer: InboxSigner): Record<string, unknown> =>
+  signer.onBehalf ? { on_behalf: true, on_behalf_of_employee_id: signer.employeeId, on_behalf_of_name: signer.name } : {};
+
+/** "Firmaste como X" o, a nombre de otro, "Se colocó la firma de N como X". */
+const signedAsText = (signer: InboxSigner, signedAs: string): string =>
+  signer.onBehalf ? `Se colocó la firma de ${signer.name} como ${signedAs}` : `Firmaste como ${signedAs}`;
+
+/** Los mensajes de las reglas hablan en segunda persona; a nombre de otro se dicen del firmante. */
+const forSigner = (signer: InboxSigner, message: string): string =>
+  signer.onBehalf
+    ? message
+        .replace(/^Ya firmaste (este|esta) /, `${signer.name} ya firmo $1 `)
+        .replace('no esta en tu buzon de firmas', `no esta en el buzon de firmas de ${signer.name}`)
+        .replace('Volvera a tu buzon', 'Volvera a su buzon')
+    : message;
+
+/** Reescribe el mensaje publico de un error para la firma a nombre de otro. */
+const failForSigner = (res: Response, signer: InboxSigner | null, error: any, logLabel: string, fallback: string): Response => {
+  if (signer && error?.publicMessage) error.publicMessage = forSigner(signer, String(error.publicMessage));
+  return fail(res, error, logLabel, fallback);
+};
+
+const missingSignature = (signer: InboxSigner) =>
+  coded('RH_DOC_SIGNATURE_INVALID', signer.onBehalf ? 'Carga la imagen de la firma.' : 'Traza tu firma para firmar.');
+
 const parseTarget = (req: AuthRequest): { kind: InboxKind; id: number } | null => {
   const kind = String(req.params.kind ?? '').toUpperCase();
   const id = parseId(req.params.id);
@@ -84,7 +144,7 @@ const parseTarget = (req: AuthRequest): { kind: InboxKind; id: number } | null =
 /** GET /my/signature-inbox */
 export const listSignatureInboxController = async (req: AuthRequest, res: Response) => {
   try {
-    return res.json(await listUnifiedInbox(await myEmployeeId(req)));
+    return res.json(await listUnifiedInbox((await inboxSigner(req)).employeeId));
   } catch (error) {
     return fail(res, error, 'Error listando el buzon de firmas', 'No se pudo cargar tu buzon de firmas.');
   }
@@ -100,12 +160,21 @@ export const countSignatureInboxController = async (req: AuthRequest, res: Respo
   }
 };
 
+/** GET /my/signature-inbox/signers  (permiso de firma por imagen: firmantes con registros en espera) */
+export const listPendingSignersController = async (_req: AuthRequest, res: Response) => {
+  try {
+    return res.json({ signers: await listPendingSigners() });
+  } catch (error) {
+    return fail(res, error, 'Error listando firmantes con pendientes', 'No se pudieron cargar los firmantes con firmas pendientes.');
+  }
+};
+
 /** GET /my/signature-inbox/:kind/:id */
 export const getSignatureInboxDetailController = async (req: AuthRequest, res: Response) => {
   const target = parseTarget(req);
   if (!target) return res.status(400).json({ message: 'Registro invalido.' });
   try {
-    const employeeId = await myEmployeeId(req);
+    const { employeeId } = await inboxSigner(req);
     if (target.kind === 'SUPERVISION') {
       return res.json({ kind: target.kind, supervision: await getSignatureInboxDetail(target.id, employeeId) });
     }
@@ -120,7 +189,7 @@ export const getSignatureInboxPdfController = async (req: AuthRequest, res: Resp
   const target = parseTarget(req);
   if (!target) return res.status(400).json({ message: 'Registro invalido.' });
   try {
-    const employeeId = await myEmployeeId(req);
+    const { employeeId } = await inboxSigner(req);
     let folio: string;
     let pdf: Buffer;
     if (target.kind === 'SUPERVISION') {
@@ -160,16 +229,17 @@ export interface InboxSignOutcome {
   message: string;
 }
 
-const signSupervision = async (req: AuthRequest, id: number, employeeId: number, signature: string, batch: boolean): Promise<InboxSignOutcome> => {
-  const result = await signFromInbox({ id, userId: req.user!.id, employeeId, signature });
+const signSupervision = async (req: AuthRequest, id: number, signer: InboxSigner, signature: string, batch: boolean): Promise<InboxSignOutcome> => {
+  const result = await signFromInbox({ id, userId: req.user!.id, employeeId: signer.employeeId, signature, onBehalf: signer.onBehalf });
   const { checklist } = result;
   await auditSupervision(req, `RH_SUPERVISION_SIGNED:${id}`, id, checklist.employee_id, {
     roles: result.signed_roles,
     pending_roles: result.pending_roles,
     enrollment_id: checklist.enrollment_id,
     batch,
+    ...onBehalfAudit(signer),
   });
-  const signedAs = describeRoles(result.signed_roles);
+  const signedAs = signedAsText(signer, describeRoles(result.signed_roles));
   let message: string;
   let warning = false;
   if (result.closed) {
@@ -179,13 +249,13 @@ const signSupervision = async (req: AuthRequest, id: number, employeeId: number,
       await auditSupervision(req, `RH_SUPERVISION_CLOSED:${id}`, id, checklist.employee_id, { ...closedAuditMetadata(closed), closed_via: 'last_signature' });
     }
     warning = result.practical !== null && !result.practical.captured;
-    message = `Firmaste como ${signedAs}. Con las tres firmas reunidas: ${closedMessage(closed)}`;
+    message = `${signedAs}. Con las tres firmas reunidas: ${closedMessage(closed)}`;
   } else if (result.close_error) {
     await auditSupervision(req, `RH_SUPERVISION_AUTO_CLOSE_FAILED:${id}`, id, checklist.employee_id, { reason: result.close_error });
     warning = true;
-    message = `Firmaste como ${signedAs}. Ya estan las tres firmas, pero la lista no pudo cerrarse sola: ${result.close_error} Recursos Humanos debe reintentar el cierre.`;
+    message = `${signedAs}. Ya estan las tres firmas, pero la lista no pudo cerrarse sola: ${result.close_error} Recursos Humanos debe reintentar el cierre.`;
   } else {
-    message = `Firmaste como ${signedAs} la lista ${checklist.folio}. Falta la firma de ${describeRoles(result.pending_roles)}.`;
+    message = `${signedAs} la lista ${checklist.folio}. Falta la firma de ${describeRoles(result.pending_roles)}.`;
   }
   return { kind: 'SUPERVISION', id, folio: checklist.folio, employee_name: checklist.employee_name, closed: result.closed, warning, message };
 };
@@ -223,17 +293,18 @@ const tryCloseDocument = async (
   }
 };
 
-const signDocument = async (req: AuthRequest, kind: SignedDocumentKind, id: number, employeeId: number, png: Buffer, batch: boolean): Promise<InboxSignOutcome> => {
-  const detail = await getDocumentInboxDetail(kind, id, employeeId);
+const signDocument = async (req: AuthRequest, kind: SignedDocumentKind, id: number, signer: InboxSigner, png: Buffer, batch: boolean): Promise<InboxSignOutcome> => {
+  const detail = await getDocumentInboxDetail(kind, id, signer.employeeId);
   const record = detail.evaluation ?? detail.letter!;
   const folio = detail.letter?.folio ?? `${DOCUMENT_FORM_CODES[kind]}-${String(id).padStart(5, '0')}`;
-  const placed = await placeDocumentSignature({ kind, id, employeeId, userId: req.user!.id, png });
+  const placed = await placeDocumentSignature({ kind, id, employeeId: signer.employeeId, userId: req.user!.id, png, onBehalf: signer.onBehalf });
   await auditDocument(req, kind, `RH_DOC_SIGNED:${kind}:${id}`, id, record.employee_id, {
     roles: placed.signed_roles,
     pending_roles: placed.pending_roles,
     batch,
+    ...onBehalfAudit(signer),
   });
-  const signedAs = describeDocumentRoles(placed.signed_roles);
+  const signedAs = signedAsText(signer, describeDocumentRoles(placed.signed_roles));
   if (placed.pending_roles.length > 0) {
     return {
       kind,
@@ -242,7 +313,7 @@ const signDocument = async (req: AuthRequest, kind: SignedDocumentKind, id: numb
       employee_name: record.employee_name,
       closed: false,
       warning: false,
-      message: `Firmaste como ${signedAs} el ${folio}. Falta la firma de ${describeDocumentRoles(placed.pending_roles)}.`,
+      message: `${signedAs} el ${folio}. Falta la firma de ${describeDocumentRoles(placed.pending_roles)}.`,
     };
   }
   const closing = await tryCloseDocument(req, kind, id);
@@ -254,13 +325,13 @@ const signDocument = async (req: AuthRequest, kind: SignedDocumentKind, id: numb
     closed: closing.closed,
     warning: Boolean(closing.error),
     message: closing.error
-      ? `Firmaste como ${signedAs}. Ya estan todas las firmas, pero el ${DOCUMENT_FORM_CODES[kind]} no pudo cerrarse solo: ${closing.error} Recursos Humanos debe revisarlo.`
-      : `Firmaste como ${signedAs}. Con todas las firmas reunidas: ${closing.note || 'el registro quedo cerrado.'}`,
+      ? `${signedAs}. Ya estan todas las firmas, pero el ${DOCUMENT_FORM_CODES[kind]} no pudo cerrarse solo: ${closing.error} Recursos Humanos debe revisarlo.`
+      : `${signedAs}. Con todas las firmas reunidas: ${closing.note || 'el registro quedo cerrado.'}`,
   };
 };
 
-const signOne = async (req: AuthRequest, kind: InboxKind, id: number, employeeId: number, signature: string, png: Buffer, batch: boolean) =>
-  kind === 'SUPERVISION' ? signSupervision(req, id, employeeId, signature, batch) : signDocument(req, kind, id, employeeId, png, batch);
+const signOne = async (req: AuthRequest, kind: InboxKind, id: number, signer: InboxSigner, signature: string, png: Buffer, batch: boolean) =>
+  kind === 'SUPERVISION' ? signSupervision(req, id, signer, signature, batch) : signDocument(req, kind, id, signer, png, batch);
 
 /** POST /my/signature-inbox/:kind/:id/sign {signature} */
 export const signFromInboxController = async (req: AuthRequest, res: Response) => {
@@ -268,13 +339,15 @@ export const signFromInboxController = async (req: AuthRequest, res: Response) =
   if (!target) return res.status(400).json({ message: 'Registro invalido.' });
   if (!req.user?.id) return res.status(401).json({ message: 'Sesion invalida o expirada' });
   const { signature } = req.body as SignatureInboxSignBody;
+  let signer: InboxSigner | null = null;
   try {
+    signer = await inboxSigner(req);
     const png = decodeSignaturePng(signature);
-    if (!png) throw coded('RH_DOC_SIGNATURE_INVALID', 'Traza tu firma para firmar.');
-    const outcome = await signOne(req, target.kind, target.id, await myEmployeeId(req), signature, png, false);
+    if (!png) throw missingSignature(signer);
+    const outcome = await signOne(req, target.kind, target.id, signer, signature, png, false);
     return res.status(201).json(outcome);
   } catch (error) {
-    return fail(res, error, 'Error firmando desde el buzon de firmas', 'No se pudo registrar tu firma.');
+    return failForSigner(res, signer, error, 'Error firmando desde el buzon de firmas', 'No se pudo registrar la firma.');
   }
 };
 
@@ -289,9 +362,9 @@ export const batchSignFromInboxController = async (req: AuthRequest, res: Respon
   if (!req.user?.id) return res.status(401).json({ message: 'Sesion invalida o expirada' });
   const body = req.body as SignatureInboxBatchSignBody;
   try {
+    const signer = await inboxSigner(req);
     const png = decodeSignaturePng(body.signature);
-    if (!png) throw coded('RH_DOC_SIGNATURE_INVALID', 'Traza tu firma para firmar.');
-    const employeeId = await myEmployeeId(req);
+    if (!png) throw missingSignature(signer);
     const seen = new Set<string>();
     const results: Array<InboxSignOutcome & { ok: boolean }> = [];
     for (const item of body.items) {
@@ -299,7 +372,7 @@ export const batchSignFromInboxController = async (req: AuthRequest, res: Respon
       if (seen.has(key)) continue;
       seen.add(key);
       try {
-        results.push({ ...(await signOne(req, item.kind, item.id, employeeId, body.signature, png, true)), ok: true });
+        results.push({ ...(await signOne(req, item.kind, item.id, signer, body.signature, png, true)), ok: true });
       } catch (error: any) {
         if (!error?.publicMessage) console.error(`Firma en lote ${key}:`, error);
         results.push({
@@ -310,7 +383,7 @@ export const batchSignFromInboxController = async (req: AuthRequest, res: Respon
           closed: false,
           warning: true,
           ok: false,
-          message: publicMessageOf(error, 'No se pudo registrar la firma.'),
+          message: forSigner(signer, publicMessageOf(error, 'No se pudo registrar la firma.')),
         });
       }
     }
@@ -318,7 +391,7 @@ export const batchSignFromInboxController = async (req: AuthRequest, res: Respon
     const closed = results.filter((result) => result.closed).length;
     const failed = results.length - signed;
     const message =
-      `Firmaste ${signed} de ${results.length} registro(s)` +
+      `${signer.onBehalf ? `Se colocó la firma de ${signer.name} en` : 'Firmaste'} ${signed} de ${results.length} registro(s)` +
       (closed > 0 ? `; ${closed} quedaron cerrados con todas sus firmas` : '') +
       (failed > 0 ? `. ${failed} no se pudieron firmar: revisa el detalle.` : '.');
     return res.status(201).json({ results, signed, closed, failed, message });
