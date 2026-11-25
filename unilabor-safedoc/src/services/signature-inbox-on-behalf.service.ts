@@ -30,6 +30,7 @@ const PENDING_SLOTS = `
                               ('AREA_RESPONSIBLE', c.area_responsible_employee_id),
                               ('EMPLOYEE', c.employee_id)) AS slot(role, employee_id)
    WHERE c.status = 'PENDING_SIGNATURES' AND slot.employee_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM public.employees own WHERE own.id = c.employee_id AND own.is_active = TRUE)
      AND NOT EXISTS (SELECT 1 FROM public.rh_supervision_checklist_signatures sg
                       WHERE sg.checklist_id = c.id AND sg.invalidated_at IS NULL AND sg.signer_role = slot.role)
   UNION ALL
@@ -41,6 +42,7 @@ const PENDING_SLOTS = `
                               ('RH', d.rh_signatory_employee_id),
                               ('DIRECTOR', d.director_signatory_employee_id)) AS slot(role, employee_id)
    WHERE d.status = 'DRAFT' AND d.signature_requested_at IS NOT NULL AND slot.employee_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM public.employees own WHERE own.id = d.employee_id AND own.is_active = TRUE)
      AND NOT EXISTS (SELECT 1 FROM public.rh_document_signatures s
                       WHERE s.document_kind = 'COMPETENCY_EVALUATION' AND s.document_id = d.id
                         AND s.invalidated_at IS NULL AND s.signer_role = slot.role)
@@ -51,6 +53,7 @@ const PENDING_SLOTS = `
                               ('AREA', d.area_signatory_employee_id),
                               ('DIRECTOR', d.director_signatory_employee_id)) AS slot(role, employee_id)
    WHERE d.status = 'DRAFT' AND d.signature_requested_at IS NOT NULL AND slot.employee_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM public.employees own WHERE own.id = d.employee_id AND own.is_active = TRUE)
      AND NOT EXISTS (SELECT 1 FROM public.rh_document_signatures s
                       WHERE s.document_kind = 'ASSIGNMENT_LETTER' AND s.document_id = d.id
                         AND s.invalidated_at IS NULL AND s.signer_role = slot.role)`;

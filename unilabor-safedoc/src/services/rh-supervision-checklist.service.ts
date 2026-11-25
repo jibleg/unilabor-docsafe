@@ -674,6 +674,8 @@ export const listSupervisionChecklists = async (query: SupervisionChecklistQuery
   };
   if (query.status) add('c.status = ?', query.status);
   if (query.employeeId) add('c.employee_id = ?', query.employeeId);
+  // Sin pedir a un colaborador en particular, los dados de baja no se listan.
+  else clauses.push('emp.is_active = TRUE');
   if (query.supervisorEmployeeId) add('c.supervisor_employee_id = ?', query.supervisorEmployeeId);
   if (query.positionId) add('c.position_id = ?', query.positionId);
   if (query.enrollmentId) add('c.enrollment_id = ?', query.enrollmentId);

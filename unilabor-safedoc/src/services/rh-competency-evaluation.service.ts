@@ -471,7 +471,8 @@ export const listEvaluations = async (
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
   const search = buildIlikeSearch(['e.full_name', 'e.employee_code', 'p.name'], options.search, 0);
-  const conditions = [search.clause].filter(Boolean);
+  // Los colaboradores dados de baja no se listan (su evaluacion se sigue consultando por id).
+  const conditions = [search.clause, 'e.is_active = TRUE'].filter(Boolean);
   const values: unknown[] = [...search.values];
   if (options.status) {
     values.push(options.status);

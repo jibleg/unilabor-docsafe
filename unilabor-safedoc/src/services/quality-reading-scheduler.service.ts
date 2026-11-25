@@ -53,7 +53,9 @@ export const findReadingsDueForReminder = async (
         -- Lecturas de Induccion: el colaborador solo recibe el aviso de inicio de fase.
         AND NOT EXISTS (
           SELECT 1 FROM public.rh_induction_reading_items ri WHERE ri.acknowledgement_id = a.id
-        );`,
+        )
+        -- A una cuenta o colaborador dado de baja no se le recuerda nada.
+        AND u.is_active = TRUE AND COALESCE(e.is_active, TRUE);`,
     [now.toISOString(), REMINDER_WINDOW_HOURS],
   );
 

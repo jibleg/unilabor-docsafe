@@ -443,7 +443,7 @@ const healPhaseEnrollments = async (phaseId: number): Promise<void> => {
 
 export const loadPhaseRosterRows = async (phaseId: number): Promise<InductionRosterRow[]> => {
   await healPhaseEnrollments(phaseId);
-  const result = await pool.query(`${ROSTER_SELECT} WHERE e.phase_id = $1 AND e.queue_status = 'ACTIVE' ORDER BY emp.full_name ASC, e.position_sequence ASC NULLS FIRST;`, [phaseId]);
+  const result = await pool.query(`${ROSTER_SELECT} WHERE e.phase_id = $1 AND e.queue_status = 'ACTIVE' AND emp.is_active = TRUE ORDER BY emp.full_name ASC, e.position_sequence ASC NULLS FIRST;`, [phaseId]);
   const now = new Date();
   return result.rows.map((row) => mapRosterRow(row, now));
 };
@@ -461,7 +461,7 @@ export const loadEmployeeRosterRows = async (employeeId: number): Promise<Induct
 /** Todas las inscripciones del programa (Fases 1-6) para el directorio por colaborador. */
 export const loadProgramRosterRows = async (): Promise<InductionRosterRow[]> => {
   const result = await pool.query(
-    `${ROSTER_SELECT} WHERE p.phase_number <= ${ROSTER_LAST_PHASE} AND e.queue_status = 'ACTIVE'
+    `${ROSTER_SELECT} WHERE p.phase_number <= ${ROSTER_LAST_PHASE} AND e.queue_status = 'ACTIVE' AND emp.is_active = TRUE
       ORDER BY emp.full_name ASC, p.phase_number ASC, e.position_sequence ASC NULLS FIRST;`,
   );
   const now = new Date();

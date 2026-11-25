@@ -201,6 +201,9 @@ const buildSourceQuery = (
   if (filters.employee_id) {
     params.push(filters.employee_id);
     conditions.push(`a.employee_id = $${params.length}`);
+  } else {
+    // Sin pedir a un colaborador en particular, los dados de baja no se listan.
+    conditions.push('COALESCE(e.is_active, TRUE)');
   }
   if (source === 'institutional' && filters.institutional_document_id) {
     params.push(filters.institutional_document_id);

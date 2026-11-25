@@ -391,7 +391,7 @@ export const listReaders = async (publicationId: number): Promise<ReadingRecord[
 
   const result = await pool.query(
     `${READING_SELECT}
-      WHERE a.publication_id = $1
+      WHERE a.publication_id = $1 AND COALESCE(e.is_active, TRUE)
       ORDER BY u.full_name ASC;`,
     [publicationId],
   );

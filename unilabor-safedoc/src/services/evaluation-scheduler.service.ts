@@ -55,6 +55,11 @@ export const processReminders = async (now: Date = new Date()): Promise<number> 
           SELECT 1 FROM public.rh_induction_enrollments ie
            WHERE ie.evaluation_assignment_id = evaluation_assignments.id
         )
+        -- A un colaborador dado de baja no se le recuerda nada.
+        AND EXISTS (
+          SELECT 1 FROM public.employees emp
+           WHERE emp.id = evaluation_assignments.employee_id AND emp.is_active = TRUE
+        )
       RETURNING id;`,
     [iso, ACTIONABLE_STATUSES, REMINDER_WINDOW_HOURS],
   );

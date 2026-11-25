@@ -43,7 +43,7 @@ const GRADING_QUEUE_QUERY = `
   JOIN public.evaluation_templates t ON t.id = a.template_id
   JOIN public.training_courses c ON c.id = t.training_course_id
   JOIN public.employees e ON e.id = a.employee_id
-  WHERE a.status = 'grading'
+  WHERE a.status = 'grading' AND e.is_active = TRUE
 `;
 
 const mapRow = (row: any): EvaluationAssignmentRecord => ({
@@ -87,7 +87,9 @@ export const listGradingQueue = async (
     return buildPaginatedResult(data, data.length, 1, data.length || 1);
   }
   const countResult = await pool.query(
-    `SELECT COUNT(*)::int AS total FROM public.evaluation_assignments a WHERE a.status = 'grading';`,
+    `SELECT COUNT(*)::int AS total FROM public.evaluation_assignments a
+       JOIN public.employees e ON e.id = a.employee_id
+      WHERE a.status = 'grading' AND e.is_active = TRUE;`,
   );
   return buildPaginatedResult(data, countResult.rows[0]?.total, page, limit);
 };

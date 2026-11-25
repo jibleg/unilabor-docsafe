@@ -222,7 +222,8 @@ export interface AssignmentLetterListRow extends Omit<AssignmentLetterRecord, 'i
 export const listAssignmentLetters = async (query: { status?: AssignmentLetterStatus | undefined; search?: string | undefined }): Promise<AssignmentLetterListRow[]> => {
   const params: unknown[] = [];
   // Las cartas sustituidas por una nueva no se listan.
-  const clauses: string[] = ['l.superseded_by_letter_id IS NULL'];
+  // Tampoco las de colaboradores dados de baja.
+  const clauses: string[] = ['l.superseded_by_letter_id IS NULL', 'emp.is_active = TRUE'];
   if (query.status) {
     params.push(query.status);
     clauses.push(`l.status = $${params.length}`);

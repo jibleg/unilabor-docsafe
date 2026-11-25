@@ -291,6 +291,7 @@ const queryDays = async (
         AND ($3::text IS NULL OR dr.day_result = $3)
         AND ($4::bigint IS NULL OR COALESCE(dr.branch_id, e.branch_id) = $4)
         AND ($5::bigint IS NULL OR dr.employee_id = $5)
+        AND ($5::bigint IS NOT NULL OR e.is_active = TRUE)
         AND (NOT $8::boolean OR dr.overtime_hours > 0)
       ORDER BY dr.work_date, e.full_name
       LIMIT $6`,

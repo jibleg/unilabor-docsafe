@@ -1366,7 +1366,7 @@ export const listPhaseEnrollments = async (phaseId: number): Promise<RhInduction
       LEFT JOIN public.evaluation_assignments ea ON ea.id = e.evaluation_assignment_id
       LEFT JOIN public.employees sup ON sup.id = e.supervisor_employee_id
       LEFT JOIN public.rh_positions rp ON rp.id = e.position_id
-     WHERE e.phase_id = $1 AND e.queue_status <> 'CANCELLED'
+     WHERE e.phase_id = $1 AND e.queue_status <> 'CANCELLED' AND emp.is_active = TRUE
      ORDER BY emp.full_name ASC, e.position_sequence ASC NULLS FIRST;`,
     [phaseId],
   );

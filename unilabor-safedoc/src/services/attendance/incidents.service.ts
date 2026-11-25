@@ -126,6 +126,8 @@ export const listIncidents = async (filter: ListIncidentsFilter) => {
   if (filter.from) add('i.end_date >= ?::date', filter.from);
   if (filter.to) add('i.start_date <= ?::date', filter.to);
   if (filter.employee_id) add('i.employee_id = ?', filter.employee_id);
+  // Sin pedir a un colaborador en particular, los dados de baja no se listan.
+  else where.push('e.is_active = TRUE');
   if (filter.branch_id) add('e.branch_id = ?', filter.branch_id);
   if (filter.type_id) add('i.incident_type_id = ?', filter.type_id);
   if (filter.status) add('i.incident_status = ?', filter.status);

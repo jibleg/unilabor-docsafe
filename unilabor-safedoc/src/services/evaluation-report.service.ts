@@ -200,6 +200,9 @@ export const getTraceabilityReport = async (
   if (filters.employee_id) {
     values.push(filters.employee_id);
     conditions.push(`a.employee_id = $${values.length}`);
+  } else {
+    // Sin pedir a un colaborador en particular, los dados de baja no se listan.
+    conditions.push('e.is_active = TRUE');
   }
   const statusCondition = buildStatusCondition(filters.statuses, values);
   if (statusCondition) {
@@ -250,6 +253,7 @@ export const getTraceabilityReport = async (
        FROM public.evaluation_assignments a
        JOIN public.evaluation_templates t ON t.id = a.template_id
        JOIN public.training_courses c ON c.id = t.training_course_id
+       JOIN public.employees e ON e.id = a.employee_id
        ${whereClause};`,
     values,
   );

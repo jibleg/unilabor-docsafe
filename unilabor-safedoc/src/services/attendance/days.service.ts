@@ -38,6 +38,8 @@ export const listDays = async (query: DaysQuery) => {
 
   if (query.branch_id) where.push(`d.branch_id = ${push(query.branch_id)}`);
   if (query.employee_id) where.push(`d.employee_id = ${push(query.employee_id)}`);
+  // Sin pedir a un colaborador en particular, los dados de baja no se listan.
+  else where.push('e.is_active = TRUE');
   if (query.result.length > 0) where.push(`d.day_result = ANY(${push(query.result)}::text[])`);
   if (query.search) {
     const term = push(`%${query.search}%`);

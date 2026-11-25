@@ -91,6 +91,9 @@ export const listPunches = async (query: PunchesQuery) => {
   };
   if (query.branch_id) where.push(`p.branch_id = ${push(query.branch_id)}`);
   if (query.employee_id) where.push(`p.employee_id = ${push(query.employee_id)}`);
+  // Sin pedir a un colaborador en particular, los dados de baja no se listan
+  // (las checadas sin colaborador identificado si: hay que revisarlas).
+  else where.push('COALESCE(e.is_active, TRUE)');
   if (query.source) where.push(`p.source = ${push(query.source)}`);
   if (query.only_review) where.push(`p.review_status = 'pending'`);
   else if (query.review_status) where.push(`p.review_status = ${push(query.review_status)}`);

@@ -143,7 +143,8 @@ const documentSelect = (kind: SignedDocumentKind): string => {
            (SELECT max(s.signed_at) FROM public.rh_document_signatures s
              WHERE s.document_kind = '${kind}' AND s.document_id = d.id AND s.invalidated_at IS NULL AND s.signer_employee_id = $1) AS my_signed_at
       FROM ${source.from}
-      JOIN public.employees emp ON emp.id = d.employee_id
+      -- El buzon no muestra registros de colaboradores dados de baja.
+      JOIN public.employees emp ON emp.id = d.employee_id AND emp.is_active = TRUE
       JOIN public.rh_positions rp ON rp.id = d.position_id
       LEFT JOIN public.users sr ON sr.id = d.signature_requested_by_user_id`;
 };

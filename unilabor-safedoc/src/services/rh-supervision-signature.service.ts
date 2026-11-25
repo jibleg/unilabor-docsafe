@@ -231,7 +231,8 @@ const INBOX_SELECT = `
          (SELECT max(sg.signed_at) FROM public.rh_supervision_checklist_signatures sg
            WHERE sg.checklist_id = c.id AND sg.invalidated_at IS NULL AND sg.signer_employee_id = $1) AS my_signed_at
     FROM public.rh_supervision_checklists c
-    JOIN public.employees emp ON emp.id = c.employee_id
+    -- El buzon no muestra registros de colaboradores dados de baja.
+    JOIN public.employees emp ON emp.id = c.employee_id AND emp.is_active = TRUE
     JOIN public.rh_positions rp ON rp.id = c.position_id
     LEFT JOIN public.rh_process_areas pa ON pa.id = rp.process_area_id
     LEFT JOIN public.users req ON req.id = c.signature_requested_by_user_id`;

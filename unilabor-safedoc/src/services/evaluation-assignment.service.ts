@@ -237,7 +237,8 @@ export const listAssignmentsByTemplate = async (
   const paginate = isPaginationRequested(options);
   const { page, limit, offset } = resolvePagination(options);
   const search = buildIlikeSearch(['e.full_name', 'e.employee_code'], options.search, 1);
-  const conditions = ['a.template_id = $1', search.clause].filter(Boolean);
+  // Los colaboradores dados de baja no se listan.
+  const conditions = ['a.template_id = $1', search.clause, 'e.is_active = TRUE'].filter(Boolean);
   if (options.status) {
     conditions.push(`a.status = $${search.values.length + 2}`);
   }
