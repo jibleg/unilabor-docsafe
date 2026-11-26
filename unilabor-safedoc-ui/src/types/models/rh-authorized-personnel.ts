@@ -80,3 +80,21 @@ export interface AuthorizedPersonnelListing {
   authorization_levels: RhAuthorizationLevel[];
   organizational_levels: RhOrganizationalLevel[];
 }
+
+/** Puesto de firma del pie del formato. */
+export type FormSignerSlot = 'ELABORO' | 'REVISO' | 'AUTORIZO';
+
+/** Firmante vigente (nombre, cargo y firma) que imprime el PDF del formato. */
+export interface RhFormSigner {
+  id: number;
+  form_code: string;
+  slot: FormSignerSlot;
+  signer_name: string;
+  signer_title: string;
+  has_signature: boolean;
+  sha256: string | null;
+  registered_at: string;
+  registered_by_name: string | null;
+}
+
+export type RhFormSignersBySlot = Record<FormSignerSlot, RhFormSigner | null>;

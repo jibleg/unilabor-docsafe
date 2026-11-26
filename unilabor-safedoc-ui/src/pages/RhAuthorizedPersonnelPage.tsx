@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileDown, ListChecks, Loader2, RefreshCw, Search, Settings2, X } from 'lucide-react';
+import { FileDown, ListChecks, Loader2, PenLine, RefreshCw, Search, Settings2, X } from 'lucide-react';
 import { getAuthorizedPersonnel, getAuthorizedPersonnelPdfUrl } from '../api/service.api-rh-authorized-personnel';
 import { getApiErrorMessage } from '../api/service.parsers';
 import { AuthorizedPersonnelBoard } from '../components/rh/authorized-personnel/AuthorizedPersonnelBoard';
 import { AuthorizedPersonnelTable } from '../components/rh/authorized-personnel/AuthorizedPersonnelTable';
+import { FormSignersDrawer } from '../components/rh/authorized-personnel/FormSignersDrawer';
 import { PersonnelLevelsDrawer } from '../components/rh/authorized-personnel/PersonnelLevelsDrawer';
 import { Pagination } from '../components/Pagination';
 import type { AuthorizedPersonnelListing } from '../types/models';
@@ -38,6 +39,7 @@ export const RhAuthorizedPersonnelPage = () => {
   const [exporting, setExporting] = useState(false);
   const [filters, setFilters] = useState<AuthorizedPersonnelFilters>(EMPTY_AUTHORIZED_FILTERS);
   const [catalogsOpen, setCatalogsOpen] = useState(false);
+  const [signersOpen, setSignersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]!);
   const canAuthorize = useHasPermission('RH.COMPETENCY.AUTHORIZE');
@@ -108,9 +110,14 @@ export const RhAuthorizedPersonnelPage = () => {
         <div className="flex flex-wrap items-center gap-2">
           {listing ? <span className="hidden text-[11px] text-[var(--unilabor-neutral)] md:inline">Corte al {formatDateOnly(listing.cutoff_date)}</span> : null}
           {canAuthorize ? (
-            <button type="button" onClick={() => setCatalogsOpen(true)} className={BUTTON} title="Niveles de autorización y niveles organizacionales">
-              <Settings2 size={15} /> Catálogos
-            </button>
+            <>
+              <button type="button" onClick={() => setCatalogsOpen(true)} className={BUTTON} title="Niveles de autorización y niveles organizacionales">
+                <Settings2 size={15} /> Catálogos
+              </button>
+              <button type="button" onClick={() => setSignersOpen(true)} className={BUTTON} title="Firmas de Elaboró, Revisó y Autorizó que imprime el PDF">
+                <PenLine size={15} /> Firmas
+              </button>
+            </>
           ) : null}
           <button
             type="button"
@@ -229,6 +236,7 @@ export const RhAuthorizedPersonnelPage = () => {
       ) : null}
 
       <PersonnelLevelsDrawer open={catalogsOpen} onClose={() => setCatalogsOpen(false)} onChanged={() => void load()} />
+      <FormSignersDrawer open={signersOpen} onClose={() => setSignersOpen(false)} />
     </div>
   );
 };

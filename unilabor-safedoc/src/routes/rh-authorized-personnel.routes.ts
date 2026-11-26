@@ -4,7 +4,11 @@ import {
   createOrganizationalLevelController,
   getAuthorizedPersonnelController,
   getAuthorizedPersonnelPdfController,
+  getFormSignerImageController,
   listAuthorizationLevelsController,
+  listFormSignersController,
+  retireFormSignerController,
+  setFormSignerController,
   listOrganizationalLevelsController,
   setAuthorizationLevelController,
   updateAuthorizationLevelController,
@@ -12,7 +16,7 @@ import {
 } from '../controllers/rh-authorized-personnel.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { authorizationLevelSchema, authorizedPersonnelPdfSchema, organizationalLevelSchema } from '../schemas/rh-authorized-personnel.schema';
+import { authorizationLevelSchema, authorizedPersonnelPdfSchema, formSignerBodySchema, organizationalLevelSchema } from '../schemas/rh-authorized-personnel.schema';
 import { setCompetencyAuthorizationLevelSchema } from '../schemas/rh-competency-evaluation.schema';
 
 /**
@@ -34,6 +38,11 @@ router.post(
   validate(authorizedPersonnelPdfSchema),
   getAuthorizedPersonnelPdfController,
 );
+// Firmantes del pie del PDF (ELABORO / REVISO / AUTORIZO): consulta quien gestiona, edita quien autoriza.
+router.get('/authorized-personnel/signers', requirePermission('RH.COMPETENCY.MANAGE'), listFormSignersController);
+router.get('/authorized-personnel/signers/:slot/image', requirePermission('RH.COMPETENCY.MANAGE'), getFormSignerImageController);
+router.put('/authorized-personnel/signers/:slot', requirePermission('RH.COMPETENCY.AUTHORIZE'), validate(formSignerBodySchema), setFormSignerController);
+router.post('/authorized-personnel/signers/:slot/retire', requirePermission('RH.COMPETENCY.AUTHORIZE'), retireFormSignerController);
 router.put(
   '/authorized-personnel/evaluations/:id/authorization-level',
   requirePermission('RH.COMPETENCY.AUTHORIZE'),

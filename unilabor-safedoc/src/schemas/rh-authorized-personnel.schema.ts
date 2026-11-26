@@ -32,3 +32,16 @@ export const authorizedPersonnelPdfSchema = z.object({
   filter_label: z.string().trim().max(300, 'La descripcion del filtro es demasiado larga').optional(),
 });
 export type AuthorizedPersonnelPdfInput = z.infer<typeof authorizedPersonnelPdfSchema>;
+
+/** Firmante del pie del formato (ELABORO / REVISO / AUTORIZO). */
+export const formSignerSlotParamsSchema = z.object({
+  slot: z.enum(['ELABORO', 'REVISO', 'AUTORIZO'], { message: 'Puesto de firma invalido' }),
+});
+
+export const formSignerBodySchema = z.object({
+  signer_name: z.string().trim().min(1, 'El nombre es obligatorio').max(120, 'El nombre es demasiado largo'),
+  signer_title: z.string().trim().min(1, 'El cargo es obligatorio').max(120, 'El cargo es demasiado largo'),
+  /** PNG en data URL o base64; sin imagen se conserva la firma vigente. */
+  image: z.string().min(1).max(7_000_000, 'La imagen es demasiado grande').optional(),
+});
+export type FormSignerBody = z.infer<typeof formSignerBodySchema>;

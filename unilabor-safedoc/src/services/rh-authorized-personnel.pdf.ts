@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
+import type { FormSignerForPdf, FormSignerSlot } from './rh-form-signers.service';
 import { winAnsiSafe } from './reading/reading-annex.pdf';
 import { REPORT_RELEASE_LEVEL_NO } from './rh-authorized-personnel.rules';
 import type { AuthorizedPersonnelListing, AuthorizedPersonnelRow } from './rh-authorized-personnel.service';
@@ -88,7 +89,11 @@ const titleCase = (value: string | null): string =>
 export interface AuthorizedPersonnelPdfOptions {
   /** Aviso impreso bajo la fecha de corte cuando el PDF no trae el listado completo. */
   filterNote?: string;
+  /** Firmantes capturados (nombre, cargo y firma); donde falten, se imprime el nombre fijo del formato sin firma. */
+  signers?: Partial<Record<FormSignerSlot, FormSignerForPdf>>;
 }
+
+const SIGNER_SLOTS: FormSignerSlot[] = ['ELABORO', 'REVISO', 'AUTORIZO'];
 
 export const buildAuthorizedPersonnelPdf = async (
   listing: AuthorizedPersonnelListing,
@@ -103,6 +108,13 @@ export const buildAuthorizedPersonnelPdf = async (
   const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
   const logoBytes = resolveLogo();
   const logo: PDFImage | null = logoBytes ? await doc.embedPng(logoBytes).catch(() => null) : null;
+  // Firmas del pie: se embeben una vez; un PNG ilegible se trata como sin firma.
+  const signerImages = new Map<FormSignerSlot, PDFImage>();
+  for (const slot of SIGNER_SLOTS) {
+    const png = options.signers?.[slot]?.png;
+    const image = png ? await doc.embedPng(png).catch(() => null) : null;
+    if (image) signerImages.set(slot, image);
+  }
 
   let page: PDFPage = doc.addPage([PAGE_W, PAGE_H]);
   let y = PAGE_H - MARGIN;
@@ -338,21 +350,38 @@ export const buildAuthorizedPersonnelPdf = async (
   const drawSignatures = () => {
     const headH = 12;
     const titleH = 10;
-    const signH = 34;
+    const signH = 48;
     const roleH = 11;
     if (y - (headH + titleH + signH + roleH) < BOTTOM) newPage(false);
     band('FIRMAS', MARGIN, y, CONTENT_W, headH);
     y -= headH;
     const widths = [span(0, 3), span(4, 8), span(9, 13)];
     let x = MARGIN;
-    AUTHORIZED_PERSONNEL_FORM.signers.forEach((signer, index) => {
+    AUTHORIZED_PERSONNEL_FORM.signers.forEach((fixed, index) => {
       const w = widths[index]!;
+      const slot = SIGNER_SLOTS[index]!;
+      const captured = options.signers?.[slot];
+      const name = captured?.name ?? fixed.name;
+      const role = captured?.title ?? fixed.role;
       box(x, y, w, titleH, GRAY_HEAD);
-      cell(signer.heading, x, y, w, titleH, { font: bold, size: 5.5 });
+      cell(fixed.heading, x, y, w, titleH, { font: bold, size: 5.5 });
       box(x, y - titleH, w, signH);
-      cell(signer.name, x, y - titleH - signH + 10, w, 10, { size: 6 });
+      const image = signerImages.get(slot);
+      if (image) {
+        // La firma ocupa el recuadro por encima del renglon del nombre.
+        const areaH = signH - 11;
+        const scale = Math.min((w - 12) / image.width, (areaH - 3) / image.height);
+        const drawW = image.width * scale;
+        const drawH = image.height * scale;
+        page.drawImage(image, { x: x + (w - drawW) / 2, y: y - titleH - 2 - (areaH - drawH) / 2 - drawH, width: drawW, height: drawH });
+        if (captured?.signedAt) {
+          const stampText = safe(`Firma registrada el ${formatDate(captured.signedAt.slice(0, 10))}`);
+          page.drawText(stampText, { x: x + w - 4 - regular.widthOfTextAtSize(stampText, 4.5), y: y - titleH - 6, size: 4.5, font: regular, color: MUTED });
+        }
+      }
+      cell(name, x, y - titleH - signH + 10, w, 10, { size: 6 });
       box(x, y - titleH - signH, w, roleH, BLUE_ROLE);
-      cell(signer.role, x, y - titleH - signH, w, roleH, { font: bold, size: 6.5 });
+      cell(role, x, y - titleH - signH, w, roleH, { font: bold, size: 6.5 });
       x += w;
     });
     y -= titleH + signH + roleH;
