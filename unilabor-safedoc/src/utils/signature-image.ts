@@ -18,6 +18,17 @@ export const decodeSignaturePng = (dataUrl: string): Buffer | null => {
   return buffer.length >= MIN_SIGNATURE_BYTES ? buffer : null;
 };
 
+/** Lee un PNG de firma guardado (ruta relativa al cwd o absoluta); null si falta. */
+export const readSignaturePng = (storedPath: string | null): Buffer | null => {
+  if (!storedPath) return null;
+  const absolute = path.isAbsolute(storedPath) ? storedPath : path.resolve(process.cwd(), storedPath);
+  try {
+    return fs.existsSync(absolute) ? fs.readFileSync(absolute) : null;
+  } catch {
+    return null;
+  }
+};
+
 /** Escribe la firma en el directorio de firmas y devuelve la ruta relativa. */
 export const writeSignaturePng = (buffer: Buffer, prefix = 'SIGN'): string => {
   const dir = process.env.DIRECTORY_UPLOAD_SIGNATURE || 'uploads/signatures';

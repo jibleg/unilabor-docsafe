@@ -241,6 +241,9 @@ const RhLateRequestsPage = lazy(() =>
 const RhAuthorizedPersonnelPage = lazy(() =>
   import('./pages/RhAuthorizedPersonnelPage').then((module) => ({ default: module.RhAuthorizedPersonnelPage })),
 );
+const RhSignatureRegistryPage = lazy(() =>
+  import('./pages/RhSignatureRegistryPage').then((module) => ({ default: module.RhSignatureRegistryPage })),
+);
 const RhCompetencyDashboardPage = lazy(() =>
   import('./pages/RhCompetencyDashboardPage').then((module) => ({ default: module.RhCompetencyDashboardPage })),
 );
@@ -546,6 +549,14 @@ function App() {
           element={
             <PermissionGate permission="RH.COMPETENCY.MANAGE" redirectTo="/rh">
               <RhAuthorizedPersonnelPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="signature-registry"
+          element={
+            <PermissionGate permission="RH.SIGNATURE_REGISTRY.MANAGE" redirectTo="/rh">
+              <RhSignatureRegistryPage />
             </PermissionGate>
           }
         />

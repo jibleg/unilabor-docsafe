@@ -117,6 +117,7 @@ export const NAV_CONFIG: Record<ModuleCode, NavSection[]> = {
         { icon: FileSignature, label: 'Cartas de asignación', path: '/rh/assignment-letters', permission: 'RH.COMPETENCY.MANAGE' },
         { icon: Gauge, label: 'Tablero de competencia', path: '/rh/competency-dashboard', permission: 'RH.COMPETENCY.MANAGE' },
         { icon: ListChecks, label: 'Personal autorizado', path: '/rh/authorized-personnel', permission: 'RH.COMPETENCY.MANAGE' },
+        { icon: PenLine, label: 'Firmas autorizadas', path: '/rh/signature-registry', permission: 'RH.SIGNATURE_REGISTRY.MANAGE' },
       ],
     },
     {

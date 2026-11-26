@@ -12,3 +12,4 @@ export * from './agreements';
 export * from './rh-assignment-letter';
 export * from './notifications';
 export * from './rh-authorized-personnel';
+export * from './rh-signature-registry';
