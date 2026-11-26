@@ -79,13 +79,9 @@ export const getSignatureRegistryPdfController = async (req: AuthRequest, res: R
     const now = new Date();
     const full = await getSignatureRegistryListing(now);
     const listing = body.keys ? filterSignatureRegistryListing(full, body.keys) : full;
-    const partial = listing.rows.length !== full.rows.length;
-    const filterNote = partial
-      ? `EXTRACTO: ${listing.rows.length} de ${full.rows.length} filas del registro${body.filter_label ? ` · Filtros: ${body.filter_label}` : ''}`
-      : undefined;
     const specimenIds = listing.rows.flatMap((row) => [row.signature_specimen?.id, row.initials_specimen?.id]).filter((id): id is number => typeof id === 'number');
     const specimenImages = await loadSpecimenImages([...new Set(specimenIds)]);
-    const pdf = await buildSignatureRegistryPdf(listing, now, { specimenImages, ...(filterNote ? { filterNote } : {}) });
+    const pdf = await buildSignatureRegistryPdf(listing, now, { specimenImages });
     await audit(req, `RH_SIGNATURE_REGISTRY_PDF:${listing.cutoff_date}:${listing.rows.length}/${full.rows.length}`, 'signature_registry', null);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${SIGNATURE_REGISTRY_FORM.code}_Registro_firmas_autorizadas_${listing.cutoff_date}.pdf"`);

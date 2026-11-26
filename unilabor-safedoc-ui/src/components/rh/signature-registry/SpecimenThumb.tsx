@@ -52,5 +52,5 @@ export const SpecimenThumb = ({ specimen, height = 36, className = '' }: Specime
     );
   }
   if (!current?.url) return <span className={`inline-block animate-pulse rounded bg-slate-100 ${className}`} style={{ height, width: height * 2 }} />;
-  return <img src={current.url} alt={specimen.kind === 'FIRMA' ? 'Firma' : 'Rúbrica'} title={title} className={`inline-block object-contain ${className}`} style={{ height, maxWidth: height * 3.2 }} />;
+  return <img src={current.url} alt={specimen.kind === 'FIRMA' ? 'Firma' : 'Rúbrica'} title={title} className={`inline-block object-contain ${className}`} style={{ height, maxWidth: '100%' }} />;
 };

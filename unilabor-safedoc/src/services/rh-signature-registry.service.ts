@@ -2,6 +2,7 @@ import pool from '../config/db';
 import { getPositionOtherAuthorizations, OTHER_AUTHORIZATIONS_ITEM_NO } from './rh-assignment-letter.service';
 import { AUTHORIZED_PERSONNEL_WARNING_DAYS, resolveAuthorizedPersonnelRow, type AuthorizedPersonnelRowState } from './rh-authorized-personnel.rules';
 import { getAuthorizedPersonnelListing, toSedeLabel, todayInMexico, type AuthorizedPersonnelRow } from './rh-authorized-personnel.service';
+import { listAuthorizationLevels, type RhAuthorizationLevel } from './rh-personnel-levels.service';
 import { proposeSigningScope, resolveSignatureRegistryStatus, type SignatureRegistryStatus, type SignatureRegistryStatusResult } from './rh-signature-registry.rules';
 import { loadActiveSpecimensByEmployee, type SignatureSpecimenSummary } from './rh-signature-specimen.service';
 
@@ -49,6 +50,10 @@ export interface SignatureRegistryRow extends SignatureRegistryStatusResult {
   is_discipline_responsible: boolean;
   signing_scope_text: string | null;
   notes: string | null;
+  /** Nivel de autorizacion del REH-REG-026 (elegido al autorizar el REH-REG-003). */
+  authorization_level_id: number | null;
+  authorization_level_no: number | null;
+  authorization_level_name: string | null;
   /** Carta REH-REG-008 cerrada y vigente del puesto (fecha de alta). */
   letter_id: number | null;
   letter_folio: string | null;
@@ -77,6 +82,8 @@ export interface SignatureRegistryListing {
   rows: SignatureRegistryRow[];
   summary: SignatureRegistrySummary;
   disciplines: RhDiscipline[];
+  /** Catalogo de niveles de autorizacion (activos e inactivos), para el filtro. */
+  authorization_levels: RhAuthorizationLevel[];
 }
 
 /** Clave de fila que comparte la pantalla con el PDF filtrado. */
@@ -341,12 +348,13 @@ export const getSignatureRegistryListing = async (now: Date = new Date()): Promi
   const cutoff = todayInMexico(now);
   const current = (await getAuthorizedPersonnelListing(now)).rows.filter((row) => row.authorized === true && row.position_id !== null).map(fromCurrent);
   const currentKeys = new Set(current.map((row) => `${row.employee_id}:${row.position_id}`));
-  const [historical, letters, authorizations, specimens, disciplines] = await Promise.all([
+  const [historical, letters, authorizations, specimens, disciplines, authorizationLevels] = await Promise.all([
     loadHistoricalRows(cutoff, currentKeys),
     loadClosedLetters(),
     loadAuthorizations(),
     loadActiveSpecimensByEmployee(),
     listDisciplines(true),
+    listAuthorizationLevels(true),
   ]);
 
   const rows = [...current, ...historical].map((base, index): SignatureRegistryRow => {
@@ -392,6 +400,9 @@ export const getSignatureRegistryListing = async (now: Date = new Date()): Promi
       is_discipline_responsible: authorization?.is_discipline_responsible ?? false,
       signing_scope_text: authorization?.signing_scope_text ?? null,
       notes: authorization?.notes ?? null,
+      authorization_level_id: base.state.authorization_level_id,
+      authorization_level_no: base.state.authorization_level_no,
+      authorization_level_name: base.state.authorization_level_name,
       letter_id: letter?.id ?? null,
       letter_folio: letter?.folio ?? null,
       start_date: letter?.start_date ?? null,
@@ -405,7 +416,14 @@ export const getSignatureRegistryListing = async (now: Date = new Date()): Promi
     };
   });
 
-  return { cutoff_date: cutoff, warning_days: AUTHORIZED_PERSONNEL_WARNING_DAYS, rows, summary: summarizeSignatureRegistry(rows), disciplines };
+  return {
+    cutoff_date: cutoff,
+    warning_days: AUTHORIZED_PERSONNEL_WARNING_DAYS,
+    rows,
+    summary: summarizeSignatureRegistry(rows),
+    disciplines,
+    authorization_levels: authorizationLevels,
+  };
 };
 
 // --- Captura por fila ----------------------------------------------------------

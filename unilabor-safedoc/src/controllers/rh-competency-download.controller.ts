@@ -31,8 +31,8 @@ export const downloadCompetencyEvaluationsController = async (req: AuthRequest, 
           entity_type: 'competency_evaluation',
           entity_id: row.evaluation_id,
           employee_id: row.employee_id,
-          document_id: row.document_id,
-          metadata: { form_code: 'REH-REG-003', file_name: row.file_name, batch_size: delivered.length },
+          // access_logs.document_id es UUID (documentos de Calidad); el documento RH va en metadata.
+          metadata: { form_code: 'REH-REG-003', employee_document_id: row.document_id, file_name: row.file_name, batch_size: delivered.length },
         }),
       ),
     );

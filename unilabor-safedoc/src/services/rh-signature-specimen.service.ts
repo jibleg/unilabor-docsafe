@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import pool from '../config/db';
 import { readSignaturePng, writeSignaturePng } from '../utils/signature-image';
+import { trimSignaturePng } from '../utils/png-trim';
 import { withTransaction } from '../utils/transaction';
 import { DOCUMENT_FORM_CODES, type SignedDocumentKind } from './rh-document-signature.rules';
 
@@ -87,7 +88,9 @@ export interface RegisterSpecimenInput {
 export const registerSpecimen = async (input: RegisterSpecimenInput): Promise<SignatureSpecimenSummary> => {
   const employee = await pool.query(`SELECT id FROM public.employees WHERE id = $1 LIMIT 1;`, [input.employeeId]);
   if (employee.rows.length === 0) return throwCoded('RH_SIGNATURE_EMPLOYEE_NOT_FOUND', 'El colaborador no existe.');
-  const imagePath = writeSignaturePng(input.png, `REHREG027-${input.kind}`);
+  // Se guarda recortado a la tinta: asi la miniatura y el PDF muestran el trazo, no el lienzo vacio.
+  const png = trimSignaturePng(input.png);
+  const imagePath = writeSignaturePng(png, `REHREG027-${input.kind}`);
   const id = await withTransaction(async (client) => {
     await client.query(
       `UPDATE public.rh_employee_signature_specimens SET retired_at = NOW(), retired_by_user_id = $3
@@ -97,7 +100,7 @@ export const registerSpecimen = async (input: RegisterSpecimenInput): Promise<Si
     const inserted = await client.query(
       `INSERT INTO public.rh_employee_signature_specimens (employee_id, kind, image_path, sha256, source, source_note, registered_by_user_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;`,
-      [input.employeeId, input.kind, imagePath, sha256Of(input.png), input.source, input.sourceNote, input.userId],
+      [input.employeeId, input.kind, imagePath, sha256Of(png), input.source, input.sourceNote, input.userId],
     );
     return Number(inserted.rows[0].id);
   });
@@ -154,7 +157,8 @@ export const getSpecimenImage = async (id: number): Promise<SpecimenImage> => {
   if (!row) return throwCoded('RH_SIGNATURE_SPECIMEN_NOT_FOUND', 'El espécimen no existe.');
   const png = readSignaturePng(String(row.image_path));
   if (!png) return throwCoded('RH_SIGNATURE_SPECIMEN_FILE_MISSING', 'No se encontró la imagen del espécimen en el servidor.');
-  return { specimen: mapSpecimen(row), png };
+  // Los especimenes guardados antes del recorte se recortan al servirlos.
+  return { specimen: mapSpecimen(row), png: trimSignaturePng(png) };
 };
 
 /** PNG de cada especimen pedido (para embeberlos en el PDF); los que faltan se omiten. */
@@ -164,7 +168,7 @@ export const loadSpecimenImages = async (ids: number[]): Promise<Map<number, Buf
   const result = await pool.query(`SELECT id, image_path FROM public.rh_employee_signature_specimens WHERE id = ANY($1::bigint[]);`, [ids]);
   for (const row of result.rows) {
     const png = readSignaturePng(String(row.image_path));
-    if (png) map.set(Number(row.id), png);
+    if (png) map.set(Number(row.id), trimSignaturePng(png));
   }
   return map;
 };

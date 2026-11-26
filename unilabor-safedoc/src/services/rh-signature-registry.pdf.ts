@@ -37,7 +37,8 @@ export const SIGNATURE_REGISTRY_FORM = {
 } as const;
 
 // Anchos de las 13 columnas en las proporciones del Excel (B..N).
-const LAYOUT = columnLayout([5, 31, 27, 14, 20, 13, 34, 20, 18, 14, 16, 15, 17]);
+// FIRMA y RUBRICA van mas anchas que en el Excel para que el trazo se lea.
+const LAYOUT = columnLayout([5, 29, 25, 13, 18, 12, 30, 28, 26, 14, 16, 15, 17]);
 const { widths: COL_W, xs: COL_X, span } = LAYOUT;
 
 const HEADERS = [
@@ -56,7 +57,7 @@ const HEADERS = [
   'ESTADO',
 ];
 
-const ROW_H = 30;
+const ROW_H = 36;
 const HEADER_ROW_H = 32;
 
 const TONE_STYLE: Record<SignatureRegistryTone, { fill: Rgb; color: Rgb }> = {
@@ -67,8 +68,6 @@ const TONE_STYLE: Record<SignatureRegistryTone, { fill: Rgb; color: Rgb }> = {
 };
 
 export interface SignatureRegistryPdfOptions {
-  /** Aviso impreso bajo la leyenda cuando el PDF no trae el registro completo. */
-  filterNote?: string;
   /** PNG de cada especimen por id (los que falten salen en blanco). */
   specimenImages?: Map<number, Buffer>;
 }
@@ -107,15 +106,7 @@ export const buildSignatureRegistryPdf = async (listing: SignatureRegistryListin
       cutoffH,
       { size: 6, align: 'left', color: FORM_COLORS.MUTED, maxLines: 1 },
     );
-    kit.advance(cutoffH);
-    if (options.filterNote) {
-      // Extracto del registro: se declara para que nadie lo tome por el registro completo.
-      const noteH = 12;
-      kit.box(FORM_MARGIN, kit.y(), FORM_CONTENT_W, noteH, FORM_COLORS.YELLOW);
-      kit.cell(options.filterNote, FORM_MARGIN, kit.y(), FORM_CONTENT_W, noteH, { font: kit.bold, size: 6.5, align: 'left', maxLines: 1 });
-      kit.advance(noteH);
-    }
-    kit.advance(8);
+    kit.advance(cutoffH + 8);
   };
 
   const drawTableHeader = () => {
@@ -148,7 +139,7 @@ export const buildSignatureRegistryPdf = async (listing: SignatureRegistryListin
     ];
     cells.forEach((entry, index) => {
       kit.box(COL_X[index]!, y, COL_W[index]!, ROW_H, entry.fill);
-      if (entry.image) kit.image(entry.image, COL_X[index]!, y, COL_W[index]!, ROW_H, 2);
+      if (entry.image) kit.image(entry.image, COL_X[index]!, y, COL_W[index]!, ROW_H, 3);
       else {
         kit.cell(entry.value, COL_X[index]!, y, COL_W[index]!, ROW_H, {
           font: entry.font ?? kit.regular,

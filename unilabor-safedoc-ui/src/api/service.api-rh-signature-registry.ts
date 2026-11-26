@@ -24,8 +24,8 @@ export const getSignatureRegistry = async (): Promise<SignatureRegistryListing> 
 export const signatureRegistryRowKey = (row: Pick<SignatureRegistryRow, 'employee_id' | 'position_id'>): string => `${row.employee_id}:${row.position_id}`;
 
 /** PDF del registro con las filas que muestra la tabla y la descripción de sus filtros, como URL de blob. */
-export const getSignatureRegistryPdfUrl = async (rows: SignatureRegistryRow[], filterLabel: string): Promise<string> => {
-  const response = await api.post(`${BASE}/pdf`, { keys: rows.map(signatureRegistryRowKey), ...(filterLabel ? { filter_label: filterLabel } : {}) }, { responseType: 'blob' });
+export const getSignatureRegistryPdfUrl = async (rows: SignatureRegistryRow[]): Promise<string> => {
+  const response = await api.post(`${BASE}/pdf`, { keys: rows.map(signatureRegistryRowKey) }, { responseType: 'blob' });
   return URL.createObjectURL(response.data as Blob);
 };
 

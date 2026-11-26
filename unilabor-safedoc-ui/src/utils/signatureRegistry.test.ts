@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SignatureRegistryListing, SignatureRegistryRow, SignatureRegistryStatus } from '../types/models';
-import { EMPTY_SIGNATURE_FILTERS, NO_DISCIPLINE, describeFilters, filterSignatureRegistry, hasActiveFilters } from './signatureRegistry';
+import { EMPTY_SIGNATURE_FILTERS, NO_DISCIPLINE, filterSignatureRegistry, hasActiveFilters } from './signatureRegistry';
 
 const row = (employeeId: number, status: SignatureRegistryStatus, overrides: Partial<SignatureRegistryRow> = {}): SignatureRegistryRow => ({
   row_no: employeeId,
@@ -20,6 +20,9 @@ const row = (employeeId: number, status: SignatureRegistryStatus, overrides: Par
   is_discipline_responsible: true,
   signing_scope_text: 'Validación técnica de resultados.',
   notes: null,
+  authorization_level_id: 2,
+  authorization_level_no: 2,
+  authorization_level_name: 'Operación',
   letter_id: 1,
   letter_folio: 'REH-REG-008-00001',
   start_date: '2026-07-30',
@@ -45,13 +48,17 @@ const listing: SignatureRegistryListing = {
   rows: [
     row(1, 'VIGENTE'),
     row(2, 'POR_VENCER', { branch_name: 'CENTRO', discipline_id: null, discipline_name: null }),
-    row(3, 'INCOMPLETA', { discipline_id: 2, discipline_name: 'Uroanálisis' }),
+    row(3, 'INCOMPLETA', { discipline_id: 2, discipline_name: 'Uroanálisis', authorization_level_id: 4, authorization_level_no: 4, authorization_level_name: 'Liberación', position_id: 2, position_name: 'Responsable de uroanálisis' }),
     row(4, 'DADA_DE_BAJA'),
   ],
   summary: { rows_total: 4, people_total: 4, active_rows: 3, retired_rows: 1, by_status: { DADA_DE_BAJA: 1, INCOMPLETA: 1, SIN_EVALUACION: 0, VENCIDA: 0, POR_VENCER: 1, VIGENTE: 1 } },
   disciplines: [
     { id: 1, code: 'QUIMICA_CLINICA', name: 'Química clínica', sort_order: 1, is_active: true },
     { id: 2, code: 'UROANALISIS', name: 'Uroanálisis', sort_order: 4, is_active: true },
+  ],
+  authorization_levels: [
+    { id: 2, level_no: 2, name: 'Operación', description: null, is_active: true },
+    { id: 4, level_no: 4, name: 'Liberación', description: null, is_active: true },
   ],
 };
 
@@ -75,18 +82,27 @@ describe('filterSignatureRegistry', () => {
   });
 });
 
-describe('describeFilters / hasActiveFilters', () => {
-  it('describe los filtros para la leyenda de extracto del PDF', () => {
-    expect(describeFilters(EMPTY_SIGNATURE_FILTERS, listing)).toBe('Sin dadas de baja');
-    expect(describeFilters({ search: ' ana ', branch: 'CIDE', discipline: '2', statuses: ['VENCIDA', 'POR_VENCER'], showRetired: true }, listing)).toBe(
-      'Sucursal CIDE · Disciplina Uroanálisis · Estado Vencida / Por vencer · Con dadas de baja · Búsqueda "ana"',
-    );
-    expect(describeFilters({ ...EMPTY_SIGNATURE_FILTERS, discipline: NO_DISCIPLINE }, listing)).toBe('Sin disciplina · Sin dadas de baja');
-  });
+describe('hasActiveFilters', () => {
 
   it('sabe cuando hay filtros aplicados', () => {
     expect(hasActiveFilters(EMPTY_SIGNATURE_FILTERS)).toBe(false);
     expect(hasActiveFilters({ ...EMPTY_SIGNATURE_FILTERS, showRetired: true })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_SIGNATURE_FILTERS, statuses: ['VIGENTE'] })).toBe(true);
+  });
+});
+
+describe('filtros por nivel de autorización y puesto', () => {
+  it('admite varios niveles a la vez', () => {
+    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, levelIds: [4] }).map((item) => item.employee_id)).toEqual([3]);
+    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, levelIds: [2, 4] }).map((item) => item.employee_id)).toEqual([1, 2, 3]);
+  });
+
+  it('admite varios puestos y se combina con el nivel', () => {
+    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, positionIds: [2] }).map((item) => item.employee_id)).toEqual([3]);
+    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, positionIds: [1, 2], levelIds: [2] }).map((item) => item.employee_id)).toEqual([1, 2]);
+  });
+
+  it('cuentan como filtro activo', () => {
+    expect(hasActiveFilters({ ...EMPTY_SIGNATURE_FILTERS, levelIds: [4], positionIds: [2] })).toBe(true);
   });
 });

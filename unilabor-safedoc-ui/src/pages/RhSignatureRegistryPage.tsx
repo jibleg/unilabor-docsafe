@@ -18,8 +18,9 @@ import {
   STATUS_OPTIONS,
   STATUS_TONE,
   STATUS_TONE_CLASS,
-  describeFilters,
   filterSignatureRegistry,
+  filterableLevels,
+  filterablePositions,
   hasActiveFilters,
   uniqueValues,
   type SignatureRegistryFilters,
@@ -80,13 +81,28 @@ export const RhSignatureRegistryPage = () => {
   // Vacío = todos marcados en el dropdown; marcar todos vuelve a dejarlo vacío (sin filtro).
   const changeStatuses = (values: string[]) =>
     updateFilters((current) => ({ ...current, statuses: values.length >= ACTIVE_STATUSES.length ? [] : (values as SignatureRegistryStatus[]) }));
+  // Nivel de autorización y puesto: multi-selección con la misma convención (los ids viajan como texto).
+  const levelOptions = useMemo(
+    () => (listing ? filterableLevels(listing) : []).map((level) => ({ value: String(level.id), label: `${level.level_no} · ${level.name}` })),
+    [listing],
+  );
+  const positionOptions = useMemo(
+    () => (listing ? filterablePositions(listing) : []).map((position) => ({ value: String(position.id), label: position.name })),
+    [listing],
+  );
+  const allLevelValues = useMemo(() => levelOptions.map((option) => option.value), [levelOptions]);
+  const allPositionValues = useMemo(() => positionOptions.map((option) => option.value), [positionOptions]);
+  const changeLevels = (values: string[]) =>
+    updateFilters((current) => ({ ...current, levelIds: values.length >= allLevelValues.length ? [] : values.map(Number) }));
+  const changePositions = (values: string[]) =>
+    updateFilters((current) => ({ ...current, positionIds: values.length >= allPositionValues.length ? [] : values.map(Number) }));
 
-  // El PDF lleva exactamente las filas de la tabla (todas sus páginas), con los filtros impresos.
+  // El PDF lleva exactamente las filas de la tabla (todas sus páginas).
   const openPdf = async () => {
     if (!listing) return;
     setExporting(true);
     try {
-      window.open(await getSignatureRegistryPdfUrl(rows, describeFilters(filters, listing)), '_blank', 'noopener');
+      window.open(await getSignatureRegistryPdfUrl(rows), '_blank', 'noopener');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo generar el PDF del registro.'));
     } finally {
@@ -176,6 +192,26 @@ export const RhSignatureRegistryPage = () => {
                 options={STATUS_OPTIONS}
                 onChange={changeStatuses}
                 allLabel="Todos los estados"
+                triggerClassName={`${SELECT} w-full`}
+              />
+            </div>
+            <div className="w-[220px]" title="Nivel de autorización (uno o varios)">
+              <MultiSelectFilter
+                values={filters.levelIds.length > 0 ? filters.levelIds.map(String) : allLevelValues}
+                defaultValues={allLevelValues}
+                options={levelOptions}
+                onChange={changeLevels}
+                allLabel="Todos los niveles"
+                triggerClassName={`${SELECT} w-full`}
+              />
+            </div>
+            <div className="w-[240px]" title="Puesto (uno o varios)">
+              <MultiSelectFilter
+                values={filters.positionIds.length > 0 ? filters.positionIds.map(String) : allPositionValues}
+                defaultValues={allPositionValues}
+                options={positionOptions}
+                onChange={changePositions}
+                allLabel="Todos los puestos"
                 triggerClassName={`${SELECT} w-full`}
               />
             </div>

@@ -46,6 +46,5 @@ export type SpecimenInput = z.infer<typeof specimenSchema>;
 /** PDF del registro con las filas que muestra la pantalla (`empleado:puesto`); sin claves sale completo. */
 export const signatureRegistryPdfSchema = z.object({
   keys: z.array(z.string().regex(/^\d+:\d+$/, 'Clave de fila invalida')).max(5000).optional(),
-  filter_label: z.string().trim().max(300, 'La descripcion del filtro es demasiado larga').optional(),
 });
 export type SignatureRegistryPdfInput = z.infer<typeof signatureRegistryPdfSchema>;

@@ -1,4 +1,5 @@
 // Registro de firmas autorizadas (REH-REG-027), derivado del REH-REG-026.
+import type { RhAuthorizationLevel } from './rh-authorized-personnel';
 
 export interface RhDiscipline {
   id: number;
@@ -51,6 +52,10 @@ export interface SignatureRegistryRow {
   is_discipline_responsible: boolean;
   signing_scope_text: string | null;
   notes: string | null;
+  /** Nivel de autorización del REH-REG-026. */
+  authorization_level_id: number | null;
+  authorization_level_no: number | null;
+  authorization_level_name: string | null;
   letter_id: number | null;
   letter_folio: string | null;
   /** Fecha de alta = carta REH-REG-008 cerrada del puesto. */
@@ -85,6 +90,8 @@ export interface SignatureRegistryListing {
   rows: SignatureRegistryRow[];
   summary: SignatureRegistrySummary;
   disciplines: RhDiscipline[];
+  /** Catálogo de niveles de autorización (activos e inactivos), para el filtro. */
+  authorization_levels: RhAuthorizationLevel[];
 }
 
 export interface SignatureAuthorizationPayload {

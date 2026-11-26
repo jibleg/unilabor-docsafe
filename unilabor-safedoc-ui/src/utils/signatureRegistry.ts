@@ -1,4 +1,10 @@
-import type { SignatureRegistryListing, SignatureRegistryRow, SignatureRegistryStatus, SignatureRegistryTone } from '../types/models';
+import type {
+  RhAuthorizationLevel,
+  SignatureRegistryListing,
+  SignatureRegistryRow,
+  SignatureRegistryStatus,
+  SignatureRegistryTone,
+} from '../types/models';
 
 /** Filtros del Registro de firmas autorizadas (se aplican en el cliente). */
 export interface SignatureRegistryFilters {
@@ -8,6 +14,10 @@ export interface SignatureRegistryFilters {
   discipline: string;
   /** Estados a mostrar; vacío = todos los estados de filas vigentes. */
   statuses: SignatureRegistryStatus[];
+  /** Niveles de autorización (ids del catálogo); vacío = todos. */
+  levelIds: number[];
+  /** Puestos (ids); vacío = todos. */
+  positionIds: number[];
   /** Muestra también las filas históricas (DADA DE BAJA). */
   showRetired: boolean;
 }
@@ -17,7 +27,28 @@ export const NO_DISCIPLINE = 'none';
 /** Estados de una fila vigente (DADA DE BAJA se controla con el interruptor). */
 export const ACTIVE_STATUSES: SignatureRegistryStatus[] = ['VIGENTE', 'POR_VENCER', 'VENCIDA', 'SIN_EVALUACION', 'INCOMPLETA'];
 
-export const EMPTY_SIGNATURE_FILTERS: SignatureRegistryFilters = { search: '', branch: '', discipline: '', statuses: [], showRetired: false };
+export const EMPTY_SIGNATURE_FILTERS: SignatureRegistryFilters = {
+  search: '',
+  branch: '',
+  discipline: '',
+  statuses: [],
+  levelIds: [],
+  positionIds: [],
+  showRetired: false,
+};
+
+/** Niveles que se ofrecen en el filtro: los activos y los inactivos que alguna fila aún tenga. */
+export const filterableLevels = (listing: SignatureRegistryListing): RhAuthorizationLevel[] => {
+  const inUse = new Set(listing.rows.map((row) => row.authorization_level_id));
+  return listing.authorization_levels.filter((level) => level.is_active || inUse.has(level.id)).sort((a, b) => a.level_no - b.level_no);
+};
+
+/** Puestos presentes en el registro, por nombre. */
+export const filterablePositions = (listing: SignatureRegistryListing): Array<{ id: number; name: string }> => {
+  const byId = new Map<number, string>();
+  for (const row of listing.rows) byId.set(row.position_id, row.position_name);
+  return [...byId.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+};
 
 export const STATUS_LABEL: Record<SignatureRegistryStatus, string> = {
   DADA_DE_BAJA: 'Dada de baja',
@@ -48,31 +79,28 @@ export const STATUS_TONE: Record<SignatureRegistryStatus, SignatureRegistryTone>
 export const STATUS_OPTIONS = ACTIVE_STATUSES.map((status) => ({ value: status, label: STATUS_LABEL[status], className: STATUS_TONE_CLASS[STATUS_TONE[status]] }));
 
 export const hasActiveFilters = (filters: SignatureRegistryFilters): boolean =>
-  Boolean(filters.search || filters.branch || filters.discipline || filters.statuses.length > 0 || filters.showRetired);
-
-/** Texto corto de los filtros aplicados, para imprimirlo en el PDF como aviso de extracto. */
-export const describeFilters = (filters: SignatureRegistryFilters, listing: SignatureRegistryListing): string => {
-  const parts: string[] = [];
-  if (filters.branch) parts.push(`Sucursal ${filters.branch}`);
-  if (filters.discipline === NO_DISCIPLINE) parts.push('Sin disciplina');
-  else if (filters.discipline) {
-    const discipline = listing.disciplines.find((item) => String(item.id) === filters.discipline);
-    if (discipline) parts.push(`Disciplina ${discipline.name}`);
-  }
-  if (filters.statuses.length > 0) parts.push(`Estado ${filters.statuses.map((status) => STATUS_LABEL[status]).join(' / ')}`);
-  parts.push(filters.showRetired ? 'Con dadas de baja' : 'Sin dadas de baja');
-  if (filters.search.trim()) parts.push(`Búsqueda "${filters.search.trim()}"`);
-  return parts.join(' · ');
-};
+  Boolean(
+    filters.search ||
+      filters.branch ||
+      filters.discipline ||
+      filters.statuses.length > 0 ||
+      filters.levelIds.length > 0 ||
+      filters.positionIds.length > 0 ||
+      filters.showRetired,
+  );
 
 const normalize = (value: string): string => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export const filterSignatureRegistry = (listing: SignatureRegistryListing, filters: SignatureRegistryFilters): SignatureRegistryRow[] => {
   const needle = normalize(filters.search.trim());
   const statuses = new Set(filters.statuses);
+  const levelIds = new Set(filters.levelIds);
+  const positionIds = new Set(filters.positionIds);
   return listing.rows.filter((row) => {
     if (row.retired && !filters.showRetired) return false;
     if (filters.branch && row.branch_name !== filters.branch) return false;
+    if (levelIds.size > 0 && (row.authorization_level_id === null || !levelIds.has(row.authorization_level_id))) return false;
+    if (positionIds.size > 0 && !positionIds.has(row.position_id)) return false;
     if (filters.discipline === NO_DISCIPLINE ? row.discipline_id !== null : filters.discipline && String(row.discipline_id) !== filters.discipline) return false;
     // El filtro de estado solo acota las filas vigentes; las dadas de baja las rige el interruptor.
     if (statuses.size > 0 && !row.retired && !statuses.has(row.status)) return false;
