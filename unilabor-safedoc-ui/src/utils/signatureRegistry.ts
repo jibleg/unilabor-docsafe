@@ -18,6 +18,8 @@ export interface SignatureRegistryFilters {
   levelIds: number[];
   /** Puestos (ids); vacío = todos. */
   positionIds: number[];
+  /** Colaboradores (ids); vacío = todos. */
+  employeeIds: number[];
   /** Muestra también las filas históricas (DADA DE BAJA). */
   showRetired: boolean;
 }
@@ -34,6 +36,7 @@ export const EMPTY_SIGNATURE_FILTERS: SignatureRegistryFilters = {
   statuses: [],
   levelIds: [],
   positionIds: [],
+  employeeIds: [],
   showRetired: false,
 };
 
@@ -41,6 +44,13 @@ export const EMPTY_SIGNATURE_FILTERS: SignatureRegistryFilters = {
 export const filterableLevels = (listing: SignatureRegistryListing): RhAuthorizationLevel[] => {
   const inUse = new Set(listing.rows.map((row) => row.authorization_level_id));
   return listing.authorization_levels.filter((level) => level.is_active || inUse.has(level.id)).sort((a, b) => a.level_no - b.level_no);
+};
+
+/** Colaboradores presentes en el registro, por nombre. */
+export const filterableEmployees = (listing: SignatureRegistryListing): Array<{ id: number; name: string; code: string }> => {
+  const byId = new Map<number, { id: number; name: string; code: string }>();
+  for (const row of listing.rows) byId.set(row.employee_id, { id: row.employee_id, name: row.full_name, code: row.employee_code });
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'));
 };
 
 /** Puestos presentes en el registro, por nombre. */
@@ -86,6 +96,7 @@ export const hasActiveFilters = (filters: SignatureRegistryFilters): boolean =>
       filters.statuses.length > 0 ||
       filters.levelIds.length > 0 ||
       filters.positionIds.length > 0 ||
+      filters.employeeIds.length > 0 ||
       filters.showRetired,
   );
 
@@ -97,11 +108,13 @@ export const filterSignatureRegistry = (listing: SignatureRegistryListing, filte
   const levelIds = new Set(filters.levelIds);
   const disciplines = new Set(filters.disciplines);
   const positionIds = new Set(filters.positionIds);
+  const employeeIds = new Set(filters.employeeIds);
   return listing.rows.filter((row) => {
     if (row.retired && !filters.showRetired) return false;
     if (filters.branch && row.branch_name !== filters.branch) return false;
     if (levelIds.size > 0 && (row.authorization_level_id === null || !levelIds.has(row.authorization_level_id))) return false;
     if (positionIds.size > 0 && !positionIds.has(row.position_id)) return false;
+    if (employeeIds.size > 0 && !employeeIds.has(row.employee_id)) return false;
     if (disciplines.size > 0 && !disciplines.has(row.discipline_id === null ? NO_DISCIPLINE : String(row.discipline_id))) return false;
     // El filtro de estado solo acota las filas vigentes; las dadas de baja las rige el interruptor.
     if (statuses.size > 0 && !row.retired && !statuses.has(row.status)) return false;

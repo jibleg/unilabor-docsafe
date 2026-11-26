@@ -20,6 +20,7 @@ import {
   STATUS_TONE,
   STATUS_TONE_CLASS,
   filterSignatureRegistry,
+  filterableEmployees,
   filterableLevels,
   filterablePositions,
   hasActiveFilters,
@@ -103,8 +104,15 @@ export const RhSignatureRegistryPage = () => {
     () => (listing ? filterablePositions(listing) : []).map((position) => ({ value: String(position.id), label: position.name })),
     [listing],
   );
+  const employeeOptions = useMemo(
+    () => (listing ? filterableEmployees(listing) : []).map((employee) => ({ value: String(employee.id), label: `${employee.name} · ${employee.code}` })),
+    [listing],
+  );
+  const allEmployeeValues = useMemo(() => employeeOptions.map((option) => option.value), [employeeOptions]);
   const allLevelValues = useMemo(() => levelOptions.map((option) => option.value), [levelOptions]);
   const allPositionValues = useMemo(() => positionOptions.map((option) => option.value), [positionOptions]);
+  const changeEmployees = (values: string[]) =>
+    updateFilters((current) => ({ ...current, employeeIds: values.length >= allEmployeeValues.length ? [] : values.map(Number) }));
   const changeLevels = (values: string[]) =>
     updateFilters((current) => ({ ...current, levelIds: values.length >= allLevelValues.length ? [] : values.map(Number) }));
   const changePositions = (values: string[]) =>
@@ -184,6 +192,18 @@ export const RhSignatureRegistryPage = () => {
                 className={`${SELECT} w-full pl-9`}
               />
             </label>
+            <div className="w-[260px]" title="Colaborador (uno o varios)">
+              <MultiSelectFilter
+                values={filters.employeeIds.length > 0 ? filters.employeeIds.map(String) : allEmployeeValues}
+                defaultValues={allEmployeeValues}
+                options={employeeOptions}
+                onChange={changeEmployees}
+                allLabel="Todos los colaboradores"
+                searchable
+                searchPlaceholder="Buscar colaborador..."
+                triggerClassName={`${SELECT} w-full`}
+              />
+            </div>
             <select value={filters.branch} onChange={(event) => updateFilters((current) => ({ ...current, branch: event.target.value }))} aria-label="Sucursal" className={SELECT}>
               <option value="">Todas las sucursales</option>
               {branches.map((branch) => (

@@ -104,6 +104,10 @@ describe('filtros por nivel de autorización y puesto', () => {
     expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, positionIds: [1, 2], levelIds: [2] }).map((item) => item.employee_id)).toEqual([1, 2]);
   });
 
+  it('admite varios colaboradores a la vez', () => {
+    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, employeeIds: [1, 3] }).map((item) => item.employee_id)).toEqual([1, 3]);
+  });
+
   it('cuentan como filtro activo', () => {
     expect(hasActiveFilters({ ...EMPTY_SIGNATURE_FILTERS, levelIds: [4], positionIds: [2] })).toBe(true);
   });

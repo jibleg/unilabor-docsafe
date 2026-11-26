@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, ListChecks, RotateCcw } from 'lucide-react';
+import { Check, ChevronDown, ListChecks, RotateCcw, Search } from 'lucide-react';
 
 export interface MultiSelectOption {
   value: string;
@@ -20,7 +20,12 @@ interface MultiSelectFilterProps {
   disabled?: boolean;
   /** Clases visuales del disparador; sustituyen a las predeterminadas para igualar los filtros vecinos. */
   triggerClassName?: string;
+  /** Muestra un buscador dentro del menu (para listas largas, p. ej. colaboradores). */
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }
+
+const normalize = (value: string): string => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const DEFAULT_TRIGGER_CLASS =
   'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)] disabled:opacity-60';
@@ -39,8 +44,13 @@ export const MultiSelectFilter = ({
   allLabel = 'Todos',
   disabled = false,
   triggerClassName = DEFAULT_TRIGGER_CLASS,
+  searchable = false,
+  searchPlaceholder = 'Buscar...',
 }: MultiSelectFilterProps) => {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const needle = normalize(query.trim());
+  const visibleOptions = needle ? options.filter((option) => normalize(option.label).includes(needle)) : options;
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -55,6 +65,12 @@ export const MultiSelectFilter = ({
       ? selectedLabels.join(', ')
       : `${selectedLabels.length} de ${options.length} seleccionados`;
 
+  // Al cerrar el menu se limpia la busqueda.
+  const closeMenu = () => {
+    setOpen(false);
+    setQuery('');
+  };
+
   useEffect(() => {
     if (!open) {
       return;
@@ -64,15 +80,15 @@ export const MultiSelectFilter = ({
       if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) {
         return;
       }
-      setOpen(false);
+      closeMenu();
     };
     const handleScroll = (event: Event) => {
       if (menuRef.current?.contains(event.target as Node)) {
         return;
       }
-      setOpen(false);
+      closeMenu();
     };
-    const handleResize = () => setOpen(false);
+    const handleResize = () => closeMenu();
     document.addEventListener('mousedown', handlePointer);
     window.addEventListener('scroll', handleScroll, true);
     window.addEventListener('resize', handleResize);
@@ -96,7 +112,8 @@ export const MultiSelectFilter = ({
       const top = openUpward ? Math.max(8, rect.top - ESTIMATED_MENU_HEIGHT - 4) : rect.bottom + 4;
       setPos({ top, left: rect.left, width: Math.max(rect.width, 260) });
     }
-    setOpen((current) => !current);
+    if (open) closeMenu();
+    else setOpen(true);
   };
 
   const toggleValue = (value: string) => {
@@ -158,8 +175,21 @@ export const MultiSelectFilter = ({
                   </button>
                 ) : null}
               </div>
+              {searchable ? (
+                <div className="flex items-center gap-2 border-b border-[rgba(0,65,106,0.08)] px-3 py-2">
+                  <Search size={14} className="shrink-0 text-[var(--unilabor-neutral)]" />
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={searchPlaceholder}
+                    aria-label={searchPlaceholder}
+                    className="w-full bg-transparent text-sm text-[var(--unilabor-ink)] outline-none"
+                  />
+                </div>
+              ) : null}
               <div className="max-h-72 overflow-y-auto py-1">
-                {options.map((option) => {
+                {visibleOptions.length === 0 ? <p className="px-3 py-3 text-sm text-[var(--unilabor-neutral)]">Sin coincidencias.</p> : null}
+                {visibleOptions.map((option) => {
                   const checked = selectedSet.has(option.value);
                   return (
                     <button
