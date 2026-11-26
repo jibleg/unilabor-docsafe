@@ -24,6 +24,7 @@ import {
   getCompetencySignersController,
   sendCompetencyToSignatureController,
 } from '../controllers/rh-phase7-signature.controller';
+import { downloadCompetencyEvaluationsController } from '../controllers/rh-competency-download.controller';
 import {
   getCompetencyDashboardController,
   getCompetencyEmployeeDetailController,
@@ -43,6 +44,7 @@ import {
   assignCourseKnowledgeSchema,
   sendCompetencyToSignatureSchema,
   createCompetencyEvaluationSchema,
+  downloadCompetencyEvaluationsSchema,
   replaceActionsSchema,
   replaceSectionItemsSchema,
   updateCompetencyEvaluationSchema,
@@ -75,6 +77,8 @@ router.get('/dashboard/employees/:employeeId', getCompetencyEmployeeDetailContro
 
 router.get('/', listCompetencyEvaluationsController);
 router.post('/', validate(createCompetencyEvaluationSchema), createCompetencyEvaluationController);
+// Descarga de REH-REG-003 firmados (PDF o ZIP). Va ANTES de /:id.
+router.post('/download', validate(downloadCompetencyEvaluationsSchema), downloadCompetencyEvaluationsController);
 router.get('/:id', getCompetencyEvaluationController);
 router.patch('/:id', validate(updateCompetencyEvaluationSchema), updateCompetencyEvaluationController);
 router.put('/:id/items', validate(replaceSectionItemsSchema), replaceCompetencySectionItemsController);

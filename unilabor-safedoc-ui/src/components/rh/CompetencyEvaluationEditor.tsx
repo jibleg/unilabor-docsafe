@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Award, Check, Eye, FileText, Loader2, Plus, Save, Send, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertTriangle, Award, Check, Download, Eye, FileText, Loader2, Plus, Save, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { KnowledgeQuizPanel } from './KnowledgeQuizPanel';
 import { toast } from 'react-toastify';
 import {
   cancelCompetencySignature,
+  downloadCompetencyEvaluations,
   getCompetencyPdfUrl,
   getCompetencySigners,
   issueCompetencyCertificate,
@@ -445,6 +446,19 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
   );
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
   const [issuingCertificate, setIssuingCertificate] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  // Descarga del REH-REG-003 firmado (pedido de los auditores de la ema).
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await downloadCompetencyEvaluations([evaluation.id]);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo descargar el REH-REG-003.'));
+    } finally {
+      setDownloading(false);
+    }
+  };
   // Secciones 1-3 en pestañas para acortar el scroll. Todas se mantienen montadas
   // (solo se ocultan) para no perder cambios sin guardar al cambiar de pestaña.
   const [activeSection, setActiveSection] = useState<RhCompetencySection>('COMPETENCIA');
@@ -572,6 +586,17 @@ export const CompetencyEvaluationEditor = ({ evaluation, onChanged, autoOpenAuth
                       className={buttonClass}
                     >
                       <FileText size={14} /> Ver registro
+                    </button>
+                  ) : null}
+                  {evaluation.document_id ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleDownload()}
+                      disabled={downloading}
+                      className={buttonClass}
+                      title="Descargar el REH-REG-003 firmado (PDF)"
+                    >
+                      {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Descargar
                     </button>
                   ) : null}
                   {evaluation.certificate_document_id ? (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ClipboardCheck, Loader2, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Download, Loader2, Plus, Search, ShieldCheck, Trash2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { listEmployees } from '../api/service';
@@ -7,6 +7,7 @@ import { listPositions } from '../api/service.api-rh-position';
 import {
   createCompetencyEvaluation,
   deleteCompetencyEvaluationDraft,
+  downloadCompetencyEvaluations,
   getCompetencyEvaluation,
   listCompetencyEvaluations,
 } from '../api/service.api-rh-competency';
@@ -35,6 +36,38 @@ const TYPE_LABELS: Record<RhCompetencyEvaluationType, string> = {
 
 const todayIso = (): string => new Date().toISOString().slice(0, 10);
 
+/** Solo las cerradas con su REH-REG-003 archivado se pueden descargar. */
+const isDownloadable = (evaluation: RhCompetencyEvaluation): boolean =>
+  evaluation.status === 'CLOSED' && evaluation.document_id !== null;
+
+interface SelectSwitchProps {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onToggle: () => void;
+}
+
+/** Interruptor compacto para elegir evaluaciones a descargar. */
+const SelectSwitch = ({ checked, disabled = false, label, onToggle }: SelectSwitchProps) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={label}
+    title={label}
+    disabled={disabled}
+    onClick={(event) => {
+      event.stopPropagation();
+      onToggle();
+    }}
+    className={`inline-flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition ${checked ? 'bg-emerald-500' : 'bg-slate-300'} ${
+      disabled ? 'cursor-not-allowed opacity-40' : ''
+    }`}
+  >
+    <span className={`h-3 w-3 rounded-full bg-white shadow transition ${checked ? 'translate-x-3' : ''}`} />
+  </button>
+);
+
 export const RhCompetencyEvaluationsPage = () => {
   const [evaluations, setEvaluations] = useState<RhCompetencyEvaluation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +93,29 @@ export const RhCompetencyEvaluationsPage = () => {
   const [createEvaluator, setCreateEvaluator] = useState('');
   const [creating, setCreating] = useState(false);
 
+  // Descarga de REH-REG-003 firmados (auditoria ema): seleccion por fila o todas las descargables.
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [downloading, setDownloading] = useState(false);
+  const downloadable = evaluations.filter(isDownloadable);
+  const allSelected = downloadable.length > 0 && downloadable.every((item) => selectedIds.includes(item.id));
+
+  const toggleOne = (id: number) =>
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  const toggleAll = () => setSelectedIds(allSelected ? [] : downloadable.map((item) => item.id));
+
+  const handleDownload = async (ids: number[]) => {
+    if (ids.length === 0) return;
+    setDownloading(true);
+    try {
+      await downloadCompetencyEvaluations(ids);
+      toast.success(ids.length === 1 ? 'REH-REG-003 descargado.' : `${ids.length} evaluaciones descargadas en un ZIP.`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'No se pudo preparar la descarga.'));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -70,6 +126,7 @@ export const RhCompetencyEvaluationsPage = () => {
         ...(pendingOnly ? { limit: 100 } : {}),
       });
       setEvaluations(pendingOnly ? result.data.filter((item) => item.results.authorization_result === 'PENDIENTE') : result.data);
+      setSelectedIds([]);
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'No se pudieron cargar las evaluaciones.'));
     } finally {
@@ -336,9 +393,28 @@ export const RhCompetencyEvaluationsPage = () => {
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
+            {downloadable.length > 0 ? (
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(0,65,106,0.08)] bg-[rgba(248,251,253,0.95)] px-3 py-2">
+                <label className="flex items-center gap-2 text-xs font-semibold text-[var(--color-brand-700)]">
+                  <SelectSwitch checked={allSelected} label="Elegir todas las cerradas" onToggle={toggleAll} />
+                  Todas las cerradas ({downloadable.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void handleDownload(selectedIds)}
+                  disabled={downloading || selectedIds.length === 0}
+                  className={buttonClass}
+                  title="Descargar el REH-REG-003 firmado de las evaluaciones elegidas (una = PDF, varias = ZIP)"
+                >
+                  {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  Descargar{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+                </button>
+              </div>
+            ) : null}
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="text-[var(--unilabor-neutral)]">
+                  <th className="pb-2 pr-2 font-semibold" aria-label="Elegir" />
                   <th className="pb-2 pr-2 font-semibold">Colaborador</th>
                   <th className="pb-2 pr-2 font-semibold">Puesto</th>
                   <th className="pb-2 pr-2 font-semibold">Tipo</th>
@@ -357,6 +433,14 @@ export const RhCompetencyEvaluationsPage = () => {
                       onClick={() => void openDetail(evaluation.id)}
                       className="cursor-pointer border-t border-[rgba(0,65,106,0.06)] align-top transition hover:bg-[rgba(239,245,250,0.7)]"
                     >
+                      <td className="py-2.5 pr-2">
+                        <SelectSwitch
+                          checked={selectedIds.includes(evaluation.id)}
+                          disabled={!isDownloadable(evaluation)}
+                          label={isDownloadable(evaluation) ? 'Elegir para descargar' : 'Solo se descargan las cerradas'}
+                          onToggle={() => toggleOne(evaluation.id)}
+                        />
+                      </td>
                       <td className="py-2 pr-2">
                         <p className="font-bold text-[var(--color-brand-700)]">{evaluation.employee_name}</p>
                         <p className="text-[var(--unilabor-neutral)]">{evaluation.employee_code}</p>

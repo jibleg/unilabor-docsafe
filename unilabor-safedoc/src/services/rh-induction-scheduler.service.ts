@@ -44,6 +44,12 @@ export const runInductionReadingSweep = async (): Promise<void> => {
 };
 
 export const startInductionScheduler = (): void => {
+  // Mismo candado que los demas schedulers: una instancia local o secundaria no
+  // debe barrer la base en paralelo con el servidor de produccion.
+  if (process.env.SCHEDULER_ENABLED === 'false') {
+    console.log('Scheduler de induccion deshabilitado (SCHEDULER_ENABLED=false).');
+    return;
+  }
   cron.schedule('*/10 * * * *', () => {
     void runInductionReadingSweep();
   });

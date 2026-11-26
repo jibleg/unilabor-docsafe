@@ -54,6 +54,43 @@ export const listCompetencyEvaluations = async (
   return { data, pagination: extractPagination(response.data, data.length) };
 };
 
+/** Nombre de archivo que manda el servidor en Content-Disposition (RFC 5987 o entrecomillado). */
+const fileNameFromDisposition = (disposition: string, fallback: string): string => {
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  if (utf8?.[1]) return decodeURIComponent(utf8[1]);
+  const plain = /filename="?([^";]+)"?/i.exec(disposition);
+  return plain?.[1] ?? fallback;
+};
+
+/**
+ * Descarga el REH-REG-003 firmado de una o varias evaluaciones cerradas
+ * (una = PDF, varias = ZIP) y lo guarda en el equipo del usuario.
+ */
+export const downloadCompetencyEvaluations = async (ids: number[]): Promise<void> => {
+  let response;
+  try {
+    response = await api.post('/rh/competency-evaluations/download', { ids }, { responseType: 'blob' });
+  } catch (error) {
+    // Con responseType blob el error del servidor llega como Blob: se recupera el mensaje JSON.
+    const data = (error as { response?: { data?: unknown } })?.response?.data;
+    if (data instanceof Blob) {
+      const parsed = asRecord(JSON.parse(await data.text()));
+      throw new Error(typeof parsed?.message === 'string' ? parsed.message : 'No se pudo preparar la descarga.');
+    }
+    throw error;
+  }
+  const fallback = ids.length === 1 ? `REH-REG-003-${String(ids[0]).padStart(5, '0')}.pdf` : 'REH-REG-003 Evaluaciones de competencia.zip';
+  const filename = fileNameFromDisposition(String(response.headers['content-disposition'] ?? ''), fallback);
+  const url = URL.createObjectURL(response.data as Blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};
+
 export const getCompetencyEvaluation = async (id: number): Promise<RhCompetencyEvaluation | null> => {
   const response = await api.get(`/rh/competency-evaluations/${id}`);
   const data = asRecord(unwrapPayload(response.data));

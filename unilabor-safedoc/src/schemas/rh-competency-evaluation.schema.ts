@@ -154,3 +154,12 @@ export const setCompetencyAuthorizationLevelSchema = z.object({
 });
 
 export type AuthorizeCompetencyEvaluationInput = z.infer<typeof authorizeCompetencyEvaluationSchema>;
+
+/** Descarga de REH-REG-003 firmados: una o varias evaluaciones cerradas (PDF suelto o ZIP). */
+export const downloadCompetencyEvaluationsSchema = z.object({
+  ids: z
+    .array(z.coerce.number().int().positive('Evaluacion invalida'))
+    .min(1, 'Elige al menos una evaluacion')
+    .max(500, 'Maximo 500 evaluaciones por descarga'),
+});
+export type DownloadCompetencyEvaluationsBody = z.infer<typeof downloadCompetencyEvaluationsSchema>;
