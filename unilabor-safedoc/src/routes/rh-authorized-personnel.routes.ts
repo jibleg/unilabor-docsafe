@@ -4,11 +4,7 @@ import {
   createOrganizationalLevelController,
   getAuthorizedPersonnelController,
   getAuthorizedPersonnelPdfController,
-  getFormSignerImageController,
   listAuthorizationLevelsController,
-  listFormSignersController,
-  retireFormSignerController,
-  setFormSignerController,
   listOrganizationalLevelsController,
   setAuthorizationLevelController,
   updateAuthorizationLevelController,
@@ -18,6 +14,8 @@ import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { authorizationLevelSchema, authorizedPersonnelPdfSchema, formSignerBodySchema, organizationalLevelSchema } from '../schemas/rh-authorized-personnel.schema';
 import { setCompetencyAuthorizationLevelSchema } from '../schemas/rh-competency-evaluation.schema';
+import { createFormSignerControllers } from '../controllers/rh-form-signers.controller';
+import { AUTHORIZED_PERSONNEL_FORM } from '../services/rh-authorized-personnel.pdf';
 
 /**
  * Listado de personal autorizado (REH-REG-026). Se monta en /api/rh.
@@ -39,10 +37,11 @@ router.post(
   getAuthorizedPersonnelPdfController,
 );
 // Firmantes del pie del PDF (ELABORO / REVISO / AUTORIZO): consulta quien gestiona, edita quien autoriza.
-router.get('/authorized-personnel/signers', requirePermission('RH.COMPETENCY.MANAGE'), listFormSignersController);
-router.get('/authorized-personnel/signers/:slot/image', requirePermission('RH.COMPETENCY.MANAGE'), getFormSignerImageController);
-router.put('/authorized-personnel/signers/:slot', requirePermission('RH.COMPETENCY.AUTHORIZE'), validate(formSignerBodySchema), setFormSignerController);
-router.post('/authorized-personnel/signers/:slot/retire', requirePermission('RH.COMPETENCY.AUTHORIZE'), retireFormSignerController);
+const signers026 = createFormSignerControllers(AUTHORIZED_PERSONNEL_FORM.code);
+router.get('/authorized-personnel/signers', requirePermission('RH.COMPETENCY.MANAGE'), signers026.list);
+router.get('/authorized-personnel/signers/:slot/image', requirePermission('RH.COMPETENCY.MANAGE'), signers026.image);
+router.put('/authorized-personnel/signers/:slot', requirePermission('RH.COMPETENCY.AUTHORIZE'), validate(formSignerBodySchema), signers026.set);
+router.post('/authorized-personnel/signers/:slot/retire', requirePermission('RH.COMPETENCY.AUTHORIZE'), signers026.retire);
 router.put(
   '/authorized-personnel/evaluations/:id/authorization-level',
   requirePermission('RH.COMPETENCY.AUTHORIZE'),

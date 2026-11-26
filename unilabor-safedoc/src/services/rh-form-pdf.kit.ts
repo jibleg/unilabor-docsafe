@@ -244,25 +244,51 @@ export interface FormSigner {
   role: string;
 }
 
-/** Bloque FIRMAS al pie: una columna por firmante con sus anchos. */
-export const drawFormSignatures = (kit: FormPdfKit, signers: readonly FormSigner[], widths: number[]): void => {
+/** Firmante capturado en SafeDoc (rh_form_signers) ya con su imagen embebida. */
+export interface CapturedFormSigner {
+  name: string;
+  role: string;
+  image: PDFImage | null;
+  /** Fecha ISO en que se registro la firma (se imprime en pequenio). */
+  signedAt: string | null;
+}
+
+/**
+ * Bloque FIRMAS al pie: una columna por firmante con sus anchos. Donde hay
+ * firmante capturado se imprimen su nombre, cargo y firma; si no, el fijo del formato.
+ */
+export const drawFormSignatures = (
+  kit: FormPdfKit,
+  signers: readonly FormSigner[],
+  widths: number[],
+  captured: Array<CapturedFormSigner | null> = [],
+): void => {
   const headH = 12;
   const titleH = 10;
-  const signH = 34;
+  const signH = captured.some((item) => item?.image) ? 48 : 34;
   const roleH = 11;
   if (kit.y() - (headH + titleH + signH + roleH) < FORM_BOTTOM) kit.newPage();
   const y = kit.y();
   kit.band('FIRMAS', FORM_MARGIN, y, FORM_CONTENT_W, headH);
   let x = FORM_MARGIN;
-  signers.forEach((signer, index) => {
+  signers.forEach((fixed, index) => {
     const w = widths[index]!;
     const top = y - headH;
+    const current = captured[index] ?? null;
     kit.box(x, top, w, titleH, FORM_COLORS.GRAY);
-    kit.cell(signer.heading, x, top, w, titleH, { font: kit.bold, size: 5.5 });
+    kit.cell(fixed.heading, x, top, w, titleH, { font: kit.bold, size: 5.5 });
     kit.box(x, top - titleH, w, signH);
-    kit.cell(signer.name, x, top - titleH - signH + 10, w, 10, { size: 6 });
+    if (current?.image) {
+      // La firma ocupa el recuadro por encima del renglon del nombre.
+      kit.image(current.image, x, top - titleH - 2, w, signH - 12, 3);
+      if (current.signedAt) {
+        const stamp = kit.safe(`Firma registrada el ${formatFormDate(current.signedAt.slice(0, 10))}`);
+        kit.page().drawText(stamp, { x: x + w - 4 - kit.regular.widthOfTextAtSize(stamp, 4.5), y: top - titleH - 6, size: 4.5, font: kit.regular, color: FORM_COLORS.MUTED });
+      }
+    }
+    kit.cell(current?.name ?? fixed.name, x, top - titleH - signH + 10, w, 10, { size: 6 });
     kit.box(x, top - titleH - signH, w, roleH, FORM_COLORS.BLUE_ROLE);
-    kit.cell(signer.role, x, top - titleH - signH, w, roleH, { font: kit.bold, size: 6.5 });
+    kit.cell(current?.role ?? fixed.role, x, top - titleH - signH, w, roleH, { font: kit.bold, size: 6.5 });
     x += w;
   });
   kit.advance(headH + titleH + signH + roleH);

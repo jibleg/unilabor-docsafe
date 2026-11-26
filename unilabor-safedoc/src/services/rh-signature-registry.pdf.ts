@@ -10,9 +10,11 @@ import {
   drawFormSignatures,
   formatFormDate,
   type Rgb,
+  type CapturedFormSigner,
 } from './rh-form-pdf.kit';
 import type { SignatureRegistryTone } from './rh-signature-registry.rules';
 import type { SignatureRegistryListing, SignatureRegistryRow } from './rh-signature-registry.service';
+import type { FormSignerForPdf, FormSignerSlot } from './rh-form-signers.service';
 
 /**
  * PDF del Registro de firmas autorizadas REH-REG-027 con el diseno del formato
@@ -70,7 +72,11 @@ const TONE_STYLE: Record<SignatureRegistryTone, { fill: Rgb; color: Rgb }> = {
 export interface SignatureRegistryPdfOptions {
   /** PNG de cada especimen por id (los que falten salen en blanco). */
   specimenImages?: Map<number, Buffer>;
+  /** Firmantes capturados del pie (Responsable de elaboracion / Reviso / Aprobo). */
+  signers?: Partial<Record<FormSignerSlot, FormSignerForPdf>>;
 }
+
+const SIGNER_SLOTS: FormSignerSlot[] = ['ELABORO', 'REVISO', 'AUTORIZO'];
 
 export const buildSignatureRegistryPdf = async (listing: SignatureRegistryListing, generatedAt: Date, options: SignatureRegistryPdfOptions = {}): Promise<Buffer> => {
   const kit = await createFormPdfKit(`${SIGNATURE_REGISTRY_FORM.code} ${SIGNATURE_REGISTRY_FORM.title} - corte ${formatFormDate(listing.cutoff_date)}`);
@@ -193,7 +199,17 @@ export const buildSignatureRegistryPdf = async (listing: SignatureRegistryListin
   }
   kit.advance(12);
   drawSummary();
-  drawFormSignatures(kit, SIGNATURE_REGISTRY_FORM.signers, [span(0, 3), span(4, 7), span(8, 12)]);
+  const captured: Array<CapturedFormSigner | null> = [];
+  for (const slot of SIGNER_SLOTS) {
+    const signer = options.signers?.[slot];
+    if (!signer) {
+      captured.push(null);
+      continue;
+    }
+    const image = signer.png ? await kit.doc.embedPng(signer.png).catch(() => null) : null;
+    captured.push({ name: signer.name, role: signer.title, image, signedAt: signer.signedAt });
+  }
+  drawFormSignatures(kit, SIGNATURE_REGISTRY_FORM.signers, [span(0, 3), span(4, 7), span(8, 12)], captured);
   kit.footer(SIGNATURE_REGISTRY_FORM.code, generatedAt);
 
   return Buffer.from(await kit.doc.save());

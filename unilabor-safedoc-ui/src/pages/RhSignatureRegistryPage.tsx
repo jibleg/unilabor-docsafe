@@ -4,6 +4,7 @@ import { getSignatureRegistry, getSignatureRegistryPdfUrl } from '../api/service
 import { getApiErrorMessage } from '../api/service.parsers';
 import { MultiSelectFilter } from '../components/MultiSelectFilter';
 import { Pagination } from '../components/Pagination';
+import { FormSignersDrawer, type FormSignerSlotSpec } from '../components/rh/form-signers/FormSignersDrawer';
 import { DisciplinesDrawer } from '../components/rh/signature-registry/DisciplinesDrawer';
 import { SignatureRegistryDrawer } from '../components/rh/signature-registry/SignatureRegistryDrawer';
 import { SignatureRegistryTable } from '../components/rh/signature-registry/SignatureRegistryTable';
@@ -28,6 +29,12 @@ import {
 
 const SELECT = 'rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none focus:border-[var(--color-brand-300)]';
 const BUTTON = 'inline-flex items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50';
+// Puestos de firma del pie del REH-REG-027 (encabezados del formato).
+const SIGNER_SLOTS: FormSignerSlotSpec[] = [
+  { slot: 'ELABORO', label: 'Responsable de elaboración', hint: 'Coordinación de Recursos Humanos' },
+  { slot: 'REVISO', label: 'Revisó', hint: 'Coordinador de Procedimientos Analíticos' },
+  { slot: 'AUTORIZO', label: 'Aprobó', hint: 'Dirección General' },
+];
 const PAGE_SIZE_OPTIONS = [30, 50, 70];
 const SUMMARY_ORDER: SignatureRegistryStatus[] = ['VIGENTE', 'POR_VENCER', 'VENCIDA', 'SIN_EVALUACION', 'INCOMPLETA', 'DADA_DE_BAJA'];
 
@@ -42,6 +49,7 @@ export const RhSignatureRegistryPage = () => {
   const [exporting, setExporting] = useState(false);
   const [filters, setFilters] = useState<SignatureRegistryFilters>(EMPTY_SIGNATURE_FILTERS);
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [signersOpen, setSignersOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]!);
@@ -127,6 +135,9 @@ export const RhSignatureRegistryPage = () => {
           {listing ? <span className="hidden text-[11px] text-[var(--unilabor-neutral)] md:inline">Corte al {formatDateOnly(listing.cutoff_date)}</span> : null}
           <button type="button" onClick={() => setCatalogOpen(true)} className={BUTTON} title="Catálogo de disciplinas o áreas">
             <Settings2 size={15} /> Disciplinas
+          </button>
+          <button type="button" onClick={() => setSignersOpen(true)} className={BUTTON} title="Firmas del responsable de elaboración, de quien revisa y de quien aprueba; se imprimen en el PDF">
+            <PenLine size={15} /> Firmas
           </button>
           <button
             type="button"
@@ -262,6 +273,7 @@ export const RhSignatureRegistryPage = () => {
 
       <SignatureRegistryDrawer row={editingRow} disciplines={listing?.disciplines ?? []} onClose={() => setEditingKey(null)} onChanged={() => void load()} />
       <DisciplinesDrawer open={catalogOpen} onClose={() => setCatalogOpen(false)} onChanged={() => void load()} />
+      <FormSignersDrawer open={signersOpen} onClose={() => setSignersOpen(false)} basePath="/rh/signature-registry" formCode="REH-REG-027" slots={SIGNER_SLOTS} />
     </div>
   );
 };

@@ -4,7 +4,7 @@ import { getAuthorizedPersonnel, getAuthorizedPersonnelPdfUrl } from '../api/ser
 import { getApiErrorMessage } from '../api/service.parsers';
 import { AuthorizedPersonnelBoard } from '../components/rh/authorized-personnel/AuthorizedPersonnelBoard';
 import { AuthorizedPersonnelTable } from '../components/rh/authorized-personnel/AuthorizedPersonnelTable';
-import { FormSignersDrawer } from '../components/rh/authorized-personnel/FormSignersDrawer';
+import { FormSignersDrawer, type FormSignerSlotSpec } from '../components/rh/form-signers/FormSignersDrawer';
 import { PersonnelLevelsDrawer } from '../components/rh/authorized-personnel/PersonnelLevelsDrawer';
 import { Pagination } from '../components/Pagination';
 import type { AuthorizedPersonnelListing } from '../types/models';
@@ -24,6 +24,12 @@ import { notifyError } from '../utils/notify';
 import { useHasPermission } from '../utils/permissions';
 
 const SELECT = 'rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none focus:border-[var(--color-brand-300)]';
+// Puestos de firma del pie del REH-REG-026.
+const SIGNER_SLOTS: FormSignerSlotSpec[] = [
+  { slot: 'ELABORO', label: 'Elaboró', hint: 'Coordinación de Recursos Humanos' },
+  { slot: 'REVISO', label: 'Revisó', hint: 'Quien revisa el listado' },
+  { slot: 'AUTORIZO', label: 'Autorizó', hint: 'Dirección General' },
+];
 const PAGE_SIZE_OPTIONS = [30, 50, 70];
 const BUTTON = 'inline-flex items-center gap-1.5 rounded-xl border border-[rgba(0,65,106,0.14)] bg-[rgba(191,212,230,0.4)] px-3 py-2 text-sm font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(124,173,211,0.3)] disabled:opacity-50';
 
@@ -236,7 +242,7 @@ export const RhAuthorizedPersonnelPage = () => {
       ) : null}
 
       <PersonnelLevelsDrawer open={catalogsOpen} onClose={() => setCatalogsOpen(false)} onChanged={() => void load()} />
-      <FormSignersDrawer open={signersOpen} onClose={() => setSignersOpen(false)} />
+      <FormSignersDrawer open={signersOpen} onClose={() => setSignersOpen(false)} basePath="/rh/authorized-personnel" formCode="REH-REG-026" slots={SIGNER_SLOTS} />
     </div>
   );
 };

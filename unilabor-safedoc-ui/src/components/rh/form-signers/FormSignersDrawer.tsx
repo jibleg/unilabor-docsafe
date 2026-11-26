@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardPaste, ImageUp, Loader2, Save, Trash2 } from 'lucide-react';
-import { getFormSignerImageUrl, listFormSigners, retireFormSigner, saveFormSigner } from '../../../api/service.api-rh-authorized-personnel';
+import { getFormSignerImageUrl, listFormSigners, retireFormSigner, saveFormSigner } from '../../../api/service.api-rh-form-signers';
 import { getApiErrorMessage } from '../../../api/service.parsers';
 import { useImagePaste } from '../../../hooks/useImagePaste';
 import type { FormSignerSlot, RhFormSigner, RhFormSignersBySlot } from '../../../types/models';
@@ -10,22 +10,29 @@ import { notifyError, notifySuccess } from '../../../utils/notify';
 import { SPECIMEN_IMAGE_ACCEPT, specimenImageIssue, specimenImageToPngDataUrl } from '../../../utils/specimen-image';
 import { DrawerShell } from '../../attendance/schedule/DrawerShell';
 
+export interface FormSignerSlotSpec {
+  slot: FormSignerSlot;
+  /** Encabezado del puesto tal como lo imprime el formato (Elaboró, Aprobó…). */
+  label: string;
+  hint: string;
+}
+
 interface FormSignersDrawerProps {
   open: boolean;
   onClose: () => void;
+  /** Base de las rutas del módulo: `/rh/authorized-personnel`, `/rh/signature-registry`. */
+  basePath: string;
+  /** Código del formato, para el subtítulo. */
+  formCode: string;
+  slots: FormSignerSlotSpec[];
 }
-
-const SLOTS: Array<{ slot: FormSignerSlot; label: string; hint: string }> = [
-  { slot: 'ELABORO', label: 'Elaboró', hint: 'Coordinación de Recursos Humanos' },
-  { slot: 'REVISO', label: 'Revisó', hint: 'Quien revisa el listado' },
-  { slot: 'AUTORIZO', label: 'Autorizó', hint: 'Dirección General' },
-];
 
 const INPUT = 'w-full rounded-xl border border-[rgba(0,65,106,0.14)] bg-white px-3 py-2 text-sm text-[var(--unilabor-ink)] outline-none focus:border-[var(--color-brand-300)]';
 const ACTION =
   'inline-flex items-center gap-1 rounded-lg border border-[rgba(0,65,106,0.12)] bg-white px-2 py-1 text-[11px] font-semibold text-[var(--color-brand-700)] transition hover:bg-[rgba(191,212,230,0.28)] disabled:opacity-50';
 
 interface SignerCardProps {
+  basePath: string;
   slot: FormSignerSlot;
   label: string;
   hint: string;
@@ -34,7 +41,7 @@ interface SignerCardProps {
 }
 
 /** Un puesto de firma: nombre, cargo y firma (archivo, portapapeles o Ctrl+V); guardar retira el registro anterior. */
-const SignerCard = ({ slot, label, hint, signer, onChanged }: SignerCardProps) => {
+const SignerCard = ({ basePath, slot, label, hint, signer, onChanged }: SignerCardProps) => {
   const zoneRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(signer?.signer_name ?? '');
@@ -56,7 +63,7 @@ const SignerCard = ({ slot, label, hint, signer, onChanged }: SignerCardProps) =
       setCurrentUrl(null);
       return undefined;
     }
-    getFormSignerImageUrl(slot)
+    getFormSignerImageUrl(basePath, slot)
       .then((url) => {
         if (active) setCurrentUrl(url);
       })
@@ -66,7 +73,7 @@ const SignerCard = ({ slot, label, hint, signer, onChanged }: SignerCardProps) =
     return () => {
       active = false;
     };
-  }, [signer, slot]);
+  }, [signer, slot, basePath]);
 
   const pickFile = async (file: File) => {
     const issue = specimenImageIssue(file);
@@ -98,7 +105,7 @@ const SignerCard = ({ slot, label, hint, signer, onChanged }: SignerCardProps) =
     }
     setBusy(true);
     try {
-      const result = await saveFormSigner(slot, { signer_name: name.trim(), signer_title: title.trim(), ...(pendingImage ? { image: pendingImage } : {}) });
+      const result = await saveFormSigner(basePath, slot, { signer_name: name.trim(), signer_title: title.trim(), ...(pendingImage ? { image: pendingImage } : {}) });
       notifySuccess(result.message);
       setPendingImage(null);
       onChanged();
@@ -118,7 +125,7 @@ const SignerCard = ({ slot, label, hint, signer, onChanged }: SignerCardProps) =
     if (!ok) return;
     setBusy(true);
     try {
-      notifySuccess(await retireFormSigner(slot));
+      notifySuccess(await retireFormSigner(basePath, slot));
       onChanged();
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo retirar al firmante.'));
@@ -188,36 +195,36 @@ const SignerCard = ({ slot, label, hint, signer, onChanged }: SignerCardProps) =
   );
 };
 
-/** Firmantes del pie del PDF REH-REG-026: nombre, cargo y firma de Elaboró, Revisó y Autorizó. */
-export const FormSignersDrawer = ({ open, onClose }: FormSignersDrawerProps) => {
+/** Firmantes del pie del PDF de un formato: nombre, cargo y firma de quien elabora, revisa y autoriza. */
+export const FormSignersDrawer = ({ open, onClose, basePath, formCode, slots }: FormSignersDrawerProps) => {
   const [signers, setSigners] = useState<RhFormSignersBySlot | null>(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setSigners(await listFormSigners());
+      setSigners(await listFormSigners(basePath));
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudieron cargar los firmantes.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [basePath]);
 
   useEffect(() => {
     if (open) void load();
   }, [open, load]);
 
   return (
-    <DrawerShell open={open} onClose={onClose} title="Firmas del formato" subtitle="REH-REG-026 · quienes elaboran, revisan y autorizan el listado; se imprimen al pie del PDF">
+    <DrawerShell open={open} onClose={onClose} title="Firmas del formato" subtitle={`${formCode} · quienes elaboran, revisan y autorizan; se imprimen al pie del PDF`}>
       {loading && !signers ? (
         <div className="flex justify-center py-10">
           <Loader2 size={20} className="animate-spin text-[var(--unilabor-neutral)]" />
         </div>
       ) : signers ? (
         <div className="space-y-3 p-4">
-          {SLOTS.map((item) => (
-            <SignerCard key={item.slot} slot={item.slot} label={item.label} hint={item.hint} signer={signers[item.slot]} onChanged={() => void load()} />
+          {slots.map((item) => (
+            <SignerCard key={item.slot} basePath={basePath} slot={item.slot} label={item.label} hint={item.hint} signer={signers[item.slot]} onChanged={() => void load()} />
           ))}
         </div>
       ) : null}

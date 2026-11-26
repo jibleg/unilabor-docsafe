@@ -21,6 +21,7 @@ import {
   SPECIMEN_KIND_LABEL,
 } from '../services/rh-signature-specimen.service';
 import { decodeSignaturePng } from '../utils/signature-image';
+import { loadFormSignersForPdf } from '../services/rh-form-signers.service';
 import {
   signatureRegistryEmployeeParamsSchema,
   signatureRegistryIdParamsSchema,
@@ -80,8 +81,8 @@ export const getSignatureRegistryPdfController = async (req: AuthRequest, res: R
     const full = await getSignatureRegistryListing(now);
     const listing = body.keys ? filterSignatureRegistryListing(full, body.keys) : full;
     const specimenIds = listing.rows.flatMap((row) => [row.signature_specimen?.id, row.initials_specimen?.id]).filter((id): id is number => typeof id === 'number');
-    const specimenImages = await loadSpecimenImages([...new Set(specimenIds)]);
-    const pdf = await buildSignatureRegistryPdf(listing, now, { specimenImages });
+    const [specimenImages, signers] = await Promise.all([loadSpecimenImages([...new Set(specimenIds)]), loadFormSignersForPdf(SIGNATURE_REGISTRY_FORM.code)]);
+    const pdf = await buildSignatureRegistryPdf(listing, now, { specimenImages, signers });
     await audit(req, `RH_SIGNATURE_REGISTRY_PDF:${listing.cutoff_date}:${listing.rows.length}/${full.rows.length}`, 'signature_registry', null);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${SIGNATURE_REGISTRY_FORM.code}_Registro_firmas_autorizadas_${listing.cutoff_date}.pdf"`);
