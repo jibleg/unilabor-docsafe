@@ -75,8 +75,10 @@ describe('filterSignatureRegistry', () => {
 
   it('filtra por sucursal, disciplina (incluida "sin disciplina") y busqueda sin acentos', () => {
     expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, branch: 'CENTRO' }).map((item) => item.employee_id)).toEqual([2]);
-    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, discipline: NO_DISCIPLINE }).map((item) => item.employee_id)).toEqual([2]);
-    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, discipline: '2' }).map((item) => item.employee_id)).toEqual([3]);
+    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, disciplines: [NO_DISCIPLINE] }).map((item) => item.employee_id)).toEqual([2]);
+    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, disciplines: ['2'] }).map((item) => item.employee_id)).toEqual([3]);
+    // Varias a la vez, incluida «Sin disciplina».
+    expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, disciplines: ['2', NO_DISCIPLINE] }).map((item) => item.employee_id)).toEqual([2, 3]);
     expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, search: 'validacion tecnica' })).toHaveLength(3);
     expect(filterSignatureRegistry(listing, { ...EMPTY_SIGNATURE_FILTERS, search: 'colaborador 3' }).map((item) => item.employee_id)).toEqual([3]);
   });

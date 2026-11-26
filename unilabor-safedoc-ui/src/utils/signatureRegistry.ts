@@ -10,8 +10,8 @@ import type {
 export interface SignatureRegistryFilters {
   search: string;
   branch: string;
-  /** '' = todas; 'none' = sin disciplina; si no, el id de la disciplina como texto. */
-  discipline: string;
+  /** Disciplinas a mostrar (ids como texto; NO_DISCIPLINE = sin disciplina); vacío = todas. */
+  disciplines: string[];
   /** Estados a mostrar; vacío = todos los estados de filas vigentes. */
   statuses: SignatureRegistryStatus[];
   /** Niveles de autorización (ids del catálogo); vacío = todos. */
@@ -30,7 +30,7 @@ export const ACTIVE_STATUSES: SignatureRegistryStatus[] = ['VIGENTE', 'POR_VENCE
 export const EMPTY_SIGNATURE_FILTERS: SignatureRegistryFilters = {
   search: '',
   branch: '',
-  discipline: '',
+  disciplines: [],
   statuses: [],
   levelIds: [],
   positionIds: [],
@@ -82,7 +82,7 @@ export const hasActiveFilters = (filters: SignatureRegistryFilters): boolean =>
   Boolean(
     filters.search ||
       filters.branch ||
-      filters.discipline ||
+      filters.disciplines.length > 0 ||
       filters.statuses.length > 0 ||
       filters.levelIds.length > 0 ||
       filters.positionIds.length > 0 ||
@@ -95,13 +95,14 @@ export const filterSignatureRegistry = (listing: SignatureRegistryListing, filte
   const needle = normalize(filters.search.trim());
   const statuses = new Set(filters.statuses);
   const levelIds = new Set(filters.levelIds);
+  const disciplines = new Set(filters.disciplines);
   const positionIds = new Set(filters.positionIds);
   return listing.rows.filter((row) => {
     if (row.retired && !filters.showRetired) return false;
     if (filters.branch && row.branch_name !== filters.branch) return false;
     if (levelIds.size > 0 && (row.authorization_level_id === null || !levelIds.has(row.authorization_level_id))) return false;
     if (positionIds.size > 0 && !positionIds.has(row.position_id)) return false;
-    if (filters.discipline === NO_DISCIPLINE ? row.discipline_id !== null : filters.discipline && String(row.discipline_id) !== filters.discipline) return false;
+    if (disciplines.size > 0 && !disciplines.has(row.discipline_id === null ? NO_DISCIPLINE : String(row.discipline_id))) return false;
     // El filtro de estado solo acota las filas vigentes; las dadas de baja las rige el interruptor.
     if (statuses.size > 0 && !row.retired && !statuses.has(row.status)) return false;
     return !needle || normalize(`${row.full_name} ${row.position_name} ${row.position_code} ${row.employee_code} ${row.signing_scope_text ?? ''}`).includes(needle);

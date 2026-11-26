@@ -72,10 +72,13 @@ export const RhSignatureRegistryPage = () => {
   const rows = useMemo(() => (listing ? filterSignatureRegistry(listing, filters) : []), [listing, filters]);
   const branches = useMemo(() => uniqueValues(listing?.rows.map((row) => row.branch_name) ?? []), [listing]);
   // Disciplinas del filtro: las activas y las inactivas que alguna fila aún tenga.
+  // Opciones del filtro de disciplina (multi-selección): «Sin disciplina» + activas e inactivas aún en uso.
   const disciplineOptions = useMemo(() => {
     const inUse = new Set(listing?.rows.map((row) => row.discipline_id) ?? []);
-    return (listing?.disciplines ?? []).filter((discipline) => discipline.is_active || inUse.has(discipline.id));
+    const catalog = (listing?.disciplines ?? []).filter((discipline) => discipline.is_active || inUse.has(discipline.id));
+    return [{ value: NO_DISCIPLINE, label: 'Sin disciplina' }, ...catalog.map((discipline) => ({ value: String(discipline.id), label: discipline.name }))];
   }, [listing]);
+  const allDisciplineValues = useMemo(() => disciplineOptions.map((option) => option.value), [disciplineOptions]);
   // La fila en edición se toma del listado vigente: así el drawer ve los cambios tras recargar.
   const editingRow = useMemo(() => listing?.rows.find((row) => `${row.employee_id}:${row.position_id}` === editingKey) ?? null, [listing, editingKey]);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -86,6 +89,8 @@ export const RhSignatureRegistryPage = () => {
     setFilters(change);
     setPage(1);
   };
+  const changeDisciplines = (values: string[]) =>
+    updateFilters((current) => ({ ...current, disciplines: values.length >= allDisciplineValues.length ? [] : values }));
   // Vacío = todos marcados en el dropdown; marcar todos vuelve a dejarlo vacío (sin filtro).
   const changeStatuses = (values: string[]) =>
     updateFilters((current) => ({ ...current, statuses: values.length >= ACTIVE_STATUSES.length ? [] : (values as SignatureRegistryStatus[]) }));
@@ -187,15 +192,16 @@ export const RhSignatureRegistryPage = () => {
                 </option>
               ))}
             </select>
-            <select value={filters.discipline} onChange={(event) => updateFilters((current) => ({ ...current, discipline: event.target.value }))} aria-label="Disciplina" className={SELECT}>
-              <option value="">Todas las disciplinas</option>
-              <option value={NO_DISCIPLINE}>Sin disciplina</option>
-              {disciplineOptions.map((discipline) => (
-                <option key={discipline.id} value={discipline.id}>
-                  {discipline.name}
-                </option>
-              ))}
-            </select>
+            <div className="w-[220px]" title="Disciplina (una o varias)">
+              <MultiSelectFilter
+                values={filters.disciplines.length > 0 ? filters.disciplines : allDisciplineValues}
+                defaultValues={allDisciplineValues}
+                options={disciplineOptions}
+                onChange={changeDisciplines}
+                allLabel="Todas las disciplinas"
+                triggerClassName={`${SELECT} w-full`}
+              />
+            </div>
             <div className="w-[220px]" title="Estado (uno o varios)">
               <MultiSelectFilter
                 values={filters.statuses.length > 0 ? filters.statuses : ACTIVE_STATUSES}
