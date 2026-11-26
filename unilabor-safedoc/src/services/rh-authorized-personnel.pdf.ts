@@ -85,7 +85,16 @@ const yesNo = (value: boolean | null): string => (value === null ? '' : value ? 
 const titleCase = (value: string | null): string =>
   value ? value.toLowerCase().replace(/(^|\s)\p{L}/gu, (letter) => letter.toUpperCase()) : '';
 
-export const buildAuthorizedPersonnelPdf = async (listing: AuthorizedPersonnelListing, generatedAt: Date): Promise<Buffer> => {
+export interface AuthorizedPersonnelPdfOptions {
+  /** Aviso impreso bajo la fecha de corte cuando el PDF no trae el listado completo. */
+  filterNote?: string;
+}
+
+export const buildAuthorizedPersonnelPdf = async (
+  listing: AuthorizedPersonnelListing,
+  generatedAt: Date,
+  options: AuthorizedPersonnelPdfOptions = {},
+): Promise<Buffer> => {
   const doc = await PDFDocument.create();
   doc.setTitle(`${AUTHORIZED_PERSONNEL_FORM.code} ${AUTHORIZED_PERSONNEL_FORM.title} - corte ${formatDate(listing.cutoff_date)}`);
   doc.setAuthor('UNILABOR · SafeDoc');
@@ -196,7 +205,15 @@ export const buildAuthorizedPersonnelPdf = async (listing: AuthorizedPersonnelLi
     cell(formatDate(listing.cutoff_date), MARGIN + labelW, y, dateW, h, { font: bold, size: 8 });
     box(MARGIN + labelW + dateW, y, CONTENT_W - labelW - dateW, h);
     cell(AUTHORIZED_PERSONNEL_FORM.statement, MARGIN + labelW + dateW, y, CONTENT_W - labelW - dateW, h, { font: italic, size: 6.5 });
-    y -= h + 8;
+    y -= h;
+    if (options.filterNote) {
+      // Extracto del listado: se declara para que nadie lo tome por el censo completo.
+      const noteH = 12;
+      box(MARGIN, y, CONTENT_W, noteH, YELLOW);
+      cell(options.filterNote, MARGIN, y, CONTENT_W, noteH, { font: bold, size: 6.5, align: 'left', maxLines: 1 });
+      y -= noteH;
+    }
+    y -= 8;
   };
 
   const drawLegends = () => {

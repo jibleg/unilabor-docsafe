@@ -49,6 +49,22 @@ export interface AuthorizedPersonnelListing {
   organizational_levels: RhOrganizationalLevel[];
 }
 
+/** Clave de fila que comparte la pantalla con el PDF filtrado. */
+export const authorizedPersonnelRowKey = (row: Pick<AuthorizedPersonnelRow, 'employee_id' | 'position_id'>): string =>
+  `${row.employee_id}:${row.position_id ?? 'none'}`;
+
+/**
+ * Deja en el listado solo las filas elegidas (las que la pantalla muestra con
+ * sus filtros), renumeradas y con el TABLERO recalculado sobre ese subconjunto.
+ */
+export const filterAuthorizedPersonnelListing = (listing: AuthorizedPersonnelListing, keys: string[]): AuthorizedPersonnelListing => {
+  const wanted = new Set(keys);
+  const rows = listing.rows
+    .filter((row) => wanted.has(authorizedPersonnelRowKey(row)))
+    .map((row, index) => ({ ...row, row_no: index + 1 }));
+  return { ...listing, rows, summary: summarizeAuthorizedPersonnel(rows) };
+};
+
 const LISTING_QUERY = `
   SELECT
     e.id AS employee_id, e.employee_code, e.full_name, bu.name AS branch_name,

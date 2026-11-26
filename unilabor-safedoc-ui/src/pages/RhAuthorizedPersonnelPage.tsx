@@ -7,10 +7,14 @@ import { AuthorizedPersonnelTable } from '../components/rh/authorized-personnel/
 import { PersonnelLevelsDrawer } from '../components/rh/authorized-personnel/PersonnelLevelsDrawer';
 import { Pagination } from '../components/Pagination';
 import type { AuthorizedPersonnelListing } from '../types/models';
+import { MultiSelectFilter } from '../components/MultiSelectFilter';
 import {
   EMPTY_AUTHORIZED_FILTERS,
   QUICK_FILTERS,
+  describeFilters,
   filterAuthorizedPersonnel,
+  filterableAuthorizationLevels,
+  hasActiveFilters,
   uniqueValues,
   type AuthorizedPersonnelFilters,
 } from '../utils/authorizedPersonnel';
@@ -56,6 +60,12 @@ export const RhAuthorizedPersonnelPage = () => {
   const rows = useMemo(() => (listing ? filterAuthorizedPersonnel(listing, filters) : []), [listing, filters]);
   const branches = useMemo(() => uniqueValues(listing?.rows.map((row) => row.branch_name) ?? []), [listing]);
   const areas = useMemo(() => uniqueValues(listing?.rows.map((row) => row.area_name) ?? []), [listing]);
+  // Opciones del filtro por nivel: el id va como texto porque el dropdown trabaja con strings.
+  const levelOptions = useMemo(
+    () => (listing ? filterableAuthorizationLevels(listing) : []).map((level) => ({ value: String(level.id), label: `${level.level_no} · ${level.name}` })),
+    [listing],
+  );
+  const allLevelValues = useMemo(() => levelOptions.map((option) => option.value), [levelOptions]);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   // Si el filtro o una recarga dejan menos páginas, se muestra la última que exista.
   const currentPage = Math.min(page, totalPages);
@@ -64,12 +74,17 @@ export const RhAuthorizedPersonnelPage = () => {
     setFilters(change);
     setPage(1);
   };
-  const filtered = filters.search || filters.branch || filters.area || filters.focus !== 'ALL';
+  const filtered = hasActiveFilters(filters);
+  // Vacio = todos marcados en el dropdown; marcar todos vuelve a dejarlo vacio (sin filtro).
+  const changeLevels = (values: string[]) =>
+    updateFilters((current) => ({ ...current, levelIds: values.length >= allLevelValues.length ? [] : values.map(Number) }));
 
+  // El PDF lleva exactamente las filas de la tabla (todas sus páginas), con los filtros impresos.
   const openPdf = async () => {
+    if (!listing) return;
     setExporting(true);
     try {
-      window.open(await getAuthorizedPersonnelPdfUrl(), '_blank', 'noopener');
+      window.open(await getAuthorizedPersonnelPdfUrl(rows, filtered ? describeFilters(filters, listing.authorization_levels) : ''), '_blank', 'noopener');
     } catch (error) {
       notifyError(getApiErrorMessage(error, 'No se pudo generar el PDF del listado.'));
     } finally {
@@ -97,7 +112,13 @@ export const RhAuthorizedPersonnelPage = () => {
               <Settings2 size={15} /> Catálogos
             </button>
           ) : null}
-          <button type="button" onClick={() => void openPdf()} disabled={exporting || !listing} className={BUTTON} title="Generar el PDF con el formato REH-REG-026">
+          <button
+            type="button"
+            onClick={() => void openPdf()}
+            disabled={exporting || !listing || rows.length === 0}
+            className={BUTTON}
+            title={filtered ? `PDF REH-REG-026 con las ${rows.length} filas de la tabla (extracto)` : 'PDF REH-REG-026 con el listado completo'}
+          >
             {exporting ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />} PDF
           </button>
           <button type="button" onClick={() => void load()} className={BUTTON} title="Actualizar" aria-label="Actualizar">
@@ -141,6 +162,18 @@ export const RhAuthorizedPersonnelPage = () => {
                 </option>
               ))}
             </select>
+            {levelOptions.length > 0 ? (
+              <div className="w-[230px]" title="Nivel de autorización (uno o varios)">
+                <MultiSelectFilter
+                  values={filters.levelIds.length > 0 ? filters.levelIds.map(String) : allLevelValues}
+                  defaultValues={allLevelValues}
+                  options={levelOptions}
+                  onChange={changeLevels}
+                  allLabel="Todos los niveles"
+                  triggerClassName={`${SELECT} w-full`}
+                />
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => updateFilters(() => EMPTY_AUTHORIZED_FILTERS)}
@@ -187,7 +220,11 @@ export const RhAuthorizedPersonnelPage = () => {
               }}
             />
           ) : null}
-          <p className="text-[11px] text-[var(--unilabor-neutral)]">El PDF incluye siempre el listado completo, sin los filtros de pantalla.</p>
+          <p className="text-[11px] text-[var(--unilabor-neutral)]">
+            {filtered
+              ? `El PDF saldrá con las ${rows.length} filas de la tabla y la leyenda de extracto con los filtros aplicados.`
+              : 'El PDF incluye el listado completo; si filtras la tabla, saldrá solo lo que ves.'}
+          </p>
         </>
       ) : null}
 

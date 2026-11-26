@@ -18,7 +18,12 @@ interface MultiSelectFilterProps {
   /** Texto del disparador cuando todas las opciones estan marcadas. */
   allLabel?: string;
   disabled?: boolean;
+  /** Clases visuales del disparador; sustituyen a las predeterminadas para igualar los filtros vecinos. */
+  triggerClassName?: string;
 }
+
+const DEFAULT_TRIGGER_CLASS =
+  'w-full rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)] disabled:opacity-60';
 
 /**
  * Dropdown de seleccion multiple con casillas (mismo patron de SearchableSelect:
@@ -33,6 +38,7 @@ export const MultiSelectFilter = ({
   defaultValues,
   allLabel = 'Todos',
   disabled = false,
+  triggerClassName = DEFAULT_TRIGGER_CLASS,
 }: MultiSelectFilterProps) => {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
@@ -115,7 +121,7 @@ export const MultiSelectFilter = ({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-xl border border-[rgba(0,65,106,0.12)] bg-[rgba(248,251,253,0.95)] px-3 py-2.5 text-left text-sm text-[var(--unilabor-ink)] outline-none transition focus:border-[var(--color-brand-300)] focus:ring-2 focus:ring-[rgba(124,173,211,0.2)] disabled:opacity-60"
+        className={`flex items-center justify-between gap-2 text-left ${triggerClassName}`}
       >
         <span className="inline-flex min-w-0 items-center gap-2">
           <ListChecks size={15} className="shrink-0 text-[var(--color-brand-500)]" />

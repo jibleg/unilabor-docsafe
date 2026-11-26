@@ -1,4 +1,4 @@
-import type { AuthorizedPersonnelAlert, AuthorizedPersonnelListing, AuthorizedPersonnelRow } from '../types/models';
+import type { AuthorizedPersonnelAlert, AuthorizedPersonnelListing, AuthorizedPersonnelRow, RhAuthorizationLevel } from '../types/models';
 
 /** Filtros del Listado de personal autorizado (se aplican en el cliente). */
 export interface AuthorizedPersonnelFilters {
@@ -6,6 +6,8 @@ export interface AuthorizedPersonnelFilters {
   branch: string;
   area: string;
   focus: AuthorizedPersonnelFocus;
+  /** Niveles de autorizacion (ids del catalogo) a mostrar; vacio = todos. */
+  levelIds: number[];
 }
 
 /** Enfoques del tablero: cada renglón del TABLERO del formato filtra la tabla. */
@@ -23,7 +25,40 @@ export type AuthorizedPersonnelFocus =
   | 'RECENT'
   | 'EXPIRING_30';
 
-export const EMPTY_AUTHORIZED_FILTERS: AuthorizedPersonnelFilters = { search: '', branch: '', area: '', focus: 'ALL' };
+export const EMPTY_AUTHORIZED_FILTERS: AuthorizedPersonnelFilters = { search: '', branch: '', area: '', focus: 'ALL', levelIds: [] };
+
+export const hasActiveFilters = (filters: AuthorizedPersonnelFilters): boolean =>
+  Boolean(filters.search || filters.branch || filters.area || filters.focus !== 'ALL' || filters.levelIds.length > 0);
+
+/** Texto corto de los filtros aplicados, para imprimirlo en el PDF como aviso de extracto. */
+export const describeFilters = (filters: AuthorizedPersonnelFilters, levels: RhAuthorizationLevel[]): string => {
+  const parts: string[] = [];
+  if (filters.branch) parts.push(`Sede ${filters.branch}`);
+  if (filters.area) parts.push(`Área ${filters.area}`);
+  if (filters.focus !== 'ALL') parts.push(QUICK_FILTERS.find((quick) => quick.focus === filters.focus)?.label ?? FOCUS_LABELS[filters.focus]);
+  if (filters.levelIds.length > 0) {
+    const names = levels.filter((level) => filters.levelIds.includes(level.id)).map((level) => `${level.level_no} ${level.name}`);
+    parts.push(`Nivel ${names.join(' / ')}`);
+  }
+  if (filters.search.trim()) parts.push(`Búsqueda "${filters.search.trim()}"`);
+  return parts.join(' · ');
+};
+
+/** Etiquetas de los enfoques del TABLERO que no tienen botón de búsqueda rápida. */
+const FOCUS_LABELS: Record<AuthorizedPersonnelFocus, string> = {
+  ALL: '',
+  COMPETENT: 'Competentes',
+  AUTHORIZED: 'Autorizados',
+  AUTHORIZED_NOT_COMPETENT: 'Autorizados sin ser competentes',
+  WITHOUT_DATE: 'Sin fecha de última evaluación',
+  EXPIRED: 'Vencidos',
+  EXPIRING: 'Por vencer',
+  RELEASE_LEVEL: 'Nivel 4 · liberan informes',
+  PENDING: 'En proceso',
+  VALID: 'Vigentes',
+  RECENT: 'Autorizados recientemente',
+  EXPIRING_30: 'Por vencer < 1 mes',
+};
 
 /** En proceso: la evaluación del puesto está en captura / firma o espera la autorización. */
 const PENDING_ALERTS: AuthorizedPersonnelAlert[] = ['PENDIENTE_AUTORIZACION', 'EN_CAPTURA'];
@@ -77,13 +112,24 @@ const normalize = (value: string): string => value.normalize('NFD').replace(/[̀
 
 export const filterAuthorizedPersonnel = (listing: AuthorizedPersonnelListing, filters: AuthorizedPersonnelFilters): AuthorizedPersonnelRow[] => {
   const needle = normalize(filters.search.trim());
+  const levelIds = new Set(filters.levelIds);
   return listing.rows.filter(
     (row) =>
       (!filters.branch || row.branch_name === filters.branch) &&
       (!filters.area || row.area_name === filters.area) &&
+      (levelIds.size === 0 || (row.authorization_level_id !== null && levelIds.has(row.authorization_level_id))) &&
       matchesFocus(row, filters.focus, listing.cutoff_date) &&
       (!needle || normalize(`${row.full_name} ${row.position_name ?? ''} ${row.position_code ?? ''} ${row.employee_code}`).includes(needle)),
   );
+};
+
+/**
+ * Niveles que se ofrecen en el filtro: los activos del catalogo y los inactivos
+ * que alguna fila todavia tenga asignados (para que esas filas sigan filtrables).
+ */
+export const filterableAuthorizationLevels = (listing: AuthorizedPersonnelListing): RhAuthorizationLevel[] => {
+  const inUse = new Set(listing.rows.map((row) => row.authorization_level_id));
+  return listing.authorization_levels.filter((level) => level.is_active || inUse.has(level.id)).sort((a, b) => a.level_no - b.level_no);
 };
 
 export const uniqueValues = (values: Array<string | null>): string[] =>

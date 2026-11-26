@@ -1,6 +1,6 @@
 import api from './axios';
 import { asRecord, unwrapPayload } from './service.shared';
-import type { AuthorizedPersonnelListing, RhAuthorizationLevel, RhOrganizationalLevel } from '../types/models';
+import type { AuthorizedPersonnelListing, AuthorizedPersonnelRow, RhAuthorizationLevel, RhOrganizationalLevel } from '../types/models';
 
 /** API del Listado de personal autorizado (REH-REG-026) y sus catálogos. */
 
@@ -9,9 +9,20 @@ export const getAuthorizedPersonnel = async (): Promise<AuthorizedPersonnelListi
   return unwrapPayload(response.data) as AuthorizedPersonnelListing;
 };
 
-/** PDF del listado con el formato controlado, como URL de blob. */
-export const getAuthorizedPersonnelPdfUrl = async (): Promise<string> => {
-  const response = await api.get('/rh/authorized-personnel/pdf', { responseType: 'blob' });
+/** Clave de fila que comparte la tabla con el PDF: `empleado:puesto`. */
+export const authorizedPersonnelRowKey = (row: Pick<AuthorizedPersonnelRow, 'employee_id' | 'position_id'>): string =>
+  `${row.employee_id}:${row.position_id ?? 'none'}`;
+
+/**
+ * PDF del listado con el formato controlado, como URL de blob. Lleva las filas
+ * que muestra la tabla (con sus filtros) y la descripcion de esos filtros.
+ */
+export const getAuthorizedPersonnelPdfUrl = async (rows: AuthorizedPersonnelRow[], filterLabel: string): Promise<string> => {
+  const response = await api.post(
+    '/rh/authorized-personnel/pdf',
+    { keys: rows.map(authorizedPersonnelRowKey), ...(filterLabel ? { filter_label: filterLabel } : {}) },
+    { responseType: 'blob' },
+  );
   return URL.createObjectURL(response.data as Blob);
 };
 

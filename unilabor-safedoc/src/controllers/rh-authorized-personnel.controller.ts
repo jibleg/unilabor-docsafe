@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 import type { AuthRequest } from '../types';
 import { registerAuditEvent } from '../services/audit.service';
-import { getAuthorizedPersonnelListing } from '../services/rh-authorized-personnel.service';
+import { filterAuthorizedPersonnelListing, getAuthorizedPersonnelListing } from '../services/rh-authorized-personnel.service';
 import { AUTHORIZED_PERSONNEL_FORM, buildAuthorizedPersonnelPdf } from '../services/rh-authorized-personnel.pdf';
 import { setEvaluationAuthorizationLevel } from '../services/rh-competency-authorization.service';
 import {
@@ -12,7 +12,7 @@ import {
   updateAuthorizationLevel,
   updateOrganizationalLevel,
 } from '../services/rh-personnel-levels.service';
-import { levelParamsSchema } from '../schemas/rh-authorized-personnel.schema';
+import { levelParamsSchema, type AuthorizedPersonnelPdfInput } from '../schemas/rh-authorized-personnel.schema';
 
 /** Controladores del Listado de personal autorizado (REH-REG-026) y sus catalogos. */
 
@@ -55,12 +55,22 @@ export const getAuthorizedPersonnelController = async (_req: AuthRequest, res: R
   }
 };
 
+/**
+ * PDF del REH-REG-026 con las filas que muestra la pantalla (sus filtros).
+ * Sin claves sale el listado completo; con claves se imprime el aviso de extracto.
+ */
 export const getAuthorizedPersonnelPdfController = async (req: AuthRequest, res: Response) => {
+  const body = req.body as AuthorizedPersonnelPdfInput;
   try {
     const now = new Date();
-    const listing = await getAuthorizedPersonnelListing(now);
-    const pdf = await buildAuthorizedPersonnelPdf(listing, now);
-    await audit(req, `RH_AUTHORIZED_PERSONNEL_PDF:${listing.cutoff_date}:${listing.rows.length}`, 'authorized_personnel', null);
+    const full = await getAuthorizedPersonnelListing(now);
+    const listing = body.keys ? filterAuthorizedPersonnelListing(full, body.keys) : full;
+    const partial = listing.rows.length !== full.rows.length;
+    const filterNote = partial
+      ? `EXTRACTO: ${listing.rows.length} de ${full.rows.length} filas del listado${body.filter_label ? ` · Filtros: ${body.filter_label}` : ''}`
+      : undefined;
+    const pdf = await buildAuthorizedPersonnelPdf(listing, now, filterNote ? { filterNote } : {});
+    await audit(req, `RH_AUTHORIZED_PERSONNEL_PDF:${listing.cutoff_date}:${listing.rows.length}/${full.rows.length}`, 'authorized_personnel', null);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${AUTHORIZED_PERSONNEL_FORM.code}_Listado_personal_autorizado_${listing.cutoff_date}.pdf"`);
     res.setHeader('Cache-Control', 'no-store');

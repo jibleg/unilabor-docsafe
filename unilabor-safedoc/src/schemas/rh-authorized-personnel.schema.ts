@@ -20,3 +20,15 @@ export const authorizationLevelSchema = z.object({
 export type AuthorizationLevelInput = z.infer<typeof authorizationLevelSchema>;
 
 export const levelParamsSchema = z.object({ id: z.coerce.number().int().positive() });
+
+/**
+ * PDF del listado con las filas que muestra la pantalla. Cada clave es
+ * `empleado:puesto` (`none` cuando el colaborador no tiene puesto). Sin claves
+ * sale el listado completo.
+ */
+export const authorizedPersonnelPdfSchema = z.object({
+  keys: z.array(z.string().regex(/^\d+:(\d+|none)$/, 'Clave de fila invalida')).max(5000).optional(),
+  /** Descripcion de los filtros aplicados, para dejarla impresa en el PDF. */
+  filter_label: z.string().trim().max(300, 'La descripcion del filtro es demasiado larga').optional(),
+});
+export type AuthorizedPersonnelPdfInput = z.infer<typeof authorizedPersonnelPdfSchema>;

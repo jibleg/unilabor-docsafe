@@ -12,7 +12,7 @@ import {
 } from '../controllers/rh-authorized-personnel.controller';
 import { requirePermission, verifyToken } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { authorizationLevelSchema, organizationalLevelSchema } from '../schemas/rh-authorized-personnel.schema';
+import { authorizationLevelSchema, authorizedPersonnelPdfSchema, organizationalLevelSchema } from '../schemas/rh-authorized-personnel.schema';
 import { setCompetencyAuthorizationLevelSchema } from '../schemas/rh-competency-evaluation.schema';
 
 /**
@@ -27,7 +27,13 @@ router.use(verifyToken);
 const READ_CATALOGS = ['RH.COMPETENCY.MANAGE', 'RH.INDUCTION.MANAGE'];
 
 router.get('/authorized-personnel', requirePermission('RH.COMPETENCY.MANAGE'), getAuthorizedPersonnelController);
-router.get('/authorized-personnel/pdf', requirePermission('RH.COMPETENCY.MANAGE'), getAuthorizedPersonnelPdfController);
+// POST: recibe las claves de las filas que muestra la pantalla (sin claves = listado completo).
+router.post(
+  '/authorized-personnel/pdf',
+  requirePermission('RH.COMPETENCY.MANAGE'),
+  validate(authorizedPersonnelPdfSchema),
+  getAuthorizedPersonnelPdfController,
+);
 router.put(
   '/authorized-personnel/evaluations/:id/authorization-level',
   requirePermission('RH.COMPETENCY.AUTHORIZE'),
